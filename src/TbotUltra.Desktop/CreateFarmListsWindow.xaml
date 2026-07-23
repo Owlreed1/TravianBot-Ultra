@@ -138,6 +138,9 @@
                         Content="Create farmlists"
                         MinWidth="150"
                         Margin="0,0,8,0"
+                        Background="{DynamicResource SuccessBgBrush}"
+                        BorderBrush="{DynamicResource SuccessBorderBrush}"
+                        Foreground="{DynamicResource SuccessTextBrush}"
                         Click="CreateButton_Click" />
                 <Button Content="Cancel"
                         Width="100"

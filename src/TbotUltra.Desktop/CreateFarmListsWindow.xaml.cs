@@ -22,6 +22,10 @@ public partial class CreateFarmListsWindow : Window
     private readonly CancellationTokenSource _runCts;
     private readonly ObservableCollection<FarmListNameEntry> _listNameEntries = [];
 
+    // Tribe used for the troop catalog only when the selected village's own tribe is unknown, so a
+    // multi-tribe account never falls back to the generic troop list when a real tribe is available.
+    private readonly string _fallbackTribe;
+
     public FarmListCreateBatchResult? RunResult { get; private set; }
 
     public CreateFarmListsWindow(
@@ -43,11 +47,11 @@ public partial class CreateFarmListsWindow : Window
         ListCountComboBox.ItemsSource = Enumerable.Range(1, 100);
         ListCountComboBox.SelectedItem = 1;
         SyncListNameFields();
+        _fallbackTribe = tribe;
         VillageComboBox.ItemsSource = villages;
         VillageComboBox.SelectedItem = villages.FirstOrDefault(village => village.IsCapital)
                                        ?? villages.FirstOrDefault();
-        TroopTypeComboBox.ItemsSource = TroopCatalog.ResolveTroopTypesForTribe(tribe);
-        TroopTypeComboBox.SelectedIndex = TroopTypeComboBox.Items.Count > 0 ? 0 : -1;
+        ApplyTroopTypesForSelectedVillage();
         RefreshState();
     }
 
@@ -70,7 +74,29 @@ public partial class CreateFarmListsWindow : Window
             SyncListNameFields();
         }
 
+        // Each village can be a different tribe on multi-tribe servers, so refresh the troop catalog to
+        // match the newly selected village rather than the village the program happens to stand in.
+        if (ReferenceEquals(sender, VillageComboBox))
+        {
+            ApplyTroopTypesForSelectedVillage();
+        }
+
         RefreshState();
+    }
+
+    // Points the default troop-type list at the selected village's tribe catalog. Falls back to the
+    // tribe passed in at construction only when the village's own tribe is still unknown.
+    private void ApplyTroopTypesForSelectedVillage()
+    {
+        if (TroopTypeComboBox is null)
+        {
+            return;
+        }
+
+        var selectedTribe = (VillageComboBox?.SelectedItem as VillageSelectionItem)?.Tribe;
+        var tribe = TroopCatalog.IsKnownTribe(selectedTribe) ? selectedTribe : _fallbackTribe;
+        TroopTypeComboBox.ItemsSource = TroopCatalog.ResolveTroopTypesForTribe(tribe);
+        TroopTypeComboBox.SelectedIndex = TroopTypeComboBox.Items.Count > 0 ? 0 : -1;
     }
 
     private async void CreateButton_Click(object sender, RoutedEventArgs e)

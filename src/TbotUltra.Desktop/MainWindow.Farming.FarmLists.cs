@@ -784,6 +784,18 @@ public partial class MainWindow
             }
 
             await RefreshFarmListsFromServerAsync(options, operationToken);
+
+            var createdCount = dialog.RunResult.CreatedCount;
+            AppDialog.ShowCustom(
+                this,
+                $"{createdCount} farmlist{(createdCount == 1 ? " was" : "s were")} created.",
+                "Create farmlists complete",
+                [("OK", MessageBoxResult.OK)],
+                MessageBoxImage.Information,
+                defaultResult: MessageBoxResult.OK,
+                cancelResult: MessageBoxResult.OK,
+                successResult: MessageBoxResult.OK);
+
             CompleteOperation(
                 operationId,
                 operationSw,

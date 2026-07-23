@@ -18,7 +18,6 @@ public partial class TravcoToolsWindow : Window
     private bool _allowClose;
     private bool _closeInProgress;
     private bool _busy;
-    private bool _travcoReady;
     private bool _editMode;
 
     public Func<TravcoSearchRequest, IProgress<TravcoSearchProgress>, CancellationToken, Task<TravcoScrapeResult>>? SearchRequested { get; init; }
@@ -64,150 +63,29 @@ public partial class TravcoToolsWindow : Window
 
     private void InactiveSearchButton_Click(object sender, RoutedEventArgs e)
     {
-        _ = RunSearchAsync();
-    }
-
-    private async Task RunSearchAsync()
-    {
-        if (_busy || SearchRequested is null)
+        if (_busy || SearchRequested is null || ScrapeAllPagesRequested is null)
         {
             return;
         }
 
-        SetBusy(true);
-        var village = _viewModel.SelectedVillage;
-        if (village?.CoordX is null || village.CoordY is null)
+        // The whole analyze + save-all workflow lives in its own popup. Open it empty; the user picks the
+        // village/inactivity there, analyzes, and saves. On return, refresh the saved-list panel.
+        var analyze = new TravcoAnalyzeWindow(
+            _store,
+            _viewModel.Villages.ToList(),
+            _viewModel.SelectedVillage,
+            SearchRequested,
+            ScrapeAllPagesRequested,
+            _log,
+            _windowCts.Token)
         {
-            SetStatus("Select a village with coordinates.");
-            SetBusy(false);
-            return;
-        }
-
-        if (!int.TryParse(_viewModel.DaysInactiveText, out var daysInactive)
-            || daysInactive is < 1 or > 7)
+            Owner = this,
+        };
+        analyze.ShowDialog();
+        if (analyze.ListSaved)
         {
-            SetStatus("Active days must be a whole number between 1 and 7.");
-            SetBusy(false);
-            return;
-        }
-
-        var request = new TravcoSearchRequest(
-            village.CoordX.Value,
-            village.CoordY.Value,
-            daysInactive,
-            _viewModel.SelectedOrderBy);
-        SetStatus(
-            $"Analyzing Travco for {village.NameWithCoords}, {daysInactive} active day(s), order {_viewModel.SelectedOrderBy}.");
-        BusyOverlay.Show("Analyze Travco", "0% complete\nWaiting for the browser session...");
-        BusyOverlay.IsIndeterminate = false;
-        BusyOverlay.ProgressValue = 0;
-        try
-        {
-            var progress = new Progress<TravcoSearchProgress>(value =>
-            {
-                var total = Math.Max(1, value.TotalSteps);
-                var completed = Math.Clamp(value.CompletedSteps, 0, total);
-                var percent = (double)completed / total * 100;
-                BusyOverlay.ProgressValue = percent;
-                BusyOverlay.Text = $"{percent:0}% complete\n{value.Status}\nStep {completed}/{total}";
-            });
-            var result = await SearchRequested(request, progress, _windowCts.Token);
-            _travcoReady = true;
-            SetEditMode(false);
-            _openedSavedListId = null;
-            ApplyRows(result.Rows.Select(TravcoListRow.FromWorker));
-            _viewModel.ListName = $"Travco page {result.PageNumber}";
-            _viewModel.SelectedSavedList = null;
-            SetStatus(result.Rows.Count == 0
-                ? $"Travco search finished: {result.TotalPages} page(s) found, current page has no matching villages."
-                : $"Travco search finished: {result.TotalPages} page(s) found, page {result.PageNumber} has {result.Rows.Count} village(s).");
-        }
-        catch (OperationCanceledException)
-        {
-            SetStatus("Travco search canceled.");
-        }
-        catch (Exception ex)
-        {
-            SetStatus($"Travco search failed: {ex.Message}");
-        }
-        finally
-        {
-            BusyOverlay.Hide();
-            SetBusy(false);
-        }
-    }
-
-    private void SaveAllPagesButton_Click(object sender, RoutedEventArgs e)
-    {
-        _ = SaveAllPagesAsync();
-    }
-
-    private async Task SaveAllPagesAsync()
-    {
-        if (_busy || !_travcoReady || ScrapeAllPagesRequested is null)
-        {
-            return;
-        }
-
-        var confirm = AppDialog.ShowCustom(
-            this,
-            "Read every Travco result page and save all rows in one list?",
-            "Save all Travco pages",
-            [("Yes", MessageBoxResult.Yes), ("No", MessageBoxResult.No)],
-            MessageBoxImage.Question,
-            MessageBoxResult.No,
-            MessageBoxResult.No);
-        if (confirm != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        SetBusy(true);
-        using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(_windowCts.Token);
-        _activeOperationCts = operationCts;
-        BusyOverlay.ShowCancel = true;
-        BusyOverlay.Show("Save all Travco pages", "Preparing page collection...");
-        BusyOverlay.IsIndeterminate = false;
-        BusyOverlay.ProgressValue = 0;
-        try
-        {
-            SetStatus("Reading all Travco result pages.");
-            var progress = new Progress<(int CurrentPage, int TotalPages)>(value =>
-            {
-                var total = Math.Max(1, value.TotalPages);
-                var current = Math.Clamp(value.CurrentPage, 0, total);
-                var percent = (double)current / total * 100;
-                BusyOverlay.ProgressValue = percent;
-                BusyOverlay.Text =
-                    $"{percent:0}% complete\n" +
-                    $"Page {current}/{total} - {total - current} remaining";
-            });
-            var result = await ScrapeAllPagesRequested(progress, operationCts.Token);
-            SetEditMode(false);
-            ApplyRows(result.Rows.Select(TravcoListRow.FromWorker));
-            var name = _viewModel.ListName.StartsWith("Travco page ", StringComparison.OrdinalIgnoreCase)
-                ? "Travco all pages"
-                : _viewModel.ListName;
-            // Never overwrite/duplicate an existing list: append " 1", " 2", ... until the name is free.
-            name = MakeUniqueListName(name);
-            _viewModel.ListName = name;
-            SaveCurrentRows(name);
-            SetStatus($"Saved all {result.TotalPages} page(s) as one list with {result.Rows.Count} row(s).");
-        }
-        catch (OperationCanceledException)
-        {
-            SetStatus("Saving all Travco pages was canceled.");
-        }
-        catch (Exception ex)
-        {
-            SetStatus($"Could not save all Travco pages: {ex.Message}");
-        }
-        finally
-        {
-            _activeOperationCts = null;
-            BusyOverlay.ShowCancel = false;
-            BusyOverlay.Hide();
-            SetBusy(false);
+            ReloadSavedLists();
+            SetStatus("Saved list updated from Analyze Travco.");
         }
     }
 
@@ -347,7 +225,6 @@ public partial class TravcoToolsWindow : Window
 
             SetEditMode(false);
             _openedSavedListId = null;
-            _travcoReady = false;
             ApplyRows(oases.Select(OasisToRow));
             var name = OasisListNaming.CreateName(
                 OasisListNaming.TypeOrder,
@@ -744,7 +621,6 @@ public partial class TravcoToolsWindow : Window
         InactiveSearchButton.IsEnabled = !busy;
         AnalyzeMapOasisButton.IsEnabled = !busy;
         CalculateDistanceButton.IsEnabled = !busy;
-        SaveAllPagesButton.IsEnabled = !busy && _travcoReady;
         SavedListsListBox.IsEnabled = !busy;
         ResultsDataGrid.IsEnabled = !busy;
         SaveEditedListButton.IsEnabled = !busy && _editMode;
@@ -772,5 +648,7 @@ public partial class TravcoToolsWindow : Window
         _editMode = editing;
         UseColumn.IsReadOnly = !editing;
         SaveEditedListButton.IsEnabled = !_busy && editing;
+        // The rename field only makes sense while editing a saved list; hide it otherwise.
+        EditNamePanel.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
     }
 }

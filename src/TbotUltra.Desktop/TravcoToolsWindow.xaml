@@ -17,98 +17,33 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0" HorizontalAlignment="Left">
-                    <Button x:Name="InactiveSearchButton"
-                            MinWidth="175"
-                            HorizontalAlignment="Left"
-                            Content="1. Analyze Travco"
-                            Background="{DynamicResource SuccessBgBrush}"
-                            BorderBrush="{DynamicResource SuccessBorderBrush}"
-                            Foreground="{DynamicResource SuccessTextBrush}"
-                            Click="InactiveSearchButton_Click" />
-                    <Button x:Name="SaveAllPagesButton"
-                            Margin="0,8,0,0"
-                            MinWidth="175"
-                            HorizontalAlignment="Left"
-                            Content="2. Save all pages as list"
-                            Click="SaveAllPagesButton_Click" />
-                    <Button x:Name="CalculateDistanceButton"
-                            Margin="0,28,0,0"
-                            MinWidth="175"
-                            HorizontalAlignment="Left"
-                            Content="Calculate distance"
-                            Click="CalculateDistanceButton_Click" />
-                </StackPanel>
-
-                <StackPanel Grid.Column="2">
-                    <Border HorizontalAlignment="Right"
-                            Margin="0,0,0,10"
-                            Background="{DynamicResource SurfaceBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Padding="8">
-                        <Button x:Name="AnalyzeMapOasisButton"
-                                Content="Analyze map oasis"
-                                MinWidth="150"
-                                Background="{DynamicResource SuccessBgBrush}"
-                                BorderBrush="{DynamicResource SuccessBorderBrush}"
-                                Foreground="{DynamicResource SuccessTextBrush}"
-                                Click="AnalyzeMapOasisButton_Click" />
-                    </Border>
-                    <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="180" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="90" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="130" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="0" Text="Village" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,4" />
-                    <TextBlock Grid.Column="2" Text="Active days" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,4" />
-                    <TextBlock Grid.Column="4" Text="Order by" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,4" />
-                    <TextBlock Grid.Column="6" Text="List name" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,4" />
-
-                    <ComboBox Grid.Row="1"
-                              Grid.Column="0"
-                              ItemsSource="{Binding Villages}"
-                              SelectedItem="{Binding SelectedVillage}"
-                              DisplayMemberPath="NameWithCoords" />
-                    <TextBox Grid.Row="1"
-                             Grid.Column="2"
-                             VerticalContentAlignment="Center"
-                             Text="{Binding DaysInactiveText, UpdateSourceTrigger=PropertyChanged}" />
-                    <ComboBox Grid.Row="1"
-                              Grid.Column="4"
-                              ItemsSource="{Binding OrderByOptions}"
-                              SelectedValue="{Binding SelectedOrderBy}"
-                              SelectedValuePath="Value"
-                              DisplayMemberPath="Label" />
-                    <TextBox x:Name="ListNameTextBox"
-                             Grid.Row="1"
-                             Grid.Column="6"
-                             MinWidth="220"
-                             MaxWidth="420"
-                             HorizontalAlignment="Left"
-                             VerticalContentAlignment="Center"
-                             Text="{Binding ListName, UpdateSourceTrigger=PropertyChanged}" />
-                    </Grid>
-                </StackPanel>
-            </Grid>
+            <StackPanel Grid.Row="0" Margin="0,0,0,12" HorizontalAlignment="Left">
+                <Button x:Name="InactiveSearchButton"
+                        MinWidth="175"
+                        HorizontalAlignment="Left"
+                        Content="Analyze Travco"
+                        FontWeight="SemiBold"
+                        Background="{DynamicResource SuccessBgBrush}"
+                        BorderBrush="{DynamicResource SuccessBorderBrush}"
+                        Foreground="{DynamicResource SuccessTextBrush}"
+                        Click="InactiveSearchButton_Click" />
+                <Button x:Name="AnalyzeMapOasisButton"
+                        Margin="0,8,0,0"
+                        MinWidth="175"
+                        HorizontalAlignment="Left"
+                        Content="Analyze map oasis"
+                        FontWeight="SemiBold"
+                        Background="{DynamicResource InfoBgBrush}"
+                        BorderBrush="{DynamicResource FocusBorderBrush}"
+                        Foreground="{DynamicResource InfoTextBrush}"
+                        Click="AnalyzeMapOasisButton_Click" />
+                <Button x:Name="CalculateDistanceButton"
+                        Margin="0,28,0,0"
+                        MinWidth="175"
+                        HorizontalAlignment="Left"
+                        Content="Calculate distance"
+                        Click="CalculateDistanceButton_Click" />
+            </StackPanel>
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
@@ -127,6 +62,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock Text="Saved lists"
@@ -150,7 +86,18 @@
                                 <DataGridTextColumn Header="Villages" Width="75" Binding="{Binding VillageCount}" />
                             </DataGrid.Columns>
                         </DataGrid>
-                        <Grid Grid.Row="2" Margin="0,10,0,0">
+                        <StackPanel x:Name="EditNamePanel"
+                                    Grid.Row="2"
+                                    Visibility="Collapsed"
+                                    Margin="0,10,0,0">
+                            <TextBlock Text="List name"
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       Margin="0,0,0,4" />
+                            <TextBox x:Name="ListNameTextBox"
+                                     VerticalContentAlignment="Center"
+                                     Text="{Binding ListName, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                        <Grid Grid.Row="3" Margin="0,10,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />

@@ -242,8 +242,8 @@ public sealed partial class TravianClient
                 }
                 else
                 {
-                    // Non-selected units are just reset to 0 — a plain fill is fine (nothing to "type").
-                    await input.FillAsync("0").WaitAsync(cancellationToken);
+                    // Leave non-selected units blank (not 0) so only the chosen troop carries a default.
+                    await input.FillAsync(string.Empty).WaitAsync(cancellationToken);
                 }
             }
         }
