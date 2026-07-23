@@ -376,6 +376,14 @@ public sealed partial class TravianClient
                 active.blur();
               }
 
+              // Neutralise any previous target's resolved state so the post-coordinate wait reacts only to
+              // the NEW lookup: disable Save and clear the stale error. Travian re-enables Save / re-flags
+              // the error once its async lookup resolves for the freshly entered coordinates.
+              const staleSave = form.querySelector('button.save, button[type="submit"]');
+              if (staleSave) staleSave.disabled = true;
+              const staleWrapper = form.querySelector('.targetSelectionResultWrapper');
+              if (staleWrapper) staleWrapper.classList.remove('hasError');
+
               const clickTarget = form.querySelector(
                 '.targetSelection, .targetSelectionResultWrapper, .troopSelection, .actionButtons')
                 || form;
@@ -392,10 +400,13 @@ public sealed partial class TravianClient
         }
 
         Notify($"[farm-list] Add target validation triggered after coordinates for ({x}|{y}) in '{farmListName}'.");
-        // Functional wait (not just pacing): after the coordinates are entered Travian runs an async
-        // lookup that loads the target's village name / owner. Without this pause the form is read before
-        // that lookup resolves, so every target wrongly comes back as "no village at these coordinates".
-        await DelayBeforeClickAsync(cancellationToken, "add farm: load target data");
+        // Functional wait (not pacing): after the coordinates are entered Travian runs an async lookup that
+        // loads the target's village/owner, briefly showing "no village" before it resolves. Proceed as soon
+        // as that lookup resolves (Save re-enabled = valid target, or the error persists = truly no village)
+        // instead of blocking on the full click-pacing, so a high click-pacing setting no longer slows every
+        // add. A short settle lets the lookup start after the state was neutralised above.
+        await Task.Delay(Random.Shared.Next(200, 350), cancellationToken);
+        await WaitForAddTargetLookupResolvedAsync(cancellationToken);
 
         if (!useDefaultTroops)
         {
@@ -576,6 +587,60 @@ public sealed partial class TravianClient
 
         Notify($"[farm-list] Add target save ended in unexpected state '{saveState}' for ({x}|{y}) in '{farmListName}'.");
         return AddRaidSaveOutcome.Failed;
+    }
+
+    // Waits for Travian's async Add-target lookup to resolve after the coordinates were entered. Returns as
+    // soon as a valid target is loaded (Save re-enabled without an error) or the error state has persisted
+    // long enough to be a real "no village" result rather than the transient pre-lookup flash. Event-driven,
+    // so it never blocks on the configured click-pacing; bounded by a timeout after which the caller's own
+    // Save-ready check (WaitForFunctionAsync below) and invalid-coordinate probe make the final decision.
+    private async Task WaitForAddTargetLookupResolvedAsync(CancellationToken cancellationToken)
+    {
+        const int timeoutMs = 5000;
+        const int pollIntervalMs = 60;
+        var stableError = TimeSpan.FromMilliseconds(300);
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        DateTime? errorSince = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var state = await _page.EvaluateAsync<string>(
+                """
+                () => {
+                  const form = document.querySelector('#farmListTargetForm');
+                  if (!form) return 'gone';
+                  const wrapper = form.querySelector('.targetSelectionResultWrapper');
+                  const save = form.querySelector('button.save, button[type="submit"]');
+                  const saveReady = !!save && !save.disabled;
+                  const errorEl = wrapper?.querySelector('.targetSelectionValidation.show, .customValidationRenderElement');
+                  const hasError = !!(wrapper && wrapper.classList.contains('hasError'))
+                    && ((errorEl?.textContent || '').replace(/\s+/g, ' ').trim().length > 0);
+                  if (saveReady && !hasError) return 'valid';
+                  if (hasError) return 'error';
+                  return 'pending';
+                }
+                """).WaitAsync(cancellationToken);
+
+            if (state is "valid" or "gone")
+            {
+                return;
+            }
+
+            if (state == "error")
+            {
+                errorSince ??= DateTime.UtcNow;
+                if (DateTime.UtcNow - errorSince.Value >= stableError)
+                {
+                    return;
+                }
+            }
+            else
+            {
+                errorSince = null;
+            }
+
+            await Task.Delay(pollIntervalMs, cancellationToken);
+        }
     }
 
     private async Task<FarmListTargetStateJs> ReadFarmListTargetStateAsync(string lid, int x, int y, CancellationToken cancellationToken)
