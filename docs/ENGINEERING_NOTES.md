@@ -187,8 +187,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Hero, Town Hall, Brewery, and Smithy restart delays are independently toggleable and enabled by default. Hero
   reuses one session deadline after returning home or discovering a new adventure. Smithy delays only after an
   occupied queue slot frees; an empty queue starts immediately and Plus slots are filled together without delay.
-- Hero HP regeneration per day is only a scheduling estimate for low-HP adventure defers. A successful periodic
-  current-page HP read is authoritative and releases the deferred Hero task immediately once the threshold is met.
+- Hero HP regeneration per day is only a scheduling estimate for low-HP adventure defers. A successful current-page
+  HP read is authoritative and releases the deferred Hero task immediately once the threshold is met. That release
+  is centralized in the shared UI HP-read helper, so login, quick re-login, browser restart, the manual refresh
+  button, and the periodic tick all clear a stale regen-estimate countdown, not just the background tick.
 - Account-wide construction behavior, including storage look-ahead and construction start delay, belongs in the
   Construction settings category rather than the Buildings workspace.
 - Secondary explanations use the shared `i` tooltip when permanent text wastes space.

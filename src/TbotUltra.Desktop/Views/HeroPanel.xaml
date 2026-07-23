@@ -240,7 +240,7 @@
                                                     <Setter Property="Foreground" Value="{DynamicResource TextSubtleBrush}" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding HeroStatusText}" Value="Ready">
-                                                            <Setter Property="Text" Value="Ready" />
+                                                            <Setter Property="Text" Value="{Binding HeroReadyText}" />
                                                             <Setter Property="Foreground" Value="{DynamicResource SuccessTextStrongBrush}" />
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding HeroLoopTask.HasCountdown}" Value="True">

@@ -367,6 +367,8 @@ public sealed partial class TravianClient
         var deadline = DateTime.UtcNow.AddSeconds(Math.Max(10, _config.ManualLoginTimeoutSeconds));
         var navigationRetryLogged = false;
         var unexpectedErrorRecoveryAttempted = false;
+        var inlineErrorRecoveryAttempts = 0;
+        const int maxInlineErrorRecoveries = 2;
         while (DateTime.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -390,6 +392,29 @@ public sealed partial class TravianClient
                     return true;
                 }
 
+                // The lobby form can reject the first submit with an inline "Unexpected error"
+                // (data-rule="customErrorExists") and keep the Login button disabled until a field is
+                // edited. Re-entering the credentials clears that custom error and re-enables submit, so
+                // resubmit a bounded number of times before giving up.
+                if (inlineErrorRecoveryAttempts < maxInlineErrorRecoveries
+                    && await IsLobbyLoginUnexpectedErrorBlockingSubmitAsync())
+                {
+                    inlineErrorRecoveryAttempts++;
+                    Notify($"[lobby-login] inline 'Unexpected error' disabled the Login button; re-entering credentials and resubmitting (attempt {inlineErrorRecoveryAttempts}/{maxInlineErrorRecoveries}).");
+                    try
+                    {
+                        await FillLoginCredentialsWithPacingAsync(cancellationToken);
+                        await ClickLoginButtonAsync(cancellationToken);
+                    }
+                    catch (Exception ex) when (ex is PlaywrightException or TimeoutException or InvalidOperationException)
+                    {
+                        Notify($"[lobby-login] resubmit after inline error did not complete ({ex.Message}); continuing to wait.");
+                    }
+
+                    await Task.Delay(TimeSpan.FromMilliseconds(600), cancellationToken);
+                    continue;
+                }
+
                 ThrowIfAccountAccessBlocked(await ReadExplicitLobbyAccessStateAsync());
             }
             catch (PlaywrightException ex) when (IsTransientExecutionContextError(ex))
@@ -405,6 +430,34 @@ public sealed partial class TravianClient
         }
 
         return false;
+    }
+
+    // True when the lobby login modal shows the inline "Unexpected error" (customErrorExists) on the
+    // password field and the Login submit button is disabled — the state the user has to clear manually
+    // by re-focusing a field. Scoped to the #loginLobby modal so it never matches an authenticated lobby.
+    private async Task<bool> IsLobbyLoginUnexpectedErrorBlockingSubmitAsync()
+    {
+        try
+        {
+            return await _page.EvaluateAsync<bool>(
+                """
+                () => {
+                  const modal = document.querySelector('#loginLobby');
+                  if (!modal) return false;
+                  const submit = modal.querySelector("button[type='submit']");
+                  const submitDisabled = !!submit
+                    && (submit.disabled || submit.getAttribute('disabled') !== null);
+                  const hasCustomError = Array.from(
+                    modal.querySelectorAll('.validation[data-rule="customErrorExists"]'))
+                    .some(node => node.classList.contains('show'));
+                  return submitDisabled && hasCustomError;
+                }
+                """);
+        }
+        catch (PlaywrightException ex) when (IsTransientExecutionContextError(ex))
+        {
+            return false;
+        }
     }
 
     private async Task<bool> TryRecoverFromUnexpectedLobbyErrorPageAsync(CancellationToken cancellationToken)

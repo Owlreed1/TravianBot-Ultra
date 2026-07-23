@@ -95,6 +95,29 @@ public sealed class HeroViewModelTests
     }
 
     [Fact]
+    public void HeroReadyText_SaysNoAdventures_WhenHomeAndReadyWithoutAdventures()
+    {
+        var vm = new HeroViewModel();
+        var changes = new List<string>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName ?? string.Empty);
+
+        // Hero home/idle = "Ready". No adventures available -> "No adventures".
+        vm.HeroStatusText = "Ready";
+        vm.AdventureCountText = "0";
+        Assert.Equal("No adventures", vm.HeroReadyText);
+        Assert.Contains(nameof(HeroViewModel.HeroReadyText), changes);
+
+        // A newly discovered adventure flips it back to "Ready".
+        vm.AdventureCountText = "1";
+        Assert.Equal("Ready", vm.HeroReadyText);
+
+        // Away/other states never read "No adventures" (the timer shows instead).
+        vm.HeroStatusText = "Away";
+        vm.AdventureCountText = "0";
+        Assert.Equal("Ready", vm.HeroReadyText);
+    }
+
+    [Fact]
     public void HeroLoopTask_UsesSharedAutomationLoopCountdown()
     {
         var vm = new HeroViewModel();

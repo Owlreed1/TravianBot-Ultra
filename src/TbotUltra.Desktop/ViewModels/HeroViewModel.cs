@@ -92,8 +92,26 @@ public sealed class HeroViewModel : BaseViewModel
     public string AdventureCountText
     {
         get => _adventureCountText;
-        set => SetProperty(ref _adventureCountText, value);
+        set
+        {
+            if (SetProperty(ref _adventureCountText, value))
+            {
+                OnPropertyChanged(nameof(HeroReadyText));
+            }
+        }
     }
+
+    /// <summary>
+    /// Text for the Hero status box while the hero is home and idle (<see cref="HeroStatusText"/> ==
+    /// "Ready"). Reads "No adventures" when none are available so an idle hero with nothing to do is
+    /// distinguishable from one ready to depart; otherwise "Ready". Recomputed whenever the hero status
+    /// or the adventure count changes, so a newly discovered adventure flips it back to "Ready".
+    /// </summary>
+    public string HeroReadyText =>
+        string.Equals(_heroStatusText, "Ready", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(_adventureCountText?.Trim(), "0", StringComparison.Ordinal)
+            ? "No adventures"
+            : "Ready";
 
     /// <summary>Current hero HP read from the always-visible top-bar health arc.</summary>
     public string HeroHpText
@@ -115,7 +133,13 @@ public sealed class HeroViewModel : BaseViewModel
     public string HeroStatusText
     {
         get => _heroStatusText;
-        set => SetProperty(ref _heroStatusText, string.IsNullOrWhiteSpace(value) ? "Unknown" : value);
+        set
+        {
+            if (SetProperty(ref _heroStatusText, string.IsNullOrWhiteSpace(value) ? "Unknown" : value))
+            {
+                OnPropertyChanged(nameof(HeroReadyText));
+            }
+        }
     }
 
     /// <summary>The same Hero task instance displayed and ticked by the Automation Loop card.</summary>

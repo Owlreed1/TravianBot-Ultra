@@ -318,6 +318,12 @@ public partial class MainWindow
             _heroViewModel.HeroHpText = $"{Math.Clamp(hpPercent.Value, 0, 100)}%";
         }
 
+        // An authoritative current-page HP read releases a low-HP adventure defer as soon as HP reaches
+        // the threshold. Doing it here — the single helper used by login, the manual "Refresh hero HP"
+        // button and the background tick — means the hero timer stops showing a stale regen-estimate
+        // countdown the moment HP has already recovered, instead of only after the next background tick.
+        TryReleaseLowHpHeroManageDefer(options, hpPercent);
+
         return hpPercent;
     }
 

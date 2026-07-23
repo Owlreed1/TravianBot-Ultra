@@ -702,10 +702,11 @@ public partial class MainWindow
             }
         }
 
-        int? refreshedHeroHp = null;
         try
         {
-            refreshedHeroHp = await ReadHeroHpFromCurrentPageForUiAsync(
+            // The HP read releases a stale low-HP adventure defer itself (see
+            // ReadHeroHpFromCurrentPageForUiAsync), so no separate release call is needed here.
+            await ReadHeroHpFromCurrentPageForUiAsync(
                 options,
                 _loopController.AcquireSessionScopeToken());
         }
@@ -718,7 +719,6 @@ public partial class MainWindow
             AppendLog($"[hero:verbose] background Hero HP refresh skipped ({ex.Message})");
         }
 
-        TryReleaseLowHpHeroManageDefer(options, refreshedHeroHp);
         await TryReleaseRevivingHeroManageDeferAsync(options);
         await TryReleaseAwayHeroManageDeferAsync(options);
 
