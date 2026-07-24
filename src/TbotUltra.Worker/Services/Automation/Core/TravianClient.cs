@@ -522,6 +522,12 @@ public sealed partial class TravianClient
 
         [JsonPropertyName("lid")]
         public string? Lid { get; init; }
+
+        [JsonPropertyName("villageName")]
+        public string? VillageName { get; init; }
+
+        [JsonPropertyName("villageIndex")]
+        public int? VillageIndex { get; init; }
     }
 
     private sealed class FarmDispatchLimitStateJs
@@ -533,19 +539,13 @@ public sealed partial class TravianClient
         public int? MinTimerSeconds { get; init; }
     }
 
-    private sealed class FarmListSendAllClickStateJs
+    private sealed class SendableFarmListJs
     {
-        [JsonPropertyName("clicked")]
-        public bool Clicked { get; init; }
+        [JsonPropertyName("lid")]
+        public string? Lid { get; init; }
 
-        [JsonPropertyName("reason")]
-        public string? Reason { get; init; }
-
-        [JsonPropertyName("listIds")]
-        public string[]? ListIds { get; init; }
-
-        [JsonPropertyName("listCount")]
-        public int ListCount { get; init; }
+        [JsonPropertyName("name")]
+        public string? Name { get; init; }
     }
 
     private sealed class FarmListLossRowJs

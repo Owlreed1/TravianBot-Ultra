@@ -18,7 +18,7 @@
             </Grid.RowDefinitions>
 
             <StackPanel Margin="0,0,0,12">
-                <TextBlock Text="Add farms from Travco"
+                <TextBlock Text="Add farms to farmlist"
                            FontSize="18"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -91,6 +91,12 @@
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
+                            <Button x:Name="CheckAllTargetsButton"
+                                    Content="Check all"
+                                    HorizontalAlignment="Left"
+                                    MinWidth="90"
+                                    Margin="0,8,0,0"
+                                    Click="CheckAllTargets_Click" />
                         </StackPanel>
                     </Border>
 
@@ -249,6 +255,9 @@
 
             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
                 <Button x:Name="AddButton" Content="Add farms" Width="110" Margin="0,0,8,0"
+                        Background="{DynamicResource SuccessBgBrush}"
+                        Foreground="{DynamicResource SuccessTextBrush}"
+                        BorderBrush="{DynamicResource SuccessBorderBrush}"
                         Click="AddButton_Click" />
                 <Button Content="Cancel" Width="100" Click="CancelButton_Click" />
             </StackPanel>
@@ -258,5 +267,90 @@
                                   Title="Adding farms"
                                   Text="Preparing..."
                                   Cancelled="LoadingOverlay_Cancelled" />
+
+        <!-- Modern, compact progress card shown while farms are being added. Shows the list being added to,
+             the added/requested progress, and an Invalid + Elapsed footer. -->
+        <Border x:Name="AddingOverlay" Visibility="Collapsed"
+                Background="{DynamicResource OverlayScrimBrush}">
+            <Border Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="28,24"
+                    Width="360"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="Adding farms"
+                               FontSize="17"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock x:Name="AddingCurrentListText"
+                               Text="-"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Margin="0,4,0,18" />
+
+                    <ProgressBar x:Name="AddingProgressBar"
+                                 Minimum="0" Maximum="100" Value="0"
+                                 Height="8"
+                                 Margin="0,0,0,8" />
+                    <Grid Margin="0,0,0,16">
+                        <TextBlock x:Name="AddingAddedText"
+                                   Text="0 / 0 added"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Left" />
+                        <TextBlock x:Name="AddingPercentText"
+                                   Text="0%"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   HorizontalAlignment="Right" />
+                    </Grid>
+
+                    <Border BorderBrush="{DynamicResource BorderMutedBrush}"
+                            BorderThickness="0,1,0,0"
+                            Padding="0,12,0,0"
+                            Margin="0,0,0,18">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" HorizontalAlignment="Left">
+                                <TextBlock Text="Invalid" FontSize="11" Foreground="{DynamicResource TextSubtleBrush}" />
+                                <TextBlock x:Name="AddingInvalidText" Text="0"
+                                           FontSize="14" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                <TextBlock Text="Elapsed" FontSize="11"
+                                           Foreground="{DynamicResource TextSubtleBrush}"
+                                           HorizontalAlignment="Right" />
+                                <TextBlock x:Name="AddingElapsedText" Text="00:00:00"
+                                           FontSize="14" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           HorizontalAlignment="Right" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Button x:Name="AddingCancelButton"
+                            Content="Cancel"
+                            MinWidth="110"
+                            Height="32"
+                            Padding="14,0"
+                            Background="{DynamicResource DangerBgBrush}"
+                            BorderBrush="{DynamicResource DangerBorderBrush}"
+                            Foreground="{DynamicResource DangerTextBrush}"
+                            HorizontalAlignment="Center"
+                            Click="AddingCancelButton_Click" />
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 </Window>

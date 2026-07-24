@@ -778,6 +778,9 @@ public partial class MainWindow : Window
                 UpdateInboxButtons(0, 0);
                 UpdateGoldClubInfoFromStoredAnalysis();
                 LoadHeroAttributeSnapshotForActiveAccount(account.Name);
+                // Show the last analyzed farm lists immediately so the farming panel is never blank
+                // at startup / after an account switch. Fire-and-forget: it is disk-only and self-guards.
+                _ = RestoreFarmListsFromSnapshotForActiveAccount();
             }
             catch (Exception ex)
             {

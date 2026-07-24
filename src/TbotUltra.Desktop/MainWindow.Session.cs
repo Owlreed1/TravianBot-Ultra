@@ -1009,7 +1009,8 @@ public partial class MainWindow
         _farmingFeaturesAvailable = true;
         if (FarmingStatusTextBlock is not null)
         {
-            FarmingStatusTextBlock.Text = "No farm lists loaded. Click Analyze Farmlists.";
+            FarmingStatusTextBlock.Text = string.Empty;
+            FarmingStatusTextBlock.Visibility = Visibility.Collapsed;
         }
 
         foreach (var village in _resourceTransferVillages)

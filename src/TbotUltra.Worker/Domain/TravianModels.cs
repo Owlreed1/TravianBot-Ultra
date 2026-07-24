@@ -316,7 +316,14 @@ public sealed record FarmListOverview(
     int? Capacity = null,
     IReadOnlyList<string>? FarmCoordinates = null,
     TimerSnapshot? Finish = null,
-    bool TimerIsEstimated = false);
+    bool TimerIsEstimated = false,
+    // Display name of the village that owns this farm list (from the .villageWrapper header). Used only
+    // to group lists under a village heading in the UI; it is re-read on every analyze, so a village
+    // rename simply re-groups on the next read and never breaks the stable list identity (ListId).
+    string? VillageName = null,
+    // Ordinal of the owning .villageWrapper on the page. The page exposes no village id/coordinates on the
+    // wrapper, so this ordinal is the grouping key that keeps two villages with the same display name apart.
+    int? VillageIndex = null);
 
 public sealed record FarmListLossDeactivationResult(
     int RowsFound,

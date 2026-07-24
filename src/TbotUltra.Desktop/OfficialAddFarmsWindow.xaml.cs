@@ -277,6 +277,30 @@ public partial class OfficialAddFarmsWindow : Window
     private void InputChanged(object sender, RoutedEventArgs e) => RefreshState();
     private void TargetCheckBox_Changed(object sender, RoutedEventArgs e) => RefreshState();
 
+    // "Check all" toggles every destination list at once: checks them all, or clears them all when they
+    // are already all checked.
+    private void CheckAllTargets_Click(object sender, RoutedEventArgs e)
+    {
+        if (TargetListsListBox?.ItemsSource is not IEnumerable<TargetOption> targets)
+        {
+            return;
+        }
+
+        var targetList = targets.ToList();
+        if (targetList.Count == 0)
+        {
+            return;
+        }
+
+        var check = !targetList.All(option => option.IsChecked);
+        foreach (var option in targetList)
+        {
+            option.IsChecked = check;
+        }
+
+        RefreshState();
+    }
+
     private void SourceListComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         RebuildOasisFilter();
@@ -363,7 +387,7 @@ public partial class OfficialAddFarmsWindow : Window
         _runElapsedTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _runElapsedTimer.Tick += (_, _) => UpdateAddingFarmsOverlayText();
         _runElapsedTimer.Start();
-        LoadingOverlay.Show("Adding farms", string.Empty);
+        AddingOverlay.Visibility = Visibility.Visible;
         UpdateAddingFarmsOverlayText();
         var progress = new Progress<FarmAddProgress>(value =>
         {
@@ -392,7 +416,7 @@ public partial class OfficialAddFarmsWindow : Window
         catch (OperationCanceledException)
         {
             RunDuration = _runStopwatch.Elapsed;
-            LoadingOverlay.Hide();
+            AddingOverlay.Visibility = Visibility.Collapsed;
             // Cancelled mid-run: still surface the dead villages found so far so the caller can offer to
             // remove them from the Travco source list (otherwise cancelling would silently keep retrying
             // the same non-existent coordinates on the next run).
@@ -417,7 +441,7 @@ public partial class OfficialAddFarmsWindow : Window
         }
         catch (Exception ex)
         {
-            LoadingOverlay.Hide();
+            AddingOverlay.Visibility = Visibility.Collapsed;
             AppDialog.Show(this, ex.Message, "Add farms failed", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
@@ -428,24 +452,23 @@ public partial class OfficialAddFarmsWindow : Window
         }
     }
 
-    // Renders the live "Adding farms" overlay text from the latest progress snapshot plus the counting-up
-    // elapsed time. Called both by the progress callback (new counts) and the 1s timer (elapsed only).
+    // Renders the live "Adding farms" overlay from the latest progress snapshot plus the counting-up elapsed
+    // time. Called both by the progress callback (new counts) and the 1s timer (elapsed only). Progress is
+    // measured by farms actually ADDED toward the requested amount — an invalid or skipped candidate does not
+    // advance it, so it no longer jumps to 100% while dead coordinates are still being checked.
     private void UpdateAddingFarmsOverlayText()
     {
         var p = _lastAddProgress;
-        var total = Math.Max(1, p?.TotalCount ?? _addTotal);
-        var processed = Math.Clamp(p?.ProcessedCount ?? 0, 0, total);
-        var percent = (double)processed / total * 100;
-        LoadingOverlay.IsIndeterminate = false;
-        LoadingOverlay.ProgressValue = percent;
-        LoadingOverlay.Text =
-            $"{percent:0}% complete\n" +
-            $"Farms checked: {processed}/{total} - {total - processed} remaining\n" +
-            $"Added villages: {p?.AddedCount ?? 0}\n" +
-            $"Current list: {(p?.FarmListName ?? "-")}\n" +
-            $"Invalid: {(p?.NotFoundCount ?? 0)}\n" +
-            $"Occupied (oasis) skipped: {(p?.OccupiedOasisSkippedCount ?? 0)}\n" +
-            $"Elapsed: {FormatElapsed(_runStopwatch.Elapsed)}";
+        var requested = Math.Max(1, p?.TotalCount ?? _addTotal);
+        var added = Math.Clamp(p?.AddedCount ?? 0, 0, requested);
+        var percent = (double)added / requested * 100;
+
+        AddingProgressBar.Value = percent;
+        AddingPercentText.Text = $"{percent:0}%";
+        AddingAddedText.Text = $"{added} / {requested} added";
+        AddingCurrentListText.Text = string.IsNullOrWhiteSpace(p?.FarmListName) ? "-" : p!.FarmListName;
+        AddingInvalidText.Text = (p?.NotFoundCount ?? 0).ToString(CultureInfo.InvariantCulture);
+        AddingElapsedText.Text = FormatElapsed(_runStopwatch.Elapsed);
     }
 
     private static string FormatElapsed(TimeSpan value) =>
@@ -458,6 +481,8 @@ public partial class OfficialAddFarmsWindow : Window
     }
 
     private void LoadingOverlay_Cancelled(object sender, EventArgs e) => _runCts.Cancel();
+
+    private void AddingCancelButton_Click(object sender, RoutedEventArgs e) => _runCts.Cancel();
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
@@ -482,6 +507,14 @@ public partial class OfficialAddFarmsWindow : Window
         SummaryTextBlock.Text =
             $"Selected destination lists: {selectedTargets}. Villages scheduled: {requested}. " +
             $"Analyzed existing farm coordinates: {_existingCoordinates.Count}.";
+        if (CheckAllTargetsButton is not null)
+        {
+            var targetOptions = (TargetListsListBox?.ItemsSource as IEnumerable<TargetOption>)?.ToList() ?? [];
+            CheckAllTargetsButton.IsEnabled = targetOptions.Count > 0;
+            CheckAllTargetsButton.Content = targetOptions.Count > 0 && targetOptions.All(option => option.IsChecked)
+                ? "Uncheck all"
+                : "Check all";
+        }
         AddButton.IsEnabled = requested > 0
                               && (!IsCustomTroops()
                                   || (TroopTypeComboBox.SelectedItem is string

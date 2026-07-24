@@ -25,8 +25,10 @@ public static class PacingDefaults
     public const double ActionPacingClickMaxSeconds = 1.5;
     public const double ActionPacingLoopMinSeconds = 4.0;
     public const double ActionPacingLoopMaxSeconds = 25.0;
-    public const double FarmListStepDelayMinSeconds = 1.5;
-    public const double FarmListStepDelayMaxSeconds = 4.0;
+    // "Send farmlists" pacing: the small wait between clicking each farm list's Start button during a
+    // sequential send-all, so the lists are dispatched one at a time rather than all in one burst.
+    public const double FarmListStepDelayMinSeconds = 0.1;
+    public const double FarmListStepDelayMaxSeconds = 0.3;
 
     // Occasional "step away from the computer" idle pause inserted between loop passes. Sometime within
     // the interval range a random pause of the duration range fires, then the interval reschedules.

@@ -7,6 +7,9 @@ public sealed class FarmListStatusRow : INotifyPropertyChanged
 {
     private bool _isEnabled;
     private string _name = string.Empty;
+    private string _villageName = string.Empty;
+    private string _villageHeaderText = string.Empty;
+    private int _villageOrdinal = -1;
     private string? _listId;
     private int _activeFarmCount;
     private int _totalFarmCount;
@@ -26,6 +29,59 @@ public sealed class FarmListStatusRow : INotifyPropertyChanged
             }
 
             _name = value;
+            OnPropertyChanged();
+        }
+    }
+
+    // Display name of the owning village. Kept for reference; the UI groups by VillageOrdinal and labels
+    // the heading with VillageHeaderText (name + coordinates when resolvable).
+    public string VillageName
+    {
+        get => _villageName;
+        set
+        {
+            var normalized = value ?? string.Empty;
+            if (_villageName == normalized)
+            {
+                return;
+            }
+
+            _villageName = normalized;
+            OnPropertyChanged();
+        }
+    }
+
+    // Grouping key: the ordinal of the owning .villageWrapper on the farm page. Two villages that share a
+    // display name still get distinct ordinals, so they stay as separate groups. -1 for the placeholder.
+    public int VillageOrdinal
+    {
+        get => _villageOrdinal;
+        set
+        {
+            if (_villageOrdinal == value)
+            {
+                return;
+            }
+
+            _villageOrdinal = value;
+            OnPropertyChanged();
+        }
+    }
+
+    // Heading label shown for the village group: the village name, with coordinates appended when they can
+    // be resolved unambiguously ("Name (x | y)"). Empty for the placeholder group, whose header is hidden.
+    public string VillageHeaderText
+    {
+        get => _villageHeaderText;
+        set
+        {
+            var normalized = value ?? string.Empty;
+            if (_villageHeaderText == normalized)
+            {
+                return;
+            }
+
+            _villageHeaderText = normalized;
             OnPropertyChanged();
         }
     }

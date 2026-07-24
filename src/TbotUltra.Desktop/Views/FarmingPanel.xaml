@@ -35,37 +35,28 @@
                                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                                    Margin="0,0,0,12" />
 
-                                        <WrapPanel Grid.Row="1" Margin="0,0,0,12">
-                                            <Button x:Name="AnalyzeFarmListsButton"
-                                                    Content="Analyze Farmlists"
-                                                    Background="{DynamicResource SuccessBgBrush}"
-                                                    Foreground="{DynamicResource SuccessTextBrush}"
-                                                    BorderBrush="{DynamicResource SuccessBorderBrush}"
-                                                    MinWidth="150"
-                                                    Click="AnalyzeFarmListsButton_Click" />
-                                            <Button x:Name="AddFarmsToListButton"
-                                                    Content="Add Farms to List"
-                                                    MinWidth="140"
-                                                    Click="AddFarmsToListButton_Click" />
-                                            <Button x:Name="CreateFarmListButton"
-                                                    Content="Create Farmlist"
-                                                    MinWidth="120"
-                                                    Click="CreateFarmListButton_Click" />
-                                        </WrapPanel>
-
-                                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                            <StackPanel>
-                                                <TextBlock x:Name="FarmingStatusTextBlock"
-                                                           Text="No farm lists loaded. Click Analyze Farmlists."
-                                                           Foreground="{DynamicResource TextMutedBrush}"
-                                                           Margin="0,0,0,8" />
-
+                                        <StackPanel Grid.Row="1" Margin="0,0,0,12">
+                                            <!-- Analyze and Send-all share the top row so Send-all stays visible
+                                                 while the list below scrolls. Create sits under Analyze. -->
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Button x:Name="AnalyzeFarmListsButton"
+                                                        Grid.Column="0"
+                                                        Content="Analyze Farmlists"
+                                                        Background="{DynamicResource SuccessBgBrush}"
+                                                        Foreground="{DynamicResource SuccessTextBrush}"
+                                                        BorderBrush="{DynamicResource SuccessBorderBrush}"
+                                                        MinWidth="150"
+                                                        Click="AnalyzeFarmListsButton_Click" />
                                                 <Button x:Name="FarmListSendAllNowButton"
+                                                        Grid.Column="2"
                                                         Content="Send all Now"
                                                         MinWidth="110"
                                                         Height="32"
-                                                        Margin="0,0,0,8"
-                                                        HorizontalAlignment="Right"
                                                         IsEnabled="False"
                                                         Click="FarmListSendAllNowButton_Click">
                                                     <Button.Style>
@@ -83,8 +74,57 @@
                                                         </Style>
                                                     </Button.Style>
                                                 </Button>
+                                            </Grid>
+                                            <WrapPanel>
+                                                <Button x:Name="CreateFarmListButton"
+                                                        Content="Create Farmlist"
+                                                        MinWidth="150"
+                                                        Click="CreateFarmListButton_Click" />
+                                                <Button x:Name="AddFarmsToListButton"
+                                                        Content="Add Farms to List"
+                                                        MinWidth="140"
+                                                        Click="AddFarmsToListButton_Click" />
+                                            </WrapPanel>
+                                            <TextBlock x:Name="FarmingStatusTextBlock"
+                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                       Margin="0,8,0,0"
+                                                       TextWrapping="Wrap"
+                                                       Visibility="Collapsed" />
+                                        </StackPanel>
 
+                                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                                 <ItemsControl x:Name="FarmListsItemsControl">
+                                                    <ItemsControl.GroupStyle>
+                                                        <GroupStyle>
+                                                            <GroupStyle.HeaderTemplate>
+                                                                <DataTemplate>
+                                                                    <!-- Grouped by village ordinal; the heading text (name + coordinates)
+                                                                         is taken from the group's first row. Empty for the placeholder
+                                                                         group, whose header is then hidden. -->
+                                                                    <Border Margin="0,6,0,6" Padding="0,0,0,4">
+                                                                        <Border.Style>
+                                                                            <Style TargetType="Border">
+                                                                                <Setter Property="BorderBrush" Value="{DynamicResource BorderMutedBrush}" />
+                                                                                <Setter Property="BorderThickness" Value="0,0,0,1" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding Items[0].VillageHeaderText}" Value="{x:Null}">
+                                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding Items[0].VillageHeaderText}" Value="">
+                                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Border.Style>
+                                                                        <TextBlock Text="{Binding Items[0].VillageHeaderText}"
+                                                                                   FontWeight="SemiBold"
+                                                                                   FontSize="13"
+                                                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </GroupStyle.HeaderTemplate>
+                                                        </GroupStyle>
+                                                    </ItemsControl.GroupStyle>
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
                                                             <Border CornerRadius="9" Padding="10" Margin="0,0,0,10">
@@ -201,7 +241,6 @@
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
-                                            </StackPanel>
                                         </ScrollViewer>
 
                                         <!-- Floats in the bottom-right corner of the Farm List
@@ -246,18 +285,18 @@
                                             <StackPanel Margin="0,0,0,10">
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                     <RadioButton x:Name="FarmSendListPerListRadioButton"
-                                                                 Content="Send list per list"
+                                                                 Content="Send toggled lists"
                                                                  GroupName="FarmSendMode"
                                                                  Margin="0,0,16,0"
                                                                  Checked="FarmingSettings_Changed" />
                                                     <RadioButton x:Name="FarmSendAllAtOnceRadioButton"
-                                                                 Content="Send all lists at once"
+                                                                 Content="Send all lists"
                                                                  GroupName="FarmSendMode"
                                                                  Margin="0,0,8,0"
                                                                  Checked="FarmingSettings_Changed" />
                                                     <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                                     VerticalAlignment="Center"
-                                                                    ToolTip="Choose whether continuous farming sends one selected farmlist per run or clicks Travian's start-all button for all farmlists at once." />
+                                                                    ToolTip="Send toggled lists: each round sends every farm list toggled on above, one at a time. Send all lists: sends every farm list on the account. Either way the lists go out one at a time (paced by 'Send farmlists'); 'Delay between farm sends' is the wait between whole rounds." />
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                     <TextBlock Text="Delay between farm sends"

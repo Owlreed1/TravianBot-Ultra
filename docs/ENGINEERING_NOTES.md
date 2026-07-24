@@ -296,6 +296,22 @@ Published artifacts belong under `artifacts/`, never beside source files.
   later full logins merge the live sidebar so new/renamed villages are found without another profile visit.
 - Browser activity statistics are account-scoped: lifetime counters persist; session counters do not.
 - Farm-list exact timers get a 5-15s render margin; unreadable disabled timers use an estimated 60s wait.
+- Farm lists are always sent ONE AT A TIME via `SendFarmListsSequentiallyAsync`: click each list's Start,
+  then wait for that list's `.farmListStatus` "N/M being raided" numerator to rise (or its Start to disable)
+  before the next click — never the single "start all" button (a list can silently fail with no feedback).
+  The wait between clicks is the "Send farmlists" action pacing (`FarmListStepDelayMin/MaxSeconds`, default
+  0.1-0.3s, on the Settings pacing tab). "Send toggled lists" mode sends every selected list each round;
+  "Send all lists" sends every list; `ContinuousFarmDispatchDelay` (minutes) is the gap between whole rounds,
+  not between individual lists.
+- Farm-list rows dedupe/merge by stable `lid` (data-list), never by display name — two villages can hold
+  same-named lists that a name key would collapse into one row/group. Rows are grouped in the UI by the owning
+  `.villageWrapper` ordinal (read per analyze), not by name, so two villages that share a display name stay in
+  separate groups; the heading label is the village name plus coordinates. The farm page exposes no village
+  id/coordinates on the wrapper, so coordinates are resolved from the known village list by name and only when
+  that name is unique (a duplicated name is ambiguous → name only). A village rename just re-groups next read.
+- Analyzed farm lists persist per account (`FarmListsSnapshotPath`) and are restored into the panel at
+  startup / account switch so it is never blank; restored timers are re-based on the capture time and
+  `_lastFarmListsAnalysisAt` stays `MinValue` so a real re-analyze still fires when due.
 - Never stack Add-target dialogs: a canceled/failed add-farms run can leave the dialog open, and the reopen
   dispatch fires even behind an overlay, so opening a new one produces two stacked dialogs whose top
   `#dialogOverlay` intercepts every click on the form inputs (coordinate click times out). `OpenAddRaidFormAsync`

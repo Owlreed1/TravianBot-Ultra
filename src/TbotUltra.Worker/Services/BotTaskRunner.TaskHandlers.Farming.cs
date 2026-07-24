@@ -22,7 +22,7 @@ public sealed partial class BotTaskRunner
                 capturedAtUtc = DateTimeOffset.UtcNow,
                 lists = overview.Where(item => item is not null).Select(item => new
                 {
-                    item.Name, item.ActiveFarmCount, item.TotalFarmCount, item.RemainingSeconds, item.ListId, item.Capacity, item.FarmCoordinates,
+                    item.Name, item.VillageName, item.VillageIndex, item.ActiveFarmCount, item.TotalFarmCount, item.RemainingSeconds, item.ListId, item.Capacity, item.FarmCoordinates,
                 }).ToList(),
             };
             await File.WriteAllTextAsync(outputPath, JsonSerializer.Serialize(payload), context.CancellationToken);
@@ -71,26 +71,26 @@ public sealed partial class BotTaskRunner
             throw BuildContinuousFarmDefer("Selected farm lists were not found on the farm page.", retryWaitSeconds, 0);
         }
 
-        var currentIndex = Math.Clamp(context.Options.ContinuousFarmNextListIndex, 0, matchingLists.Count - 1);
-        var current = matchingLists[currentIndex];
-        context.Log($"Continuous farming selected farmlist index={currentIndex + 1}/{matchingLists.Count} name='{current.Name}'.");
-        if (current.RemainingSeconds is > 0)
+        // "Send toggled lists" mode: each round sends EVERY toggled list that is ready, one at a time (the
+        // small "Send farmlists" pacing sits between each list). The dispatch delay below is the gap between
+        // whole rounds, not between individual lists. If none is ready yet, defer until the soonest one is.
+        var readyLists = matchingLists.Where(item => item.RemainingSeconds is null or <= 0).ToList();
+        if (readyLists.Count <= 0)
         {
-            var renderMarginSeconds = current.TimerIsEstimated ? 0 : Random.Shared.Next(5, 16);
-            var waitSeconds = Math.Max(1, current.RemainingSeconds.Value + renderMarginSeconds);
-            var estimateSuffix = current.TimerIsEstimated ? " (estimated)" : $" + {renderMarginSeconds}s render margin";
-            context.Log($"Continuous farming: selected list '{current.Name}' is not ready. Remaining time={waitSeconds}s{estimateSuffix}.");
-            throw BuildContinuousFarmDefer($"Selected farm list '{current.Name}' is not ready.", waitSeconds, currentIndex);
+            var soonestRemaining = matchingLists.Min(item => item.RemainingSeconds is > 0 ? item.RemainingSeconds.Value : 1);
+            var waitSeconds = Math.Max(1, soonestRemaining + Random.Shared.Next(5, 16));
+            context.Log($"Continuous farming: none of the {matchingLists.Count} toggled list(s) is ready. Soonest ready in {waitSeconds}s.");
+            throw BuildContinuousFarmDefer("No toggled farm list is ready.", waitSeconds, 0);
         }
 
         await RunFarmListLossDeactivationIfEnabledAsync(context);
-        await context.Client.SendFarmListNowAsync(current.Name, context.CancellationToken);
-        context.Log($"Continuous farming sent list '{current.Name}'. Delay between sends={dispatchDelaySeconds}s.");
+        context.Log($"Continuous farming (toggled lists): sending {readyLists.Count}/{matchingLists.Count} ready list(s) this round; delay between rounds={dispatchDelaySeconds}s.");
+        var sent = await context.Client.SendSelectedFarmListsNowAsync(selectedNames, selectedIds, context.CancellationToken);
+        context.Log($"Continuous farming (toggled lists): {sent} list(s) dispatched this round.");
         var refreshedOverview = await context.Client.ReadFarmListsOverviewAsync(context.CancellationToken);
         await WriteFarmListsSnapshotAsync(context, refreshedOverview);
-        var nextIndex = (currentIndex + 1) % matchingLists.Count;
-        LogContinuousFarmNextSchedule(context, dispatchDelaySeconds, nextIndex);
-        throw BuildContinuousFarmDefer("Continuous farming cooldown active.", dispatchDelaySeconds, nextIndex, TaskWaitReasons.WorkQueued);
+        LogContinuousFarmNextSchedule(context, dispatchDelaySeconds, 0);
+        throw BuildContinuousFarmDefer("Continuous farming cooldown active.", dispatchDelaySeconds, 0, TaskWaitReasons.WorkQueued);
     }
 
     private static async Task ExecuteSendAllFarmlistsAsync(TaskExecutionContext context, int dispatchDelaySeconds)

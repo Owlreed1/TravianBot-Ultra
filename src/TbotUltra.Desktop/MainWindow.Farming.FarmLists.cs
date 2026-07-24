@@ -51,7 +51,10 @@ public partial class MainWindow
             return;
         }
 
-        FarmingStatusTextBlock.Text = _farmListsViewModel.DescribeStatus();
+        // Farming available: the per-list rows already show every list's state, so no status line is
+        // shown (the old "Loaded N farm list(s)" text is intentionally hidden here).
+        FarmingStatusTextBlock.Text = string.Empty;
+        FarmingStatusTextBlock.Visibility = Visibility.Collapsed;
     }
 
     private void SetFarmingFeatureAvailability(bool enabled, string? reason = null)
@@ -63,9 +66,11 @@ public partial class MainWindow
         {
             if (FarmingStatusTextBlock is not null)
             {
+                // The status line is reserved for problems only — surface why farming is unavailable.
                 FarmingStatusTextBlock.Text = string.IsNullOrWhiteSpace(reason)
                     ? "Farming is unavailable for this account."
                     : reason;
+                FarmingStatusTextBlock.Visibility = Visibility.Visible;
             }
         }
         else
@@ -129,6 +134,8 @@ public partial class MainWindow
                 lists = lists.Select(item => new
                 {
                     name = item.Name,
+                    villageName = item.VillageName,
+                    villageIndex = item.VillageIndex,
                     activeFarmCount = item.ActiveFarmCount,
                     totalFarmCount = item.TotalFarmCount,
                     remainingSeconds = item.RemainingSeconds,
@@ -157,8 +164,10 @@ public partial class MainWindow
     {
         var selectedFarmLists = LoadConfiguredContinuousFarmListNames();
         var selectedFarmListIds = LoadConfiguredContinuousFarmListIds();
-        var mergedByName = new Dictionary<string, (int Active, int Total, int? RemainingSeconds, string? ListId, int? Capacity, IReadOnlyList<string> Coordinates)>(StringComparer.OrdinalIgnoreCase);
-        var orderedNames = new List<string>();
+        // Keyed by the stable lid (falling back to name for layouts without one) so two same-named lists
+        // in different villages stay separate — a name-only key would merge them into one row/group.
+        var mergedByKey = new Dictionary<string, (string Name, string? VillageName, int? VillageIndex, int Active, int Total, int? RemainingSeconds, string? ListId, int? Capacity, IReadOnlyList<string> Coordinates)>(StringComparer.OrdinalIgnoreCase);
+        var orderedKeys = new List<string>();
         var analyzedCoordinates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var incompleteReads = new List<string>();
         foreach (var list in lists)
@@ -170,6 +179,8 @@ public partial class MainWindow
 
             var normalizedName = string.IsNullOrWhiteSpace(list.Name) ? "Farm list" : list.Name.Trim();
             var incomingListId = string.IsNullOrWhiteSpace(list.ListId) ? null : list.ListId.Trim();
+            var incomingVillageName = string.IsNullOrWhiteSpace(list.VillageName) ? null : list.VillageName.Trim();
+            var mergeKey = incomingListId ?? normalizedName;
             var incomingCoordinates = (list.FarmCoordinates ?? [])
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Select(value => value.Trim())
@@ -184,10 +195,13 @@ public partial class MainWindow
             {
                 incompleteReads.Add($"'{normalizedName}' {incomingCoordinates.Count}/{listTotal}");
             }
-            if (!mergedByName.TryGetValue(normalizedName, out var existing))
+            if (!mergedByKey.TryGetValue(mergeKey, out var existing))
             {
-                orderedNames.Add(normalizedName);
-                mergedByName[normalizedName] = (
+                orderedKeys.Add(mergeKey);
+                mergedByKey[mergeKey] = (
+                    Name: normalizedName,
+                    VillageName: incomingVillageName,
+                    VillageIndex: list.VillageIndex is >= 0 ? list.VillageIndex : null,
                     Active: Math.Max(0, list.ActiveFarmCount),
                     Total: Math.Max(0, list.TotalFarmCount),
                     RemainingSeconds: list.RemainingSeconds is > 0 ? list.RemainingSeconds : null,
@@ -198,7 +212,10 @@ public partial class MainWindow
             }
 
             var incomingRemaining = list.RemainingSeconds is > 0 ? list.RemainingSeconds : null;
-            mergedByName[normalizedName] = (
+            mergedByKey[mergeKey] = (
+                Name: existing.Name,
+                VillageName: existing.VillageName ?? incomingVillageName,
+                VillageIndex: existing.VillageIndex ?? (list.VillageIndex is >= 0 ? list.VillageIndex : null),
                 Active: Math.Max(existing.Active, Math.Max(0, list.ActiveFarmCount)),
                 Total: Math.Max(existing.Total, Math.Max(0, list.TotalFarmCount)),
                 RemainingSeconds: existing.RemainingSeconds is > 0
@@ -219,32 +236,44 @@ public partial class MainWindow
                 _analyzedFarmCoordinates.UnionWith(analyzedCoordinates);
                 _farmListIncompleteReads = incompleteReads;
                 _farmListCapacitiesByName.Clear();
+                // Coordinates are not on the farm page per village, so resolve them from the known village
+                // list by name — only when the name is unique (a duplicated name is ambiguous, so no coords).
+                var villageCoordsByName = BuildUniqueVillageCoordsByName();
                 var displayedRows = 0;
-                foreach (var name in orderedNames)
+                foreach (var key in orderedKeys)
                 {
                     if (displayedRows >= MaxFarmListsShown)
                     {
                         break;
                     }
 
-                    var pair = new KeyValuePair<string, (int Active, int Total, int? RemainingSeconds, string? ListId, int? Capacity, IReadOnlyList<string> Coordinates)>(
-                        name,
-                        mergedByName[name]);
+                    var value = mergedByKey[key];
                     var hasSelection = selectedFarmLists.Count > 0 || selectedFarmListIds.Count > 0;
                     var isSelected = !hasSelection
-                        || (pair.Value.ListId is not null && selectedFarmListIds.Contains(pair.Value.ListId))
-                        || selectedFarmLists.Contains(pair.Key);
+                        || (value.ListId is not null && selectedFarmListIds.Contains(value.ListId))
+                        || selectedFarmLists.Contains(value.Name);
+                    var villageName = value.VillageName ?? string.Empty;
+                    var headerText = villageName;
+                    if (!string.IsNullOrEmpty(villageName)
+                        && villageCoordsByName.TryGetValue(villageName, out var coords))
+                    {
+                        headerText = $"{villageName} {coords}";
+                    }
+
                     _farmLists.Add(new FarmListStatusRow
                     {
-                        Name = pair.Key,
-                        ListId = pair.Value.ListId,
-                        ActiveFarmCount = pair.Value.Active,
-                        TotalFarmCount = pair.Value.Total,
-                        Capacity = pair.Value.Capacity,
+                        Name = value.Name,
+                        VillageName = villageName,
+                        VillageOrdinal = value.VillageIndex ?? -1,
+                        VillageHeaderText = headerText,
+                        ListId = value.ListId,
+                        ActiveFarmCount = value.Active,
+                        TotalFarmCount = value.Total,
+                        Capacity = value.Capacity,
                         IsEnabled = isSelected,
-                        RemainingSeconds = pair.Value.RemainingSeconds,
+                        RemainingSeconds = value.RemainingSeconds,
                     });
-                    _farmListCapacitiesByName[pair.Key] = pair.Value.Capacity;
+                    _farmListCapacitiesByName[value.Name] = value.Capacity;
                     displayedRows++;
                 }
 
@@ -274,9 +303,9 @@ public partial class MainWindow
             RefreshFarmListsItemsControl();
         });
 
-        if (mergedByName.Count > MaxFarmListsShown)
+        if (mergedByKey.Count > MaxFarmListsShown)
         {
-            AppendLog($"Farm list UI limited to {MaxFarmListsShown} rows (detected {mergedByName.Count}).");
+            AppendLog($"Farm list UI limited to {MaxFarmListsShown} rows (detected {mergedByKey.Count}).");
         }
 
         if (incompleteReads.Count > 0)
@@ -374,11 +403,80 @@ public partial class MainWindow
                 RemainingSeconds: entry.RemainingSeconds,
                 ListId: string.IsNullOrWhiteSpace(entry.ListId) ? null : entry.ListId,
                 Capacity: entry.Capacity,
-                FarmCoordinates: entry.FarmCoordinates ?? []))
+                FarmCoordinates: entry.FarmCoordinates ?? [],
+                VillageName: string.IsNullOrWhiteSpace(entry.VillageName) ? null : entry.VillageName,
+                VillageIndex: entry.VillageIndex))
             .ToList();
 
         await ApplyFarmListOverviewToUiAsync(lists);
         return true;
+    }
+
+    // Restores the last analyzed farm lists from the persisted snapshot at startup / after an account
+    // switch, so the farming panel is never blank when lists were already analyzed in a prior session.
+    // Unlike TryApplyFarmListsSnapshotAsync (post-send, freshness-gated) this accepts a snapshot of any
+    // age: timers are re-based on the capture time so a stale countdown never keeps ticking from an old
+    // value, and _lastFarmListsAnalysisAt stays MinValue so a real re-analyze is still triggered when due.
+    private async Task RestoreFarmListsFromSnapshotForActiveAccount()
+    {
+        var snapshotPath = AccountStoragePaths.FarmListsSnapshotPath(_projectRoot, _accountStore.ActiveAccountName());
+        if (!File.Exists(snapshotPath))
+        {
+            return;
+        }
+
+        FarmListsSnapshotDto? snapshot;
+        try
+        {
+            var json = await File.ReadAllTextAsync(snapshotPath);
+            snapshot = JsonSerializer.Deserialize<FarmListsSnapshotDto>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Could not restore saved farm lists: {ex.Message}");
+            return;
+        }
+
+        if (snapshot?.Lists is null || snapshot.Lists.Count == 0)
+        {
+            return;
+        }
+
+        // Re-base each timer against the capture time so restored countdowns reflect elapsed time.
+        var elapsedSeconds = snapshot.CapturedAtUtc is { } capturedAt
+            ? Math.Max(0, (int)(DateTimeOffset.UtcNow - capturedAt).TotalSeconds)
+            : 0;
+        var lists = snapshot.Lists
+            .Where(entry => entry is not null && !string.IsNullOrWhiteSpace(entry.Name))
+            .Select(entry =>
+            {
+                var remaining = entry!.RemainingSeconds is > 0
+                    ? Math.Max(0, entry.RemainingSeconds.Value - elapsedSeconds)
+                    : entry.RemainingSeconds;
+                return new FarmListOverview(
+                    Name: entry.Name!,
+                    ActiveFarmCount: entry.ActiveFarmCount,
+                    TotalFarmCount: entry.TotalFarmCount,
+                    RemainingSeconds: remaining is > 0 ? remaining : null,
+                    ListId: string.IsNullOrWhiteSpace(entry.ListId) ? null : entry.ListId,
+                    Capacity: entry.Capacity,
+                    FarmCoordinates: entry.FarmCoordinates ?? [],
+                    VillageName: string.IsNullOrWhiteSpace(entry.VillageName) ? null : entry.VillageName,
+                    VillageIndex: entry.VillageIndex);
+            })
+            .ToList();
+        if (lists.Count == 0)
+        {
+            return;
+        }
+
+        await ApplyFarmListOverviewToUiAsync(lists);
+        // A restore is not a fresh analyze: keep the marker unset so the continuous loop still runs one.
+        await Dispatcher.InvokeAsync(() => _lastFarmListsAnalysisAt = DateTimeOffset.MinValue);
+        AppendLog($"[farm-list] restored {lists.Count} saved farm list(s) from the last analysis.");
     }
 
     private sealed class FarmListsSnapshotDto
@@ -390,6 +488,8 @@ public partial class MainWindow
     private sealed class FarmListSnapshotEntryDto
     {
         public string? Name { get; init; }
+        public string? VillageName { get; init; }
+        public int? VillageIndex { get; init; }
         public int ActiveFarmCount { get; init; }
         public int TotalFarmCount { get; init; }
         public int? RemainingSeconds { get; init; }
@@ -434,6 +534,7 @@ public partial class MainWindow
             if (FarmingStatusTextBlock is not null)
             {
                 FarmingStatusTextBlock.Text = "Analyze failed. Previous farm list state kept.";
+                FarmingStatusTextBlock.Visibility = Visibility.Visible;
             }
             FailOperation(operationId, operationSw, ex);
         }
@@ -835,6 +936,39 @@ public partial class MainWindow
             .ToList();
     }
 
+    // Maps village name -> "(x | y)" for names that identify exactly one village. Duplicate names are left
+    // out (ambiguous — the farm page carries no coordinates to disambiguate them), so the group heading for
+    // a same-named village falls back to the bare name and the two villages still stay in separate groups.
+    private Dictionary<string, string> BuildUniqueVillageCoordsByName()
+    {
+        var coordsByName = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var village in GetFarmListCreationVillages())
+        {
+            if (string.IsNullOrWhiteSpace(village.Name) || village.CoordX is null || village.CoordY is null)
+            {
+                continue;
+            }
+
+            var name = village.Name.Trim();
+            var coords = $"({village.CoordX} | {village.CoordY})";
+            if (coordsByName.TryGetValue(name, out var existing))
+            {
+                if (!string.Equals(existing, coords, StringComparison.Ordinal))
+                {
+                    coordsByName[name] = null; // Same name, different coordinates -> ambiguous.
+                }
+            }
+            else
+            {
+                coordsByName[name] = coords;
+            }
+        }
+
+        return coordsByName
+            .Where(pair => pair.Value is not null)
+            .ToDictionary(pair => pair.Key, pair => pair.Value!, StringComparer.OrdinalIgnoreCase);
+    }
+
     private async void FarmListSendNowButton_Click(object sender, RoutedEventArgs e)
         => await GuardUiAsync(() => FarmListSendNowButtonClickAsync(sender, e));
 
@@ -967,6 +1101,14 @@ public partial class MainWindow
 
             EnsureFarmListPlaceholderRow();
             var view = CollectionViewSource.GetDefaultView(FarmListsItemsControl.ItemsSource);
+            // Group rows under their owning village so each village gets its own heading. Grouped by the
+            // village ordinal (not name) so two villages sharing a display name stay in separate groups; the
+            // placeholder row (ordinal -1, empty header) forms one group whose header is hidden.
+            if (view is not null && view.GroupDescriptions.Count == 0)
+            {
+                view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(FarmListStatusRow.VillageOrdinal)));
+            }
+
             view?.Refresh();
             SyncFarmingControlsEnabledState();
         }

@@ -104,7 +104,29 @@ public sealed partial class TravianClient : IFarmingClient
         return remaining;
     }
 
-    public async Task<int> SendAllFarmListsNowAsync(CancellationToken cancellationToken = default)
+    public Task<int> SendAllFarmListsNowAsync(CancellationToken cancellationToken = default)
+        => SendFarmListsSequentiallyAsync(selectedNames: null, selectedIds: null, throwIfNoneSendable: true, cancellationToken);
+
+    public Task<int> SendSelectedFarmListsNowAsync(
+        IReadOnlyCollection<string> selectedNames,
+        IReadOnlyCollection<string> selectedIds,
+        CancellationToken cancellationToken = default)
+        => SendFarmListsSequentiallyAsync(
+            selectedNames: new HashSet<string>(selectedNames ?? [], StringComparer.OrdinalIgnoreCase),
+            selectedIds: new HashSet<string>(selectedIds ?? [], StringComparer.OrdinalIgnoreCase),
+            throwIfNoneSendable: false,
+            cancellationToken);
+
+    // Core sequential send: opens the farm page, resolves every list with an enabled Start button (optionally
+    // filtered to the toggled/selected lists), then clicks each Start ONE AT A TIME and waits for that list's
+    // "being raided" counter to rise (Travian's live confirmation the raids were dispatched) before the next
+    // click. Clicking every list at once — or the single "start all" button — is unsafe: a list can silently
+    // fail to send with no per-list feedback. The wait between each click is the "Send farmlists" pacing.
+    private async Task<int> SendFarmListsSequentiallyAsync(
+        IReadOnlySet<string>? selectedNames,
+        IReadOnlySet<string>? selectedIds,
+        bool throwIfNoneSendable,
+        CancellationToken cancellationToken)
     {
         LogFunctionStarted();
         await EnsureLoggedInAsync(cancellationToken: cancellationToken);
@@ -119,22 +141,175 @@ public sealed partial class TravianClient : IFarmingClient
         await WaitForFarmListsRenderedAsync(cancellationToken);
         await WaitForDispatchLimitToClearAsync(cancellationToken);
 
-        var clickState = await TryClickStartAllFarmListsAsync(cancellationToken);
-        if (clickState.ListCount <= 0)
+        var sendable = await ReadSendableFarmListsAsync(cancellationToken);
+        if (selectedNames is not null || selectedIds is not null)
         {
-            throw new InvalidOperationException("No farm lists were found for start-all farming.");
+            sendable = sendable
+                .Where(entry =>
+                    (selectedIds is not null && selectedIds.Contains(entry.Lid))
+                    || (selectedNames is not null && selectedNames.Contains(entry.Name)))
+                .ToList();
         }
 
-        if (!clickState.Clicked)
+        if (sendable.Count <= 0)
         {
-            throw new InvalidOperationException($"Could not click Travian Start all farmlists button: {clickState.Reason ?? "unknown reason"}.");
+            if (throwIfNoneSendable)
+            {
+                throw new InvalidOperationException("No farm lists were found for start-all farming.");
+            }
+
+            Notify("[farm-list] send: none of the selected farm lists is ready to send right now.");
+            return 0;
         }
 
-        Notify($"[farm-list] send-all started for {clickState.ListCount} list(s).");
-        await WaitForFarmListStartButtonsDisabledAsync(clickState.ListIds ?? [], cancellationToken);
-        await WaitForFarmListStartButtonsEnabledAsync(clickState.ListIds ?? [], cancellationToken);
-        Notify($"[farm-list] send-all completed for {clickState.ListCount} list(s).");
-        return clickState.ListCount;
+        Notify($"[farm-list] send: sending {sendable.Count} list(s) one at a time.");
+        var sent = 0;
+        for (var index = 0; index < sendable.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var entry = sendable[index];
+
+            // "Send farmlists" action pacing: a small randomized wait between each list's Start click.
+            if (index > 0)
+            {
+                await ApplyPacingDelayAsync(
+                    _config.FarmListStepDelayMinSeconds,
+                    _config.FarmListStepDelayMaxSeconds,
+                    "send-farmlists-pacing",
+                    $"Send farmlists: before '{entry.Name}'",
+                    cancellationToken);
+            }
+
+            var beingRaidedBefore = await ReadFarmListBeingRaidedCountAsync(entry.Lid, cancellationToken);
+            var clicked = await TryClickFarmListStartByLidAsync(entry.Lid, entry.Name, cancellationToken);
+            if (!clicked)
+            {
+                Notify($"[farm-list] send: could not click Start for '{entry.Name}' (lid {entry.Lid}); skipping.");
+                continue;
+            }
+
+            if (await WaitForFarmListRaidConfirmedAsync(entry.Lid, beingRaidedBefore, cancellationToken))
+            {
+                sent++;
+                Notify($"[farm-list] send: '{entry.Name}' dispatched (confirmed — being raided rose from {beingRaidedBefore}).");
+            }
+            else
+            {
+                Notify($"[farm-list] send: '{entry.Name}' Start click not confirmed as raided within timeout; continuing.");
+            }
+        }
+
+        Notify($"[farm-list] send completed: {sent}/{sendable.Count} list(s) confirmed dispatched.");
+        return sent;
+    }
+
+    // Reads the lid + name of every farm list whose Start button is currently enabled — the lists that a
+    // sequential send should actually send. Disabled buttons (empty list or on cooldown) are excluded.
+    private async Task<IReadOnlyList<(string Lid, string Name)>> ReadSendableFarmListsAsync(CancellationToken cancellationToken)
+    {
+        var entries = await _page.EvaluateAsync<SendableFarmListJs[]>(
+            """
+            () => {
+              const normalize = (value) => (value || '').replace(/\s+/g, ' ').trim();
+              const isDisabled = (node) => {
+                const cls = (node?.getAttribute('class') || '').toLowerCase();
+                return !node || node.disabled || node.getAttribute('disabled') !== null || cls.includes('disabled');
+              };
+              const out = [];
+              for (const wrapper of document.querySelectorAll('#rallyPointFarmList .farmListWrapper')) {
+                const button = wrapper.querySelector('button.startFarmList');
+                if (isDisabled(button)) continue;
+                const lid =
+                  wrapper.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') ||
+                  wrapper.querySelector('[data-farm-list-id]')?.getAttribute('data-farm-list-id') || '';
+                if (!lid) continue;
+                out.push({ lid, name: normalize(wrapper.querySelector('.farmListName .name')?.textContent) || 'Farm list' });
+              }
+              return out;
+            }
+            """).WaitAsync(cancellationToken);
+
+        return (entries ?? [])
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.Lid))
+            .Select(entry => (entry.Lid!.Trim(), string.IsNullOrWhiteSpace(entry.Name) ? "Farm list" : entry.Name!.Trim()))
+            .ToList();
+    }
+
+    // Reads the "being raided" numerator ("N/M being raided") from a list's status, used as the before/after
+    // signal that its Start click actually dispatched raids. Returns 0 when the list/status is not present.
+    private async Task<int> ReadFarmListBeingRaidedCountAsync(string lid, CancellationToken cancellationToken)
+    {
+        return await _page.EvaluateAsync<int>(
+            """
+            (listId) => {
+              const clean = (value) => (value || '')
+                .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+              const wrapper = Array.from(document.querySelectorAll('#rallyPointFarmList .farmListWrapper'))
+                .find(node => node.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') === String(listId));
+              const match = clean(wrapper?.querySelector('.farmListStatus')?.textContent).match(/(\d+)\s*\/\s*(\d+)/);
+              return match ? Number(match[1]) : 0;
+            }
+            """,
+            lid).WaitAsync(cancellationToken);
+    }
+
+    // Real, trusted click of a single list's Start button, resolved by its stable lid. Falls back to the
+    // name-based synthetic-dispatch path only when the real click is not actionable, matching the other sends.
+    private async Task<bool> TryClickFarmListStartByLidAsync(string lid, string name, CancellationToken cancellationToken)
+    {
+        var button = _page
+            .Locator($"#rallyPointFarmList .farmListWrapper:has(.dragAndDrop[data-list='{lid}']) button.startFarmList")
+            .First;
+        return await TryRealClickFarmButtonAsync(
+            button,
+            () => JsDispatchFarmListSendNowAsync(name),
+            $"send farm list '{name}'",
+            cancellationToken);
+    }
+
+    // Waits for Travian's live confirmation that a list's raids were dispatched: its "being raided" count
+    // rises above the pre-click value, or its Start button becomes disabled (nothing left ready to send).
+    // Bounded so a list that shows no visible change never blocks the rest of the sequential send.
+    private async Task<bool> WaitForFarmListRaidConfirmedAsync(string lid, int beingRaidedBefore, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _page.WaitForFunctionAsync(
+                """
+                ([listId, before]) => {
+                  const clean = (value) => (value || '')
+                    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                  const wrapper = Array.from(document.querySelectorAll('#rallyPointFarmList .farmListWrapper'))
+                    .find(node => node.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') === String(listId));
+                  if (!wrapper) return false;
+                  const match = clean(wrapper.querySelector('.farmListStatus')?.textContent).match(/(\d+)\s*\/\s*(\d+)/);
+                  const nowRaided = match ? Number(match[1]) : 0;
+                  if (nowRaided > before) return true;
+                  const button = wrapper.querySelector('button.startFarmList');
+                  const cls = (button?.getAttribute('class') || '').toLowerCase();
+                  return !button || button.disabled || button.getAttribute('disabled') !== null || cls.includes('disabled');
+                }
+                """,
+                new object[] { lid, beingRaidedBefore },
+                new PageWaitForFunctionOptions { Timeout = 5000 }).WaitAsync(cancellationToken);
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
     }
 
     public async Task<FarmListLossDeactivationResult> DeactivateFarmListLossTargetsAsync(
@@ -471,6 +646,9 @@ public sealed partial class TravianClient : IFarmingClient
 
               // Official Travian (T4.6) keeps list metadata rendered even when lists are collapsed.
               const officialCandidates = Array.from(document.querySelectorAll('#rallyPointFarmList .farmListWrapper'));
+              // Ordinal of each owning .villageWrapper, so two villages that happen to share a display
+              // name stay as separate groups (the page exposes no village id/coordinates on the wrapper).
+              const villageWrappers = Array.from(document.querySelectorAll('#rallyPointFarmList .villageWrapper'));
               if (officialCandidates.length > 0) {
                 return officialCandidates.slice(0, 200).map((candidate) => {
                   const name =
@@ -480,6 +658,12 @@ public sealed partial class TravianClient : IFarmingClient
                     candidate.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') ||
                     candidate.querySelector('[data-farm-list-id]')?.getAttribute('data-farm-list-id') ||
                     '';
+
+                  // Owning village name + ordinal from the wrapping .villageWrapper header. Used only to
+                  // group lists under a village heading in the UI; empty/-1 when there is no wrapper.
+                  const villageWrapper = candidate.closest('.villageWrapper');
+                  const villageName = normalize(villageWrapper?.querySelector('.villageHeader .villageName')?.textContent);
+                  const villageIndex = villageWrapper ? villageWrappers.indexOf(villageWrapper) : -1;
 
                   const statusText = cleanNumericText(candidate.querySelector('.farmListStatus')?.textContent);
                   const statusMatch = statusText.match(/(\d+)\s*\/\s*(\d+)/);
@@ -537,7 +721,9 @@ public sealed partial class TravianClient : IFarmingClient
                     // green, clickable "Start (N)" button for the N targets that ARE ready — it must still
                     // be sendable. Only treat it as not-ready when that button is missing/disabled or 0.
                     disabled: startButtonDisabled || startCount === 0,
-                    lid
+                    lid,
+                    villageName,
+                    villageIndex
                   };
                 });
               }
@@ -690,7 +876,9 @@ public sealed partial class TravianClient : IFarmingClient
                     Capacity: row.Capacity,
                     FarmCoordinates: row.FarmCoordinates ?? [],
                     Finish: timer.RemainingSeconds is > 0 ? TimerSnapshot.FromRemaining(timer.RemainingSeconds.Value) : null,
-                    TimerIsEstimated: timer.IsEstimated);
+                    TimerIsEstimated: timer.IsEstimated,
+                    VillageName: string.IsNullOrWhiteSpace(row.VillageName) ? null : row.VillageName!.Trim(),
+                    VillageIndex: row.VillageIndex is >= 0 ? row.VillageIndex : null);
             })
             .ToList();
     }
@@ -741,86 +929,6 @@ public sealed partial class TravianClient : IFarmingClient
         throw new InvalidOperationException($"Farm dispatch limit active. queue_wait_seconds={waitSeconds}");
     }
 
-    private async Task<FarmListSendAllClickStateJs> TryClickStartAllFarmListsAsync(CancellationToken cancellationToken)
-    {
-        // Resolve the start-all button state WITHOUT clicking, so the click itself can be a real, trusted
-        // Playwright click below (pointer movement + full event sequence, isTrusted=true). An empty reason
-        // with listCount>0 means the button is present and enabled; a non-empty reason means not clickable.
-        var state = await _page.EvaluateAsync<FarmListSendAllClickStateJs>(
-            """
-            () => {
-              const readListId = (wrapper) =>
-                wrapper?.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') ||
-                wrapper?.querySelector('[data-farm-list-id]')?.getAttribute('data-farm-list-id') ||
-                '';
-              const isDisabled = (node) => {
-                const cls = (node?.getAttribute('class') || '').toLowerCase();
-                return !node || node.disabled || node.getAttribute('disabled') !== null || cls.includes('disabled');
-              };
-
-              // Only track lists whose Start button is ENABLED — those are the ones "send all" actually
-              // sends. Lists that are already disabled (empty/no valid targets, or on cooldown) are not
-              // part of this send and must be excluded, otherwise the completion wait below would block
-              // for its full timeout waiting for a button that never re-enables.
-              const wrappers = Array.from(document.querySelectorAll('#rallyPointFarmList .farmListWrapper'));
-              const listIds = wrappers
-                .map(wrapper => ({ wrapper, button: wrapper.querySelector('button.startFarmList') }))
-                .filter(entry => entry.button && !isDisabled(entry.button))
-                .map(entry => readListId(entry.wrapper))
-                .filter(id => id && id.length > 0);
-              const allButton = document.querySelector('#rallyPointFarmList button.startAllFarmLists, button.startAllFarmLists');
-              if (!allButton) {
-                return { clicked: false, reason: 'start-all button not found', listIds, listCount: listIds.length };
-              }
-
-              if (isDisabled(allButton)) {
-                return { clicked: false, reason: 'start-all button disabled', listIds, listCount: listIds.length };
-              }
-
-              return { clicked: false, reason: '', listIds, listCount: listIds.length };
-            }
-            """).WaitAsync(cancellationToken);
-
-        state ??= new FarmListSendAllClickStateJs { Clicked = false, Reason = "start-all state could not be read" };
-        if (state.ListCount <= 0 || !string.IsNullOrEmpty(state.Reason))
-        {
-            return state;
-        }
-
-        var clicked = await TryRealClickFarmButtonAsync(
-            _page.Locator("#rallyPointFarmList button.startAllFarmLists, button.startAllFarmLists").First,
-            JsDispatchStartAllFarmListsAsync,
-            "start all farm lists",
-            cancellationToken);
-
-        return new FarmListSendAllClickStateJs
-        {
-            Clicked = clicked,
-            Reason = clicked ? string.Empty : "start-all button click did not register",
-            ListIds = state.ListIds,
-            ListCount = state.ListCount,
-        };
-    }
-
-    // Fallback that dispatches synthetic mouse events on the start-all button. Used only when the real
-    // Playwright click above is not actionable (covered/detached), so farm-send behavior never regresses.
-    private async Task<bool> JsDispatchStartAllFarmListsAsync()
-    {
-        return await _page.EvaluateAsync<bool>(
-            """
-            () => {
-              const allButton = document.querySelector('#rallyPointFarmList button.startAllFarmLists, button.startAllFarmLists');
-              if (!allButton) return false;
-              const cls = (allButton.getAttribute('class') || '').toLowerCase();
-              if (allButton.disabled || allButton.getAttribute('disabled') !== null || cls.includes('disabled')) return false;
-              allButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-              allButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-              allButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-              return true;
-            }
-            """);
-    }
-
     // Clicks a farm-list button with a real, trusted Playwright click (Playwright moves the pointer and
     // fires the full event sequence, so the click reads as isTrusted). Falls back to the supplied
     // synthetic-dispatch action only when the real click is not actionable, so behavior never regresses.
@@ -852,79 +960,6 @@ public sealed partial class TravianClient : IFarmingClient
 
         return await jsFallback();
     }
-
-    private async Task WaitForFarmListStartButtonsDisabledAsync(IReadOnlyList<string> listIds, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await _page.WaitForFunctionAsync(
-                FarmListStartButtonsDisabledScript,
-                listIds.ToArray(),
-                new PageWaitForFunctionOptions { Timeout = 15000 }).WaitAsync(cancellationToken);
-        }
-        catch (TimeoutException)
-        {
-            Notify("[farm-list] send-all buttons did not visibly disable within 15 seconds; continuing to completion wait.");
-        }
-    }
-
-    private async Task WaitForFarmListStartButtonsEnabledAsync(IReadOnlyList<string> listIds, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await _page.WaitForFunctionAsync(
-                FarmListStartButtonsEnabledScript,
-                listIds.ToArray(),
-                new PageWaitForFunctionOptions { Timeout = 60000 }).WaitAsync(cancellationToken);
-        }
-        catch (TimeoutException)
-        {
-            // The raids were already dispatched by the click above; a Start button that has not re-enabled
-            // within the timeout (e.g. a list now on cooldown) is not a send failure. Complete the operation
-            // with a warning instead of blocking/alarming.
-            Notify("[farm-list] send-all: some Start buttons had not re-enabled within 60 seconds; treating the send as complete.");
-        }
-    }
-
-    private const string FarmListStartButtonsDisabledScript =
-        """
-        (ids) => {
-          const wanted = new Set((ids || []).map(String).filter(Boolean));
-          const readListId = (button) => {
-            const wrapper = button.closest('.farmListWrapper');
-            return wrapper?.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') ||
-              wrapper?.querySelector('[data-farm-list-id]')?.getAttribute('data-farm-list-id') ||
-              '';
-          };
-          const isDisabled = (node) => {
-            const cls = (node?.getAttribute('class') || '').toLowerCase();
-            return !!node && (node.disabled || node.getAttribute('disabled') !== null || cls.includes('disabled'));
-          };
-          const buttons = Array.from(document.querySelectorAll('#rallyPointFarmList button.startFarmList, button.startFarmList'))
-            .filter(button => wanted.size === 0 || wanted.has(readListId(button)));
-          return buttons.length === 0 || buttons.some(isDisabled);
-        }
-        """;
-
-    private const string FarmListStartButtonsEnabledScript =
-        """
-        (ids) => {
-          const wanted = new Set((ids || []).map(String).filter(Boolean));
-          const readListId = (button) => {
-            const wrapper = button.closest('.farmListWrapper');
-            return wrapper?.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') ||
-              wrapper?.querySelector('[data-farm-list-id]')?.getAttribute('data-farm-list-id') ||
-              '';
-          };
-          const isDisabled = (node) => {
-            const cls = (node?.getAttribute('class') || '').toLowerCase();
-            return !!node && (node.disabled || node.getAttribute('disabled') !== null || cls.includes('disabled'));
-          };
-          const buttons = Array.from(document.querySelectorAll('#rallyPointFarmList button.startFarmList, button.startFarmList'))
-            .filter(button => wanted.size === 0 || wanted.has(readListId(button)));
-          return buttons.length === 0 || buttons.every(button => !isDisabled(button));
-        }
-        """;
 
     private async Task<IReadOnlyList<FarmListLossRowJs>> ReadFarmListLossRowsFromCurrentPageAsync(CancellationToken cancellationToken)
     {

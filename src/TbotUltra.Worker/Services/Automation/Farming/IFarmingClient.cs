@@ -18,6 +18,13 @@ public interface IFarmingClient
 
     Task<int> SendAllFarmListsNowAsync(CancellationToken cancellationToken = default);
 
+    // Sends only the toggled/selected farm lists (by name and/or stable lid), one at a time with per-list
+    // confirmation and "Send farmlists" pacing. Returns how many were confirmed dispatched (0 if none ready).
+    Task<int> SendSelectedFarmListsNowAsync(
+        IReadOnlyCollection<string> selectedNames,
+        IReadOnlyCollection<string> selectedIds,
+        CancellationToken cancellationToken = default);
+
     Task<FarmListLossDeactivationResult> DeactivateFarmListLossTargetsAsync(
         bool includeUnoccupiedOasis,
         CancellationToken cancellationToken = default);
