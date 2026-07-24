@@ -126,19 +126,14 @@ public partial class TravcoAnalyzeWindow : Window
         }
     }
 
-    // Fills the three stat tiles from an analysis result. "Players" is the distinct account count on the
-    // analyzed page; the full total is only known after Save all pages scrapes every page.
+    // Fills the stat tiles from an analysis result. Villages comes from Travco's own header badge
+    // (#list-object-count) — the whole search's inactive total — falling back to the current page's row
+    // count only when that badge was not readable.
     private void ShowAnalysisInfo(TravcoScrapeResult result)
     {
-        var players = result.Rows
-            .Select(row => row.Account?.Trim())
-            .Where(account => !string.IsNullOrWhiteSpace(account))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Count();
         PagesValue.Text = result.TotalPages.ToString();
-        PlayersValue.Text = players.ToString();
-        VillagesValue.Text = result.Rows.Count.ToString();
-        InfoCard.Visibility = Visibility.Visible;
+        VillagesValue.Text = (result.TotalInactiveCount ?? result.Rows.Count).ToString();
+        ResultsPanel.Visibility = Visibility.Visible;
     }
 
     private void SaveAllButton_Click(object sender, RoutedEventArgs e) => _ = RunSaveAllAsync();
@@ -187,6 +182,10 @@ public partial class TravcoAnalyzeWindow : Window
                 defaultResult: MessageBoxResult.OK,
                 cancelResult: MessageBoxResult.OK,
                 successResult: MessageBoxResult.OK);
+            // The user has confirmed the result; close this popup so they return to the Travco tools window,
+            // whose saved-list panel refreshes (ListSaved) with the freshly saved list.
+            Close();
+            return;
         }
         catch (OperationCanceledException)
         {

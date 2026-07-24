@@ -19,7 +19,8 @@ public static partial class TravcoInactiveSearchParser
         return new TravcoScrapeResult(
             Math.Max(1, rawPage.PageNumber),
             Math.Max(1, rawPage.TotalPages),
-            rows);
+            rows,
+            rawPage.TotalInactiveCount);
     }
 
     private static TravcoRow? ParseRow(TravcoRawRow rawRow)

@@ -590,17 +590,10 @@
                                        Foreground="{DynamicResource TextPrimaryBrush}"
                                        Margin="0,0,0,10" />
 
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <TextBlock Text="After login"
-                                        FontWeight="SemiBold"
-                                        Foreground="{DynamicResource TextPrimaryBrush}"
-                                        VerticalAlignment="Center" />
-
-                                <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                Margin="6,0,0,0"
-                                                ToolTip="Optional extra analyzing-functions to run after login.
-                                                (This is optional)" />
-                            </StackPanel>
+                            <TextBlock Text="These functions will run when the user is logged in"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,8" />
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="PostLoginAnalyzeFarmlistsCheckBox"
@@ -880,7 +873,7 @@
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="190" />
-                                    <ColumnDefinition Width="48" />
+                                    <ColumnDefinition Width="53" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="Minimum silver balance" VerticalAlignment="Center" />
@@ -892,7 +885,7 @@
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="190" />
-                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="53" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="Daily spending limit" VerticalAlignment="Center" />
@@ -941,7 +934,7 @@
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="190" />
-                                    <ColumnDefinition Width="48" />
+                                    <ColumnDefinition Width="53" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="Minimum gold balance" VerticalAlignment="Center" />
@@ -953,7 +946,7 @@
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="190" />
-                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="53" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="Daily spending limit" VerticalAlignment="Center" />

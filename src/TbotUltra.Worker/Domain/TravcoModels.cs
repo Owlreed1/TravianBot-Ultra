@@ -10,7 +10,10 @@ public sealed record TravcoRow(
 public sealed record TravcoScrapeResult(
     int PageNumber,
     int TotalPages,
-    IReadOnlyList<TravcoRow> Rows);
+    IReadOnlyList<TravcoRow> Rows,
+    // Total inactive villages reported by Travco's own header badge (#list-object-count) for the whole
+    // search, independent of how many rows are on the current page. Null when the badge was not readable.
+    int? TotalInactiveCount = null);
 
 public sealed record TravcoSearchRequest(
     int X,
@@ -31,4 +34,5 @@ public sealed record TravcoRawPage(
     int PageNumber,
     int TotalPages,
     IReadOnlyList<string> Headers,
-    IReadOnlyList<TravcoRawRow> Rows);
+    IReadOnlyList<TravcoRawRow> Rows,
+    int? TotalInactiveCount = null);

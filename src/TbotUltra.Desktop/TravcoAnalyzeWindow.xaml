@@ -36,9 +36,13 @@
                     Background="{DynamicResource SurfaceBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
                     BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="14">
+                    CornerRadius="10"
+                    Padding="16">
                 <StackPanel>
+                    <TextBlock Text="Search settings"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               Margin="0,0,0,12" />
                     <TextBlock Text="Village"
                                Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,4" />
                     <ComboBox ItemsSource="{Binding Villages}"
@@ -47,7 +51,7 @@
 
                     <Grid Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="130" />
                             <ColumnDefinition Width="14" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
@@ -55,7 +59,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Active days"
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Days inactive"
                                    Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,4" />
                         <TextBlock Grid.Row="0" Grid.Column="2" Text="Order by"
                                    Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,4" />
@@ -90,104 +94,78 @@
                     Foreground="{DynamicResource SuccessTextBrush}"
                     Click="AnalyzeButton_Click" />
 
-            <!-- Analysis result -->
-            <Border Grid.Row="3"
-                    x:Name="InfoCard"
-                    Visibility="Collapsed"
-                    Margin="0,14,0,0"
-                    Background="{DynamicResource SurfaceBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="14">
-                <StackPanel>
-                    <TextBlock Text="Analysis result"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimaryBrush}"
-                               Margin="0,0,0,10" />
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="10" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="10" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
+            <!-- Analysis result + save action -->
+            <StackPanel Grid.Row="3"
+                        x:Name="ResultsPanel"
+                        Visibility="Collapsed"
+                        Margin="0,14,0,0">
+                <Border Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="Analysis result"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Margin="0,0,0,10" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="10" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0"
-                                Background="{DynamicResource HeroAdvBgBrush}"
-                                BorderBrush="{DynamicResource HeroAdvBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Padding="10,8">
-                            <StackPanel>
-                                <TextBlock x:Name="PagesValue" Text="-"
-                                           FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource SuccessTextStrongBrush}" />
-                                <TextBlock Text="Pages"
-                                           Foreground="{DynamicResource TextMutedBrush}" Margin="0,2,0,0" />
-                            </StackPanel>
-                        </Border>
+                            <Border Grid.Column="0"
+                                    Background="{DynamicResource HeroAdvBgBrush}"
+                                    BorderBrush="{DynamicResource HeroAdvBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="12,10">
+                                <StackPanel>
+                                    <TextBlock x:Name="PagesValue" Text="-"
+                                               FontSize="22" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource SuccessTextStrongBrush}" />
+                                    <TextBlock Text="Pages"
+                                               Foreground="{DynamicResource TextMutedBrush}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Border>
 
-                        <Border Grid.Column="2"
-                                Background="{DynamicResource HeroAdvBgBrush}"
-                                BorderBrush="{DynamicResource HeroAdvBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Padding="10,8">
-                            <StackPanel>
-                                <TextBlock x:Name="PlayersValue" Text="-"
-                                           FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource SuccessTextStrongBrush}" />
-                                <TextBlock Text="Players"
-                                           Foreground="{DynamicResource TextMutedBrush}" Margin="0,2,0,0" />
-                            </StackPanel>
-                        </Border>
+                            <Border Grid.Column="2"
+                                    Background="{DynamicResource HeroAdvBgBrush}"
+                                    BorderBrush="{DynamicResource HeroAdvBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="12,10">
+                                <StackPanel>
+                                    <TextBlock x:Name="VillagesValue" Text="-"
+                                               FontSize="22" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource SuccessTextStrongBrush}" />
+                                    <TextBlock Text="Villages"
+                                               Foreground="{DynamicResource TextMutedBrush}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
 
-                        <Border Grid.Column="4"
-                                Background="{DynamicResource HeroAdvBgBrush}"
-                                BorderBrush="{DynamicResource HeroAdvBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Padding="10,8">
-                            <StackPanel>
-                                <TextBlock x:Name="VillagesValue" Text="-"
-                                           FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource SuccessTextStrongBrush}" />
-                                <TextBlock Text="Villages"
-                                           Foreground="{DynamicResource TextMutedBrush}" Margin="0,2,0,0" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-
-                    <Button x:Name="SaveAllButton"
-                            Content="Save all pages as list"
-                            Height="34"
-                            MinWidth="180"
-                            HorizontalAlignment="Left"
-                            Margin="0,14,0,0"
-                            IsEnabled="False"
-                            FontWeight="SemiBold"
-                            Background="{DynamicResource SuccessBgBrush}"
-                            BorderBrush="{DynamicResource SuccessBorderBrush}"
-                            Foreground="{DynamicResource SuccessTextBrush}"
-                            Click="SaveAllButton_Click" />
-                </StackPanel>
-            </Border>
+                <Button x:Name="SaveAllButton"
+                        Content="Save all pages as list"
+                        Height="34"
+                        MinWidth="180"
+                        HorizontalAlignment="Left"
+                        Margin="0,14,0,0"
+                        IsEnabled="False"
+                        FontWeight="SemiBold"
+                        Background="{DynamicResource SuccessBgBrush}"
+                        BorderBrush="{DynamicResource SuccessBorderBrush}"
+                        Foreground="{DynamicResource SuccessTextBrush}"
+                        Click="SaveAllButton_Click" />
+            </StackPanel>
 
             <!-- Bottom bar -->
             <Grid Grid.Row="5" Margin="0,14,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0"
-                           Text="{Binding StatusText}"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           VerticalAlignment="Center"
-                           TextWrapping="Wrap"
-                           Margin="0,0,12,0" />
-                <Button Grid.Column="1" Width="100" Content="Close" Click="CloseButton_Click" />
+                <Button HorizontalAlignment="Right" Width="100" Content="Close" Click="CloseButton_Click" />
             </Grid>
         </Grid>
 

@@ -296,6 +296,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
   later full logins merge the live sidebar so new/renamed villages are found without another profile visit.
 - Browser activity statistics are account-scoped: lifetime counters persist; session counters do not.
 - Farm-list exact timers get a 5-15s render margin; unreadable disabled timers use an estimated 60s wait.
+- Never stack Add-target dialogs: a canceled/failed add-farms run can leave the dialog open, and the reopen
+  dispatch fires even behind an overlay, so opening a new one produces two stacked dialogs whose top
+  `#dialogOverlay` intercepts every click on the form inputs (coordinate click times out). `OpenAddRaidFormAsync`
+  closes any lingering dialog before opening, and a single target's fill/save exception is skipped (bounded
+  consecutive-failure abort) instead of failing the whole batch.
 - Bonus-video failures use shared protected timing, typed cooldowns, account proxy routing, and sanitized logs.
   See [bonus-video ADR](adr/2026-07-18-bonus-video.md).
 - Diagnostics use shared busy/cancel behavior, sanitize settings/logs/paths/URLs/auth/proxy data, and never present

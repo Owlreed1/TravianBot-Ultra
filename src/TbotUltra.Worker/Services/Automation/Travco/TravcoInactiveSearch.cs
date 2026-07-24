@@ -176,9 +176,12 @@ public static class TravcoInactiveSearch
                   ];
                 });
               const totalPages = Math.max(1, ...pageCandidates.filter(Number.isFinite));
+              const countText = (document.querySelector('#list-object-count')?.textContent || '').replace(/[^\d]/g, '');
+              const totalInactiveCount = countText.length > 0 ? Number.parseInt(countText, 10) : null;
               return {
                 pageNumber: Number.isFinite(pageNumber) ? pageNumber : 1,
                 totalPages,
+                totalInactiveCount: Number.isFinite(totalInactiveCount) ? totalInactiveCount : null,
                 headers,
                 rows
               };
@@ -383,6 +386,10 @@ public static class TravcoInactiveSearch
             && totalElement.TryGetInt32(out var parsedTotal)
                 ? parsedTotal
                 : 1;
+        int? totalInactiveCount = payload.TryGetProperty("totalInactiveCount", out var countElement)
+            && countElement.TryGetInt32(out var parsedCount)
+                ? parsedCount
+                : null;
         var headers = payload.TryGetProperty("headers", out var headersElement)
             && headersElement.ValueKind == JsonValueKind.Array
                 ? headersElement.EnumerateArray()
@@ -414,7 +421,7 @@ public static class TravcoInactiveSearch
             }
         }
 
-        return new TravcoRawPage(pageNumber, totalPages, headers, rows);
+        return new TravcoRawPage(pageNumber, totalPages, headers, rows, totalInactiveCount);
     }
 
     private static string NormalizeHost(string? value)

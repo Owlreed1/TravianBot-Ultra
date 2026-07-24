@@ -214,6 +214,16 @@ public sealed partial class TravianClient
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            // Snapshot how many rewards are still claimable BEFORE the click. After the click we wait for
+            // this to drop (the reward we clicked actually registered as claimed) before selecting the next
+            // one — otherwise a slow React state update leaves the same button as :not(.collected) and the
+            // loop clicks it again, which glitches/hangs the page.
+            var claimableBefore = await CountClaimableCollectButtonsOnCurrentTabAsync();
+            if (claimableBefore <= 0)
+            {
+                break;
+            }
+
             // Paced by the dedicated "Collect tasks delay" setting, before every click, so the
             // React page registers the previous claim and the burst does not look robotic. The click
             // below therefore skips the generic click pacing — running both stacked two waits per
@@ -289,9 +299,82 @@ public sealed partial class TravianClient
             }
 
             collected += 1;
+
+            // Confirm THIS claim registered (the claimable count dropped) before clicking again. Without
+            // this the loop can re-click the same, still-animating button — the repeated press right as the
+            // reward disappears is what makes the page glitch and hang. A slow/absent drop stops the tab
+            // instead of hammering; a genuinely unclaimed reward is picked up on the next pass or run.
+            if (!await WaitForCollectClaimRegisteredAsync(claimableBefore, cancellationToken))
+            {
+                Notify("[tasks] collect claim not confirmed after click; stopping this tab to avoid re-clicking the same reward");
+                break;
+            }
         }
 
         return collected;
+    }
+
+    // Number of collect buttons still claimable (visible, enabled, not yet .collected) on the current tab.
+    // A read-only probe used to confirm a click actually claimed a reward before moving to the next one.
+    private async Task<int> CountClaimableCollectButtonsOnCurrentTabAsync()
+    {
+        try
+        {
+            return await _page.EvaluateAsync<int>(
+                """
+                () => {
+                  const isVisible = element => {
+                    if (!element) return false;
+                    const style = window.getComputedStyle(element);
+                    const rect = element.getBoundingClientRect();
+                    return style.visibility !== 'hidden'
+                      && style.display !== 'none'
+                      && rect.width > 0
+                      && rect.height > 0;
+                  };
+                  return Array.from(document.querySelectorAll('button.textButtonV2.collect:not(.collected)'))
+                    .filter(button => {
+                      if (!isVisible(button)) return false;
+                      const disabled = button.disabled
+                        || /(^|\s)disabled(\s|$)/i.test(button.className || '')
+                        || button.getAttribute('aria-disabled') === 'true';
+                      if (disabled) return false;
+                      const label = (button.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+                      return label === 'collect';
+                    }).length;
+                }
+                """);
+        }
+        catch (PlaywrightException ex) when (IsTransientExecutionContextError(ex))
+        {
+            return -1;
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
+    // After a collect click, waits until the claimable-button count drops below what it was before the
+    // click — i.e. the reward just clicked registered as claimed. Returns false if it never drops within
+    // the timeout, so the caller can stop rather than re-click the same button while React is still
+    // processing/animating the claim. A transient read failure (-1) is ignored, not treated as a drop.
+    private async Task<bool> WaitForCollectClaimRegisteredAsync(int claimableBefore, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(4000);
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var current = await CountClaimableCollectButtonsOnCurrentTabAsync();
+            if (current >= 0 && current < claimableBefore)
+            {
+                return true;
+            }
+
+            await Task.Delay(Random.Shared.Next(100, 180), cancellationToken);
+        }
+
+        return false;
     }
 
     // Randomized delay between the reward clicks in the auto-collect tasks flow only (configured by

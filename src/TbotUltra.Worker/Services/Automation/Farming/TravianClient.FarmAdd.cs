@@ -100,25 +100,22 @@ public sealed partial class TravianClient
         // When a coordinate is skipped before Save the Add-target form is left open (see TryFillAddRaidFormAndSaveAsync),
         // so the next coordinate is typed straight into it instead of closing + reopening the dialog every miss.
         var reuseOpenForm = false;
+        // Consecutive fill/save exceptions. A single failure is skipped, but a run of them means the session
+        // itself is broken, so the batch aborts instead of churning through every remaining candidate.
+        var consecutiveFillExceptions = 0;
         for (var i = 0; i < coordinates.Count && added < targetAddedCount; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // On a reused (already-open) form the farm count cannot have changed since the last miss, so skip
-            // the re-read — it would otherwise query the list sitting behind the open dialog.
-            if (!reuseOpenForm)
+            // The farm count stays authoritative without re-reading the page every loop: it starts from the
+            // initial read above and each verified Added below increments it by exactly one. The save
+            // confirmation (WaitForFunction + ReadAddTargetSaveStateAsync) is what proves an add really
+            // happened, so this 100/100 capacity guard is just as safe while reusing the count we already
+            // have instead of an extra round-trip between saving and opening the next Add target form.
+            if (!reuseOpenForm && currentFarmCount.Value >= OfficialFarmListCapacity)
             {
-                currentFarmCount = await ReadOfficialFarmListFarmCountAsync(lid, cancellationToken);
-                if (!currentFarmCount.HasValue)
-                {
-                    throw new InvalidOperationException($"Could not verify the current farm count for '{farmListName}'.");
-                }
-
-                if (currentFarmCount.Value >= OfficialFarmListCapacity)
-                {
-                    Notify($"[farm-list] '{farmListName}' reached 100/100; stopping before another Add target attempt.");
-                    break;
-                }
+                Notify($"[farm-list] '{farmListName}' reached 100/100; stopping before another Add target attempt.");
+                break;
             }
 
             var coordinate = coordinates[i];
@@ -130,16 +127,43 @@ public sealed partial class TravianClient
                 await OpenAddRaidFormAsync(lid, cancellationToken);
             }
 
-            var saveOutcome = await TryFillAddRaidFormAndSaveAsync(
-                farmListName,
-                troopType.Trim(),
-                troopCount,
-                coordinate.X,
-                coordinate.Y,
-                lid,
-                useDefaultTroops,
-                coordinate.RequireUnoccupiedOasis,
-                cancellationToken);
+            AddRaidSaveOutcome saveOutcome;
+            try
+            {
+                saveOutcome = await TryFillAddRaidFormAndSaveAsync(
+                    farmListName,
+                    troopType.Trim(),
+                    troopCount,
+                    coordinate.X,
+                    coordinate.Y,
+                    lid,
+                    useDefaultTroops,
+                    coordinate.RequireUnoccupiedOasis,
+                    cancellationToken);
+                consecutiveFillExceptions = 0;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
+            {
+                // One target failing to fill/save (e.g. an overlay intercepting the coordinate click) must not
+                // abort the whole batch: close whatever is open so the next open starts clean, count this one
+                // as failed, and continue. Too many in a row means the session is broken, so bail out then.
+                failed++;
+                reuseOpenForm = false;
+                Notify($"{stepPrefix} Add target for ({coordinate.X}|{coordinate.Y}) failed and was skipped: {ex.Message}");
+                progress?.Report(new FarmAddProgress(farmListName, attempted, targetAddedCount, added, notFound, OccupiedOasisSkippedCount: occupiedSkipped));
+                await CloseAnyOpenAddTargetDialogAsync(cancellationToken);
+                if (++consecutiveFillExceptions >= 5)
+                {
+                    throw new InvalidOperationException(
+                        $"Add farms aborted after {consecutiveFillExceptions} consecutive Add target failures.", ex);
+                }
+
+                continue;
+            }
 
             // Saved/already/failed outcomes close or abandon the form. Pre-save skips keep it open for the next attempt.
             reuseOpenForm = false;
@@ -147,6 +171,9 @@ public sealed partial class TravianClient
             if (saveOutcome == AddRaidSaveOutcome.Added)
             {
                 added++;
+                // Carry the confirmed add forward instead of re-reading the page: a verified save added
+                // exactly one farm, so the maintained count stays correct for the next capacity check.
+                currentFarmCount = currentFarmCount.Value + 1;
                 Notify($"{stepPrefix} Added farm ({coordinate.X}|{coordinate.Y}) to '{farmListName}'.");
                 progress?.Report(new FarmAddProgress(farmListName, attempted, targetAddedCount, added, notFound, OccupiedOasisSkippedCount: occupiedSkipped));
                 continue;
@@ -214,6 +241,12 @@ public sealed partial class TravianClient
             await EnsureRallyPointAndOpenFarmListPageAsync(cancellationToken);
         }
 
+        // Never stack Add-target dialogs. A previous run that was canceled or failed mid-form can leave a
+        // dialog open; the dispatch below fires even behind an overlay, so it would open a SECOND dialog and
+        // the top #dialogOverlay then intercepts every click on the new form's inputs (the coordinate click
+        // times out). Close any lingering dialog first so exactly one is ever open.
+        await CloseAnyOpenAddTargetDialogAsync(cancellationToken);
+
         var clicked = await _page.EvaluateAsync<bool>(
             """
             (listId) => {
@@ -262,6 +295,36 @@ public sealed partial class TravianClient
         }
 
         await EnsureLoggedInAsync(cancellationToken: cancellationToken);
+    }
+
+    // Closes any Add-target dialog / modal overlay that is already open, so opening a new one can never stack
+    // a second dialog on top of it. A leftover dialog (e.g. after a canceled or failed run) otherwise makes
+    // the next open produce two stacked dialogs whose top #dialogOverlay intercepts every click on the form's
+    // inputs, timing out the coordinate field. Safe to call when nothing is open — it no-ops.
+    private async Task CloseAnyOpenAddTargetDialogAsync(CancellationToken cancellationToken)
+    {
+        // One dismiss per iteration collapses one layer of a (usually single) leftover dialog; the loop
+        // handles the rare case where a previous failure stacked more than one. Reuses the existing dismiss
+        // path so no new raw DOM click is introduced.
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var anyOpen = await _page.EvaluateAsync<bool>(
+                """
+                () => !!document.querySelector('#farmListTargetForm')
+                  || Array.from(document.querySelectorAll('.dialogOverlay.dialogVisible'))
+                      .some(node => node.getClientRects().length > 0)
+                """).WaitAsync(cancellationToken);
+            if (!anyOpen)
+            {
+                return;
+            }
+
+            Notify($"[farm-list] closing a lingering Add target dialog before opening a new one (attempt {attempt}/3).");
+            await DismissAddTargetDialogAsync($"clearing a lingering dialog before opening a new Add target (attempt {attempt})");
+        }
+
+        Notify("[farm-list] a lingering Add target dialog could not be fully closed before opening a new one.");
     }
 
     private async Task<AddRaidSaveOutcome> TryFillAddRaidFormAndSaveAsync(
