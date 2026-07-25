@@ -37,12 +37,20 @@
                         BorderBrush="{DynamicResource FocusBorderBrush}"
                         Foreground="{DynamicResource InfoTextBrush}"
                         Click="AnalyzeMapOasisButton_Click" />
-                <Button x:Name="CalculateDistanceButton"
-                        Margin="0,28,0,0"
-                        MinWidth="175"
-                        HorizontalAlignment="Left"
-                        Content="Calculate distance"
-                        Click="CalculateDistanceButton_Click" />
+                <StackPanel Orientation="Horizontal" Margin="0,28,0,0">
+                    <Button x:Name="CalculateDistanceButton"
+                            MinWidth="175"
+                            Content="Calculate distance"
+                            Click="CalculateDistanceButton_Click" />
+                    <ComboBox x:Name="DistanceVillageComboBox"
+                              Width="220"
+                              Margin="8,0,0,0"
+                              VerticalAlignment="Center"
+                              ToolTip="Village the distances in the lists are measured from."
+                              ItemsSource="{Binding Villages}"
+                              SelectedItem="{Binding SelectedVillage}"
+                              DisplayMemberPath="NameWithCoords" />
+                </StackPanel>
             </StackPanel>
 
             <Grid Grid.Row="1">

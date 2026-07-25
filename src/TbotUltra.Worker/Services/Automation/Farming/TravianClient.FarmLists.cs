@@ -203,6 +203,58 @@ public sealed partial class TravianClient : IFarmingClient
         return sent;
     }
 
+    // Sends every farm list in one action by clicking Travian's own "Start all farm lists" button
+    // (button.startAllFarmLists) — the fast "send everything at once" path, in contrast to the sequential
+    // per-list send above. Returns the number of lists that had an enabled Start button when clicked.
+    public async Task<int> SendAllFarmListsViaStartAllButtonAsync(CancellationToken cancellationToken = default)
+    {
+        LogFunctionStarted();
+        await EnsureLoggedInAsync(cancellationToken: cancellationToken);
+        if (!await ReadGoldClubEnabledAsync(cancellationToken))
+        {
+            throw new InvalidOperationException("Gold Club is not enabled for this account.");
+        }
+
+        await EnsureRallyPointAndOpenFarmListPageAsync(cancellationToken);
+        await DismissDeactivatedTargetsNoticeAsync(cancellationToken);
+        await WaitForPageReadyAsync(cancellationToken);
+        await WaitForFarmListsRenderedAsync(cancellationToken);
+        await WaitForDispatchLimitToClearAsync(cancellationToken);
+
+        var sendable = await ReadSendableFarmListsAsync(cancellationToken);
+        var clicked = await TryRealClickFarmButtonAsync(
+            _page.Locator("#rallyPointFarmList button.startAllFarmLists, button.startAllFarmLists").First,
+            JsDispatchStartAllFarmListsAsync,
+            "start all farm lists",
+            cancellationToken);
+        if (!clicked)
+        {
+            throw new InvalidOperationException("Could not click Travian's 'Start all farm lists' button.");
+        }
+
+        Notify($"[farm-list] clicked 'Start all farm lists' ({sendable.Count} list(s) had an enabled Start button).");
+        return sendable.Count;
+    }
+
+    // Synthetic-dispatch fallback for the start-all button, used only when the real Playwright click is not
+    // actionable (covered/detached), so the send never silently regresses.
+    private async Task<bool> JsDispatchStartAllFarmListsAsync()
+    {
+        return await _page.EvaluateAsync<bool>(
+            """
+            () => {
+              const allButton = document.querySelector('#rallyPointFarmList button.startAllFarmLists, button.startAllFarmLists');
+              if (!allButton) return false;
+              const cls = (allButton.getAttribute('class') || '').toLowerCase();
+              if (allButton.disabled || allButton.getAttribute('disabled') !== null || cls.includes('disabled')) return false;
+              allButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+              allButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+              allButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+              return true;
+            }
+            """);
+    }
+
     // Reads the lid + name of every farm list whose Start button is currently enabled — the lists that a
     // sequential send should actually send. Disabled buttons (empty list or on cooldown) are excluded.
     private async Task<IReadOnlyList<(string Lid, string Name)>> ReadSendableFarmListsAsync(CancellationToken cancellationToken)

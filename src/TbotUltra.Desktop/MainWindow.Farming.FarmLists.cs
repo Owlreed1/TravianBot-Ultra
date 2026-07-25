@@ -1037,19 +1037,54 @@ public partial class MainWindow
             return;
         }
 
+        // Let the user pick how to send: only the toggled lists (paced, like continuous farming) or every
+        // list at once via Travian's "Start all farm lists" button.
+        var chooser = new SendAllFarmListsWindow(this);
+        if (chooser.ShowDialog() != true || chooser.Choice == SendAllFarmListsWindow.SendAllChoice.Cancel)
+        {
+            return;
+        }
+
+        var sendToggled = chooser.Choice == SendAllFarmListsWindow.SendAllChoice.Toggled;
+        List<string> toggledNames = [];
+        List<string> toggledIds = [];
+        if (sendToggled)
+        {
+            var enabledRows = _farmLists.Where(row => IsRealFarmListRow(row) && row.IsEnabled).ToList();
+            toggledNames = enabledRows
+                .Select(row => row.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            toggledIds = enabledRows
+                .Select(row => row.ListId)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (toggledNames.Count == 0 && toggledIds.Count == 0)
+            {
+                AppendLog("[farm-list] Send all toggled: no farm lists are toggled on.");
+                AppDialog.Show(this, "No farm lists are toggled on.", "Send farmlists", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+        }
+
         var operationId = BeginOperation("Farm Send All Now");
         var operationSw = Stopwatch.StartNew();
         var operationToken = _loopController.StartOperation("operation");
         SetFarmingFunctionRunning(true, showCancelButton: false);
         BusyOverlay.ShowCancel = true;
-        ShowBusyOverlay("Send all now", "Sending all farmlists...");
+        ShowBusyOverlay("Send all now", sendToggled ? "Sending toggled farmlists..." : "Sending all farmlists...");
         try
         {
             var options = ApplySelectedVillageToOptions(LoadBotOptions());
             await EnsureChromiumInstalledAsync();
-            var sentCount = await _botService.SendAllFarmListsNowAsync(options, AppendLog, operationToken);
+            var sentCount = sendToggled
+                ? await _botService.SendSelectedFarmListsNowAsync(options, toggledNames, toggledIds, AppendLog, operationToken)
+                : await _botService.SendAllFarmListsViaStartAllButtonAsync(options, AppendLog, operationToken);
             await RefreshFarmListsFromServerAsync(options, operationToken);
-            CompleteOperation(operationId, operationSw, $"Sent all farmlists ({sentCount} list(s)).");
+            CompleteOperation(operationId, operationSw, $"Sent {(sendToggled ? "toggled" : "all")} farmlists ({sentCount} list(s)).");
         }
         catch (OperationCanceledException)
         {

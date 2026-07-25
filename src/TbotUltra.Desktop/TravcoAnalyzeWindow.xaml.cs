@@ -134,6 +134,9 @@ public partial class TravcoAnalyzeWindow : Window
         PagesValue.Text = result.TotalPages.ToString();
         VillagesValue.Text = (result.TotalInactiveCount ?? result.Rows.Count).ToString();
         ResultsPanel.Visibility = Visibility.Visible;
+        // Save all lives on the bottom bar next to Close (so Close is never pushed off the window); reveal it
+        // now that there is an analysis to save.
+        SaveAllButton.Visibility = Visibility.Visible;
     }
 
     private void SaveAllButton_Click(object sender, RoutedEventArgs e) => _ = RunSaveAllAsync();

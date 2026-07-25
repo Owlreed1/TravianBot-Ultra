@@ -621,6 +621,7 @@ public partial class TravcoToolsWindow : Window
         InactiveSearchButton.IsEnabled = !busy;
         AnalyzeMapOasisButton.IsEnabled = !busy;
         CalculateDistanceButton.IsEnabled = !busy;
+        DistanceVillageComboBox.IsEnabled = !busy;
         SavedListsListBox.IsEnabled = !busy;
         ResultsDataGrid.IsEnabled = !busy;
         SaveEditedListButton.IsEnabled = !busy && _editMode;

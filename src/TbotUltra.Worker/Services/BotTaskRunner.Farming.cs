@@ -80,6 +80,54 @@ public sealed partial class BotTaskRunner
         return listCount;
     }
 
+    public async Task<int> SendSelectedFarmListsNowAsync(
+        BotOptions options,
+        IReadOnlyCollection<string> selectedNames,
+        IReadOnlyCollection<string> selectedIds,
+        Action<string> log,
+        string? accountName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var sent = 0;
+        await ExecuteWithClientAsync(
+            options,
+            log,
+            accountName,
+            interactive: false,
+            cancellationToken,
+            async client =>
+            {
+                await client.LoginAsync(cancellationToken);
+                await RunFarmListLossDeactivationIfEnabledAsync(new TaskExecutionContext(this, options, client, log, cancellationToken, _ => { }));
+                sent = await client.SendSelectedFarmListsNowAsync(selectedNames, selectedIds, cancellationToken);
+            });
+
+        return sent;
+    }
+
+    public async Task<int> SendAllFarmListsViaStartAllButtonAsync(
+        BotOptions options,
+        Action<string> log,
+        string? accountName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var listCount = 0;
+        await ExecuteWithClientAsync(
+            options,
+            log,
+            accountName,
+            interactive: false,
+            cancellationToken,
+            async client =>
+            {
+                await client.LoginAsync(cancellationToken);
+                await RunFarmListLossDeactivationIfEnabledAsync(new TaskExecutionContext(this, options, client, log, cancellationToken, _ => { }));
+                listCount = await client.SendAllFarmListsViaStartAllButtonAsync(cancellationToken);
+            });
+
+        return listCount;
+    }
+
     public async Task<FarmAddBatchResult> AddFarmsFromCoordinatesAsync(
         BotOptions options,
         string farmListName,

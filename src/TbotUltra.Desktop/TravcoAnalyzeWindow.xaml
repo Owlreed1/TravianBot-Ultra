@@ -117,30 +117,30 @@
                             </Grid.ColumnDefinitions>
 
                             <Border Grid.Column="0"
-                                    Background="{DynamicResource HeroAdvBgBrush}"
-                                    BorderBrush="{DynamicResource HeroAdvBorderBrush}"
+                                    Background="{DynamicResource InfoBgBrush}"
+                                    BorderBrush="{DynamicResource FocusBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="6"
                                     Padding="12,10">
                                 <StackPanel>
                                     <TextBlock x:Name="PagesValue" Text="-"
                                                FontSize="22" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource SuccessTextStrongBrush}" />
+                                               Foreground="{DynamicResource InfoTextStrongBrush}" />
                                     <TextBlock Text="Pages"
                                                Foreground="{DynamicResource TextMutedBrush}" Margin="0,2,0,0" />
                                 </StackPanel>
                             </Border>
 
                             <Border Grid.Column="2"
-                                    Background="{DynamicResource HeroAdvBgBrush}"
-                                    BorderBrush="{DynamicResource HeroAdvBorderBrush}"
+                                    Background="{DynamicResource InfoBgBrush}"
+                                    BorderBrush="{DynamicResource FocusBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="6"
                                     Padding="12,10">
                                 <StackPanel>
                                     <TextBlock x:Name="VillagesValue" Text="-"
                                                FontSize="22" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource SuccessTextStrongBrush}" />
+                                               Foreground="{DynamicResource InfoTextStrongBrush}" />
                                     <TextBlock Text="Villages"
                                                Foreground="{DynamicResource TextMutedBrush}" Margin="0,2,0,0" />
                                 </StackPanel>
@@ -148,24 +148,34 @@
                         </Grid>
                     </StackPanel>
                 </Border>
+            </StackPanel>
 
+            <!-- Bottom bar: Save all (left, shown after analysis) and Close (right, always) share one row. -->
+            <Grid Grid.Row="5" Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <Button x:Name="SaveAllButton"
+                        Grid.Column="0"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
                         Content="Save all pages as list"
                         Height="34"
                         MinWidth="180"
-                        HorizontalAlignment="Left"
-                        Margin="0,14,0,0"
+                        Visibility="Collapsed"
                         IsEnabled="False"
                         FontWeight="SemiBold"
                         Background="{DynamicResource SuccessBgBrush}"
                         BorderBrush="{DynamicResource SuccessBorderBrush}"
                         Foreground="{DynamicResource SuccessTextBrush}"
                         Click="SaveAllButton_Click" />
-            </StackPanel>
-
-            <!-- Bottom bar -->
-            <Grid Grid.Row="5" Margin="0,14,0,0">
-                <Button HorizontalAlignment="Right" Width="100" Content="Close" Click="CloseButton_Click" />
+                <Button Grid.Column="1"
+                        Width="100"
+                        Height="34"
+                        VerticalAlignment="Center"
+                        Content="Close"
+                        Click="CloseButton_Click" />
             </Grid>
         </Grid>
 

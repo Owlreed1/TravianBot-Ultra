@@ -2,10 +2,10 @@
 
 `Preview` of the program
 
-![Version](https://img.shields.io/badge/Version-v0.4.6-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-v0.6.0-blue?style=for-the-badge)
 
 <p align="center">
-  <img src="assets/images/tbot_v046.png" alt="Tbot Ultra Dashboard">
+  <img src="assets/images/tbot_v060.png" alt="Tbot Ultra Dashboard">
 </p>
 
 ---
@@ -76,6 +76,7 @@ Compatible with:
 - Use hero inventory resources for buildings, smithy, brewery, town hall celebrations
 - Collect daily quests
 - Collect tasks
+- NPC trade
 - Read messages and reports
 - Upgrade troops in smithy
 - Send resources between own villages
@@ -84,7 +85,6 @@ Compatible with:
 - Create multiple farmlists with selected village and default troops
 - Send catapult waves
 - Session pacing
-- Configurable idle browsing, including Official statistics pages
 - Auto sleep (logout and wait)
 - Oasis scan for whole map (and add to farmlists)
 - Travco inactive search (and add to farmlists)
@@ -98,7 +98,8 @@ Compatible with:
 - Support to use Proxy per account, manage proxy lists, automatically recover from failed proxies, and track per-account IP/proxy usage time (Using: https://github.com/TheSpeedX/PROXY-List)
 - Make building templates that is reusable for different villages
 - Language detection if wrong (Must be in English) + auto change language
------------------------------------------------------------------------------------
+- Configurable idle browsing, including Official statistics pages
+---
 - Read account/village data
 - Clean dark mode UI
 - Multi-village support

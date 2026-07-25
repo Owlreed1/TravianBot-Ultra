@@ -1,0 +1,63 @@
+<Window x:Class="TbotUltra.Desktop.SendAllFarmListsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Title="Send farmlists"
+        Width="460"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+            <TextBlock Text="Send farmlists"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <TextBlock Margin="0,8,0,0"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextSecondaryBrush}">
+                <Run FontWeight="SemiBold" Text="Send all toggled farmlists" />
+                <Run Text=" — sends every farm list toggled on, one at a time with the 'Send farmlists' delay between each (like continuous farming)." />
+                <LineBreak />
+                <Run FontWeight="SemiBold" Text="Send all farmlists" />
+                <Run Text=" — clicks Travian's 'Start all farm lists' button to dispatch every list at once." />
+            </TextBlock>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1">
+            <Button x:Name="SendToggledButton"
+                    Content="Send all toggled farmlists"
+                    Height="34"
+                    Margin="0,0,0,8"
+                    Background="{DynamicResource SuccessBgBrush}"
+                    Foreground="{DynamicResource SuccessTextBrush}"
+                    BorderBrush="{DynamicResource SuccessBorderBrush}"
+                    FontWeight="SemiBold"
+                    Click="SendToggledButton_Click" />
+            <Button x:Name="SendAllButton"
+                    Content="Send all farmlists"
+                    Height="34"
+                    Background="{DynamicResource SuccessBgBrush}"
+                    Foreground="{DynamicResource SuccessTextBrush}"
+                    BorderBrush="{DynamicResource SuccessBorderBrush}"
+                    FontWeight="SemiBold"
+                    Click="SendAllButton_Click" />
+        </StackPanel>
+
+        <Button Grid.Row="2"
+                x:Name="CancelButton"
+                Content="Cancel"
+                Width="100"
+                Height="30"
+                Margin="0,16,0,0"
+                HorizontalAlignment="Right"
+                IsCancel="True"
+                Click="CancelButton_Click" />
+    </Grid>
+</Window>

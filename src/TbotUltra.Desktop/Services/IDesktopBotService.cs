@@ -45,6 +45,10 @@ public interface IDesktopBotService
     Task<IReadOnlyList<FarmListOverview>> ReadFarmListsOverviewAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken);
     Task<int?> SendFarmListNowAsync(BotOptions options, string farmListName, Action<string> log, CancellationToken cancellationToken);
     Task<int> SendAllFarmListsNowAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken);
+
+    Task<int> SendSelectedFarmListsNowAsync(BotOptions options, IReadOnlyCollection<string> selectedNames, IReadOnlyCollection<string> selectedIds, Action<string> log, CancellationToken cancellationToken);
+
+    Task<int> SendAllFarmListsViaStartAllButtonAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken);
     Task<FarmAddBatchResult> AddFarmsFromCoordinatesAsync(BotOptions options, string farmListName, string troopType, int troopCount, int requestedCount, IReadOnlyList<FarmCoordinate> coordinates, bool useDefaultTroops, Action<string> log, IProgress<FarmAddProgress>? progress, CancellationToken cancellationToken);
     Task<FarmListCreateBatchResult> CreateFarmListsAsync(BotOptions options, FarmListCreateRequest request, Action<string> log, IProgress<FarmListCreateProgress>? progress, CancellationToken cancellationToken);
     Task<IReadOnlyDictionary<string, long>> ReadAvailableTroopsForCatapultWavesAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken);
