@@ -372,7 +372,6 @@ public partial class MainWindow
         CancellationToken cancellationToken)
     {
         var tickSw = Stopwatch.StartNew();
-        var terminalCountBefore = await Dispatcher.InvokeAsync(() => _terminalEntries.Count);
         MarkDueConstructionForPreSleepFill(item);
         RefreshConstructFasterPayloadForExecution(item);
         _botService.MarkQueueItemRunning(item.Id);
@@ -430,7 +429,6 @@ public partial class MainWindow
                 item,
                 options,
                 executionResult,
-                terminalCountBefore,
                 cancellationToken);
 
             if (string.Equals(item.TaskName, "load_buildings_snapshot", StringComparison.OrdinalIgnoreCase))
@@ -818,7 +816,6 @@ public partial class MainWindow
         QueueItem item,
         BotOptions options,
         BotTaskExecutionResult executionResult,
-        int terminalCountBefore,
         CancellationToken cancellationToken)
     {
         _botService.MarkQueueItemSucceeded(item.Id);
@@ -853,30 +850,16 @@ public partial class MainWindow
         var resourceStatusRead = false;
         if (IsResourceUpgradeTask(item.TaskName))
         {
-            var fastUpdated = await TryApplyFastResourceLevelUpdateAsync(item.TaskName, terminalCountBefore);
-            if (!fastUpdated)
-            {
-                try
-                {
-                    resourceStatusRead = await RefreshResourceSnapshotForUiAsync(
-                        options,
-                        cancellationToken,
-                        currentPageOnly: true) is not null;
-                    if (resourceStatusRead)
-                    {
-                        AppendLog("[resource-refresh] current-page snapshot used after resource task; selected village was not opened.");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    AppendLog($"[resource-refresh] current-page snapshot after resource task skipped ({ex.Message}); storage-only refresh will retry without village navigation.");
-                }
-            }
+            // dorf1 mirror of the building-mutation refresh: always re-read the just-worked village's
+            // resource fields and cache them (village-specific), so field levels never go stale. The old
+            // "fast update" patched the SELECTED village's rows from log lines — wrong village in a
+            // multi-village account — and never touched the cache.
+            resourceStatusRead = await RefreshResourceStatusAfterResourceMutationAsync(cancellationToken);
         }
 
         if (IsBuildingMutationTask(item.TaskName))
         {
-            var refreshResult = await RefreshConstructionStatusAfterBuildingMutationAsync(options, executionResult, cancellationToken);
+            var refreshResult = await RefreshConstructionStatusAfterBuildingMutationAsync(cancellationToken);
             fullConstructionRefreshDone = refreshResult.FullStatusRead;
             if (!refreshResult.StorageStatusRead)
             {
@@ -951,35 +934,54 @@ public partial class MainWindow
     }
 
     private async Task<(bool FullStatusRead, bool StorageStatusRead)> RefreshConstructionStatusAfterBuildingMutationAsync(
-        BotOptions options,
-        BotTaskExecutionResult executionResult,
         CancellationToken cancellationToken)
     {
-        var outcome = executionResult.LastTask?.ConstructionOutcome ?? ConstructionTaskOutcome.UnknownSuccess;
-        // A full refresh means leaving the page the task ended on to read dorf1 AND dorf2. That is only
-        // worth it when the village actually changed. QueuedOrInProgress changed the build queue but the
-        // levels are still readable from the current page; AlreadySatisfied/AlreadyExists changed nothing
-        // at all (the building was already at the target level), so re-reading both overviews just costs a
-        // pointless dorf2 -> dorf1 -> dorf2 round trip before the next queue item runs.
-        if (outcome is ConstructionTaskOutcome.QueuedOrInProgress
-            or ConstructionTaskOutcome.AlreadySatisfied
-            or ConstructionTaskOutcome.AlreadyExists)
-        {
-            try
-            {
-                await RefreshCurrentPageStorageStatusAsync(options, "construction_success_quick", cancellationToken);
-                AppendLog(
-                    $"[construction-refresh] current-page refresh used for {outcome}; skipped full dorf1+dorf2 read.");
-                return (FullStatusRead: false, StorageStatusRead: true);
-            }
-            catch (Exception ex)
-            {
-                AppendLog($"[construction-refresh] current-page refresh failed ({ex.Message}); falling back to full construction status.");
-            }
-        }
-
+        // Always re-read the full dorf1+dorf2 for the village the task just worked, then cache + repaint it.
+        // A building level can change without the desktop otherwise noticing: an upgrade reports
+        // QueuedOrInProgress on every pass while it climbs, and a build that finishes while the loop is on
+        // another village comes back as AlreadySatisfied — both used to skip the dorf2 read, which froze the
+        // cached level (a Marketplace shown as level 12 in the UI while it had reached 20 in-game). The
+        // browser is already on the worked village, so RefreshConstructionStatusAsync reads the correct one
+        // (forceCurrentVillage) and CacheVillageStatus stores it keyed by that village's coordinates.
         await RefreshConstructionStatusAsync(cancellationToken);
         return (FullStatusRead: true, StorageStatusRead: false);
+    }
+
+    // dorf1 counterpart of RefreshConstructionStatusAfterBuildingMutationAsync: re-reads the just-worked
+    // village's resource fields (dorf1) and caches them keyed by that village's coordinates, then repaints
+    // the resource UI only when it is the selected village. The browser is already on the worked village
+    // (forceCurrentVillage), so this stays village-specific — a resource upgrade in village B never writes
+    // village A's rows. Returns true when the read succeeded.
+    private async Task<bool> RefreshResourceStatusAfterResourceMutationAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var options = AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions());
+            var status = await ReadVillageStatusWithRetryAsync(
+                options,
+                cancellationToken,
+                resourceOnly: true,
+                forceCurrentVillage: true);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                SetActiveWorkingVillageFromStatus(status);
+                CacheVillageStatus(status);
+                if (IsStatusForSelectedVillage(status))
+                {
+                    ApplyResourceRowsAndVillageStatus(status, includeQueuedTargets: true);
+                }
+            });
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[resource-refresh] full dorf1 read after resource task failed: {ex.Message}");
+            return false;
+        }
     }
 
     private async Task<bool> HandleQueueItemFailureAsync(

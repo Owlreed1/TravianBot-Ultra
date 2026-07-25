@@ -73,11 +73,15 @@ public sealed partial class TravianClient
             if (!box) continue;
             const active = box.classList.contains('active');
             let percent = 0, timer = '';
-            const dur = box.querySelector('.bonusDuration');
-            if (dur) {
-              const t = dur.querySelector('.timerReact');
-              timer = t ? strip(t.textContent).trim() : '';
-              const m = strip(dur.textContent).match(/(\d+)\s*%/);
+            // The running bonus renders as "+N% active for:" next to its .timerReact countdown, inside
+            // .bonusInfo — NOT in .bonusDuration (that only holds the auto-prolong checkbox / "whole game
+            // round" text). Read the percent AND the timer from the countdown's own label so 25% vs 15% is
+            // classified correctly and the remaining time is never dropped.
+            const timerEl = box.querySelector('.bonusInfo .timerReact') || box.querySelector('.timerReact');
+            if (timerEl) {
+              timer = strip(timerEl.textContent).trim();
+              const label = timerEl.closest('.bonusInfo') || timerEl.parentElement || box;
+              const m = strip(label.textContent).match(/(\d+)\s*%/);
               if (m) percent = parseInt(m[1], 10);
             }
             // Only the purple "Activate" button in .bonusVideo is the free +15% video. The gold

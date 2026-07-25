@@ -102,9 +102,9 @@
                     Width="120"
                     Height="30"
                     Content="Clear timers"
-                    Background="{DynamicResource DangerBrush}"
-                    Foreground="White"
-                    BorderBrush="{DynamicResource DangerBrush}"
+                    Background="{DynamicResource DangerBgBrush}"
+                    Foreground="{DynamicResource DangerTextBrush}"
+                    BorderBrush="{DynamicResource DangerBorderBrush}"
                     ToolTip="Clear all remembered production bonus timers (for testing)."
                     Click="ClearTimersButton_Click" />
             <Button DockPanel.Dock="Right"
@@ -118,9 +118,9 @@
                     Height="30"
                     Content="Scan timers"
                     Margin="0,0,8,0"
-                    Background="{DynamicResource AccentBrush}"
-                    Foreground="White"
-                    BorderBrush="{DynamicResource AccentBrush}"
+                    Background="{DynamicResource SuccessBgBrush}"
+                    Foreground="{DynamicResource SuccessTextBrush}"
+                    BorderBrush="{DynamicResource SuccessBorderBrush}"
                     ToolTip="Read the Advantages tab now to refresh these timers (no video is watched). Runs even when the bot is paused or stopped."
                     Click="ScanTimersButton_Click" />
         </DockPanel>

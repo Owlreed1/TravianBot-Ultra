@@ -290,6 +290,22 @@ Published artifacts belong under `artifacts/`, never beside source files.
   never past a known completion deadline. Navigation and state-changing clicks invalidate both.
 - Construction Queue Reconciliation plans only from confirmed full live status and applies all pending-item
   changes atomically; cache or local timers are never reconciliation evidence.
+- After every building-mutation task the desktop ALWAYS re-reads the full dorf1+dorf2 for the just-worked
+  village (`RefreshConstructionStatusAfterBuildingMutationAsync` → `RefreshConstructionStatusAsync`, then
+  `CacheVillageStatus`). Do not restore the old QueuedOrInProgress/AlreadySatisfied storage-only quick-skip:
+  an upgrade reports QueuedOrInProgress on every climb pass and a build that finishes while the loop is on
+  another village returns AlreadySatisfied, so skipping the dorf2 read froze the cached building level (a
+  Marketplace shown as 12 in the UI while it had reached 20 in-game).
+- Same rule for resource fields (dorf1): after a resource-upgrade task,
+  `RefreshResourceStatusAfterResourceMutationAsync` re-reads the just-worked village's fields
+  (`resourceOnly:true, forceCurrentVillage:true`) and `CacheVillageStatus`es them, repainting the resource
+  UI only when it is the selected village. Do not reinstate a log-line "fast update" of the displayed rows:
+  it patched the SELECTED village from another village's log lines and never cached, so field levels went
+  stale / cross-contaminated in a multi-village account.
+- Production-bonus (Advantages tab) scan reads the running bonus's percent AND `.timerReact` countdown from
+  its `.bonusInfo` "+N% active for:" label — NOT from `.bonusDuration` (that holds only the auto-prolong
+  checkbox). Timers come in a long form with a day suffix ("5d 15:52:56"); `ParseTimerToSeconds` extracts
+  the `Nd` days then parses the `hh:mm:ss` remainder.
 - Construction start-delay transition memory is village-scoped by `data-did` or coordinates, never display name;
   duplicate village names must not share a humanize deadline.
 - Persisted account analysis may seed the stable village list. Cold start without a snapshot reads the profile;

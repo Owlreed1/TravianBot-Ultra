@@ -154,8 +154,10 @@ public static class ProductionBonusDomParser
     }
 
     /// <summary>
-    /// Parses a Travian React timer ("07:59:53", "71:04:12", or "1:02:03:04") into whole seconds. Strips
-    /// bidi/isolate markers and normalizes the Unicode minus. Returns 0 on any parse failure.
+    /// Parses a Travian React timer into whole seconds. Handles both the plain colon form ("07:59:53",
+    /// "71:04:12", "1:02:03:04") and the long form where days are rendered separately with a 'd' suffix
+    /// ("5d 15:52:56", "6d 10:38:52"). Strips bidi/isolate markers and normalizes the Unicode minus.
+    /// Returns 0 on any parse failure.
     /// </summary>
     public static int ParseTimerToSeconds(string? timer)
     {
@@ -170,10 +172,28 @@ public static class ProductionBonusDomParser
             return 0;
         }
 
+        long total = 0L;
+
+        // Long timers show the day count separately as "5d 15:52:56"; pull it out, then parse the H:M:S rest.
+        var dayMatch = System.Text.RegularExpressions.Regex.Match(cleaned, @"(\d+)\s*d");
+        if (dayMatch.Success)
+        {
+            if (int.TryParse(dayMatch.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var days))
+            {
+                total += (long)days * 86400;
+            }
+
+            cleaned = cleaned[(dayMatch.Index + dayMatch.Length)..].Trim();
+            if (cleaned.Length == 0)
+            {
+                return total > int.MaxValue ? int.MaxValue : (int)total;
+            }
+        }
+
         var parts = cleaned.Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (parts.Length == 0)
         {
-            return 0;
+            return total > int.MaxValue ? int.MaxValue : (int)total;
         }
 
         var values = new int[parts.Length];
@@ -185,8 +205,7 @@ public static class ProductionBonusDomParser
             }
         }
 
-        // Interpret from the right: seconds, minutes, hours, days.
-        var total = 0L;
+        // Interpret from the right: seconds, minutes, hours, days (added to any 'd'-prefixed days above).
         var multipliers = new[] { 1, 60, 3600, 86400 };
         for (var i = 0; i < values.Length && i < multipliers.Length; i++)
         {

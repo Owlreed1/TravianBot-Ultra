@@ -10,6 +10,8 @@ public sealed class ProductionBonusDomParserTests
     [InlineData("03:52:15", 13935)]
     [InlineData("71:04:12", 255852)]
     [InlineData("1:02:03:04", 93784)] // day:hour:min:sec
+    [InlineData("5d 15:52:56", 489176)] // Travian long form: "Nd hh:mm:ss"
+    [InlineData("6d 10:38:52", 556732)]
     [InlineData("00:00:05", 5)]
     [InlineData("", 0)]
     [InlineData("garbage", 0)]
