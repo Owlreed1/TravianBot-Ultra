@@ -38,9 +38,7 @@ public partial class MainWindow
 
     // Snapshot of what was actually running when sleep started, so wake restores the same state instead
     // of always starting the continuous loop (the toggle defaults to ON even when the bot was idle).
-    private bool _wasLoggedInBeforeSleep;
-    private bool _wasContinuousLoopRunningBeforeSleep;
-    private bool _wasQueueAutoRunningBeforeSleep;
+    private SleepSnapshot _sleepSnapshot = SleepSnapshot.Idle;
     private bool IsSessionSleeping => _sessionPacer.Phase == SessionPacerPhase.Sleeping;
 
     private void InitializeSessionPacing()
@@ -230,11 +228,12 @@ public partial class MainWindow
         try
         {
             // Capture the pre-sleep state BEFORE stopping anything, so wake can restore it.
-            _wasLoggedInBeforeSleep = _isLoggedIn;
-            _wasContinuousLoopRunningBeforeSleep = _loopTask is not null && !_loopTask.IsCompleted;
-            _wasQueueAutoRunningBeforeSleep = _autoQueueRunning;
-            AppendLog($"[pacing] pre-sleep state: loggedIn={_wasLoggedInBeforeSleep}, "
-                + $"continuousLoop={_wasContinuousLoopRunningBeforeSleep}, queueAutoRun={_wasQueueAutoRunningBeforeSleep}.");
+            _sleepSnapshot = new SleepSnapshot(
+                WasLoggedIn: _isLoggedIn,
+                WasContinuousLoopRunning: _loopTask is not null && !_loopTask.IsCompleted,
+                WasQueueAutoRunning: _autoQueueRunning);
+            AppendLog($"[pacing] pre-sleep state: loggedIn={_sleepSnapshot.WasLoggedIn}, "
+                + $"continuousLoop={_sleepSnapshot.WasContinuousLoopRunning}, queueAutoRun={_sleepSnapshot.WasQueueAutoRunning}.");
 
             AppendLog("[pacing] controlled session stop requested.");
             _loopController.RequestLoopStop();
@@ -329,7 +328,7 @@ public partial class MainWindow
             }
 
             // Restore the pre-sleep state. If the bot was idle/logged out before sleeping, stay that way.
-            if (!_wasLoggedInBeforeSleep)
+            if (!_sleepSnapshot.WasLoggedIn)
             {
                 AppendLog("[pacing] wake: was logged out/idle before sleep — staying idle.");
                 return;
@@ -345,19 +344,19 @@ public partial class MainWindow
             }
 
             var loopIdle = _loopTask is null || _loopTask.IsCompleted;
-            if (_wasContinuousLoopRunningBeforeSleep && loopIdle)
+            switch (SessionWakeDecisions.ResolveResume(_sleepSnapshot, loopIdle, _autoQueueRunning))
             {
-                AppendLog("[pacing] wake: resuming continuous loop (was running before sleep).");
-                StartContinuousLoopRunner();
-            }
-            else if (_wasQueueAutoRunningBeforeSleep && !_autoQueueRunning && loopIdle)
-            {
-                AppendLog("[pacing] wake: resuming queue auto-run (was running before sleep).");
-                _ = TriggerQueueAutoRunAsync();
-            }
-            else
-            {
-                AppendLog("[pacing] wake: logged in, staying idle (was not running before sleep).");
+                case WakeResumeAction.ResumeContinuousLoop:
+                    AppendLog("[pacing] wake: resuming continuous loop (was running before sleep).");
+                    StartContinuousLoopRunner();
+                    break;
+                case WakeResumeAction.ResumeQueueAutoRun:
+                    AppendLog("[pacing] wake: resuming queue auto-run (was running before sleep).");
+                    _ = TriggerQueueAutoRunAsync();
+                    break;
+                default:
+                    AppendLog("[pacing] wake: logged in, staying idle (was not running before sleep).");
+                    break;
             }
         }
         finally
@@ -365,11 +364,6 @@ public partial class MainWindow
             _sessionPacingWakeInProgress = false;
         }
     }
-
-    // Backoff between wake-login attempts. After the ramp it stays at the last value (30 min) with NO cap on
-    // attempt count: an overnight transient (network/server timeout during the post-login snapshot) must never
-    // leave the bot parked idle until morning — it keeps retrying, sparsely, until login takes.
-    private static readonly int[] WakeLoginRetryBackoffMinutes = { 1, 2, 5, 10, 15, 30 };
 
     // Re-runs ExecuteLoginFlowAsync on a backoff until it logs in. ExecuteLoginFlowAsync swallows its own
     // exceptions and only leaves _isLoggedIn false on failure, so this loop just retries it. Returns true once
@@ -380,8 +374,8 @@ public partial class MainWindow
         // a login attempt converts into a planned sleep via TryEnterPlannedSleepInsteadOfLogin, which resets
         // these to "idle". Without restoring them, the wake after that window would log in but never resume
         // the automation that was running before the original sleep.
-        var resumeContinuousLoop = _wasContinuousLoopRunningBeforeSleep;
-        var resumeQueueAutoRun = _wasQueueAutoRunningBeforeSleep;
+        var resumeContinuousLoop = _sleepSnapshot.WasContinuousLoopRunning;
+        var resumeQueueAutoRun = _sleepSnapshot.WasQueueAutoRunning;
 
         for (var attempt = 1; ; attempt++)
         {
@@ -400,9 +394,7 @@ public partial class MainWindow
             // intent so the wake after that window continues automation instead of sitting idle logged in.
             if (IsSessionSleeping)
             {
-                _wasLoggedInBeforeSleep = true;
-                _wasContinuousLoopRunningBeforeSleep = resumeContinuousLoop;
-                _wasQueueAutoRunningBeforeSleep = resumeQueueAutoRun;
+                _sleepSnapshot = new SleepSnapshot(true, resumeContinuousLoop, resumeQueueAutoRun);
                 AppendLog("[pacing] wake retry: a planned sleep window took over; automation will resume after it.");
                 return false;
             }
@@ -413,11 +405,10 @@ public partial class MainWindow
                 return false;
             }
 
-            var index = Math.Min(attempt - 1, WakeLoginRetryBackoffMinutes.Length - 1);
-            var waitMinutes = WakeLoginRetryBackoffMinutes[index];
-            AppendLog($"[pacing] wake login failed (attempt {attempt}) — retrying in {waitMinutes} min.");
+            var wait = SessionWakeDecisions.NextWakeLoginRetryDelay(attempt);
+            AppendLog($"[pacing] wake login failed (attempt {attempt}) — retrying in {wait.TotalMinutes:0} min.");
 
-            if (!await DelayWhileWakeRetryAllowedAsync(TimeSpan.FromMinutes(waitMinutes)))
+            if (!await DelayWhileWakeRetryAllowedAsync(wait))
             {
                 AppendLog("[pacing] wake login retry stopped during wait (state changed or app closing).");
                 return false;
@@ -429,32 +420,13 @@ public partial class MainWindow
     // sleep window began, an account switch started, or the app is shutting down.
     private bool ShouldAbortWakeRetry(out string reason)
     {
-        if (_isLoggedIn)
-        {
-            reason = "already logged in";
-            return true;
-        }
-
-        if (IsSessionSleeping)
-        {
-            reason = "session is sleeping again";
-            return true;
-        }
-
-        if (_accountSwitchInProgress)
-        {
-            reason = "account switch in progress";
-            return true;
-        }
-
-        if (_shutdownInProgress || _shutdownCompleted || _loopController.IsClosing)
-        {
-            reason = "app closing";
-            return true;
-        }
-
-        reason = string.Empty;
-        return false;
+        var decision = SessionWakeDecisions.ResolveAbort(new WakeRetryState(
+            IsLoggedIn: _isLoggedIn,
+            IsSessionSleeping: IsSessionSleeping,
+            AccountSwitchInProgress: _accountSwitchInProgress,
+            AppClosing: _shutdownInProgress || _shutdownCompleted || _loopController.IsClosing));
+        reason = decision.Reason;
+        return decision.ShouldAbort;
     }
 
     // Sleeps up to `total` in short slices so an abort (or app shutdown) is noticed within a couple of seconds
@@ -493,9 +465,7 @@ public partial class MainWindow
             return false;
         }
 
-        _wasLoggedInBeforeSleep = true;
-        _wasContinuousLoopRunningBeforeSleep = false;
-        _wasQueueAutoRunningBeforeSleep = false;
+        _sleepSnapshot = new SleepSnapshot(true, false, false);
 
         if (!_sessionPacer.BeginScheduledSleepNow())
         {

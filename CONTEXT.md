@@ -27,3 +27,7 @@ _Avoid_: Manual Farming, Natar farming
 **Manual Farming**:
 The removed desktop-only manual farming UI and its saved preferences. It is not Send Troops, Farm Lists, Catapults, or Reinforcements.
 _Avoid_: Manual attack flow
+
+**Sleep Snapshot**:
+What was actually running (logged-in state, continuous loop, queue auto-run) when session sleep began, captured so the next wake restores the same state instead of always starting the continuous loop. Modeled by the `SleepSnapshot` record; the pure wake decisions live in `SessionWakeDecisions`.
+_Avoid_: pre-sleep flags, wake state

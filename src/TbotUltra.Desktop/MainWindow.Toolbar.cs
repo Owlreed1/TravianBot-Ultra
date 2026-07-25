@@ -112,9 +112,7 @@ public partial class MainWindow
         if (isScheduledSleep && result == MessageBoxResult.Yes)
         {
             // Run program is an explicit login request, never an automation-resume request.
-            _wasLoggedInBeforeSleep = true;
-            _wasContinuousLoopRunningBeforeSleep = false;
-            _wasQueueAutoRunningBeforeSleep = false;
+            _sleepSnapshot = new SleepSnapshot(true, false, false);
             _sessionPacer.WakeNow();
         }
     }
