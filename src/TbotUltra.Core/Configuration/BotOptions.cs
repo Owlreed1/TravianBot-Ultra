@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace TbotUltra.Core.Configuration;
 
-public sealed class BotOptions
+public sealed record BotOptions
 {
     [ConfigurationKeyName("server_name")]
     [Required]
