@@ -271,24 +271,19 @@ public sealed partial class TravianClient
         bool interactive = true,
         bool browserVisible = true,
         string? projectRoot = null,
-        Action<string>? statusCallback = null,
         TravianSessionCache? sessionCache = null,
-        Action<bool>? setConsentDomainsAllowed = null,
-        Func<IPage, CancellationToken, Task>? cleanupAfterBonusVideoAsync = null,
-        Func<Func<IPage, CancellationToken, Task<string>>, CancellationToken, Task<string>>? runInIsolatedBonusVideoBrowserAsync = null,
-        Func<string, CancellationToken, Task<IPage>>? rotateAfterLobbyLoginAsync = null,
-        Func<LobbyWorldSelectionRequest, CancellationToken, Task<string?>>? lobbyWorldSelectionRequested = null,
-        Func<LobbyWorldServerResolution, CancellationToken, Task>? lobbyWorldServerResolved = null,
+        TravianClientCallbacks? callbacks = null,
         BrowserTraceLogger? browserTrace = null)
     {
+        callbacks ??= new TravianClientCallbacks();
         _page = page;
         _config = config;
-        _setConsentDomainsAllowed = setConsentDomainsAllowed;
-        _cleanupAfterBonusVideoAsync = cleanupAfterBonusVideoAsync;
-        _runInIsolatedBonusVideoBrowserAsync = runInIsolatedBonusVideoBrowserAsync;
-        _rotateAfterLobbyLoginAsync = rotateAfterLobbyLoginAsync;
-        _lobbyWorldSelectionRequested = lobbyWorldSelectionRequested;
-        _lobbyWorldServerResolved = lobbyWorldServerResolved;
+        _setConsentDomainsAllowed = callbacks.SetConsentDomainsAllowed;
+        _cleanupAfterBonusVideoAsync = callbacks.CleanupAfterBonusVideoAsync;
+        _runInIsolatedBonusVideoBrowserAsync = callbacks.RunInIsolatedBonusVideoBrowserAsync;
+        _rotateAfterLobbyLoginAsync = callbacks.RotateAfterLobbyLoginAsync;
+        _lobbyWorldSelectionRequested = callbacks.LobbyWorldSelectionRequested;
+        _lobbyWorldServerResolved = callbacks.LobbyWorldServerResolved;
         _account = account;
         _interactive = interactive;
         _browserVisible = browserVisible;
@@ -300,8 +295,8 @@ public sealed partial class TravianClient
             : projectRoot;
         _capitalCachePath = AccountStoragePaths.CapitalStatePath(_projectRoot, _account.Name);
         _heroAttributeSnapshotStore = new HeroAttributeSnapshotStore(_projectRoot);
-        _statusCallback = statusCallback;
-        _browserTrace = browserTrace ?? new BrowserTraceLogger(config.DetailedBrowserLoggingEnabled, statusCallback);
+        _statusCallback = callbacks.StatusCallback;
+        _browserTrace = browserTrace ?? new BrowserTraceLogger(config.DetailedBrowserLoggingEnabled, callbacks.StatusCallback);
         _browserTrace.AttachPage(page, "travian-client");
     }
 

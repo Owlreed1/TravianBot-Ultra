@@ -149,8 +149,8 @@ public sealed partial class TravianClient
             interactive: _interactive,
             browserVisible: true,
             projectRoot: _projectRoot,
-            statusCallback: _statusCallback,
-            sessionCache: _session);
+            sessionCache: _session,
+            callbacks: new TravianClientCallbacks { StatusCallback = _statusCallback });
     }
 
     // Shared by production-bonus video cleanup. Adventure videos intentionally keep the main page

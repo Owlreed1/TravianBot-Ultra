@@ -643,25 +643,28 @@ public sealed partial class BotTaskRunner
             interactive: interactive,
             browserVisible: true,
             projectRoot: _projectContext.RootPath,
-            statusCallback: log,
             sessionCache: sessionCache,
-            setConsentDomainsAllowed: setConsentDomainsAllowed,
-            cleanupAfterBonusVideoAsync: cleanupAfterBonusVideoAsync,
-            runInIsolatedBonusVideoBrowserAsync: runInIsolatedBonusVideoBrowserAsync,
-            rotateAfterLobbyLoginAsync: rotateAfterLobbyLoginAsync,
-            lobbyWorldSelectionRequested: LobbyWorldSelectionRequested,
-            lobbyWorldServerResolved: async (resolution, cancellationToken) =>
+            callbacks: new TravianClientCallbacks
             {
-                if (LobbyWorldServerResolved is not null)
+                StatusCallback = log,
+                SetConsentDomainsAllowed = setConsentDomainsAllowed,
+                CleanupAfterBonusVideoAsync = cleanupAfterBonusVideoAsync,
+                RunInIsolatedBonusVideoBrowserAsync = runInIsolatedBonusVideoBrowserAsync,
+                RotateAfterLobbyLoginAsync = rotateAfterLobbyLoginAsync,
+                LobbyWorldSelectionRequested = LobbyWorldSelectionRequested,
+                LobbyWorldServerResolved = async (resolution, cancellationToken) =>
                 {
-                    await LobbyWorldServerResolved(resolution, cancellationToken);
-                }
+                    if (LobbyWorldServerResolved is not null)
+                    {
+                        await LobbyWorldServerResolved(resolution, cancellationToken);
+                    }
 
-                if (string.Equals(_sharedVisibleAccountName, resolution.AccountName, StringComparison.OrdinalIgnoreCase))
-                {
-                    _sharedVisibleBaseUrl = resolution.ServerUrl.TrimEnd('/');
-                    log($"[browser-session] active server identity updated to '{new Uri(_sharedVisibleBaseUrl).Host}' after verified lobby correction.");
-                }
+                    if (string.Equals(_sharedVisibleAccountName, resolution.AccountName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _sharedVisibleBaseUrl = resolution.ServerUrl.TrimEnd('/');
+                        log($"[browser-session] active server identity updated to '{new Uri(_sharedVisibleBaseUrl).Host}' after verified lobby correction.");
+                    }
+                },
             },
             browserTrace: browserTrace);
     }
