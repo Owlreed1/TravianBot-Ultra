@@ -4,17 +4,33 @@ using System.Linq;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Worker.Domain;
 
-namespace TbotUltra.Desktop;
+namespace TbotUltra.Desktop.Services;
+
+public sealed record DeferredTroopTrainingRequest(
+    string BuildingName,
+    bool Enabled,
+    string RunMode,
+    int MinimumResourcesPercent,
+    bool CheckWood,
+    bool CheckClay,
+    bool CheckIron,
+    bool CheckCrop);
+
+public sealed record DeferredTroopTrainingEvaluation(
+    bool Ready,
+    int WaitSeconds,
+    string WaitReason);
+
+public sealed record DeferredUpgradeEvaluation(bool ResourcesEnough, int WaitSeconds, string WaitReason);
 
 // Pure evaluation helpers for "deferred wait" queue logic (troop-training and
 // building/resource upgrades): given a village status snapshot and queue payload,
-// decide whether resources are ready and, if not, how long to wait. Extracted
-// verbatim from MainWindow.xaml.cs to keep that file focused on UI wiring; all
-// members are static and stateless, so this is a pure relocation with no
-// behavior change.
-public partial class MainWindow
+// decide whether resources are ready and, if not, how long to wait. Extracted from
+// MainWindow.DeferredWaits so the decisions are unit-testable in isolation from the
+// WPF window; all members are static and stateless, so the move is behavior-preserving.
+public static class DeferredWaitCalculator
 {
-    private static Dictionary<string, long> ReadCurrentResourcesFromStatus(VillageStatus status)
+    public static Dictionary<string, long> ReadCurrentResourcesFromStatus(VillageStatus status)
     {
         var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in new[] { "wood", "clay", "iron", "crop" })
@@ -30,7 +46,7 @@ public partial class MainWindow
     // detect a resource top-off (hero/farm/NPC drop) that makes a cached "needs resources" page-timer
     // wait stale: when everything is full, almost any upgrade is affordable now. Returns false when the
     // capacities are unknown so callers stay conservative.
-    private static bool IsVillageResourcesFull(VillageStatus status, IReadOnlyDictionary<string, long> currentResources)
+    public static bool IsVillageResourcesFull(VillageStatus status, IReadOnlyDictionary<string, long> currentResources)
     {
         if (status.WarehouseCapacity is not > 0 || status.GranaryCapacity is not > 0)
         {
@@ -50,7 +66,7 @@ public partial class MainWindow
             && AtCap("crop", granary);
     }
 
-    private static Dictionary<string, double?> ReadCurrentProductionByHourFromStatus(VillageStatus status)
+    public static Dictionary<string, double?> ReadCurrentProductionByHourFromStatus(VillageStatus status)
     {
         var result = new Dictionary<string, double?>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in new[] { "wood", "clay", "iron", "crop" })
@@ -63,22 +79,7 @@ public partial class MainWindow
         return result;
     }
 
-    private sealed record DeferredTroopTrainingRequest(
-        string BuildingName,
-        bool Enabled,
-        string RunMode,
-        int MinimumResourcesPercent,
-        bool CheckWood,
-        bool CheckClay,
-        bool CheckIron,
-        bool CheckCrop);
-
-    private sealed record DeferredTroopTrainingEvaluation(
-        bool Ready,
-        int WaitSeconds,
-        string WaitReason);
-
-    private static IReadOnlyList<DeferredTroopTrainingRequest> BuildDeferredTroopTrainingRequests(BotOptions options)
+    public static IReadOnlyList<DeferredTroopTrainingRequest> BuildDeferredTroopTrainingRequests(BotOptions options)
     {
         return
         [
@@ -88,7 +89,7 @@ public partial class MainWindow
         ];
     }
 
-    private static DeferredTroopTrainingEvaluation EvaluateDeferredTroopTrainingWait(
+    public static DeferredTroopTrainingEvaluation EvaluateDeferredTroopTrainingWait(
         IReadOnlyList<DeferredTroopTrainingRequest> requests,
         IReadOnlyList<Building> knownBuildings,
         IReadOnlyDictionary<string, long> currentResources,
@@ -203,7 +204,7 @@ public partial class MainWindow
         return keys.Count > 0 ? keys : ["wood", "clay", "iron", "crop"];
     }
 
-    private static int ResolveTroopTrainingFallbackCooldownSeconds(int configuredSeconds)
+    public static int ResolveTroopTrainingFallbackCooldownSeconds(int configuredSeconds)
     {
         return configuredSeconds switch
         {
@@ -212,7 +213,7 @@ public partial class MainWindow
         };
     }
 
-    private static bool TryReadDeferredUpgradeRequirements(IReadOnlyDictionary<string, string> payload, out Dictionary<string, long> required)
+    public static bool TryReadDeferredUpgradeRequirements(IReadOnlyDictionary<string, string> payload, out Dictionary<string, long> required)
     {
         required = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         var found = false;
@@ -230,7 +231,7 @@ public partial class MainWindow
         return found;
     }
 
-    private static DeferredUpgradeEvaluation EvaluateDeferredUpgradeWait(
+    public static DeferredUpgradeEvaluation EvaluateDeferredUpgradeWait(
         IReadOnlyDictionary<string, string> payload,
         IReadOnlyDictionary<string, long> required,
         IReadOnlyDictionary<string, long> currentResources,
@@ -277,7 +278,7 @@ public partial class MainWindow
         return new DeferredUpgradeEvaluation(false, wait, hasUnknownWait ? "recheck_needed" : "estimated_from_status");
     }
 
-    private static void WriteDeferredUpgradeRuntimeValues(
+    public static void WriteDeferredUpgradeRuntimeValues(
         Dictionary<string, string> payload,
         IReadOnlyDictionary<string, long> currentResources,
         IReadOnlyDictionary<string, double?> productionByHour,
@@ -320,14 +321,14 @@ public partial class MainWindow
             : null;
     }
 
-    private static long? TryParseDesktopResourceValue(string? raw)
+    public static long? TryParseDesktopResourceValue(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
         {
             return null;
         }
 
-        var cleaned = raw.Replace(" ", string.Empty, StringComparison.Ordinal)
+        var cleaned = raw.Replace(" ", string.Empty, StringComparison.Ordinal)
             .Replace(" ", string.Empty, StringComparison.Ordinal)
             .Replace(".", string.Empty, StringComparison.Ordinal)
             .Replace(",", string.Empty, StringComparison.Ordinal)
@@ -335,7 +336,7 @@ public partial class MainWindow
         return long.TryParse(cleaned, out var value) ? value : null;
     }
 
-    private static string DescribeDeferredUpgrade(IReadOnlyDictionary<string, string> payload)
+    public static string DescribeDeferredUpgrade(IReadOnlyDictionary<string, string> payload)
     {
         if (payload.TryGetValue(BotOptionPayloadKeys.UpgradeBlockedLabel, out var blockedLabel) && !string.IsNullOrWhiteSpace(blockedLabel))
         {
@@ -355,9 +356,7 @@ public partial class MainWindow
         return "upgrade";
     }
 
-    private sealed record DeferredUpgradeEvaluation(bool ResourcesEnough, int WaitSeconds, string WaitReason);
-
-    private static readonly string[] DeferredUpgradePayloadKeys =
+    public static readonly string[] DeferredUpgradePayloadKeys =
     [
         BotOptionPayloadKeys.UpgradeBlockedLabel,
         BotOptionPayloadKeys.UpgradeRequiredWood,

@@ -45,7 +45,7 @@ public partial class MainWindow
         }
 
         var changed = false;
-        foreach (var key in DeferredUpgradePayloadKeys)
+        foreach (var key in DeferredWaitCalculator.DeferredUpgradePayloadKeys)
         {
             var match = Regex.Match(message, $@"(?<!\S){Regex.Escape(key)}=(?<value>\S+)", RegexOptions.IgnoreCase);
             if (!match.Success)
@@ -133,8 +133,8 @@ public partial class MainWindow
 
     private async Task RefreshDeferredConstructionWaitsAsync(VillageStatus status, string source)
     {
-        var currentResources = ReadCurrentResourcesFromStatus(status);
-        var productionByHour = ReadCurrentProductionByHourFromStatus(status);
+        var currentResources = DeferredWaitCalculator.ReadCurrentResourcesFromStatus(status);
+        var productionByHour = DeferredWaitCalculator.ReadCurrentProductionByHourFromStatus(status);
         // Only re-evaluate deferred items for the village this status was read for. The resources read
         // belong to ONE village, so judging another village's deferred upgrade against them is wrong and
         // caused other villages' construction timers to briefly flash "Ready" (reset) then re-defer.
@@ -228,7 +228,7 @@ public partial class MainWindow
                     && _botService.PatchDeferredQueueItem(item.Id, null, null, TimeSpan.Zero))
                 {
                     AppendLog(
-                        $"Deferred upgrade resumed from {source}: storage capacity now satisfies {DescribeDeferredUpgrade(item.Payload)}.");
+                        $"Deferred upgrade resumed from {source}: storage capacity now satisfies {DeferredWaitCalculator.DescribeDeferredUpgrade(item.Payload)}.");
                 }
 
                 continue;
@@ -241,7 +241,7 @@ public partial class MainWindow
                 continue;
             }
 
-            if (!TryReadDeferredUpgradeRequirements(item.Payload, out var required))
+            if (!DeferredWaitCalculator.TryReadDeferredUpgradeRequirements(item.Payload, out var required))
             {
                 // Requirement-less resource defer: the worker could only read Travian's "enough resources
                 // in HH:MM:SS" page timer, not the upgrade cost (no upgrade_required_* in the payload), so
@@ -251,21 +251,21 @@ public partial class MainWindow
                 // so the village would idle out a countdown that no longer applies. Resume so the worker
                 // re-checks the live build page instead. A full village that still cannot afford the upgrade
                 // reclassifies as storage_capacity (different reason), so this cannot spin in a retry loop.
-                if (IsVillageResourcesFull(status, currentResources)
+                if (DeferredWaitCalculator.IsVillageResourcesFull(status, currentResources)
                     && (item.NextAttemptAt - DateTimeOffset.UtcNow) > TimeSpan.FromSeconds(5)
                     && _botService.PatchDeferredQueueItem(item.Id, null, null, TimeSpan.Zero))
                 {
                     AppendLog(
-                        $"Deferred upgrade resumed from {source}: {DescribeDeferredUpgrade(item.Payload)} — "
+                        $"Deferred upgrade resumed from {source}: {DeferredWaitCalculator.DescribeDeferredUpgrade(item.Payload)} — "
                         + "village resources full, cached page-timer wait was stale; re-checking now.");
                 }
 
                 continue;
             }
 
-            var evaluation = EvaluateDeferredUpgradeWait(item.Payload, required, currentResources, productionByHour);
+            var evaluation = DeferredWaitCalculator.EvaluateDeferredUpgradeWait(item.Payload, required, currentResources, productionByHour);
             var updatedPayload = new Dictionary<string, string>(item.Payload, StringComparer.OrdinalIgnoreCase);
-            WriteDeferredUpgradeRuntimeValues(updatedPayload, currentResources, productionByHour, evaluation);
+            DeferredWaitCalculator.WriteDeferredUpgradeRuntimeValues(updatedPayload, currentResources, productionByHour, evaluation);
             var remainingSeconds = Math.Max(0, (int)Math.Ceiling((item.NextAttemptAt - DateTimeOffset.UtcNow).TotalSeconds));
 
             if (evaluation.ResourcesEnough)
@@ -278,7 +278,7 @@ public partial class MainWindow
                 var changed = PatchDeferredQueuePayload(item, updatedPayload, TimeSpan.Zero);
                 if (changed)
                 {
-                    AppendLog($"Deferred upgrade resumed from {source}: {DescribeDeferredUpgrade(item.Payload)} now has enough resources.");
+                    AppendLog($"Deferred upgrade resumed from {source}: {DeferredWaitCalculator.DescribeDeferredUpgrade(item.Payload)} now has enough resources.");
                 }
                 continue;
             }
@@ -292,7 +292,7 @@ public partial class MainWindow
             var updated = PatchDeferredQueuePayload(item, updatedPayload, delay);
             if (updated)
             {
-                AppendLog($"Deferred upgrade wait updated from {source}: {DescribeDeferredUpgrade(item.Payload)} wait={evaluation.WaitSeconds}s reason={evaluation.WaitReason}.");
+                AppendLog($"Deferred upgrade wait updated from {source}: {DeferredWaitCalculator.DescribeDeferredUpgrade(item.Payload)} wait={evaluation.WaitSeconds}s reason={evaluation.WaitReason}.");
             }
         }
 
@@ -549,8 +549,8 @@ public partial class MainWindow
 
     private async Task RefreshDeferredTroopTrainingWaitsAsync(VillageStatus status, string source)
     {
-        var currentResources = ReadCurrentResourcesFromStatus(status);
-        var productionByHour = ReadCurrentProductionByHourFromStatus(status);
+        var currentResources = DeferredWaitCalculator.ReadCurrentResourcesFromStatus(status);
+        var productionByHour = DeferredWaitCalculator.ReadCurrentProductionByHourFromStatus(status);
         var warehouseCapacity = status.WarehouseCapacity;
         var granaryCapacity = status.GranaryCapacity;
         if (warehouseCapacity is not > 0 || granaryCapacity is not > 0)
@@ -588,9 +588,9 @@ public partial class MainWindow
             // village override into the payload), not the global config — otherwise a per-village % limit
             // is judged against the account-wide default.
             var itemOptions = BotOptionsPayloadApplier.Apply(baseOptions, item.Payload);
-            var fallbackCooldownSeconds = ResolveTroopTrainingFallbackCooldownSeconds(itemOptions.TroopTrainingFallbackCooldownSeconds);
-            var requests = BuildDeferredTroopTrainingRequests(itemOptions);
-            var evaluation = EvaluateDeferredTroopTrainingWait(
+            var fallbackCooldownSeconds = DeferredWaitCalculator.ResolveTroopTrainingFallbackCooldownSeconds(itemOptions.TroopTrainingFallbackCooldownSeconds);
+            var requests = DeferredWaitCalculator.BuildDeferredTroopTrainingRequests(itemOptions);
+            var evaluation = DeferredWaitCalculator.EvaluateDeferredTroopTrainingWait(
                 requests,
                 knownBuildings,
                 currentResources,
