@@ -18,11 +18,57 @@
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
         </Style>
+        <Style x:Key="TroopSettingsKeepPercentComboBoxStyle"
+               TargetType="{x:Type ComboBox}"
+               BasedOn="{StaticResource TroopSettingsComboBoxStyle}">
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.45" />
+                    <Setter Property="Cursor" Value="Arrow" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="DetailLabelStyle" TargetType="{x:Type TextBlock}">
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
             <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="TroopSettingsExpandButtonStyle" TargetType="{x:Type ToggleButton}">
+            <Setter Property="Background" Value="{DynamicResource SuccessBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SuccessBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ToggleButton}">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource SuccessTextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource SuccessBgBrush}" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource SuccessTextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.80" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
@@ -204,11 +250,8 @@
                                                           ToolTip="Show all settings for this village."
                                                           IsChecked="{Binding IsExpanded, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                                                 <ToggleButton.Style>
-                                                    <Style TargetType="{x:Type ToggleButton}">
+                                                    <Style TargetType="{x:Type ToggleButton}" BasedOn="{StaticResource TroopSettingsExpandButtonStyle}">
                                                         <Setter Property="Content" Value="&#x25B8;" />
-                                                        <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
-                                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-                                                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                                                         <Style.Triggers>
                                                             <Trigger Property="IsChecked" Value="True">
                                                                 <Setter Property="Content" Value="&#x25BE;" />
@@ -337,6 +380,7 @@
                                                                           Width="74"
                                                                           HorizontalAlignment="Left"
                                                                           HorizontalContentAlignment="Left"
+                                                                          Style="{StaticResource TroopSettingsKeepPercentComboBoxStyle}"
                                                                           SelectedValuePath="Tag"
                                                                           SelectedValue="{Binding KeepResourcesPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                                           IsEnabled="{Binding UsesKeepResourcesMode}">
@@ -417,15 +461,14 @@
                                                                                 </Style.Triggers>
                                                                             </Style>
                                                                         </StackPanel.Style>
-                                                                        <Slider Width="130"
-                                                                                VerticalAlignment="Center"
-                                                                                Minimum="0"
-                                                                                Maximum="100"
-                                                                                TickFrequency="1"
-                                                                                IsSnapToTickEnabled="True"
-                                                                                Value="{Binding MinimumResourcesPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                                                        <TextBlock Text="{Binding MinimumResourcesPercent, StringFormat={}{0}%}"
-                                                                                   Margin="8,0,0,0"
+                                                                        <TextBox Width="52"
+                                                                                 Height="26"
+                                                                                 VerticalAlignment="Center"
+                                                                                 TextAlignment="Center"
+                                                                                 VerticalContentAlignment="Center"
+                                                                                 Text="{Binding MinimumResourcesPercentText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                                                                        <TextBlock Text="%"
+                                                                                   Margin="6,0,0,0"
                                                                                    VerticalAlignment="Center"
                                                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                                                    FontWeight="SemiBold" />
@@ -451,18 +494,18 @@
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,16,0,0">
+            <Button Width="120"
+                    Height="30"
+                    Content="Save"
+                    Margin="0,0,8,0"
+                    Click="SaveButton_Click"
+                    Background="{DynamicResource SuccessBgBrush}"
+                    BorderBrush="{DynamicResource SuccessBorderBrush}"
+                    Foreground="{DynamicResource SuccessTextBrush}" />
             <Button Width="80"
                     Height="30"
                     Content="Cancel"
-                    Margin="0,0,8,0"
                     Click="CancelButton_Click" />
-            <Button Width="120"
-                    Height="30"
-                    Content="Save &amp; close"
-                    Click="SaveButton_Click"
-                    Background="{DynamicResource PrimaryButtonBrush}"
-                    BorderBrush="{DynamicResource AccentBrush}"
-                    Foreground="{DynamicResource OnAccentBrush}" />
         </StackPanel>
     </Grid>
 </Window>

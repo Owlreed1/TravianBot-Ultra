@@ -17,6 +17,79 @@ namespace TbotUltra.Desktop;
 
 public partial class MainWindow
 {
+    private DateTimeOffset _nextVillageStatusSweepUtc = DateTimeOffset.MinValue;
+
+    private async Task MaybeRunVillageStatusSweepAsync(BotOptions options, CancellationToken token)
+    {
+        if (!options.VillageStatusSweepEnabled || DateTimeOffset.UtcNow < _nextVillageStatusSweepUtc)
+        {
+            return;
+        }
+
+        var villages = await Dispatcher.InvokeAsync(() =>
+        {
+            var source = (DashboardVillageList.ItemsSource as IEnumerable<VillageSelectionItem>)
+                ?? (VillageComboBox.ItemsSource as IEnumerable<VillageSelectionItem>)
+                ?? Enumerable.Empty<VillageSelectionItem>();
+            return source.Where(v => !string.IsNullOrWhiteSpace(v.Name) && !string.Equals(v.Name, "-", StringComparison.Ordinal))
+                .GroupBy(GetVillageKey, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(_ => Random.Shared.Next())
+                .ToList();
+        });
+
+        if (villages.Count == 0)
+        {
+            return;
+        }
+
+        AppendLog($"[village-status-sweep] starting round for {villages.Count} village(s).");
+        foreach (var village in villages)
+        {
+            token.ThrowIfCancellationRequested();
+            try
+            {
+                var status = options.VillageStatusSweepDorf2Enabled
+                    ? await _botService.ReadVillageStatusAsync(options, AppendLog, village.Name, village.Url, token)
+                    : await _botService.ReadVillageResourceStatusAsync(options, AppendLog, village.Name, village.Url, token);
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    CacheVillageStatus(status, village.Name);
+                    if (options.VillageStatusSweepDorf2Enabled)
+                    {
+                        ReconcilePendingBuildingQueueWithLiveStatus(status);
+                    }
+                    if (IsStatusForSelectedVillage(status))
+                    {
+                        ApplyVillageStatusToUi(status);
+                    }
+                });
+                AppendLog($"[village-status-sweep] updated '{village.Name}'.");
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"[village-status-sweep] skipped '{village.Name}': {FormatExceptionForLog(ex)}");
+            }
+
+            if (!ReferenceEquals(village, villages[^1]))
+            {
+                await ActionPacer.FromOptions(options, AppendLog).DelayAsync(
+                    options.VillageStatusSweepVillageMinSeconds,
+                    options.VillageStatusSweepVillageMaxSeconds,
+                    token,
+                    "Village Status Sweep: next village");
+            }
+        }
+
+        var min = Math.Min(options.VillageStatusSweepRoundMinMinutes, options.VillageStatusSweepRoundMaxMinutes);
+        var max = Math.Max(options.VillageStatusSweepRoundMinMinutes, options.VillageStatusSweepRoundMaxMinutes);
+        _nextVillageStatusSweepUtc = DateTimeOffset.UtcNow.AddMinutes(Random.Shared.Next(min, max + 1));
+        AppendLog($"[village-status-sweep] round complete; next round after {_nextVillageStatusSweepUtc:HH:mm}.");
+    }
     private static readonly TimeSpan LoopPickVerboseThrottle = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan GoldClubInactiveRecheckInterval = TimeSpan.FromMinutes(10);
     // Idle loop passes no longer log "[LOOP n] START" + "WAIT" every few seconds. Instead a single
@@ -1726,6 +1799,7 @@ public partial class MainWindow
                 await MaybeDoIdleBrowseAsync(options, token);
                 await EnsureChromiumInstalledAsync();
                 await HonorPendingVillageSwitchAsync(options, token);
+                await MaybeRunVillageStatusSweepAsync(options, token);
                 await EnsureContinuousLoopConstructionStatusAsync(options, token);
                 await MaybeAnalyzeNewVillageDuringContinuousLoopAsync(options, token);
                 await EnsureContinuousLoopRuntimeItemsAsync(options, token);

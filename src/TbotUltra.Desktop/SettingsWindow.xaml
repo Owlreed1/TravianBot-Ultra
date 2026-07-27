@@ -447,6 +447,38 @@
                             </Border>
 
                             <Border Style="{StaticResource SettingsGroupBox}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <CheckBox x:Name="VillageStatusSweepEnabledCheckBox" Content="Village Status Sweep" />
+                                        <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                        ToolTip="Makes one randomized pass through your villages. It reads Dorf1 first, updates the UI and lets enabled automation react in the same village before continuing. The next round starts after the selected random interval." />
+                                    </StackPanel>
+                                    <WrapPanel Margin="18,0,0,8">
+                                        <CheckBox x:Name="VillageStatusSweepDorf1CheckBox" Content="Dorf1 (resources, production and storage)" IsChecked="True" Margin="0,2,16,2" />
+                                        <CheckBox x:Name="VillageStatusSweepDorf2CheckBox" Content="Dorf2 (buildings)" Margin="0,2,16,2" Checked="VillageStatusSweepDorf2Changed" Unchecked="VillageStatusSweepDorf2Changed" />
+                                        <CheckBox x:Name="VillageStatusSweepSmithyCheckBox" Content="Smithy" Margin="0,2,16,2" />
+                                        <CheckBox x:Name="VillageStatusSweepBarracksCheckBox" Content="Barracks" Margin="0,2,16,2" />
+                                        <CheckBox x:Name="VillageStatusSweepStableCheckBox" Content="Stable" Margin="0,2,16,2" />
+                                        <CheckBox x:Name="VillageStatusSweepWorkshopCheckBox" Content="Workshop" Margin="0,2,16,2" />
+                                        <CheckBox x:Name="VillageStatusSweepTownHallCheckBox" Content="Town Hall" Margin="0,2,16,2" />
+                                        <CheckBox x:Name="VillageStatusSweepBreweryCheckBox" Content="Brewery (Teutons only)" Margin="0,2,16,2" />
+                                    </WrapPanel>
+                                    <Grid Margin="18,0,0,0">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="70" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Min" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Row="0" Grid.Column="2" Text="Max" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Next round (min)" VerticalAlignment="Center" Margin="0,4" />
+                                        <TextBox x:Name="VillageStatusSweepRoundMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" />
+                                        <TextBox x:Name="VillageStatusSweepRoundMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Between villages (s)" VerticalAlignment="Center" Margin="0,4" />
+                                        <TextBox x:Name="VillageStatusSweepVillageMinTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" />
+                                        <TextBox x:Name="VillageStatusSweepVillageMaxTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource SettingsGroupBox}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="150" />

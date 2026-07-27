@@ -20,6 +20,10 @@ _Avoid_: Map data response, scan output
 The application of a confirmed live village construction status to pending construction queue items, including satisfied targets, slot rebinding, and required dependencies.
 _Avoid_: Queue repair, build queue sync
 
+**Village Status Round**:
+One randomized pass through every known village that reads the enabled live game state, updates the per-village status cache and lets already-enabled automation react before moving to the next village. It leaves the browser on the final naturally visited village; the next round is scheduled separately.
+_Avoid_: Village scan loop, village refresh
+
 **Send Troops**:
 The verified Official Travian flow that opens the Rally Point troop form and prepares troop dispatch for combat or Farm Lists.
 _Avoid_: Manual Farming, Natar farming

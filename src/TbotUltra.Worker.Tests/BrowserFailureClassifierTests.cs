@@ -56,4 +56,22 @@ public sealed class BrowserFailureClassifierTests
 
         Assert.False(BrowserFailureClassifier.IsTargetCrash(exception));
     }
+
+    [Fact]
+    public void IsTransientNavigation_MatchesNestedExecutionContextDestroyed()
+    {
+        var exception = new InvalidOperationException(
+            "UI sync failed.",
+            new Exception("Execution context was destroyed, most likely because of a navigation."));
+
+        Assert.True(BrowserFailureClassifier.IsTransientNavigation(exception));
+    }
+
+    [Fact]
+    public void IsTransientNavigation_RejectsFatalDisconnect()
+    {
+        var exception = new Exception("Target page, context or browser has been closed");
+
+        Assert.False(BrowserFailureClassifier.IsTransientNavigation(exception));
+    }
 }

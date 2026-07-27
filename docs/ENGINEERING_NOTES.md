@@ -290,6 +290,14 @@ Published artifacts belong under `artifacts/`, never beside source files.
   never past a known completion deadline. Navigation and state-changing clicks invalidate both.
 - Construction Queue Reconciliation plans only from confirmed full live status and applies all pending-item
   changes atomically; cache or local timers are never reconciliation evidence.
+- Deferred resource-gated waits are re-estimated LIVE on every resource read (jitter included), not left on
+  the worker's one-shot ETA: `RefreshDeferredConstructionWaitsAsync` / `RefreshDeferredTroopTrainingWaitsAsync`
+  re-read current resources + production, recompute the wait, update the UI timer, and release when the live
+  threshold is actually met (e.g. farming income makes a "build at 80%" fire at the real time, not a stale
+  20h). Both are triggered from `CacheVillageStatus`, so they run for ANY read village, not only the selected
+  one. The troop recompute needs storage capacities — with capacity 0 the eval falsely reports "ready", so a
+  light current-page read (no caps) fills caps/production from the village cache but keeps the LIVE current
+  resources; buildings are never cache-filled (empty is handled leniently, a stale list could wrongly exclude).
 - After every building-mutation task the desktop ALWAYS re-reads the full dorf1+dorf2 for the just-worked
   village (`RefreshConstructionStatusAfterBuildingMutationAsync` → `RefreshConstructionStatusAsync`, then
   `CacheVillageStatus`). Do not restore the old QueuedOrInProgress/AlreadySatisfied storage-only quick-skip:
@@ -316,7 +324,7 @@ Published artifacts belong under `artifacts/`, never beside source files.
   then wait for that list's `.farmListStatus` "N/M being raided" numerator to rise (or its Start to disable)
   before the next click — never the single "start all" button (a list can silently fail with no feedback).
   The wait between clicks is the "Send farmlists" action pacing (`FarmListStepDelayMin/MaxSeconds`, default
-  0.1-0.3s, on the Settings pacing tab). "Send toggled lists" mode sends every selected list each round;
+  1-4s, on the Settings pacing tab). "Send toggled lists" mode sends every selected list each round;
   "Send all lists" sends every list; `ContinuousFarmDispatchDelay` (minutes) is the gap between whole rounds,
   not between individual lists.
 - Farm-list rows dedupe/merge by stable `lid` (data-list), never by display name — two villages can hold

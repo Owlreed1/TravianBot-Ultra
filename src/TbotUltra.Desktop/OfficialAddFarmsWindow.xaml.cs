@@ -466,7 +466,7 @@ public partial class OfficialAddFarmsWindow : Window
         AddingProgressBar.Value = percent;
         AddingPercentText.Text = $"{percent:0}%";
         AddingAddedText.Text = $"{added} / {requested} added";
-        AddingCurrentListText.Text = string.IsNullOrWhiteSpace(p?.FarmListName) ? "-" : p!.FarmListName;
+        AddingCurrentListText.Text = string.IsNullOrWhiteSpace(p?.FarmListName) ? "-" : $"Farmlist: {p!.FarmListName}";
         AddingInvalidText.Text = (p?.NotFoundCount ?? 0).ToString(CultureInfo.InvariantCulture);
         AddingElapsedText.Text = FormatElapsed(_runStopwatch.Elapsed);
     }

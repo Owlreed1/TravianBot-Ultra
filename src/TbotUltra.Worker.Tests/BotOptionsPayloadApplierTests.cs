@@ -654,8 +654,8 @@ public sealed class BotOptionsPayloadApplierTests
         Assert.Equal(1.5, options.ActionPacingClickMaxSeconds);
         Assert.Equal(4.0, options.ActionPacingLoopMinSeconds);
         Assert.Equal(25.0, options.ActionPacingLoopMaxSeconds);
-        Assert.Equal(0.6, options.FarmListStepDelayMinSeconds);
-        Assert.Equal(1.2, options.FarmListStepDelayMaxSeconds);
+        Assert.Equal(1.0, options.FarmListStepDelayMinSeconds);
+        Assert.Equal(4.0, options.FarmListStepDelayMaxSeconds);
         Assert.True(options.ActionPacingIdleBreakEnabled);
         Assert.Equal(10.0, options.ActionPacingIdleBreakIntervalMinMinutes);
         Assert.Equal(60.0, options.ActionPacingIdleBreakIntervalMaxMinutes);
@@ -667,6 +667,9 @@ public sealed class BotOptionsPayloadApplierTests
         Assert.True(options.ActionPacingIdleBrowsePageStatisticsAttackers);
         Assert.Equal(0.3, options.CollectStepDelayMinSeconds);
         Assert.Equal(0.8, options.CollectStepDelayMaxSeconds);
+        Assert.Equal(90, options.TroopTrainingBarracksMinimumResourcesPercent);
+        Assert.Equal(90, options.TroopTrainingStableMinimumResourcesPercent);
+        Assert.Equal(90, options.TroopTrainingWorkshopMinimumResourcesPercent);
         Assert.False(options.IncreaseAdventuresToHard);
         Assert.Equal(70, options.HeroAdventureVideoChancePercent);
     }

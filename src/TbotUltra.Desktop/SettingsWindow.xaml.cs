@@ -705,6 +705,20 @@ public partial class SettingsWindow : Window
         ActionLoopMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingLoopMaxSeconds, PacingDefaults.ActionPacingLoopMaxSeconds));
         FarmListStepDelayMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.FarmListStepDelayMinSeconds, PacingDefaults.FarmListStepDelayMinSeconds));
         FarmListStepDelayMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.FarmListStepDelayMaxSeconds, PacingDefaults.FarmListStepDelayMaxSeconds));
+        VillageStatusSweepEnabledCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepEnabled, PacingDefaults.VillageStatusSweepEnabled);
+        VillageStatusSweepDorf1CheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepDorf1Enabled, true);
+        VillageStatusSweepDorf2CheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepDorf2Enabled, false);
+        VillageStatusSweepSmithyCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepSmithyEnabled, false);
+        VillageStatusSweepBarracksCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepBarracksEnabled, false);
+        VillageStatusSweepStableCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepStableEnabled, false);
+        VillageStatusSweepWorkshopCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepWorkshopEnabled, false);
+        VillageStatusSweepTownHallCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepTownHallEnabled, false);
+        VillageStatusSweepBreweryCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepBreweryEnabled, false);
+        VillageStatusSweepRoundMinTextBox.Text = ReadInt(BotOptionPayloadKeys.VillageStatusSweepRoundMinMinutes, PacingDefaults.VillageStatusSweepRoundMinMinutes).ToString();
+        VillageStatusSweepRoundMaxTextBox.Text = ReadInt(BotOptionPayloadKeys.VillageStatusSweepRoundMaxMinutes, PacingDefaults.VillageStatusSweepRoundMaxMinutes).ToString();
+        VillageStatusSweepVillageMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.VillageStatusSweepVillageMinSeconds, PacingDefaults.VillageStatusSweepVillageMinSeconds));
+        VillageStatusSweepVillageMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.VillageStatusSweepVillageMaxSeconds, PacingDefaults.VillageStatusSweepVillageMaxSeconds));
+        UpdateVillageStatusSweepDetailAvailability();
 
         IdleBreakEnabledCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBreakEnabled, PacingDefaults.ActionPacingIdleBreakEnabled);
         IdleBreakIntervalMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBreakIntervalMinMinutes, PacingDefaults.ActionPacingIdleBreakIntervalMinMinutes));
@@ -730,6 +744,7 @@ public partial class SettingsWindow : Window
 
     private void SavePacingConfigFromUi()
     {
+        UpdateVillageStatusSweepDetailAvailability();
         _config[BotOptionPayloadKeys.SessionPacingEnabled] = SessionPacingEnabledCheckBox.IsChecked == true;
         _config[BotOptionPayloadKeys.SessionPacingRunMinMinutes] = ReadIntText(SessionRunMinMinutesTextBox, PacingDefaults.SessionPacingRunMinMinutes, 1, 10080);
         _config[BotOptionPayloadKeys.SessionPacingRunMaxMinutes] = ReadIntText(SessionRunMaxMinutesTextBox, PacingDefaults.SessionPacingRunMaxMinutes, 1, 10080);
@@ -756,6 +771,19 @@ public partial class SettingsWindow : Window
             FarmListStepDelayMaxTextBox,
             PacingDefaults.FarmListStepDelayMinSeconds,
             PacingDefaults.FarmListStepDelayMaxSeconds);
+        _config[BotOptionPayloadKeys.VillageStatusSweepEnabled] = VillageStatusSweepEnabledCheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.VillageStatusSweepDorf1Enabled] = VillageStatusSweepDorf1CheckBox.IsChecked == true;
+        var dorf2Enabled = VillageStatusSweepDorf2CheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.VillageStatusSweepDorf2Enabled] = dorf2Enabled;
+        _config[BotOptionPayloadKeys.VillageStatusSweepSmithyEnabled] = dorf2Enabled && VillageStatusSweepSmithyCheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.VillageStatusSweepBarracksEnabled] = dorf2Enabled && VillageStatusSweepBarracksCheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.VillageStatusSweepStableEnabled] = dorf2Enabled && VillageStatusSweepStableCheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.VillageStatusSweepWorkshopEnabled] = dorf2Enabled && VillageStatusSweepWorkshopCheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.VillageStatusSweepTownHallEnabled] = dorf2Enabled && VillageStatusSweepTownHallCheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.VillageStatusSweepBreweryEnabled] = dorf2Enabled && VillageStatusSweepBreweryCheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.VillageStatusSweepRoundMinMinutes] = ReadIntText(VillageStatusSweepRoundMinTextBox, PacingDefaults.VillageStatusSweepRoundMinMinutes, 1, 1440);
+        _config[BotOptionPayloadKeys.VillageStatusSweepRoundMaxMinutes] = ReadIntText(VillageStatusSweepRoundMaxTextBox, PacingDefaults.VillageStatusSweepRoundMaxMinutes, 1, 1440);
+        WriteDelayRange(BotOptionPayloadKeys.VillageStatusSweepVillageMinSeconds, BotOptionPayloadKeys.VillageStatusSweepVillageMaxSeconds, VillageStatusSweepVillageMinTextBox, VillageStatusSweepVillageMaxTextBox, PacingDefaults.VillageStatusSweepVillageMinSeconds, PacingDefaults.VillageStatusSweepVillageMaxSeconds);
 
         // Idle "step away" break (minutes). WriteDelayRange clamps and keeps max >= min.
         _config[BotOptionPayloadKeys.ActionPacingIdleBreakEnabled] = IdleBreakEnabledCheckBox.IsChecked == true;
@@ -802,6 +830,32 @@ public partial class SettingsWindow : Window
             PacingDefaults.CollectStepDelayMaxSeconds);
     }
 
+    private void VillageStatusSweepDorf2Changed(object sender, RoutedEventArgs e)
+    {
+        UpdateVillageStatusSweepDetailAvailability();
+    }
+
+    private void UpdateVillageStatusSweepDetailAvailability()
+    {
+        var enabled = VillageStatusSweepDorf2CheckBox.IsChecked == true;
+        foreach (var checkBox in new[]
+        {
+            VillageStatusSweepSmithyCheckBox,
+            VillageStatusSweepBarracksCheckBox,
+            VillageStatusSweepStableCheckBox,
+            VillageStatusSweepWorkshopCheckBox,
+            VillageStatusSweepTownHallCheckBox,
+            VillageStatusSweepBreweryCheckBox,
+        })
+        {
+            checkBox.IsEnabled = enabled;
+            if (!enabled)
+            {
+                checkBox.IsChecked = false;
+            }
+        }
+    }
+
     private void ApplyPacingDefaultsToUi()
     {
         SessionPacingEnabledCheckBox.IsChecked = PacingDefaults.SessionPacingEnabled;
@@ -827,6 +881,19 @@ public partial class SettingsWindow : Window
         ActionLoopMaxTextBox.Text = FormatDelay(PacingDefaults.ActionPacingLoopMaxSeconds);
         FarmListStepDelayMinTextBox.Text = FormatDelay(PacingDefaults.FarmListStepDelayMinSeconds);
         FarmListStepDelayMaxTextBox.Text = FormatDelay(PacingDefaults.FarmListStepDelayMaxSeconds);
+        VillageStatusSweepEnabledCheckBox.IsChecked = PacingDefaults.VillageStatusSweepEnabled;
+        VillageStatusSweepDorf1CheckBox.IsChecked = true;
+        VillageStatusSweepDorf2CheckBox.IsChecked = false;
+        VillageStatusSweepSmithyCheckBox.IsChecked = false;
+        VillageStatusSweepBarracksCheckBox.IsChecked = false;
+        VillageStatusSweepStableCheckBox.IsChecked = false;
+        VillageStatusSweepWorkshopCheckBox.IsChecked = false;
+        VillageStatusSweepTownHallCheckBox.IsChecked = false;
+        VillageStatusSweepBreweryCheckBox.IsChecked = false;
+        VillageStatusSweepRoundMinTextBox.Text = PacingDefaults.VillageStatusSweepRoundMinMinutes.ToString();
+        VillageStatusSweepRoundMaxTextBox.Text = PacingDefaults.VillageStatusSweepRoundMaxMinutes.ToString();
+        VillageStatusSweepVillageMinTextBox.Text = FormatDelay(PacingDefaults.VillageStatusSweepVillageMinSeconds);
+        VillageStatusSweepVillageMaxTextBox.Text = FormatDelay(PacingDefaults.VillageStatusSweepVillageMaxSeconds);
         IdleBreakEnabledCheckBox.IsChecked = PacingDefaults.ActionPacingIdleBreakEnabled;
         IdleBreakIntervalMinTextBox.Text = FormatDelay(PacingDefaults.ActionPacingIdleBreakIntervalMinMinutes);
         IdleBreakIntervalMaxTextBox.Text = FormatDelay(PacingDefaults.ActionPacingIdleBreakIntervalMaxMinutes);

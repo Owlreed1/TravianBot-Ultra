@@ -264,6 +264,19 @@ public static class BotOptionPayloadKeys
     public const string ActionPacingLoopMaxSeconds = "action_pacing_loop_max_seconds";
     public const string FarmListStepDelayMinSeconds = "farm_list_step_delay_min_seconds";
     public const string FarmListStepDelayMaxSeconds = "farm_list_step_delay_max_seconds";
+    public const string VillageStatusSweepEnabled = "village_status_sweep_enabled";
+    public const string VillageStatusSweepDorf1Enabled = "village_status_sweep_dorf1_enabled";
+    public const string VillageStatusSweepDorf2Enabled = "village_status_sweep_dorf2_enabled";
+    public const string VillageStatusSweepSmithyEnabled = "village_status_sweep_smithy_enabled";
+    public const string VillageStatusSweepBarracksEnabled = "village_status_sweep_barracks_enabled";
+    public const string VillageStatusSweepStableEnabled = "village_status_sweep_stable_enabled";
+    public const string VillageStatusSweepWorkshopEnabled = "village_status_sweep_workshop_enabled";
+    public const string VillageStatusSweepTownHallEnabled = "village_status_sweep_town_hall_enabled";
+    public const string VillageStatusSweepBreweryEnabled = "village_status_sweep_brewery_enabled";
+    public const string VillageStatusSweepRoundMinMinutes = "village_status_sweep_round_min_minutes";
+    public const string VillageStatusSweepRoundMaxMinutes = "village_status_sweep_round_max_minutes";
+    public const string VillageStatusSweepVillageMinSeconds = "village_status_sweep_village_min_seconds";
+    public const string VillageStatusSweepVillageMaxSeconds = "village_status_sweep_village_max_seconds";
 
     public const string ActionPacingIdleBreakEnabled = "action_pacing_idle_break_enabled";
     public const string ActionPacingIdleBreakIntervalMinMinutes = "action_pacing_idle_break_interval_min_minutes";

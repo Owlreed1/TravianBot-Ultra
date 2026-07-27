@@ -40,29 +40,43 @@ public sealed partial class TravianClient
 
         try
         {
-            var currency = await ReadCurrencyAsync(cancellationToken);
-            var activeVillage = await ReadActiveVillageNameAsync(cancellationToken);
-            var activeCoordinates = await TryReadActiveVillageCoordsFromCurrentPageAsync(cancellationToken);
-            // If the active village was renamed in-game, refresh its cached name now (matched by
-            // coordinates) so the villages list below agrees with ActiveVillage in the same payload.
-            ReconcileActiveVillageNameInCache(activeVillage, activeCoordinates);
-            var villages = await ReadVillagesPreferCacheAsync(cancellationToken);
-            var payload = JsonSerializer.Serialize(new UiSyncSnapshot(
-                Gold: currency.Gold,
-                Silver: currency.Silver,
-                ActiveVillage: activeVillage,
-                ActiveVillageCoordX: activeCoordinates.X,
-                ActiveVillageCoordY: activeCoordinates.Y,
-                Villages: villages
-                    .Select(v => new UiSyncVillage(v.Name, v.Url, v.IsCapital, v.CoordX, v.CoordY, v.Population, v.CropFields))
-                    .ToList()));
+            var snapshot = await RetryAsync(
+                "ui sync snapshot",
+                () => ReadUiSyncSnapshotAsync(cancellationToken),
+                attempts: 3,
+                cancellationToken);
+            var payload = JsonSerializer.Serialize(snapshot);
             _lastUiSyncAt = now;
             Notify($"[ui-sync] {payload}");
+        }
+        catch (Exception ex) when (BrowserFailureClassifier.IsTransientNavigation(ex))
+        {
+            Notify($"[ui-sync:verbose] snapshot skipped after transient navigation ({ex.Message})");
         }
         catch (Exception ex)
         {
             Notify($"UI sync snapshot failed: {ex.Message}");
         }
+    }
+
+    private async Task<UiSyncSnapshot> ReadUiSyncSnapshotAsync(CancellationToken cancellationToken)
+    {
+        var currency = await ReadCurrencyAsync(cancellationToken);
+        var activeVillage = await ReadActiveVillageNameAsync(cancellationToken);
+        var activeCoordinates = await TryReadActiveVillageCoordsFromCurrentPageAsync(cancellationToken);
+        // If the active village was renamed in-game, refresh its cached name now (matched by
+        // coordinates) so the villages list below agrees with ActiveVillage in the same payload.
+        ReconcileActiveVillageNameInCache(activeVillage, activeCoordinates);
+        var villages = await ReadVillagesPreferCacheAsync(cancellationToken);
+        return new UiSyncSnapshot(
+            Gold: currency.Gold,
+            Silver: currency.Silver,
+            ActiveVillage: activeVillage,
+            ActiveVillageCoordX: activeCoordinates.X,
+            ActiveVillageCoordY: activeCoordinates.Y,
+            Villages: villages
+                .Select(v => new UiSyncVillage(v.Name, v.Url, v.IsCapital, v.CoordX, v.CoordY, v.Population, v.CropFields))
+                .ToList());
     }
 
 }

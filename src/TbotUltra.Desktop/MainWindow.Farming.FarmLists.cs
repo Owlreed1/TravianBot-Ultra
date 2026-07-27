@@ -736,44 +736,28 @@ public partial class MainWindow
             var runResult = officialDialog.RunResult;
             HideBusyOverlay();
 
-            // Single completion popup: the run summary, and — only when dead villages were found — the
-            // "remove them from the Travco list?" question baked into the same dialog (Yes/No) so the user
-            // never sees two separate popups.
+            // Single modern completion popup: the run summary as stat tiles, and — only when dead villages
+            // were found — the "remove them from the Travco list?" question baked into the same dialog
+            // (Keep / Remove them) so the user never sees two separate popups.
             var elapsed = officialDialog.RunDuration;
-            var summary =
-                $"Added: {runResult.Added}\n" +
-                $"Duplicates skipped: {runResult.Duplicates}\n" +
-                $"Occupied (oasis) skipped: {runResult.OccupiedSkipped}\n" +
-                $"Failed: {runResult.Failed}\n" +
-                $"Elapsed: {(int)elapsed.TotalHours:00}:{elapsed.Minutes:00}:{elapsed.Seconds:00}";
-            if (runResult.InvalidCoordinates.Count > 0)
+            var completeWindow = new AddFarmsCompleteWindow(
+                this,
+                runResult.Added,
+                runResult.Duplicates,
+                runResult.OccupiedSkipped,
+                runResult.Failed,
+                elapsed,
+                runResult.InvalidCoordinates.Count,
+                runResult.SourceListName);
+            completeWindow.ShowDialog();
+            if (runResult.InvalidCoordinates.Count > 0 && completeWindow.RemoveInvalidCoordinates)
             {
-                var removeInvalid = AppDialog.Show(
-                    this,
-                    summary +
-                    $"\n\n{runResult.InvalidCoordinates.Count} invalid village coordinate(s) were found.\n" +
-                    $"Remove them from Travco list '{runResult.SourceListName}'?",
-                    "Add farms complete",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-                if (removeInvalid == MessageBoxResult.Yes)
-                {
-                    var removed = _travcoListStore.RemoveRowsByCoordinates(
-                        runResult.SourceListId,
-                        runResult.InvalidCoordinates);
-                    AppendLog(
-                        $"Removed {removed}/{runResult.InvalidCoordinates.Count} invalid coordinate(s) " +
-                        $"from Travco list '{runResult.SourceListName}'.");
-                }
-            }
-            else
-            {
-                AppDialog.Show(
-                    this,
-                    summary,
-                    "Add farms complete",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                var removed = _travcoListStore.RemoveRowsByCoordinates(
+                    runResult.SourceListId,
+                    runResult.InvalidCoordinates);
+                AppendLog(
+                    $"Removed {removed}/{runResult.InvalidCoordinates.Count} invalid coordinate(s) " +
+                    $"from Travco list '{runResult.SourceListName}'.");
             }
 
             CompleteOperation(

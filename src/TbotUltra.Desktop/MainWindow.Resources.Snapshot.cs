@@ -723,6 +723,7 @@ public partial class MainWindow
         await TryReleaseAwayHeroManageDeferAsync(options);
 
         await TryQueueSpendHeroAttributePointsForLevelUpIndicatorAsync(options);
+        TryQueueHeroAdventureForAvailableAdventure(options, refreshedStatus);
 
         if (officialServer && refreshedStatus is not null)
         {
@@ -820,6 +821,55 @@ public partial class MainWindow
             .Any(item =>
                 string.Equals(item.TaskName, "spend_hero_attribute_points", StringComparison.OrdinalIgnoreCase)
                 && item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused);
+    }
+
+    private bool HasActiveHeroManageTask()
+    {
+        return _botService.GetQueueItemsForDisplay()
+            .Any(item =>
+                string.Equals(item.TaskName, "hero_manage", StringComparison.OrdinalIgnoreCase)
+                && item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused);
+    }
+
+    // Reactive Hero adventure: the jitter refresh already read the current-page adventure count into
+    // refreshedStatus, so if adventures are available and the Hero group is on, queue hero_manage right away
+    // (the same enqueue the continuous loop does on its own cadence). This makes a newly-appeared adventure
+    // fire on the next ~15-35s jitter tick instead of waiting for the next loop pass. hero_manage itself
+    // applies the hero send delay and re-defers on reviving/away/low-HP, so no HP/home check is needed here.
+    private void TryQueueHeroAdventureForAvailableAdventure(BotOptions options, VillageStatus? refreshedStatus)
+    {
+        if (refreshedStatus?.AdventureCount is not > 0)
+        {
+            return;
+        }
+
+        var heroPollingEnabled = GetContinuousLoopConsideredGroupsInOrder().Contains(QueueGroup.Hero)
+            || ShouldKeepHeroAdventurePolling();
+        if (!heroPollingEnabled || HasActiveHeroManageTask())
+        {
+            return;
+        }
+
+        if (!IsQueueItemAllowedByAutomationSettings(new QueueItem
+            {
+                TaskName = "hero_manage",
+                Group = QueueGroup.Hero,
+            }))
+        {
+            return;
+        }
+
+        var payload = BuildHeroRuntimePayload();
+        _botService.EnqueueRuntime("hero_manage", "Hero adventure", payload, priority: -50, maxRetries: 0);
+        AppendLog($"Hero: jitter refresh saw {refreshedStatus.AdventureCount} adventure(s) available — queued hero_manage now.");
+        if (IsContinuousLoopRunning())
+        {
+            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        }
+        else
+        {
+            TriggerQueueAutoRunFromEnqueue();
+        }
     }
 
     // Official only: cheap current-page check (no navigation) for claimable Questmaster task

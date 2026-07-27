@@ -17,7 +17,7 @@ public sealed class TroopTrainingBuildingOption : INotifyPropertyChanged
     private int _keepResourcesPercent = 10;
     private string _runMode = "timed";
     private int _minimumTroops = 1;
-    private int _minimumResourcesPercent = 50;
+    private int _minimumResourcesPercent = 90;
     private int _timedMinMinutes = 30;
     private int _timedMaxMinutes = 120;
     private bool _checkWood = true;
@@ -180,6 +180,21 @@ public sealed class TroopTrainingBuildingOption : INotifyPropertyChanged
 
             _minimumResourcesPercent = normalized;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(MinimumResourcesPercentText));
+        }
+    }
+
+    public string MinimumResourcesPercentText
+    {
+        get => MinimumResourcesPercent.ToString();
+        set
+        {
+            if (!int.TryParse(value?.Trim(), out var parsed))
+            {
+                return;
+            }
+
+            MinimumResourcesPercent = parsed;
         }
     }
 

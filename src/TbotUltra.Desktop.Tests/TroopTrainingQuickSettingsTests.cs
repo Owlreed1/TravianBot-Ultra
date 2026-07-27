@@ -84,6 +84,17 @@ public sealed class TroopTrainingQuickSettingsTests
     }
 
     [Fact]
+    public void MinimumResourcesPercentText_UpdatesAndNormalizesTheThreshold()
+    {
+        var row = new TroopTrainingQuickVillageRow("v1", "Village 1", true, BuildSourcePayload(), "Teutons");
+
+        row.Barracks.MinimumResourcesPercentText = "110";
+
+        Assert.Equal(100, row.Barracks.MinimumResourcesPercent);
+        Assert.Equal("100", row.Barracks.MinimumResourcesPercentText);
+    }
+
+    [Fact]
     public void VillageRows_UseTheirOwnTribeTroops()
     {
         var source = BuildSourcePayload();

@@ -54,4 +54,32 @@ public static class BrowserFailureClassifier
 
         return false;
     }
+
+    public static bool IsTransientNavigation(Exception ex)
+    {
+        if (IsTargetCrash(ex))
+        {
+            return false;
+        }
+
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            var message = current.Message;
+            if (string.IsNullOrEmpty(message))
+            {
+                continue;
+            }
+
+            if (message.Contains("Execution context was destroyed", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("Cannot find context with specified id", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("ERR_ABORTED", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("Frame was detached", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("Navigation interrupted", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

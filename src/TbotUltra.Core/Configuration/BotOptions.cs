@@ -143,7 +143,7 @@ public sealed record BotOptions
     public int TroopTrainingBarracksMinimumTroops { get; init; } = 1;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingBarracksMinimumResourcesPercent)]
-    public int TroopTrainingBarracksMinimumResourcesPercent { get; init; } = 50;
+    public int TroopTrainingBarracksMinimumResourcesPercent { get; init; } = 90;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingBarracksTimedMinMinutes)]
     public int TroopTrainingBarracksTimedMinMinutes { get; init; } = 30;
@@ -185,7 +185,7 @@ public sealed record BotOptions
     public int TroopTrainingStableMinimumTroops { get; init; } = 1;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingStableMinimumResourcesPercent)]
-    public int TroopTrainingStableMinimumResourcesPercent { get; init; } = 50;
+    public int TroopTrainingStableMinimumResourcesPercent { get; init; } = 90;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingStableTimedMinMinutes)]
     public int TroopTrainingStableTimedMinMinutes { get; init; } = 30;
@@ -227,7 +227,7 @@ public sealed record BotOptions
     public int TroopTrainingWorkshopMinimumTroops { get; init; } = 1;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingWorkshopMinimumResourcesPercent)]
-    public int TroopTrainingWorkshopMinimumResourcesPercent { get; init; } = 50;
+    public int TroopTrainingWorkshopMinimumResourcesPercent { get; init; } = 90;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingWorkshopTimedMinMinutes)]
     public int TroopTrainingWorkshopTimedMinMinutes { get; init; } = 30;
@@ -363,6 +363,33 @@ public sealed record BotOptions
 
     [ConfigurationKeyName(BotOptionPayloadKeys.ActionPacingLoopMaxSeconds)]
     public double ActionPacingLoopMaxSeconds { get; init; } = PacingDefaults.ActionPacingLoopMaxSeconds;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepEnabled)]
+    public bool VillageStatusSweepEnabled { get; init; } = PacingDefaults.VillageStatusSweepEnabled;
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepDorf1Enabled)]
+    public bool VillageStatusSweepDorf1Enabled { get; init; } = true;
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepDorf2Enabled)]
+    public bool VillageStatusSweepDorf2Enabled { get; init; }
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepSmithyEnabled)]
+    public bool VillageStatusSweepSmithyEnabled { get; init; }
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepBarracksEnabled)]
+    public bool VillageStatusSweepBarracksEnabled { get; init; }
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepStableEnabled)]
+    public bool VillageStatusSweepStableEnabled { get; init; }
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepWorkshopEnabled)]
+    public bool VillageStatusSweepWorkshopEnabled { get; init; }
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepTownHallEnabled)]
+    public bool VillageStatusSweepTownHallEnabled { get; init; }
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepBreweryEnabled)]
+    public bool VillageStatusSweepBreweryEnabled { get; init; }
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepRoundMinMinutes)]
+    public int VillageStatusSweepRoundMinMinutes { get; init; } = PacingDefaults.VillageStatusSweepRoundMinMinutes;
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepRoundMaxMinutes)]
+    public int VillageStatusSweepRoundMaxMinutes { get; init; } = PacingDefaults.VillageStatusSweepRoundMaxMinutes;
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepVillageMinSeconds)]
+    public double VillageStatusSweepVillageMinSeconds { get; init; } = PacingDefaults.VillageStatusSweepVillageMinSeconds;
+    [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepVillageMaxSeconds)]
+    public double VillageStatusSweepVillageMaxSeconds { get; init; } = PacingDefaults.VillageStatusSweepVillageMaxSeconds;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.FarmListStepDelayMinSeconds)]
     public double FarmListStepDelayMinSeconds { get; init; } = PacingDefaults.FarmListStepDelayMinSeconds;

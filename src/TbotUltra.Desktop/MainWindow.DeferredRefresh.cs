@@ -553,6 +553,45 @@ public partial class MainWindow
         var productionByHour = DeferredWaitCalculator.ReadCurrentProductionByHourFromStatus(status);
         var warehouseCapacity = status.WarehouseCapacity;
         var granaryCapacity = status.GranaryCapacity;
+        var knownBuildings = status.Buildings ?? [];
+
+        // A light current-page read (jitter/loop) carries LIVE current resources but often no storage
+        // capacities or production/h. Fill those slow-changing fields from this village's cached full read so
+        // the recompute can run for ANY read village — not only the selected one, whose merged status already
+        // has them. The live current resources that decide "ready" ALWAYS come from the fresh read above; only
+        // the capacity/threshold and ETA inputs fall back to the cache. Buildings are deliberately NOT filled
+        // from the cache: EvaluateDeferredTroopTrainingWait treats an empty building list leniently (the
+        // enqueued item already proved the building exists), whereas a stale cached list that happened to miss
+        // it would wrongly exclude the request.
+        if (warehouseCapacity is not > 0 || granaryCapacity is not > 0
+            || productionByHour.Values.All(value => value is null or <= 0))
+        {
+            var cacheKey = ResolveStatusVillageKey(status);
+            if (cacheKey is not null
+                && _villageStatusCache.TryGetByKey(cacheKey, out var cached)
+                && cached is not null)
+            {
+                if (warehouseCapacity is not > 0)
+                {
+                    warehouseCapacity = cached.WarehouseCapacity;
+                }
+
+                if (granaryCapacity is not > 0)
+                {
+                    granaryCapacity = cached.GranaryCapacity;
+                }
+
+                if (productionByHour.Values.All(value => value is null or <= 0))
+                {
+                    var cachedProduction = DeferredWaitCalculator.ReadCurrentProductionByHourFromStatus(cached);
+                    if (cachedProduction.Values.Any(value => value is > 0))
+                    {
+                        productionByHour = cachedProduction;
+                    }
+                }
+            }
+        }
+
         if (warehouseCapacity is not > 0 || granaryCapacity is not > 0)
         {
             return;
@@ -581,7 +620,6 @@ public partial class MainWindow
             return;
         }
 
-        var knownBuildings = status.Buildings ?? [];
         foreach (var item in deferredItems)
         {
             // Build the threshold/run-mode from the item's OWN per-village snapshot (the loop injects the
