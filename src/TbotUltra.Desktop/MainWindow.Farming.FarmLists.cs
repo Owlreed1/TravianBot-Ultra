@@ -14,7 +14,9 @@ using System.Windows.Data;
 using System.Windows.Threading;
 using TbotUltra.Core.Accounts;
 using TbotUltra.Core.Configuration;
+using TbotUltra.Core.Tasks;
 using TbotUltra.Desktop.Models;
+using TbotUltra.Desktop.Services;
 using TbotUltra.Desktop.ViewModels;
 using TbotUltra.Worker.Domain;
 
@@ -1159,8 +1161,44 @@ public partial class MainWindow
         }
 
         PersistContinuousFarmListSelectionToConfig();
+        RefreshQueuedContinuousFarmListSelections();
         UpdateAutomationLoopRunningIndicators();
         UpdateFarmingUiState();
+    }
+
+    private void RefreshQueuedContinuousFarmListSelections()
+    {
+        var enabledRows = _farmLists.Where(item => IsRealFarmListRow(item) && item.IsEnabled).ToList();
+        var selection = new FarmingPayload(
+            enabledRows.Select(item => item.Name).Where(name => !string.IsNullOrWhiteSpace(name)).ToList(),
+            enabledRows.Select(item => item.ListId).Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id!.Trim()).ToList());
+        var updatedCount = 0;
+
+        foreach (var item in _botService.GetQueueItemsForDisplay())
+        {
+            if (!string.Equals(item.TaskName, "send_farmlists", StringComparison.OrdinalIgnoreCase)
+                || item.Status != QueueStatus.Pending
+                || string.IsNullOrWhiteSpace(GetQueueItemVillageKey(item)))
+            {
+                continue;
+            }
+
+            var updatedPayload = selection.ApplySelectionTo(item.Payload);
+            if (ContinuousLoopSelector.PayloadEquals(item.Payload, updatedPayload))
+            {
+                continue;
+            }
+
+            if (_botService.UpdateDeferredQueueItem(item.Id, updatedPayload))
+            {
+                updatedCount++;
+            }
+        }
+
+        if (updatedCount > 0)
+        {
+            AppendLog($"[farm-list] applied the updated toggle selection to {updatedCount} queued automatic farm-list send(s).");
+        }
     }
 
     private IReadOnlySet<string> LoadConfiguredContinuousFarmListNames()

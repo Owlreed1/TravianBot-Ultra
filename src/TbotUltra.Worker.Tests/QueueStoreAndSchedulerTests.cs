@@ -552,6 +552,28 @@ public sealed class QueueStoreAndSchedulerTests : IDisposable
     }
 
     [Fact]
+    public void FarmingPayload_ApplySelectionTo_ReplacesStaleSelectionAndPreservesVillage()
+    {
+        var queuedPayload = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [BotOptionPayloadKeys.ContinuousFarmListNames] = "merc0",
+            [BotOptionPayloadKeys.ContinuousFarmListIds] = "1491",
+            [BotOptionPayloadKeys.ContinuousFarmNextListIndex] = "3",
+            [BotOptionPayloadKeys.TargetVillageName] = "ABC",
+            [BotOptionPayloadKeys.TargetVillageKey] = "123|456",
+        };
+
+        var updated = new FarmingPayload(["merc1", "merc2"], ["1400", "1401"])
+            .ApplySelectionTo(queuedPayload);
+
+        Assert.Equal("merc1,merc2", updated[BotOptionPayloadKeys.ContinuousFarmListNames]);
+        Assert.Equal("1400,1401", updated[BotOptionPayloadKeys.ContinuousFarmListIds]);
+        Assert.Equal("ABC", updated[BotOptionPayloadKeys.TargetVillageName]);
+        Assert.Equal("123|456", updated[BotOptionPayloadKeys.TargetVillageKey]);
+        Assert.False(updated.ContainsKey(BotOptionPayloadKeys.ContinuousFarmNextListIndex));
+    }
+
+    [Fact]
     public void TroopTrainingPayload_ParsesAndSerializesDictionary()
     {
         var payload = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

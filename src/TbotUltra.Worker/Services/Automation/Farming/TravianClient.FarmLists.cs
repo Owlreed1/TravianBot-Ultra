@@ -145,9 +145,7 @@ public sealed partial class TravianClient : IFarmingClient
         if (selectedNames is not null || selectedIds is not null)
         {
             sendable = sendable
-                .Where(entry =>
-                    (selectedIds is not null && selectedIds.Contains(entry.Lid))
-                    || (selectedNames is not null && selectedNames.Contains(entry.Name)))
+                .Where(entry => MatchesFarmListSelection(entry.Lid, entry.Name, selectedNames, selectedIds))
                 .ToList();
         }
 
@@ -201,6 +199,26 @@ public sealed partial class TravianClient : IFarmingClient
 
         Notify($"[farm-list] send completed: {sent}/{sendable.Count} list(s) confirmed dispatched.");
         return sent;
+    }
+
+    /// <summary>
+    /// Uses Travian's stable list id whenever the selection has ids. Names are only a legacy fallback:
+    /// two villages may legitimately contain identically named lists.
+    /// </summary>
+    internal static bool MatchesFarmListSelection(
+        string? listId,
+        string? listName,
+        IReadOnlySet<string>? selectedNames,
+        IReadOnlySet<string>? selectedIds)
+    {
+        if (selectedIds is { Count: > 0 })
+        {
+            return !string.IsNullOrWhiteSpace(listId) && selectedIds.Contains(listId);
+        }
+
+        return selectedNames is { Count: > 0 }
+            && !string.IsNullOrWhiteSpace(listName)
+            && selectedNames.Contains(listName);
     }
 
     // Sends every farm list in one action by clicking Travian's own "Start all farm lists" button

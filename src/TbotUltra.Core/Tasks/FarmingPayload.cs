@@ -35,6 +35,30 @@ public sealed record FarmingPayload(IReadOnlyList<string> FarmListNames, IReadOn
         return dictionary;
     }
 
+    /// <summary>
+    /// Replaces only the farm-list selection in an already queued automatic farming payload.
+    /// The current village and other execution settings stay intact, while a stale list cursor
+    /// is removed so the updated selection is evaluated as one complete round.
+    /// </summary>
+    public Dictionary<string, string> ApplySelectionTo(IReadOnlyDictionary<string, string> existingPayload)
+    {
+        ArgumentNullException.ThrowIfNull(existingPayload);
+
+        var payload = new Dictionary<string, string>(existingPayload, StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in ToDictionary())
+        {
+            payload[pair.Key] = pair.Value;
+        }
+
+        if (FarmListIds is not { Count: > 0 })
+        {
+            payload.Remove(BotOptionPayloadKeys.ContinuousFarmListIds);
+        }
+
+        payload.Remove(BotOptionPayloadKeys.ContinuousFarmNextListIndex);
+        return payload;
+    }
+
     private static string JoinDistinct(IReadOnlyList<string> values)
     {
         return string.Join(",", values
