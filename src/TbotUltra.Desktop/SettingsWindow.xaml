@@ -522,90 +522,69 @@
                                 </Grid>
                             </Border>
                             <Border Style="{StaticResource SettingsGroupBox}" BorderThickness="0" Padding="0" Margin="0">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="176" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                            <CheckBox x:Name="VillageStatusSweepEnabledCheckBox" Content="Village Status Sweep" />
-                                            <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Makes one randomized pass through all villages, updating cached status before moving on." />
-                                        </StackPanel>
-                                        <StackPanel Margin="18,0,0,8">
-                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                                <CheckBox x:Name="VillageStatusSweepDorf1CheckBox" Content="Dorf1" IsChecked="True" Margin="0,2,8,2" />
-                                                <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Reads resources, hourly production, Warehouse capacity and Granary capacity." />
-                                            </StackPanel>
-                                            <WrapPanel>
-                                                <CheckBox x:Name="VillageStatusSweepDorf2CheckBox" Content="Dorf2" Margin="0,2,8,2" Checked="VillageStatusSweepDorf2Changed" Unchecked="VillageStatusSweepDorf2Changed" />
-                                                <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Reads the village buildings and construction queue. Required for the detailed building pages." Margin="0,0,12,0" />
-                                                <CheckBox x:Name="VillageStatusSweepSmithyCheckBox" Content="Smithy" Margin="0,2,12,2" />
-                                                <CheckBox x:Name="VillageStatusSweepBarracksCheckBox" Content="Barracks" Margin="0,2,12,2" />
-                                                <CheckBox x:Name="VillageStatusSweepStableCheckBox" Content="Stable" Margin="0,2,12,2" />
-                                                <CheckBox x:Name="VillageStatusSweepWorkshopCheckBox" Content="Workshop" Margin="0,2,12,2" />
-                                                <CheckBox x:Name="VillageStatusSweepTownHallCheckBox" Content="Town Hall" Margin="0,2,12,2" />
-                                                <CheckBox x:Name="VillageStatusSweepBreweryCheckBox" Content="Brewery" ToolTip="Teutons only" Margin="0,2" />
-                                            </WrapPanel>
-                                        </StackPanel>
-                                        <Grid Margin="18,0,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="70" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
-                                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Min" FontWeight="SemiBold" />
-                                            <TextBlock Grid.Row="0" Grid.Column="2" Text="Max" FontWeight="SemiBold" />
-                                            <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="Function delay (min)" /><ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Random delay after a completed round before the next round starts." /></StackPanel>
-                                            <TextBox x:Name="VillageStatusSweepRoundMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                            <TextBox x:Name="VillageStatusSweepRoundMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" />
-                                            <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="Village delay (s)" /><ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Random delay before switching to the next village. Normal click pacing also applies to the navigation." /></StackPanel>
-                                            <TextBox x:Name="VillageStatusSweepVillageMinTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                            <TextBox x:Name="VillageStatusSweepVillageMaxTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" />
-                                        </Grid>
-                                    </StackPanel>
-
-                                    <Border x:Name="VillageStatusSweepNextScanCard"
-                                            Grid.Column="1"
-                                            Margin="22,0,0,0"
-                                            Padding="0"
-                                            MinHeight="112"
-                                            VerticalAlignment="Top"
-                                            Background="{DynamicResource SuccessBgBrush}"
-                                            BorderBrush="{DynamicResource SuccessBorderBrush}"
-                                            BorderThickness="1"
-                                            CornerRadius="8"
-                                            ToolTip="Time remaining until the next Village Status Sweep round.">
-                                        <Grid>
-                                            <Border x:Name="VillageStatusSweepNextScanAccent"
-                                                    Width="4"
-                                                    HorizontalAlignment="Left"
-                                                    Background="{DynamicResource SuccessBrush}"
-                                                    CornerRadius="8,0,0,8" />
-                                            <StackPanel Margin="18,14,14,14">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <Ellipse x:Name="VillageStatusSweepNextScanIndicator"
-                                                             Width="7"
-                                                             Height="7"
-                                                             Margin="0,0,7,0"
-                                                             VerticalAlignment="Center"
-                                                             Fill="{DynamicResource SuccessBrush}" />
-                                                    <TextBlock Text="NEXT SCAN"
-                                                               FontSize="10"
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <CheckBox x:Name="VillageStatusSweepEnabledCheckBox" Content="Village scan" />
+                                        <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Makes one randomized pass through all villages, updating cached status before moving on." />
+                                        <StackPanel Orientation="Horizontal" Margin="22,0,0,0" VerticalAlignment="Center">
+                                            <Border x:Name="VillageStatusSweepNextScanBadge"
+                                                    MinWidth="112"
+                                                    Padding="9,2"
+                                                    Background="{DynamicResource SuccessBgBrush}"
+                                                    BorderBrush="{DynamicResource SuccessBorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="6"
+                                                    ToolTip="Time remaining until the next Village scan round.">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <TextBlock Text="Next scan:"
+                                                               Margin="0,0,7,0"
+                                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                                    <TextBlock x:Name="VillageStatusSweepNextScanTextBlock"
+                                                               FontSize="11"
                                                                FontWeight="SemiBold"
-                                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                               Foreground="{DynamicResource SuccessTextBrush}"
+                                                               Text="Ready" />
                                                 </StackPanel>
-                                                <TextBlock x:Name="VillageStatusSweepNextScanTextBlock"
-                                                           Margin="0,7,0,2"
-                                                           FontFamily="Consolas"
-                                                           FontSize="24"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource SuccessTextBrush}"
-                                                           Text="Ready" />
-                                                <TextBlock Text="Village status sweep"
-                                                           FontSize="10"
-                                                           Foreground="{DynamicResource TextMutedBrush}" />
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-                                </Grid>
+                                            </Border>
+                                            <Button x:Name="VillageStatusSweepScanNowButton"
+                                                    Content="Scan now"
+                                                    Height="24"
+                                                    Margin="8,0,0,0"
+                                                    Padding="9,1"
+                                                    VerticalAlignment="Center"
+                                                    ToolTip="Clear the current timer and run Village scan immediately."
+                                                    Click="VillageStatusSweepScanNowButton_Click" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Margin="18,0,0,8">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                            <CheckBox x:Name="VillageStatusSweepDorf1CheckBox" Content="Dorf1" IsChecked="True" Margin="0,2,8,2" />
+                                            <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Reads resources, hourly production, Warehouse capacity and Granary capacity." />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <CheckBox x:Name="VillageStatusSweepDorf2CheckBox" Content="Dorf2" Margin="0,2,8,2" Checked="VillageStatusSweepDorf2Changed" Unchecked="VillageStatusSweepDorf2Changed" />
+                                            <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Reads the village buildings and construction queue. Required for the detailed building pages." Margin="0,0,12,0" />
+                                            <CheckBox x:Name="VillageStatusSweepSmithyCheckBox" Content="Smithy" Margin="0,2,12,2" />
+                                            <CheckBox x:Name="VillageStatusSweepBarracksCheckBox" Content="Barracks" Margin="0,2,12,2" />
+                                            <CheckBox x:Name="VillageStatusSweepStableCheckBox" Content="Stable" Margin="0,2,12,2" />
+                                            <CheckBox x:Name="VillageStatusSweepWorkshopCheckBox" Content="Workshop" Margin="0,2,12,2" />
+                                            <CheckBox x:Name="VillageStatusSweepTownHallCheckBox" Content="Town Hall" Margin="0,2,12,2" />
+                                            <CheckBox x:Name="VillageStatusSweepBreweryCheckBox" Content="Brewery" ToolTip="Teutons only" Margin="0,2" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Grid Margin="18,0,0,0">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="70" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Min" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Row="0" Grid.Column="2" Text="Max" FontWeight="SemiBold" />
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="Function delay (min)" /><ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Random delay after a completed round before the next round starts." /></StackPanel>
+                                        <TextBox x:Name="VillageStatusSweepRoundMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" />
+                                        <TextBox x:Name="VillageStatusSweepRoundMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="Village delay (s)" /><ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Random delay before switching to the next village. Normal click pacing also applies to the navigation." /></StackPanel>
+                                        <TextBox x:Name="VillageStatusSweepVillageMinTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" />
+                                        <TextBox x:Name="VillageStatusSweepVillageMaxTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                    </Grid>
+                                </StackPanel>
                             </Border>
                         </StackPanel>
                     </Border>
@@ -764,9 +743,9 @@
                                                 Margin="8,0,0,0"
                                                 VerticalAlignment="Center"
                                                 IsEnabled="{Binding HeroAdventureRestartDelay.IsEnabled}">
-                                        <TextBox Width="56" Text="{Binding HeroAdventureRestartDelay.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBox x:Name="HeroAdventureRestartDelayMinTextBox" Width="56" Text="{Binding HeroAdventureRestartDelay.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <TextBlock Text="–" Margin="8,0" VerticalAlignment="Center" />
-                                        <TextBox Width="56" Text="{Binding HeroAdventureRestartDelay.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBox x:Name="HeroAdventureRestartDelayMaxTextBox" Width="56" Text="{Binding HeroAdventureRestartDelay.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -828,9 +807,9 @@
                                                 Margin="8,0,0,0"
                                                 VerticalAlignment="Center"
                                                 IsEnabled="{Binding SmithyUpgradeRestartDelay.IsEnabled}">
-                                        <TextBox Width="56" Text="{Binding SmithyUpgradeRestartDelay.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBox x:Name="SmithyUpgradeRestartDelayMinTextBox" Width="56" Text="{Binding SmithyUpgradeRestartDelay.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <TextBlock Text="–" Margin="8,0" VerticalAlignment="Center" />
-                                        <TextBox Width="56" Text="{Binding SmithyUpgradeRestartDelay.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBox x:Name="SmithyUpgradeRestartDelayMaxTextBox" Width="56" Text="{Binding SmithyUpgradeRestartDelay.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -938,9 +917,9 @@
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="Random waiting time after a Town Hall celebration finishes before the next celebration is started." />
                                         <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center" IsEnabled="{Binding TownHallQueue.IsRestartDelayEnabled}">
-                                            <TextBox Width="56" Text="{Binding TownHallQueue.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                    <TextBox x:Name="TownHallRestartDelayMinTextBox" Width="56" Text="{Binding TownHallQueue.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                             <TextBlock Text="–" Margin="8,0" VerticalAlignment="Center" />
-                                            <TextBox Width="56" Text="{Binding TownHallQueue.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                    <TextBox x:Name="TownHallRestartDelayMaxTextBox" Width="56" Text="{Binding TownHallQueue.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
@@ -957,9 +936,9 @@
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="Random waiting time after a Brewery celebration finishes before the next celebration is started." />
                                         <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center" IsEnabled="{Binding BreweryRestartDelay.IsEnabled}">
-                                            <TextBox Width="56" Text="{Binding BreweryRestartDelay.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBox x:Name="BreweryRestartDelayMinTextBox" Width="56" Text="{Binding BreweryRestartDelay.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                             <TextBlock Text="–" Margin="8,0" VerticalAlignment="Center" />
-                                            <TextBox Width="56" Text="{Binding BreweryRestartDelay.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBox x:Name="BreweryRestartDelayMaxTextBox" Width="56" Text="{Binding BreweryRestartDelay.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </StackPanel>

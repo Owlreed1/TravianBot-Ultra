@@ -6,6 +6,28 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class VillageStatusSweepSourceTests
 {
     [Fact]
+    public void ScanNowButton_ResetsDeadlineAndForcesImmediateSweep()
+    {
+        var projectRoot = ProjectRootLocator.FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "src",
+            "TbotUltra.Desktop",
+            "SettingsWindow.xaml"));
+        var continuousLoopSource = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "src",
+            "TbotUltra.Desktop",
+            "MainWindow.ContinuousLoop.cs"));
+
+        Assert.Contains("Content=\"Scan now\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Click=\"VillageStatusSweepScanNowButton_Click\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ResetVillageStatusSweepSchedule();", continuousLoopSource, StringComparison.Ordinal);
+        Assert.Contains("force: true", continuousLoopSource, StringComparison.Ordinal);
+        Assert.Contains("_villageStatusSweepForceRequested", continuousLoopSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Dorf1Sweep_ReconcilesConstructionQueueAndRefreshesVillageList()
     {
         var projectRoot = ProjectRootLocator.FindProjectRoot();

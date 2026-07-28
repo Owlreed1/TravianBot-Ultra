@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Desktop.Models;
@@ -41,8 +42,7 @@ internal sealed record VillageOverviewSource(
     bool IsEnabled,
     IReadOnlySet<string> EnabledGroups,
     bool IsHeroHome,
-    string? TownHallMode,
-    DateTimeOffset? TownHallEndsAtUtc,
+    IReadOnlyList<TownHallCelebrationTimer> TownHallCelebrations,
     VillageStatus? Status);
 
 internal sealed record PipelineTaskSource(

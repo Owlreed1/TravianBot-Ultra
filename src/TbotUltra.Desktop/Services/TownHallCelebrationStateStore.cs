@@ -8,7 +8,12 @@ using TbotUltra.Core.Configuration;
 
 namespace TbotUltra.Desktop.Services;
 
-public sealed record TownHallCelebrationState(string Mode, DateTimeOffset EndsAtUtc);
+public sealed record TownHallCelebrationTimer(string Mode, DateTimeOffset EndsAtUtc);
+
+public sealed record TownHallCelebrationState(
+    string Mode,
+    DateTimeOffset EndsAtUtc,
+    IReadOnlyList<TownHallCelebrationTimer> Celebrations);
 
 /// <summary>
 /// Per-account remembered Town Hall celebration timers. The worker reports a queue wait after reading the
@@ -30,6 +35,7 @@ public static class TownHallCelebrationStateStore
         public string Key { get; set; } = string.Empty;
         public string Mode { get; set; } = TownHallCelebrationDefaults.Small;
         public DateTimeOffset EndsAtUtc { get; set; }
+        public List<TownHallCelebrationTimer> Celebrations { get; set; } = new();
     }
 
     private sealed class TownHallStateFile
@@ -58,7 +64,8 @@ public static class TownHallCelebrationStateStore
                 return null;
             }
 
-            if (match.EndsAtUtc <= nowUtc)
+            var celebrations = ReadActiveCelebrations(match, nowUtc);
+            if (match.EndsAtUtc <= nowUtc && celebrations.Count == 0)
             {
                 ClearLocked(projectRoot, accountName, villageKey, file!);
                 return null;
@@ -66,7 +73,8 @@ public static class TownHallCelebrationStateStore
 
             return new TownHallCelebrationState(
                 TownHallCelebrationDefaults.NormalizeMode(match.Mode),
-                match.EndsAtUtc.ToUniversalTime());
+                match.EndsAtUtc.ToUniversalTime(),
+                celebrations);
         }
     }
 
@@ -85,14 +93,21 @@ public static class TownHallCelebrationStateStore
         {
             foreach (var entry in ReadFile(projectRoot, accountName)?.Villages ?? [])
             {
-                if (entry is null || string.IsNullOrWhiteSpace(entry.Key) || entry.EndsAtUtc <= nowUtc)
+                if (entry is null || string.IsNullOrWhiteSpace(entry.Key))
+                {
+                    continue;
+                }
+
+                var celebrations = ReadActiveCelebrations(entry, nowUtc);
+                if (entry.EndsAtUtc <= nowUtc && celebrations.Count == 0)
                 {
                     continue;
                 }
 
                 result[entry.Key] = new TownHallCelebrationState(
                     TownHallCelebrationDefaults.NormalizeMode(entry.Mode),
-                    entry.EndsAtUtc.ToUniversalTime());
+                    entry.EndsAtUtc.ToUniversalTime(),
+                    celebrations);
             }
         }
 
@@ -104,7 +119,8 @@ public static class TownHallCelebrationStateStore
         string? accountName,
         string? villageKey,
         string? mode,
-        DateTimeOffset endsAtUtc)
+        DateTimeOffset endsAtUtc,
+        IReadOnlyList<TownHallCelebrationTimer>? celebrations = null)
     {
         if (string.IsNullOrWhiteSpace(accountName) || string.IsNullOrWhiteSpace(villageKey))
         {
@@ -124,12 +140,14 @@ public static class TownHallCelebrationStateStore
                     Key = villageKey,
                     Mode = TownHallCelebrationDefaults.NormalizeMode(mode),
                     EndsAtUtc = endsAtUtc.ToUniversalTime(),
+                    Celebrations = NormalizeCelebrations(celebrations),
                 });
             }
             else
             {
                 existing.Mode = TownHallCelebrationDefaults.NormalizeMode(mode);
                 existing.EndsAtUtc = endsAtUtc.ToUniversalTime();
+                existing.Celebrations = NormalizeCelebrations(celebrations);
             }
 
             WriteFile(projectRoot, accountName, file);
@@ -163,6 +181,41 @@ public static class TownHallCelebrationStateStore
         {
             WriteFile(projectRoot, accountName, file);
         }
+    }
+
+    private static List<TownHallCelebrationTimer> ReadActiveCelebrations(
+        VillageTownHallState state,
+        DateTimeOffset nowUtc)
+    {
+        var normalized = NormalizeCelebrations(state.Celebrations);
+        var active = normalized
+            .Where(timer => timer.EndsAtUtc > nowUtc)
+            .ToList();
+        if (normalized.Count > 0)
+        {
+            return active;
+        }
+
+        // Legacy files stored one combined deadline only. Keep rendering that timer until a fresh Town Hall
+        // read writes the exact one-or-two celebration list.
+        return state.EndsAtUtc > nowUtc
+            ? [new TownHallCelebrationTimer(
+                TownHallCelebrationDefaults.NormalizeMode(state.Mode),
+                state.EndsAtUtc.ToUniversalTime())]
+            : [];
+    }
+
+    private static List<TownHallCelebrationTimer> NormalizeCelebrations(
+        IReadOnlyList<TownHallCelebrationTimer>? celebrations)
+    {
+        return (celebrations ?? [])
+            .Where(timer => timer is not null && timer.EndsAtUtc != default)
+            .Select(timer => new TownHallCelebrationTimer(
+                TownHallCelebrationDefaults.NormalizeMode(timer.Mode),
+                timer.EndsAtUtc.ToUniversalTime()))
+            .OrderBy(timer => timer.EndsAtUtc)
+            .Take(2)
+            .ToList();
     }
 
     private static TownHallStateFile? ReadFile(string projectRoot, string accountName)

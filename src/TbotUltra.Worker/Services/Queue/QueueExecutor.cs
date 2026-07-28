@@ -33,7 +33,16 @@ public sealed class QueueExecutor
         log($"[queue] EXEC id={item.Id} group={item.Group} task='{item.TaskName}'{village} priority={item.Priority} retries={item.Retries}/{item.MaxRetries}");
         try
         {
-            var options = BotOptionsPayloadApplier.Apply(baseOptions, item.Payload);
+            var options = QueueExecutionOptionsResolver.Resolve(baseOptions, item);
+            if (QueueExecutionOptionsResolver.IsHeroAttributeTask(item.TaskName)
+                && item.Payload.TryGetValue(BotOptionPayloadKeys.HeroStatPriority, out var queuedPriority)
+                && !string.Equals(queuedPriority, options.HeroStatPriority, StringComparison.OrdinalIgnoreCase))
+            {
+                log(
+                    $"[queue] refreshed hero attribute priority from current settings before execution: "
+                    + $"queued='{queuedPriority}' current='{options.HeroStatPriority}'");
+            }
+
             var result = await _taskRunner.ExecuteOnceAsync(
                 options,
                 log,

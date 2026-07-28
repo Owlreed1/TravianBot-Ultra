@@ -892,8 +892,7 @@ public partial class MainWindow
                     ? string.Equals(canonicalKey, _heroHomeVillageKey, StringComparison.OrdinalIgnoreCase)
                     : !duplicateNames.Contains(normalizedName ?? string.Empty)
                       && string.Equals(normalizedName, NormalizeVillageName(_heroHomeVillageName), StringComparison.OrdinalIgnoreCase),
-                townHall?.Mode,
-                townHall?.EndsAtUtc,
+                townHall?.Celebrations ?? [],
                 status);
         }).ToList();
 

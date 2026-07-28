@@ -5,7 +5,7 @@ using TbotUltra.Core.Accounts;
 
 namespace TbotUltra.Desktop.Services;
 
-/// <summary>Per-account persisted deadline for the next Village Status Sweep round.</summary>
+/// <summary>Per-account persisted deadline for the next Village scan round.</summary>
 public static class VillageStatusSweepStateStore
 {
     private static readonly object FileIoLock = new();

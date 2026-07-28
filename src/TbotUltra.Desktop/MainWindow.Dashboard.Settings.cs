@@ -158,7 +158,7 @@ public partial class MainWindow
             ResetVillageStatusSweepSchedule();
         }
 
-        AppendLog($"[village-status-sweep] {(enabled ? "enabled" : "disabled")} from Dashboard Auto settings.");
+        AppendLog($"[village-scan] {(enabled ? "enabled" : "disabled")} from Dashboard Auto settings.");
     }
 
     private void VillageStatusSweepSettingsButton_Click(object sender, RoutedEventArgs e)

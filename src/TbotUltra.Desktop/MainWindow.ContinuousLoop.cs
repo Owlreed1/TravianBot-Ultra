@@ -20,6 +20,8 @@ public partial class MainWindow
     private DateTimeOffset _nextVillageStatusSweepUtc = DateTimeOffset.MinValue;
     private string? _villageStatusSweepScheduleAccountName;
     private readonly object _villageStatusSweepScheduleSync = new();
+    private int _villageStatusSweepForceRequested;
+    private int _villageStatusSweepManualRunInProgress;
 
     private DateTimeOffset GetVillageStatusSweepNextScanUtc()
     {
@@ -53,7 +55,58 @@ public partial class MainWindow
 
         if (!cleared)
         {
-            AppendLog("[village-status-sweep] could not clear the remembered next-scan deadline; the current session is ready immediately.");
+            AppendLog("[village-scan] could not clear the remembered next-scan deadline; the current session is ready immediately.");
+        }
+    }
+
+    private async Task RunVillageStatusSweepNowFromSettingsAsync()
+    {
+        ResetVillageStatusSweepSchedule();
+
+        if (IsContinuousLoopRunning())
+        {
+            Interlocked.Exchange(ref _villageStatusSweepForceRequested, 1);
+            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+            AppendLog("[village-scan] Scan now requested; the active loop will start it at the next safe boundary.");
+            return;
+        }
+
+        if (!_isLoggedIn || !_browserSessionLikelyOpen || IsSessionSleeping || IsFreezeActive)
+        {
+            AppendLog("[village-scan] Scan now could not start because the browser session is not active.");
+            return;
+        }
+
+        if (_autoQueueRunning || _loopController.HasActiveOperation)
+        {
+            AppendLog("[village-scan] Scan now skipped because another manual operation is active.");
+            return;
+        }
+
+        if (Interlocked.CompareExchange(ref _villageStatusSweepManualRunInProgress, 1, 0) != 0)
+        {
+            return;
+        }
+
+        var cancellationToken = _loopController.StartOperation("village-scan-now");
+        try
+        {
+            var options = AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions());
+            AppendLog("[village-scan] Scan now starting a manual round.");
+            await MaybeRunVillageStatusSweepAsync(options, cancellationToken, force: true);
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog("[village-scan] Scan now canceled.");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[village-scan] Scan now failed: {FormatExceptionForLog(ex)}");
+        }
+        finally
+        {
+            _loopController.DisposeOperation();
+            Interlocked.Exchange(ref _villageStatusSweepManualRunInProgress, 0);
         }
     }
 
@@ -78,15 +131,19 @@ public partial class MainWindow
 
         if (!saved)
         {
-            AppendLog("[village-status-sweep] could not persist the next-scan deadline; it may run again after restart.");
+            AppendLog("[village-scan] could not persist the next-scan deadline; it may run again after restart.");
         }
 
         return nextScanUtc;
     }
 
-    private async Task MaybeRunVillageStatusSweepAsync(BotOptions options, CancellationToken token)
+    private async Task MaybeRunVillageStatusSweepAsync(
+        BotOptions options,
+        CancellationToken token,
+        bool force = false)
     {
-        if (!options.VillageStatusSweepEnabled || DateTimeOffset.UtcNow < GetVillageStatusSweepNextScanUtc())
+        if ((!options.VillageStatusSweepEnabled && !force)
+            || (!force && DateTimeOffset.UtcNow < GetVillageStatusSweepNextScanUtc()))
         {
             return;
         }
@@ -124,11 +181,11 @@ public partial class MainWindow
         catch (Exception ex)
         {
             AppendLog(
-                $"[village-status-sweep] runtime preparation failed; existing queued work will still run: "
+                $"[village-scan] runtime preparation failed; existing queued work will still run: "
                 + FormatExceptionForLog(ex));
         }
 
-        AppendLog($"[village-status-sweep] starting round for {villages.Count} village(s).");
+        AppendLog($"[village-scan] starting round for {villages.Count} village(s).");
         foreach (var village in villages)
         {
             token.ThrowIfCancellationRequested();
@@ -162,7 +219,7 @@ public partial class MainWindow
                 status = collectionResult.Status;
                 status = await RefreshVillageStatusSweepOptionalStatusesAsync(options, village, status, token);
                 await RefreshVillageStatusSweepDeferredWaitsAsync(status, token);
-                AppendLog($"[village-status-sweep] updated '{village.Name}'.");
+                AppendLog($"[village-scan] updated '{village.Name}'.");
 
                 await EnsureContinuousLoopRuntimeItemsAsync(options, token, village);
                 if (!await ExecuteReadyVillageStatusSweepTasksAsync(options, village, token))
@@ -176,7 +233,7 @@ public partial class MainWindow
             }
             catch (Exception ex)
             {
-                AppendLog($"[village-status-sweep] skipped '{village.Name}': {FormatExceptionForLog(ex)}");
+                AppendLog($"[village-scan] skipped '{village.Name}': {FormatExceptionForLog(ex)}");
             }
 
             if (!ReferenceEquals(village, villages[^1]))
@@ -185,7 +242,7 @@ public partial class MainWindow
                     options.VillageStatusSweepVillageMinSeconds,
                     options.VillageStatusSweepVillageMaxSeconds,
                     token,
-                    "Village Status Sweep: next village");
+                    "Village scan: next village");
             }
         }
 
@@ -194,7 +251,7 @@ public partial class MainWindow
         var nextScanUtc = ScheduleNextVillageStatusSweep(min, max, sweepAccountName);
         if (nextScanUtc is not null)
         {
-            AppendLog($"[village-status-sweep] round complete; next round after {nextScanUtc.Value:HH:mm}.");
+            AppendLog($"[village-scan] round complete; next round after {nextScanUtc.Value:HH:mm}.");
         }
     }
 
@@ -264,17 +321,17 @@ public partial class MainWindow
         {
             cancellationToken.ThrowIfCancellationRequested();
             AppendLog(
-                $"[village-status-sweep] collecting detected rewards in '{village.Name}': "
+                $"[village-scan] collecting detected rewards in '{village.Name}': "
                 + $"task={item.TaskName}.");
             await ActionPacer.FromOptions(options, AppendLog).DelayAsync(
                 options.ActionPacingTaskMinSeconds,
                 options.ActionPacingTaskMaxSeconds,
                 cancellationToken,
-                "Village Status Sweep: before reward collection");
+                "Village scan: before reward collection");
             if (!await ExecuteSingleQueueItemAsync(
                     item,
                     options,
-                    "[village-status-sweep]",
+                    "[village-scan]",
                     QueueExecutionMode.ContinuousLoop,
                     cancellationToken))
             {
@@ -311,7 +368,8 @@ public partial class MainWindow
         BotOptions options,
         VillageSelectionItem village,
         VillageStatus status,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string logPrefix = "[village-scan]")
     {
         var readsTroopTraining = options.VillageStatusSweepDorf2Enabled
             && (options.VillageStatusSweepBarracksEnabled
@@ -351,7 +409,7 @@ public partial class MainWindow
             catch (Exception ex)
             {
                 AppendLog(
-                    $"[village-status-sweep] troop-training status read failed for "
+                    $"{logPrefix} troop-training status read failed for "
                     + $"'{village.Name}': {FormatExceptionForLog(ex)}");
             }
         }
@@ -386,7 +444,7 @@ public partial class MainWindow
             catch (Exception ex)
             {
                 AppendLog(
-                    $"[village-status-sweep] Brewery status read failed for "
+                    $"{logPrefix} Brewery status read failed for "
                     + $"'{village.Name}': {FormatExceptionForLog(ex)}");
             }
         }
@@ -410,7 +468,7 @@ public partial class MainWindow
         catch (Exception ex)
         {
             AppendLog(
-                $"[village-status-sweep] construction wait refresh failed for "
+                $"[village-scan] construction wait refresh failed for "
                 + $"'{status.ActiveVillage}': {FormatExceptionForLog(ex)}");
         }
 
@@ -426,7 +484,7 @@ public partial class MainWindow
         catch (Exception ex)
         {
             AppendLog(
-                $"[village-status-sweep] troop-training wait refresh failed for "
+                $"[village-scan] troop-training wait refresh failed for "
                 + $"'{status.ActiveVillage}': {FormatExceptionForLog(ex)}");
         }
     }
@@ -454,17 +512,17 @@ public partial class MainWindow
 
             attemptedItemIds.Add(next.Id);
             AppendLog(
-                $"[village-status-sweep] reacting in '{village.Name}': "
+                $"[village-scan] reacting in '{village.Name}': "
                 + $"group={next.Group}, task={next.TaskName}.");
             await ActionPacer.FromOptions(options, AppendLog).DelayAsync(
                 options.ActionPacingTaskMinSeconds,
                 options.ActionPacingTaskMaxSeconds,
                 cancellationToken,
-                "Village Status Sweep: before task");
+                "Village scan: before task");
             var shouldContinue = await ExecuteSingleQueueItemAsync(
                 next,
                 options,
-                "[village-status-sweep]",
+                "[village-scan]",
                 QueueExecutionMode.ContinuousLoop,
                 cancellationToken);
             MarkContinuousBrowserActivity();
@@ -914,7 +972,10 @@ public partial class MainWindow
                 // MarkQueueItemDeferred requires Running and failed silently here, which left the restored
                 // item due immediately — the task then re-ran every loop pass (the "timer restarts at ~30s
                 // over and over" bug) whenever a run ended without a persisted wait.
-                if (_botService.UpdateDeferredQueueItem(restoredItem.Id, null, remembered.EndsAtUtc - nowUtc))
+                var restoreDelay = remembered.EndsAtUtc > nowUtc
+                    ? remembered.EndsAtUtc - nowUtc
+                    : TimeSpan.Zero;
+                if (_botService.UpdateDeferredQueueItem(restoredItem.Id, null, restoreDelay))
                 {
                     AppendLog($"[town-hall] restored running celebration for '{village.Name}' until {FormatQueueServerTime(remembered.EndsAtUtc)}.");
                 }
@@ -2240,7 +2301,9 @@ public partial class MainWindow
                 await MaybeDoIdleBrowseAsync(options, token);
                 await EnsureChromiumInstalledAsync();
                 await HonorPendingVillageSwitchAsync(options, token);
-                await MaybeRunVillageStatusSweepAsync(options, token);
+                var forceVillageStatusSweep =
+                    Interlocked.Exchange(ref _villageStatusSweepForceRequested, 0) == 1;
+                await MaybeRunVillageStatusSweepAsync(options, token, forceVillageStatusSweep);
                 await EnsureContinuousLoopConstructionStatusAsync(options, token);
                 await MaybeAnalyzeNewVillageDuringContinuousLoopAsync(options, token);
                 await EnsureContinuousLoopRuntimeItemsAsync(options, token);

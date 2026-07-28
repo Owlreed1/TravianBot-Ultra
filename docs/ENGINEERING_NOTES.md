@@ -182,6 +182,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   account-wide Gold/Silver limits belong under NPC / Trade. Town Hall and Brewery restart delays include the
   configured random delay after the live celebration timer; a confirmed missing Town Hall disables that village's
   Town Hall group instead of deferring an impossible task.
+- Every editable numeric Settings field is validated before any config mutation. Decimal input uses invariant
+  culture and requires a period; invalid format, out-of-range values, and Max below Min block Save/Sleep now with
+  a warning focused on the offending field instead of silently substituting or clamping a value.
 - Gold/Silver spending has two independent guards: a minimum remaining balance and a daily spending budget.
   Daily totals reset at 00:00 server time and persist per account/server so restart cannot reset the allowance.
 - Hero, Town Hall, Brewery, and Smithy restart delays are independently toggleable and enabled by default. Hero
@@ -203,6 +206,12 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Enumerate mutable collections through immutable snapshots when sanitizing/exporting.
 - Village Overview is read-only and uses cache/queue snapshots; opening it never navigates or scans.
 - Overview projections show only real deadlines and never mutate queue or scheduler state.
+- Village Overview Farming renders only the allowed `send_farmlists` queue state: `Ready`, `Running`,
+  `Blocked`, or its `NextAttemptAt` countdown. Individual farm-list raid timers belong to the Farming panel
+  and must not replace the dashboard-synchronized dispatch deadline in Overview.
+- Village Overview Town Hall renders each live celebration on its own line as `Small: <timer>` or
+  `Great: <timer>`. The Town Hall read preserves up to two exact active timers (including mixed modes) in
+  account state; generic task names and resource-wait descriptions do not belong in that cell.
 - The 1 Hz presentation pulse must not perform file I/O, replace stable ItemsSource collections, or rebuild
   unchanged rows. Cache configuration outside the pulse, derive countdowns from absolute deadlines, and apply
   only changed values; persistence and high-volume log writes run serially off the UI dispatcher.
@@ -299,11 +308,18 @@ Published artifacts belong under `artifacts/`, never beside source files.
   one. The troop recompute needs storage capacities — with capacity 0 the eval falsely reports "ready", so a
   light current-page read (no caps) fills caps/production from the village cache but keeps the LIVE current
   resources; buildings are never cache-filled (empty is handled leniently, a stale list could wrongly exclude).
-- Village Status Sweep finishes ready, automation-enabled work for the freshly read village before applying the
+- Village scan finishes ready, automation-enabled work for the freshly read village before applying the
   inter-village delay. Task permission still comes from village Auto and group settings. Sweep wait reconciliation
   is awaited before selection so a newly released task runs during the same visit, and selection requires the exact
   canonical village key.
-- A Village Status Sweep Dorf1 read is authoritative for the visible `.buildingList` construction queue and the
+- A manual Village scan "Scan now" clears the persisted round deadline. An active continuous loop consumes a
+  forced-sweep request at its next safe boundary; without an active loop the scan runs in its own manual operation
+  scope and does not start the full continuous loop.
+- Account scan uses a new transient scan scope on every dialog open (Dorf1 and Dorf2 selected by default) and reuses
+  the Village scan page readers. It must not persist those one-off choices or alter the sweep schedule.
+  Villages are visited in randomized order and the browser remains on the final naturally scanned village; do not
+  add a return-to-start navigation.
+- A Village scan Dorf1 read is authoritative for the visible `.buildingList` construction queue and the
   active village population in `#sidebarBoxActiveVillage .population span`. Both update cache/UI and queue
   decisions even when Dorf2 scanning is disabled.
 - The same Dorf1 sweep visit checks the existing Official Questmaster and Daily Quest claimable markers. When the
@@ -353,6 +369,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
   `#dialogOverlay` intercepts every click on the form inputs (coordinate click times out). `OpenAddRaidFormAsync`
   closes any lingering dialog before opening, and a single target's fill/save exception is skipped (bounded
   consecutive-failure abort) instead of failing the whole batch.
+- Hero attribute priority is execution-authoritative from the latest saved account settings. A queued
+  `hero_manage` or `spend_hero_attribute_points` payload is only a snapshot and must never overwrite a reorder
+  the user made in the UI while the task was waiting.
+- React task-tab changes use Action pacing's click delay before the DOM click. Do not put the delay after the
+  General/Village tab click; that makes a Collect-to-tab transition effectively instantaneous.
 - Bonus-video failures use shared protected timing, typed cooldowns, account proxy routing, and sanitized logs.
   See [bonus-video ADR](adr/2026-07-18-bonus-video.md).
 - Diagnostics use shared busy/cancel behavior, sanitize settings/logs/paths/URLs/auth/proxy data, and never present

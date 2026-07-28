@@ -403,6 +403,35 @@ public sealed partial class TravianClient
     {
         try
         {
+            var canSwitch = await _page.EvaluateAsync<bool>(
+                """
+                (general) => {
+                  const isVisible = element => {
+                    if (!element) return false;
+                    const style = window.getComputedStyle(element);
+                    const rect = element.getBoundingClientRect();
+                    return style.visibility !== 'hidden'
+                      && style.display !== 'none'
+                      && rect.width > 0
+                      && rect.height > 0;
+                  };
+                  const tabs = Array.from(document.querySelectorAll('a.tabItem'));
+                  const target = general
+                    ? tabs.find(t => /general/i.test(t.textContent || ''))
+                    : tabs.find(t => !/general/i.test(t.textContent || ''));
+                  return isVisible(target) && !target.classList.contains('active');
+                }
+                """,
+                general);
+            if (!canSwitch)
+            {
+                return false;
+            }
+
+            await DelayBeforeClickAsync(
+                cancellationToken,
+                general ? "General tasks tab" : "Village tasks tab");
+
             var switched = await _page.EvaluateAsync<bool>(
                 """
                 (general) => {
@@ -427,11 +456,6 @@ public sealed partial class TravianClient
                 }
                 """,
                 general);
-            if (switched)
-            {
-                await ApplyActionDelayAsync(cancellationToken);
-            }
-
             return switched;
         }
         catch (PlaywrightException ex) when (IsTransientExecutionContextError(ex))

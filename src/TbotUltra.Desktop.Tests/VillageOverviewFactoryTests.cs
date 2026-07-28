@@ -141,8 +141,88 @@ public sealed class VillageOverviewFactoryTests
         Assert.Contains("Imperian  Lvl 4  02:30", row.Smithy);
         Assert.DoesNotContain("12:03:00", row.Smithy);
         Assert.Contains("Barracks: 03:30", row.BuildTroops);
-        Assert.Contains("Near: 04:30", row.Farming);
+        Assert.Equal("Ready", row.Farming);
         Assert.Equal("Returning: 05:30", row.Hero);
+    }
+
+    [Fact]
+    public void Create_FarmingUsesQueuedDispatchDeadlineInsteadOfIndividualFarmListTimers()
+    {
+        var now = new DateTimeOffset(2026, 7, 17, 12, 0, 0, TimeSpan.Zero);
+        var status = new VillageStatus(
+            "A",
+            [],
+            new Dictionary<string, string>(),
+            [],
+            [],
+            []) with
+        {
+            FarmLists =
+            [
+                new FarmListOverview("Near", 10, 10, 300, Finish: TimerSnapshot.FromRemaining(300, now)),
+                new FarmListOverview("Far", 10, 10, null),
+            ],
+        };
+        var farming = Task("Send selected farmlists", QueueGroup.Farming, "A", now.AddMinutes(27).AddSeconds(4));
+
+        var row = Assert.Single(VillageOverviewFactory.Create(
+            [Village("A", "A", status)],
+            [farming],
+            QueueGroupCatalog.AllGroups,
+            "A",
+            null,
+            now,
+            value => value.ToString("HH:mm:ss")).Villages);
+
+        Assert.Equal("27:04", row.Farming);
+        Assert.DoesNotContain("Near", row.Farming);
+        Assert.DoesNotContain("Far", row.Farming);
+    }
+
+    [Fact]
+    public void Create_TownHallShowsOnlyCelebrationTypeAndOneTimerPerLine()
+    {
+        var now = new DateTimeOffset(2026, 7, 17, 12, 0, 0, TimeSpan.Zero);
+        var village = Village("A", "A") with
+        {
+            TownHallCelebrations =
+            [
+                new TownHallCelebrationTimer("small", now.AddHours(1)),
+                new TownHallCelebrationTimer("big", now.AddHours(2)),
+            ],
+        };
+        var task = Task("Town Hall celebration", QueueGroup.TownHallCelebration, "A", now.AddMinutes(15));
+
+        var row = Assert.Single(VillageOverviewFactory.Create(
+            [village],
+            [task],
+            QueueGroupCatalog.AllGroups,
+            "A",
+            null,
+            now,
+            value => value.ToString("HH:mm:ss")).Villages);
+
+        Assert.Equal("Small: 01:00:00\nGreat: 02:00:00", row.TownHall);
+        Assert.DoesNotContain("Town Hall celebration", row.TownHall);
+    }
+
+    [Fact]
+    public void Create_TownHallWithoutActiveCelebrationShowsOnlyItsQueueCountdown()
+    {
+        var now = new DateTimeOffset(2026, 7, 17, 12, 0, 0, TimeSpan.Zero);
+        var task = Task("Town Hall celebration", QueueGroup.TownHallCelebration, "A", now.AddMinutes(15));
+
+        var row = Assert.Single(VillageOverviewFactory.Create(
+            [Village("A", "A")],
+            [task],
+            QueueGroupCatalog.AllGroups,
+            "A",
+            null,
+            now,
+            value => value.ToString("HH:mm:ss")).Villages);
+
+        Assert.Equal("15:00", row.TownHall);
+        Assert.DoesNotContain("Town Hall celebration", row.TownHall);
     }
 
     [Fact]
@@ -211,8 +291,10 @@ public sealed class VillageOverviewFactoryTests
         var villageA = Village("key-a", "Same");
         var villageB = Village("key-b", "Same") with
         {
-            TownHallMode = "Small",
-            TownHallEndsAtUtc = now.AddMinutes(10),
+            TownHallCelebrations =
+            [
+                new TownHallCelebrationTimer("small", now.AddMinutes(10)),
+            ],
         };
         var deferred = Task("Warehouse level 6", QueueGroup.Construction, "key-b", now.AddMinutes(2));
 
@@ -337,8 +419,7 @@ public sealed class VillageOverviewFactoryTests
             true,
             AllGroups,
             isHeroHome,
-            null,
-            null,
+            [],
             status);
     }
 }

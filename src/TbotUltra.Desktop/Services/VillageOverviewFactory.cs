@@ -352,7 +352,7 @@ internal static class VillageOverviewFactory
             ResolveConstruction(village.Status, village.Tribe, villageTasks, constructionEnabled, nowUtc, finishTimeFormatter),
             ResolveSmithy(village.Status, villageTasks, smithyEnabled, nowUtc, finishTimeFormatter),
             ResolveTroopTraining(village.Status, villageTasks, troopTrainingEnabled, nowUtc),
-            ResolveFarming(village.Status, villageTasks, farmingEnabled, nowUtc),
+            ResolveFarming(villageTasks, farmingEnabled, nowUtc),
             ResolveHero(village, heroEnabled, nowUtc),
             ResolveTownHall(village, villageTasks, townHallEnabled, nowUtc),
             ResolveBrewery(village.Status, villageTasks, breweryEnabled, nowUtc),
@@ -506,7 +506,6 @@ internal static class VillageOverviewFactory
     }
 
     private static string ResolveFarming(
-        VillageStatus? status,
         IReadOnlyList<PipelineTaskSource> tasks,
         bool enabled,
         DateTimeOffset nowUtc)
@@ -516,31 +515,7 @@ internal static class VillageOverviewFactory
             return "Disabled";
         }
 
-        if (status?.FarmLists is null)
-        {
-            return HasQueueGroupWork(tasks, QueueGroup.Farming)
-                ? ResolveQueueGroupStatus(tasks, QueueGroup.Farming, enabled, nowUtc, "Ready")
-                : "Not loaded";
-        }
-
-        if (status.FarmLists.Count == 0)
-        {
-            return "Not available";
-        }
-
-        var active = status.FarmLists.Where(list =>
-            (list.Finish?.RemainingSecondsAt(nowUtc) ?? list.RemainingSeconds) is > 0).ToList();
-        if (active.Count == 0 && HasQueueGroupWork(tasks, QueueGroup.Farming))
-        {
-            return ResolveQueueGroupStatus(tasks, QueueGroup.Farming, enabled, nowUtc, "Ready");
-        }
-
-        return string.Join("\n", status.FarmLists.Select(list =>
-        {
-            var remaining = list.Finish?.RemainingSecondsAt(nowUtc) ?? list.RemainingSeconds;
-            var timer = remaining is > 0 ? FormatCountdown(TimeSpan.FromSeconds(remaining.Value)) : "Ready";
-            return $"{list.Name}: {timer}{(list.TimerIsEstimated ? " (estimated)" : string.Empty)}";
-        }));
+        return ResolveCompactGroupStatus(tasks, QueueGroup.Farming, nowUtc);
     }
 
     private static string ResolveHero(VillageOverviewSource village, bool enabled, DateTimeOffset nowUtc)
@@ -590,13 +565,56 @@ internal static class VillageOverviewFactory
             return "Disabled";
         }
 
-        if (village.TownHallEndsAtUtc is DateTimeOffset endsAt && endsAt > nowUtc)
+        var activeCelebrations = village.TownHallCelebrations
+            .Where(celebration => celebration.EndsAtUtc > nowUtc)
+            .OrderBy(celebration => celebration.EndsAtUtc)
+            .Select(celebration =>
+            {
+                var label = string.Equals(
+                    TownHallCelebrationDefaults.NormalizeMode(celebration.Mode),
+                    TownHallCelebrationDefaults.Big,
+                    StringComparison.Ordinal)
+                    ? "Great"
+                    : "Small";
+                return $"{label}: {FormatCountdown(celebration.EndsAtUtc - nowUtc)}";
+            })
+            .ToList();
+        if (activeCelebrations.Count > 0)
         {
-            var mode = string.IsNullOrWhiteSpace(village.TownHallMode) ? "Celebration" : village.TownHallMode;
-            return $"{mode}: {FormatCountdown(endsAt - nowUtc)}";
+            return string.Join("\n", activeCelebrations);
         }
 
-        return ResolveQueueGroupStatus(tasks, QueueGroup.TownHallCelebration, enabled, nowUtc, "Ready");
+        return ResolveCompactGroupStatus(tasks, QueueGroup.TownHallCelebration, nowUtc);
+    }
+
+    private static string ResolveCompactGroupStatus(
+        IReadOnlyList<PipelineTaskSource> tasks,
+        QueueGroup group,
+        DateTimeOffset nowUtc)
+    {
+        var groupTasks = tasks
+            .Where(source => source.IsAllowed && source.Item.Group == group)
+            .ToList();
+        if (groupTasks.Any(source => source.Item.Status == QueueStatus.Running))
+        {
+            return "Running";
+        }
+
+        var deferred = groupTasks
+            .Where(source => source.Item.Status == QueueStatus.Pending && source.Item.NextAttemptAt > nowUtc)
+            .OrderBy(source => source.Item.NextAttemptAt)
+            .FirstOrDefault();
+        if (deferred is not null)
+        {
+            return FormatCountdown(deferred.Item.NextAttemptAt - nowUtc);
+        }
+
+        if (groupTasks.Any(source => source.Item.Status == QueueStatus.Paused))
+        {
+            return "Blocked";
+        }
+
+        return "Ready";
     }
 
     private static string ResolveBrewery(

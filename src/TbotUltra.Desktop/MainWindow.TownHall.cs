@@ -211,8 +211,11 @@ public partial class MainWindow
             return;
         }
 
+        var nowUtc = DateTimeOffset.UtcNow;
+        var activeCelebrations = TownHallCelebrationSignalParser.Parse(message, nowUtc);
         var lower = message.ToLowerInvariant();
-        if (!lower.Contains("town hall celebration running")
+        if (activeCelebrations.Count == 0
+            && !lower.Contains("town hall celebration running")
             && !lower.Contains("town hall celebration started"))
         {
             return;
@@ -227,9 +230,26 @@ public partial class MainWindow
 
         item.Payload.TryGetValue(BotOptionPayloadKeys.TownHallCelebrationMode, out var rawMode);
         var mode = TownHallCelebrationDefaults.NormalizeMode(rawMode);
-        var endsAtUtc = DateTimeOffset.UtcNow.AddSeconds(seconds);
-        TownHallCelebrationStateStore.Save(_projectRoot, _accountStore.ActiveAccountName(), villageKey, mode, endsAtUtc);
+        var nextAttemptAtUtc = nowUtc.AddSeconds(seconds);
+        if (activeCelebrations.Count == 0)
+        {
+            activeCelebrations =
+            [
+                new TownHallCelebrationTimer(mode, nextAttemptAtUtc),
+            ];
+        }
+
+        TownHallCelebrationStateStore.Save(
+            _projectRoot,
+            _accountStore.ActiveAccountName(),
+            villageKey,
+            mode,
+            nextAttemptAtUtc,
+            activeCelebrations);
         InvalidateVillageOverviewTownHallCache();
-        AppendLog($"[town-hall] remembered celebration timer for '{NormalizeVillageName(GetQueueItemVillageName(item)) ?? villageKey}' until {FormatQueueServerTime(endsAtUtc)}.");
+        AppendLog(
+            $"[town-hall] remembered {activeCelebrations.Count} celebration timer(s) for "
+            + $"'{NormalizeVillageName(GetQueueItemVillageName(item)) ?? villageKey}'; "
+            + $"next check {FormatQueueServerTime(nextAttemptAtUtc)}.");
     }
 }

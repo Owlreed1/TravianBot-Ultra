@@ -61,6 +61,8 @@ public sealed partial class TravianClient
         }
 
         var status = await ReadTownHallCelebrationStatusFromCurrentPageAsync(cancellationToken);
+        string WithActiveTimers(string message, TownHallCelebrationPageStatus? observed = null)
+            => message + FormatTownHallActiveTimerSignal(mode, (observed ?? status).ActiveRemainingSeconds);
 
         // Target already met: wait until the soonest celebration frees a slot, plus a random restart delay
         // so a new one is not started the instant the timer hits zero.
@@ -68,7 +70,7 @@ public sealed partial class TravianClient
         {
             var waitSeconds = ResolveTownHallSlotFreeWaitSeconds(status, restartDelaySeconds);
             Notify($"[town-hall] {status.ActiveCount}/{goalCount} celebration(s) active - waiting {TravianParsing.FormatDuration(waitSeconds)} (incl. {restartDelaySeconds}s restart delay).");
-            return $"Town Hall celebration running. queue_wait_seconds={waitSeconds}";
+            return WithActiveTimers($"Town Hall celebration running. queue_wait_seconds={waitSeconds}");
         }
 
         // Below target: start celebrations until the target is reached or the server/resources stop us.
@@ -93,7 +95,7 @@ public sealed partial class TravianClient
                             ?? resourceWaitMessage;
                     }
 
-                    return resourceWaitMessage;
+                    return WithActiveTimers(resourceWaitMessage);
                 }
 
                 Notify("[town-hall] topped up from the hero inventory; retrying start.");
@@ -107,7 +109,7 @@ public sealed partial class TravianClient
                 // computing a resource wait for a slot that cannot be filled.
                 var waitSeconds = ResolveTownHallSlotFreeWaitSeconds(status, restartDelaySeconds);
                 Notify($"[town-hall] a celebration is already running and no more can be queued; waiting {TravianParsing.FormatDuration(waitSeconds)}.");
-                return $"Town Hall celebration running. queue_wait_seconds={waitSeconds}";
+                return WithActiveTimers($"Town Hall celebration running. queue_wait_seconds={waitSeconds}");
             }
 
             if (!startAttempt.Started)
@@ -117,7 +119,7 @@ public sealed partial class TravianClient
                 {
                     // A start row exists but lacks resources (with Plus a second can still be queued) — come
                     // back when resources are ready to fill the remaining slot.
-                    return resourceWaitMessage;
+                    return WithActiveTimers(resourceWaitMessage);
                 }
 
                 if (status.ActiveCount >= 1)
@@ -126,11 +128,11 @@ public sealed partial class TravianClient
                     // server won't queue a second without Plus). Wait for the running one to free a slot.
                     var waitSeconds = ResolveTownHallSlotFreeWaitSeconds(status, restartDelaySeconds);
                     Notify($"[town-hall] cannot queue another celebration now; waiting {TravianParsing.FormatDuration(waitSeconds)} for the running one.");
-                    return $"Town Hall celebration running. queue_wait_seconds={waitSeconds}";
+                    return WithActiveTimers($"Town Hall celebration running. queue_wait_seconds={waitSeconds}");
                 }
 
                 Notify($"[town-hall] start failed - {startAttempt.Message}");
-                return $"{startAttempt.Message} queue_wait_seconds={TownHallCelebrationRetrySeconds}";
+                return WithActiveTimers($"{startAttempt.Message} queue_wait_seconds={TownHallCelebrationRetrySeconds}");
             }
 
             var startHref = ResolveUrl(startAttempt.Href);
@@ -151,7 +153,9 @@ public sealed partial class TravianClient
             if (reread.ActiveCount <= status.ActiveCount)
             {
                 Notify("[town-hall] start did not register - will retry");
-                return $"Town Hall celebration: start did not register, retrying. queue_wait_seconds={TownHallCelebrationRetrySeconds}";
+                return WithActiveTimers(
+                    $"Town Hall celebration: start did not register, retrying. queue_wait_seconds={TownHallCelebrationRetrySeconds}",
+                    reread);
             }
 
             status = reread;
@@ -159,7 +163,23 @@ public sealed partial class TravianClient
 
         var finalWaitSeconds = ResolveTownHallSlotFreeWaitSeconds(status, restartDelaySeconds);
         Notify($"[town-hall] {mode} celebration active ({status.ActiveCount}/{goalCount}) - {TravianParsing.FormatDuration(finalWaitSeconds)} until next check.");
-        return $"Town Hall celebration started. mode={mode} queue_wait_seconds={finalWaitSeconds}";
+        return WithActiveTimers($"Town Hall celebration started. mode={mode} queue_wait_seconds={finalWaitSeconds}");
+    }
+
+    internal static string FormatTownHallActiveTimerSignal(
+        string? fallbackMode,
+        IReadOnlyList<(string? Mode, int RemainingSeconds)> activeTimers)
+    {
+        var entries = activeTimers
+            .Where(timer => timer.RemainingSeconds > 0)
+            .Take(2)
+            .Select(timer =>
+                $"{TownHallCelebrationDefaults.NormalizeMode(
+                    string.IsNullOrWhiteSpace(timer.Mode) ? fallbackMode : timer.Mode)}:{timer.RemainingSeconds}")
+            .ToList();
+        return entries.Count == 0
+            ? string.Empty
+            : $" town_hall_active={string.Join(",", entries)}";
     }
 
     // Seconds until the soonest-finishing celebration frees a slot, plus the random restart delay. Used both
@@ -312,6 +332,15 @@ public sealed partial class TravianClient
               // The first timer is the one that finishes soonest (the currently running celebration).
               const runningTimers = runningTable ? Array.from(runningTable.querySelectorAll('.timer')) : [];
               const activeCount = runningTimers.length;
+              const activeTimers = runningTimers.map(timer => ({
+                text: normalize(timer.textContent || ''),
+                value: timer.getAttribute('value'),
+                mode: /(great|big|large)\s+celebration/i.test(normalize(timer.closest('tr')?.textContent || ''))
+                  ? 'big'
+                  : /small\s+celebration/i.test(normalize(timer.closest('tr')?.textContent || ''))
+                    ? 'small'
+                    : ''
+              }));
               const runningTimer = runningTimers[0] || null;
               const runningText = normalize(runningTimer ? runningTimer.textContent : '');
               const runningValueRaw = runningTimer ? runningTimer.getAttribute('value') : null;
@@ -341,6 +370,7 @@ public sealed partial class TravianClient
               return {
                 celebrationRunning,
                 activeCount,
+                activeTimers,
                 slotOccupied,
                 remainingText: runningText,
                 remainingSeconds: Number.isFinite(runningValue) && runningValue > 0 ? runningValue : null,
@@ -360,6 +390,30 @@ public sealed partial class TravianClient
             && parsedActiveCount > 0)
         {
             activeCount = parsedActiveCount;
+        }
+        var activeRemainingSeconds = new List<(string? Mode, int RemainingSeconds)>();
+        if (payload.TryGetProperty("activeTimers", out var activeTimersNode)
+            && activeTimersNode.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var timerNode in activeTimersNode.EnumerateArray())
+            {
+                var valueText = timerNode.TryGetProperty("value", out var valueNode)
+                    ? valueNode.GetString()
+                    : null;
+                var timerText = timerNode.TryGetProperty("text", out var textNode)
+                    ? textNode.GetString()
+                    : null;
+                var timerMode = timerNode.TryGetProperty("mode", out var modeNode)
+                    ? modeNode.GetString()
+                    : null;
+                var seconds = int.TryParse(valueText, out var parsedTimerValue) && parsedTimerValue > 0
+                    ? parsedTimerValue
+                    : TravianParsing.ParseDurationToSeconds(timerText);
+                if (seconds is > 0)
+                {
+                    activeRemainingSeconds.Add((timerMode, seconds.Value));
+                }
+            }
         }
         var remainingText = payload.TryGetProperty("remainingText", out var remainingTextNode)
             ? remainingTextNode.GetString() ?? string.Empty
@@ -383,6 +437,7 @@ public sealed partial class TravianClient
         return new TownHallCelebrationPageStatus(
             celebrationRunning,
             activeCount,
+            activeRemainingSeconds,
             slotOccupied,
             remainingText,
             remainingSeconds,
@@ -561,6 +616,7 @@ public sealed partial class TravianClient
     private sealed record TownHallCelebrationPageStatus(
         bool CelebrationRunning,
         int ActiveCount,
+        IReadOnlyList<(string? Mode, int RemainingSeconds)> ActiveRemainingSeconds,
         bool SlotOccupied,
         string RemainingText,
         int? RemainingSeconds,

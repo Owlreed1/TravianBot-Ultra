@@ -372,6 +372,14 @@ public partial class MainWindow
         CancellationToken cancellationToken)
     {
         var tickSw = Stopwatch.StartNew();
+        if (string.Equals(item.TaskName, "hero_manage", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.TaskName, "spend_hero_attribute_points", StringComparison.OrdinalIgnoreCase))
+        {
+            // A continuous-loop tick may have loaded its options before the user reordered Hero attributes.
+            // Reload only the execution-authoritative priority at the last synchronous boundary before running.
+            options = options with { HeroStatPriority = LoadBotOptions().HeroStatPriority };
+        }
+
         MarkDueConstructionForPreSleepFill(item);
         RefreshConstructFasterPayloadForExecution(item);
         _botService.MarkQueueItemRunning(item.Id);

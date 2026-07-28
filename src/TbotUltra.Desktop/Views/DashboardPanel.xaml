@@ -325,7 +325,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Margin="20,0,0,0">
                         <StackPanel Orientation="Horizontal">
-                            <CheckBox x:Name="VillageStatusSweepCheckBox" Content="Village Status Sweep"
+                            <CheckBox x:Name="VillageStatusSweepCheckBox" Content="Village scan"
                                       Style="{StaticResource ToggleSwitchStyle}"
                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                       VerticalAlignment="Center"
@@ -349,7 +349,7 @@
                                     VerticalAlignment="Center"
                                     Background="{DynamicResource SurfaceBrush}"
                                     BorderBrush="{DynamicResource BorderBrush}"
-                                    ToolTip="Open Village Status Sweep settings in Pacing"
+                                    ToolTip="Open Village scan settings in Pacing"
                                     Click="VillageStatusSweepSettingsButton_Click" />
                         </StackPanel>
                     </StackPanel>

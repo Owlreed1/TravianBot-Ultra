@@ -41,6 +41,7 @@ public partial class SettingsWindow : Window
     private bool _suppressDetailedBrowserLoggingConfirmation;
     private string _initialTownHallFingerprint = string.Empty;
     private readonly Func<DateTimeOffset>? _villageStatusSweepNextScanProvider;
+    private readonly Func<Task>? _runVillageStatusSweepNow;
     private readonly DispatcherTimer _villageStatusSweepTimer;
 
     public ObservableCollection<TownHallOverviewRow> TownHallRows { get; } = [];
@@ -85,7 +86,8 @@ public partial class SettingsWindow : Window
         Action? resetDailySilverSpending = null,
         int dailyGoldSpent = 0,
         int dailySilverSpent = 0,
-        Func<DateTimeOffset>? villageStatusSweepNextScanProvider = null)
+        Func<DateTimeOffset>? villageStatusSweepNextScanProvider = null,
+        Func<Task>? runVillageStatusSweepNow = null)
     {
         InitializeComponent();
         ThemeChrome.EnableEarlyDarkTitleBar(this);
@@ -98,6 +100,7 @@ public partial class SettingsWindow : Window
         _dailyGoldSpent = Math.Max(0, dailyGoldSpent);
         _dailySilverSpent = Math.Max(0, dailySilverSpent);
         _villageStatusSweepNextScanProvider = villageStatusSweepNextScanProvider;
+        _runVillageStatusSweepNow = runVillageStatusSweepNow;
         foreach (var row in townHallRows ?? [])
         {
             TownHallRows.Add(row);
@@ -112,12 +115,34 @@ public partial class SettingsWindow : Window
         SleepNowButton.IsEnabled = !_sessionSleeping;
         ResetDailyGoldLimitButton.IsEnabled = _resetDailyGoldSpending is not null;
         ResetDailySilverLimitButton.IsEnabled = _resetDailySilverSpending is not null;
+        VillageStatusSweepScanNowButton.IsEnabled = _runVillageStatusSweepNow is not null;
         UpdateDailySpendingUsage();
         _villageStatusSweepTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _villageStatusSweepTimer.Tick += (_, _) => UpdateVillageStatusSweepNextScanDisplay();
         Closed += (_, _) => _villageStatusSweepTimer.Stop();
         UpdateVillageStatusSweepNextScanDisplay();
         _villageStatusSweepTimer.Start();
+    }
+
+    private async void VillageStatusSweepScanNowButton_Click(object sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        if (_runVillageStatusSweepNow is null)
+        {
+            return;
+        }
+
+        VillageStatusSweepScanNowButton.IsEnabled = false;
+        try
+        {
+            await _runVillageStatusSweepNow();
+            UpdateVillageStatusSweepNextScanDisplay();
+        }
+        finally
+        {
+            VillageStatusSweepScanNowButton.IsEnabled = true;
+        }
     }
 
     private void UpdateVillageStatusSweepNextScanDisplay()
@@ -127,29 +152,24 @@ public partial class SettingsWindow : Window
         if (nextScanUtc == DateTimeOffset.MinValue || remaining <= TimeSpan.Zero)
         {
             VillageStatusSweepNextScanTextBlock.Text = "Ready";
-            ApplyVillageStatusSweepNextScanTheme(isReady: true);
+            ApplyVillageStatusSweepNextScanBadgeTheme(isReady: true);
             return;
         }
 
         VillageStatusSweepNextScanTextBlock.Text = remaining.TotalHours >= 1
             ? $"{(int)remaining.TotalHours:00}:{remaining.Minutes:00}:{remaining.Seconds:00}"
             : $"{remaining.Minutes:00}:{remaining.Seconds:00}";
-        ApplyVillageStatusSweepNextScanTheme(isReady: false);
+        ApplyVillageStatusSweepNextScanBadgeTheme(isReady: false);
     }
 
-    private void ApplyVillageStatusSweepNextScanTheme(bool isReady)
+    private void ApplyVillageStatusSweepNextScanBadgeTheme(bool isReady)
     {
-        var textBrush = (System.Windows.Media.Brush)FindResource(
+        VillageStatusSweepNextScanTextBlock.Foreground = (System.Windows.Media.Brush)FindResource(
             isReady ? "SuccessTextBrush" : "WarningTextBrush");
-        var statusBrush = (System.Windows.Media.Brush)FindResource(
-            isReady ? "SuccessBrush" : "WarningBrush");
-        VillageStatusSweepNextScanTextBlock.Foreground = textBrush;
-        VillageStatusSweepNextScanCard.Background = (System.Windows.Media.Brush)FindResource(
+        VillageStatusSweepNextScanBadge.Background = (System.Windows.Media.Brush)FindResource(
             isReady ? "SuccessBgBrush" : "WarningBgBrush");
-        VillageStatusSweepNextScanCard.BorderBrush = (System.Windows.Media.Brush)FindResource(
+        VillageStatusSweepNextScanBadge.BorderBrush = (System.Windows.Media.Brush)FindResource(
             isReady ? "SuccessBorderBrush" : "WarningBorderBrush");
-        VillageStatusSweepNextScanAccent.Background = statusBrush;
-        VillageStatusSweepNextScanIndicator.Fill = statusBrush;
     }
 
     private void LoadConfig()
@@ -395,6 +415,11 @@ public partial class SettingsWindow : Window
     {
         try
         {
+            if (!TryValidateNumericInputs())
+            {
+                return false;
+            }
+
             if (!TryReadSpendingLimits(
                     out var goldLimit,
                     out var dailyGoldSpendingLimit,
@@ -476,6 +501,179 @@ public partial class SettingsWindow : Window
             AppDialog.Show(this, ex.Message, "Save settings", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
+    }
+
+    private bool TryValidateNumericInputs()
+    {
+        var fields = new (TextBox TextBox, string Label, bool WholeNumber, double Min, double Max)[]
+        {
+            (SessionRunMinMinutesTextBox, "Session pacing run minimum", true, 1, 10080),
+            (SessionRunMaxMinutesTextBox, "Session pacing run maximum", true, 1, 10080),
+            (SessionSleepMinMinutesTextBox, "Session pacing sleep minimum", true, 5, 10080),
+            (SessionSleepMaxMinutesTextBox, "Session pacing sleep maximum", true, 5, 10080),
+            (ActionTaskMinTextBox, "Task action delay minimum", false, 0, 3600),
+            (ActionTaskMaxTextBox, "Task action delay maximum", false, 0, 3600),
+            (ActionPageLoadMinTextBox, "Page-load delay minimum", false, 0, 3600),
+            (ActionPageLoadMaxTextBox, "Page-load delay maximum", false, 0, 3600),
+            (ActionClickMinTextBox, "Click delay minimum", false, 0, 3600),
+            (ActionClickMaxTextBox, "Click delay maximum", false, 0, 3600),
+            (ActionLoopMinTextBox, "Loop delay minimum", false, 0, 3600),
+            (ActionLoopMaxTextBox, "Loop delay maximum", false, 0, 3600),
+            (FarmListStepDelayMinTextBox, "Farm-list step delay minimum", false, 0, 3600),
+            (FarmListStepDelayMaxTextBox, "Farm-list step delay maximum", false, 0, 3600),
+            (CollectStepDelayMinTextBox, "Collect step delay minimum", false, 0, 3600),
+            (CollectStepDelayMaxTextBox, "Collect step delay maximum", false, 0, 3600),
+            (IdleBreakIntervalMinTextBox, "Idle-break interval minimum", false, 0, 3600),
+            (IdleBreakIntervalMaxTextBox, "Idle-break interval maximum", false, 0, 3600),
+            (IdleBreakDurationMinTextBox, "Idle-break duration minimum", false, 0, 3600),
+            (IdleBreakDurationMaxTextBox, "Idle-break duration maximum", false, 0, 3600),
+            (IdleBrowseIntervalMinTextBox, "Idle-browse interval minimum", false, 0, 3600),
+            (IdleBrowseIntervalMaxTextBox, "Idle-browse interval maximum", false, 0, 3600),
+            (VillageStatusSweepRoundMinTextBox, "Village scan function delay minimum", true, 1, 1440),
+            (VillageStatusSweepRoundMaxTextBox, "Village scan function delay maximum", true, 1, 1440),
+            (VillageStatusSweepVillageMinTextBox, "Village scan village delay minimum", false, 0, 3600),
+            (VillageStatusSweepVillageMaxTextBox, "Village scan village delay maximum", false, 0, 3600),
+            (ConstructionHumanizeQueuePercentMinTextBox, "Construction queue percentage minimum", false, 0, 100),
+            (ConstructionHumanizeQueuePercentMaxTextBox, "Construction queue percentage maximum", false, 0, 100),
+            (ConstructionHumanizeMaxDelayTextBox, "Construction maximum delay", false, 0, 600),
+            (ConstructionHumanizeNoPlusMinTextBox, "Construction no-Plus delay minimum", false, 0, 600),
+            (ConstructionHumanizeNoPlusMaxTextBox, "Construction no-Plus delay maximum", false, 0, 600),
+            (HeroAdventureRestartDelayMinTextBox, "Hero adventure restart delay minimum", false, 0, double.MaxValue),
+            (HeroAdventureRestartDelayMaxTextBox, "Hero adventure restart delay maximum", false, 0, double.MaxValue),
+            (SmithyUpgradeRestartDelayMinTextBox, "Smithy restart delay minimum", false, 0, double.MaxValue),
+            (SmithyUpgradeRestartDelayMaxTextBox, "Smithy restart delay maximum", false, 0, double.MaxValue),
+            (TownHallRestartDelayMinTextBox, "Town Hall restart delay minimum", false, 0, double.MaxValue),
+            (TownHallRestartDelayMaxTextBox, "Town Hall restart delay maximum", false, 0, double.MaxValue),
+            (BreweryRestartDelayMinTextBox, "Brewery restart delay minimum", false, 0, double.MaxValue),
+            (BreweryRestartDelayMaxTextBox, "Brewery restart delay maximum", false, 0, double.MaxValue),
+            (GoldLimitTextBox, "Minimum gold balance", true, 0, int.MaxValue),
+            (DailyGoldSpendingLimitTextBox, "Daily gold spending limit", true, 0, int.MaxValue),
+            (SilverLimitTextBox, "Minimum silver balance", true, 0, int.MaxValue),
+            (DailySilverSpendingLimitTextBox, "Daily silver spending limit", true, 0, int.MaxValue),
+        };
+
+        foreach (var field in fields)
+        {
+            if (TryValidateNumericInputText(
+                    field.TextBox.Text,
+                    field.WholeNumber,
+                    field.Min,
+                    field.Max,
+                    out var error))
+            {
+                continue;
+            }
+
+            ShowInvalidNumericInput(field.TextBox, field.Label, error);
+            return false;
+        }
+
+        var ranges = new (TextBox Min, TextBox Max, string Label)[]
+        {
+            (SessionRunMinMinutesTextBox, SessionRunMaxMinutesTextBox, "Session pacing run"),
+            (SessionSleepMinMinutesTextBox, SessionSleepMaxMinutesTextBox, "Session pacing sleep"),
+            (ActionTaskMinTextBox, ActionTaskMaxTextBox, "Task action delay"),
+            (ActionPageLoadMinTextBox, ActionPageLoadMaxTextBox, "Page-load delay"),
+            (ActionClickMinTextBox, ActionClickMaxTextBox, "Click delay"),
+            (ActionLoopMinTextBox, ActionLoopMaxTextBox, "Loop delay"),
+            (FarmListStepDelayMinTextBox, FarmListStepDelayMaxTextBox, "Farm-list step delay"),
+            (CollectStepDelayMinTextBox, CollectStepDelayMaxTextBox, "Collect step delay"),
+            (IdleBreakIntervalMinTextBox, IdleBreakIntervalMaxTextBox, "Idle-break interval"),
+            (IdleBreakDurationMinTextBox, IdleBreakDurationMaxTextBox, "Idle-break duration"),
+            (IdleBrowseIntervalMinTextBox, IdleBrowseIntervalMaxTextBox, "Idle-browse interval"),
+            (VillageStatusSweepRoundMinTextBox, VillageStatusSweepRoundMaxTextBox, "Village scan function delay"),
+            (VillageStatusSweepVillageMinTextBox, VillageStatusSweepVillageMaxTextBox, "Village scan village delay"),
+            (ConstructionHumanizeQueuePercentMinTextBox, ConstructionHumanizeQueuePercentMaxTextBox, "Construction queue percentage"),
+            (ConstructionHumanizeNoPlusMinTextBox, ConstructionHumanizeNoPlusMaxTextBox, "Construction no-Plus delay"),
+            (HeroAdventureRestartDelayMinTextBox, HeroAdventureRestartDelayMaxTextBox, "Hero adventure restart delay"),
+            (SmithyUpgradeRestartDelayMinTextBox, SmithyUpgradeRestartDelayMaxTextBox, "Smithy restart delay"),
+            (TownHallRestartDelayMinTextBox, TownHallRestartDelayMaxTextBox, "Town Hall restart delay"),
+            (BreweryRestartDelayMinTextBox, BreweryRestartDelayMaxTextBox, "Brewery restart delay"),
+        };
+
+        foreach (var range in ranges)
+        {
+            var min = double.Parse(range.Min.Text, NumberStyles.Float, CultureInfo.InvariantCulture);
+            var max = double.Parse(range.Max.Text, NumberStyles.Float, CultureInfo.InvariantCulture);
+            if (max >= min)
+            {
+                continue;
+            }
+
+            ShowInvalidNumericInput(
+                range.Max,
+                range.Label,
+                "The maximum value must be greater than or equal to the minimum value.");
+            return false;
+        }
+
+        return true;
+    }
+
+    internal static bool TryValidateNumericInputText(
+        string? text,
+        bool wholeNumber,
+        double min,
+        double max,
+        out string error)
+    {
+        var trimmed = text?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0)
+        {
+            error = "Enter a value.";
+            return false;
+        }
+
+        if (trimmed.Contains(','))
+        {
+            error = "Use a period as the decimal separator, for example 5.6 instead of 5,6.";
+            return false;
+        }
+
+        double value;
+        if (wholeNumber)
+        {
+            if (!int.TryParse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedInteger))
+            {
+                error = "Enter a whole number.";
+                return false;
+            }
+
+            value = parsedInteger;
+        }
+        else if (!double.TryParse(
+                     trimmed,
+                     NumberStyles.Float,
+                     CultureInfo.InvariantCulture,
+                     out value)
+                 || !double.IsFinite(value))
+        {
+            error = "Enter a valid number using a period as the decimal separator, for example 5.6.";
+            return false;
+        }
+
+        if (value < min || value > max)
+        {
+            error = max == double.MaxValue
+                ? $"Enter a value of at least {min.ToString(CultureInfo.InvariantCulture)}."
+                : $"Enter a value between {min.ToString(CultureInfo.InvariantCulture)} and {max.ToString(CultureInfo.InvariantCulture)}.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
+    private void ShowInvalidNumericInput(TextBox textBox, string label, string error)
+    {
+        AppDialog.Show(
+            this,
+            $"{label}: {error}\n\nSettings were not saved.",
+            "Invalid settings value",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+        textBox.Focus();
+        textBox.SelectAll();
     }
 
     private void SleepNowButton_Click(object sender, RoutedEventArgs e)
