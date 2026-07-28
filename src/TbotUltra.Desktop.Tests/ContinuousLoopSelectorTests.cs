@@ -273,6 +273,49 @@ public sealed class ContinuousLoopSelectorTests
     }
 
     [Theory]
+    [InlineData("a", true, "build_troops", true)]
+    [InlineData("b", true, "build_troops", false)]
+    [InlineData("a", false, "build_troops", false)]
+    [InlineData("a", true, "collect_tasks", false)]
+    public void IsVillageStatusSweepCandidate_RequiresSameAllowedVillageAndExcludesUtilityTasks(
+        string? candidateVillageKey,
+        bool allowed,
+        string taskName,
+        bool expected)
+    {
+        var candidate = Candidate(Item(taskName, QueueStatus.Pending, 0), candidateVillageKey, allowed);
+
+        Assert.Equal(expected, ContinuousLoopSelector.IsVillageStatusSweepCandidate(candidate, "a"));
+    }
+
+    [Theory]
+    [InlineData("a", true, true, "collect_tasks", 0, true)]
+    [InlineData("a", true, true, "collect_daily_quests", 0, true)]
+    [InlineData("b", true, true, "collect_tasks", 0, false)]
+    [InlineData("a", false, true, "collect_tasks", 0, false)]
+    [InlineData("a", true, false, "collect_tasks", 0, false)]
+    [InlineData("a", true, true, "collect_tasks", 1, false)]
+    [InlineData("a", true, true, "activate_production_bonus", 0, false)]
+    public void IsVillageStatusSweepCollectionCandidate_RequiresReadyEnabledCollectionForCurrentVillage(
+        string? candidateVillageKey,
+        bool allowed,
+        bool utilityEnabled,
+        string taskName,
+        int secondsUntilReady,
+        bool expected)
+    {
+        var candidate = Candidate(
+            Item(taskName, QueueStatus.Pending, secondsUntilReady),
+            candidateVillageKey,
+            allowed,
+            utilityEnabled);
+
+        Assert.Equal(
+            expected,
+            ContinuousLoopSelector.IsVillageStatusSweepCollectionCandidate(candidate, "a", Now));
+    }
+
+    [Theory]
     [InlineData(90, true)]
     [InlineData(91, false)]
     public void ResolveShortVillageHoldUntil_OnlyHoldsActiveVillageForShortDefer(

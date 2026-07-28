@@ -823,7 +823,10 @@ public partial class MainWindow
     // Caches the latest read for a village (keyed by name). Merges so a resource-only read (no buildings)
     // keeps the buildings/resource-fields from a prior fuller read — the dropdown can then still show a
     // village's buildings even after a lightweight refresh updated only its resources.
-    private void CacheVillageStatus(VillageStatus status, string? villageNameOverride = null)
+    private void CacheVillageStatus(
+        VillageStatus status,
+        string? villageNameOverride = null,
+        bool triggerDeferredWaitRefresh = true)
     {
         var name = NormalizeVillageName(villageNameOverride) ?? NormalizeVillageName(status.ActiveVillage);
         if (name is null)
@@ -833,12 +836,18 @@ public partial class MainWindow
 
         // Reconcile persisted queue-full deferrals from the live response before a partial-read merge can
         // preserve older construction state. This lets a newly free Plus/normal slot wake the next task.
-        TriggerDeferredConstructionWaitRefresh(status, "village_status");
+        if (triggerDeferredWaitRefresh)
+        {
+            TriggerDeferredConstructionWaitRefresh(status, "village_status");
+        }
         // Same live recompute for deferred build_troops resource-% waits. Doing it here (like construction)
         // means a troop task waiting in a NON-selected village is also re-estimated against live resources on
         // every read — not only the selected village. RefreshDeferredTroopTrainingWaitsAsync fills the storage
         // capacities/buildings it needs from this village's cache when the read didn't carry them.
-        TriggerDeferredTroopTrainingWaitRefresh(status, "village_status");
+        if (triggerDeferredWaitRefresh)
+        {
+            TriggerDeferredTroopTrainingWaitRefresh(status, "village_status");
+        }
 
         // A "full" read brings buildings (or resource fields); a lightweight resource refresh does not.
         // Persist only on full reads so the durable structure is saved without thrashing the file every

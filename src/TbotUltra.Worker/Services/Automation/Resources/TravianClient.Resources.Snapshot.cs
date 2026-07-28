@@ -248,7 +248,7 @@ public sealed partial class TravianClient
         var activeConstructions = await ReadActiveConstructionsAsync(
             cancellationToken,
             allowNavigationToBuildings: false,
-            readMode: ActiveConstructionReadMode.CachedForObservation);
+            readMode: ActiveConstructionReadMode.FreshForMutation);
         var buildQueue = await ReadBuildQueueAsync(cancellationToken);
         var activeBuildCount = ConstructionSlots.ActiveBuildCount(buildQueue, activeConstructions);
         if (buildQueue.Count != activeConstructions.Count)
@@ -273,6 +273,20 @@ public sealed partial class TravianClient
         // Coordinates first: they identify which village this snapshot belongs to even when several
         // villages share a name, so the cached production survives switching between them.
         var activeCoords = await TryReadActiveVillageCoordsFromCurrentPageAsync(cancellationToken);
+        var activePopulation = await ReadActiveVillagePopulationFromCurrentPageAsync(cancellationToken);
+        if (activePopulation.HasValue)
+        {
+            villages = VillageIdentityReconciler.EnrichActiveVillagePopulation(
+                villages,
+                activeVillage,
+                activeCoords,
+                activePopulation);
+            UpdateCachedVillages(villages);
+            if (_session.LogValueChanged($"pop:{activeVillage}", activePopulation.Value.ToString()))
+            {
+                Notify($"[population] active village '{activeVillage}' from dorf1 = {activePopulation.Value}");
+            }
+        }
         var cachedSnapshot = TryGetCachedVillageResourceSnapshot(activeVillage, activeCoords);
         var resources = snapshot.Resources;
         var capacities = (

@@ -127,14 +127,29 @@ public partial class SettingsWindow : Window
         if (nextScanUtc == DateTimeOffset.MinValue || remaining <= TimeSpan.Zero)
         {
             VillageStatusSweepNextScanTextBlock.Text = "Ready";
-            VillageStatusSweepNextScanTextBlock.Foreground = (System.Windows.Media.Brush)FindResource("SuccessTextBrush");
+            ApplyVillageStatusSweepNextScanTheme(isReady: true);
             return;
         }
 
         VillageStatusSweepNextScanTextBlock.Text = remaining.TotalHours >= 1
             ? $"{(int)remaining.TotalHours:00}:{remaining.Minutes:00}:{remaining.Seconds:00}"
             : $"{remaining.Minutes:00}:{remaining.Seconds:00}";
-        VillageStatusSweepNextScanTextBlock.Foreground = (System.Windows.Media.Brush)FindResource("WarningTextBrush");
+        ApplyVillageStatusSweepNextScanTheme(isReady: false);
+    }
+
+    private void ApplyVillageStatusSweepNextScanTheme(bool isReady)
+    {
+        var textBrush = (System.Windows.Media.Brush)FindResource(
+            isReady ? "SuccessTextBrush" : "WarningTextBrush");
+        var statusBrush = (System.Windows.Media.Brush)FindResource(
+            isReady ? "SuccessBrush" : "WarningBrush");
+        VillageStatusSweepNextScanTextBlock.Foreground = textBrush;
+        VillageStatusSweepNextScanCard.Background = (System.Windows.Media.Brush)FindResource(
+            isReady ? "SuccessBgBrush" : "WarningBgBrush");
+        VillageStatusSweepNextScanCard.BorderBrush = (System.Windows.Media.Brush)FindResource(
+            isReady ? "SuccessBorderBrush" : "WarningBorderBrush");
+        VillageStatusSweepNextScanAccent.Background = statusBrush;
+        VillageStatusSweepNextScanIndicator.Fill = statusBrush;
     }
 
     private void LoadConfig()

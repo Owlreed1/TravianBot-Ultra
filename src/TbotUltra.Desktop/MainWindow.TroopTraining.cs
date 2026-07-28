@@ -765,7 +765,7 @@ public partial class MainWindow
         if (options.Count == 0)
         {
             _troopTrainingViewModel.InfoText = "Could not determine the tribe's troops yet. Scan the account first.";
-            AppendLog("Smithy upgrade options: no troops resolved for the current tribe.");
+            AppendLog($"Smithy upgrade options: no troops resolved for target village '{villageInfo.Name}'.");
             return;
         }
 
@@ -1104,7 +1104,10 @@ public partial class MainWindow
     // tribe is known, falling back to the troop slot ("t1") otherwise.
     private List<SmithyTroopOption> BuildSmithyTroopOptions(string? account, string? villageKey)
     {
-        var tribe = ResolveStoredTroopTrainingTribe();
+        // The Village settings gear can target any row, independently of the Dashboard selection.
+        // Resolve the catalog from that row's stable village key; using the selected village here made
+        // every popup show the active village's tribe on mixed-tribe servers.
+        var tribe = ResolveVillageTribeByKey(villageKey, villageName: null);
         var troopNames = TroopCatalog.ResolveTroopTypesForTribe(tribe);
         if (troopNames.Count == 0)
         {

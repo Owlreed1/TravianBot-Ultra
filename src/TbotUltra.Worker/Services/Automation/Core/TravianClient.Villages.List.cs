@@ -274,6 +274,23 @@ public sealed partial class TravianClient
         _cachedVillagesAt = DateTimeOffset.UtcNow;
     }
 
+    private async Task<int?> ReadActiveVillagePopulationFromCurrentPageAsync(
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var raw = await _page.EvaluateAsync<string?>(
+            """
+            () => document.querySelector(
+              '#sidebarBoxActiveVillage .population span, ' +
+              '.villageInfobox .population span, ' +
+              '.listEntry.village.active .population span')?.textContent || null
+            """);
+        var digits = Regex.Replace(raw ?? string.Empty, @"[^\d]", string.Empty);
+        return int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var population)
+            ? population
+            : null;
+    }
+
     private List<Village> ApplyKnownVillageTribes(IReadOnlyList<Village> villages)
     {
         return villages.Select(village =>

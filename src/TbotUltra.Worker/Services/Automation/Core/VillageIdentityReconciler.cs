@@ -154,6 +154,41 @@ internal static class VillageIdentityReconciler
             .ToList();
     }
 
+    internal static IReadOnlyList<Village> EnrichActiveVillagePopulation(
+        IReadOnlyList<Village> villages,
+        string activeVillageName,
+        (int? X, int? Y) activeCoordinates,
+        int? population)
+    {
+        if (!population.HasValue || villages.Count == 0)
+        {
+            return villages;
+        }
+
+        Village? match = HasCoordinates(activeCoordinates)
+            ? villages.FirstOrDefault(village => SameCoordinates(
+                (village.CoordX, village.CoordY),
+                activeCoordinates))
+            : null;
+
+        if (match is null)
+        {
+            var nameMatches = villages
+                .Where(village => IsSameName(village.Name, activeVillageName))
+                .Take(2)
+                .ToList();
+            match = nameMatches.Count == 1 ? nameMatches[0] : null;
+        }
+
+        return match is null
+            ? villages
+            : villages
+                .Select(village => ReferenceEquals(village, match)
+                    ? village with { Population = population.Value }
+                    : village)
+                .ToList();
+    }
+
     internal static string BuildStableVillageToken(
         int? villageDid,
         (int? X, int? Y) coordinates,

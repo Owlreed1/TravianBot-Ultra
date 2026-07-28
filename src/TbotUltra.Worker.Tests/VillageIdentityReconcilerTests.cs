@@ -106,6 +106,25 @@ public sealed class VillageIdentityReconcilerTests
     }
 
     [Fact]
+    public void EnrichActiveVillagePopulation_UpdatesOnlyCoordinateMatchedVillage()
+    {
+        Village[] villages =
+        [
+            new("New village", "/dorf1.php?newdid=1", CoordX: 10, CoordY: 20, Population: 90),
+            new("New village", "/dorf1.php?newdid=2", CoordX: 30, CoordY: 40, Population: 95),
+        ];
+
+        var updated = VillageIdentityReconciler.EnrichActiveVillagePopulation(
+            villages,
+            "New village",
+            (30, 40),
+            868);
+
+        Assert.Equal(90, updated[0].Population);
+        Assert.Equal(868, updated[1].Population);
+    }
+
+    [Fact]
     public void BuildStableVillageToken_DistinguishesSameNameVillagesByDidOrCoordinates()
     {
         var first = VillageIdentityReconciler.BuildStableVillageToken(1, (10, 20), "New village");

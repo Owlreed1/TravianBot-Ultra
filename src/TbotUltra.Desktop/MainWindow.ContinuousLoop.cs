@@ -110,28 +110,65 @@ public partial class MainWindow
             return;
         }
 
+        try
+        {
+            // Seed all normal runtime work once before visiting the first village. Per-village generation
+            // runs again after each fresh read, but account-level preparation (for example farm-list
+            // selection) must not navigate away while a village is being reacted to.
+            await EnsureContinuousLoopRuntimeItemsAsync(options, token);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppendLog(
+                $"[village-status-sweep] runtime preparation failed; existing queued work will still run: "
+                + FormatExceptionForLog(ex));
+        }
+
         AppendLog($"[village-status-sweep] starting round for {villages.Count} village(s).");
         foreach (var village in villages)
         {
             token.ThrowIfCancellationRequested();
             try
             {
-                var status = options.VillageStatusSweepDorf2Enabled
-                    ? await _botService.ReadVillageStatusAsync(options, AppendLog, village.Name, village.Url, token)
-                    : await _botService.ReadVillageResourceStatusAsync(options, AppendLog, village.Name, village.Url, token);
+                var status = await ReadVillageStatusSweepBaseStatusAsync(options, village, token);
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    CacheVillageStatus(status, village.Name);
-                    if (options.VillageStatusSweepDorf2Enabled)
-                    {
-                        ReconcilePendingBuildingQueueWithLiveStatus(status);
-                    }
+                    CacheVillageStatus(status, village.Name, triggerDeferredWaitRefresh: false);
+                    SetActiveWorkingVillageFromStatus(status);
+                    ReconcilePendingBuildingQueueWithLiveStatus(status);
+                    SyncDashboardVillageUiFromVillages(
+                        status.Villages,
+                        status.ActiveVillage,
+                        activeVillageCoordX: status.ActiveVillageCoordX,
+                        activeVillageCoordY: status.ActiveVillageCoordY);
                     if (IsStatusForSelectedVillage(status))
                     {
                         ApplyVillageStatusToUi(status);
                     }
                 });
+                var collectionResult = await CollectVillageStatusSweepRewardsAsync(
+                    options,
+                    village,
+                    status,
+                    token);
+                if (!collectionResult.ShouldContinue)
+                {
+                    return;
+                }
+                status = collectionResult.Status;
+                status = await RefreshVillageStatusSweepOptionalStatusesAsync(options, village, status, token);
+                await RefreshVillageStatusSweepDeferredWaitsAsync(status, token);
                 AppendLog($"[village-status-sweep] updated '{village.Name}'.");
+
+                await EnsureContinuousLoopRuntimeItemsAsync(options, token, village);
+                if (!await ExecuteReadyVillageStatusSweepTasksAsync(options, village, token))
+                {
+                    return;
+                }
             }
             catch (OperationCanceledException)
             {
@@ -160,6 +197,327 @@ public partial class MainWindow
             AppendLog($"[village-status-sweep] round complete; next round after {nextScanUtc.Value:HH:mm}.");
         }
     }
+
+    private Task<VillageStatus> ReadVillageStatusSweepBaseStatusAsync(
+        BotOptions options,
+        VillageSelectionItem village,
+        CancellationToken cancellationToken) =>
+        options.VillageStatusSweepDorf2Enabled
+            ? options.VillageStatusSweepSmithyEnabled
+                ? _botService.ReadVillageStatusWithSmithyAsync(
+                    options,
+                    AppendLog,
+                    village.Name,
+                    village.Url,
+                    cancellationToken)
+                : _botService.ReadVillageStatusAsync(
+                    options,
+                    AppendLog,
+                    village.Name,
+                    village.Url,
+                    cancellationToken)
+            : _botService.ReadVillageResourceStatusAsync(
+                options,
+                AppendLog,
+                village.Name,
+                village.Url,
+                cancellationToken);
+
+    private async Task<(VillageStatus Status, bool ShouldContinue)> CollectVillageStatusSweepRewardsAsync(
+        BotOptions options,
+        VillageSelectionItem village,
+        VillageStatus status,
+        CancellationToken cancellationToken)
+    {
+        await TryQueueAutoCollectTasksAsync(options, status);
+        await TryQueueAutoCollectDailyQuestsAsync(options, status);
+
+        var villageKey = _villageSettingsStore.ResolveCanonicalKey(GetVillageKey(village));
+        if (string.IsNullOrWhiteSpace(villageKey))
+        {
+            return (status, true);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var candidates = _botService.GetQueueItemsForDisplay()
+            .Select(item => new ContinuousLoopSelectionCandidate(
+                item,
+                GetQueueItemVillageKey(item),
+                IsQueueItemAllowedByAutomationSettings(item),
+                IsAutoCollectUtilityTaskEnabledNow(item.TaskName, options)))
+            .Where(candidate => ContinuousLoopSelector.IsVillageStatusSweepCollectionCandidate(
+                candidate,
+                villageKey,
+                now))
+            .ToList();
+        var readyItems = ContinuousLoopSelector.SelectUtility(new ContinuousLoopUtilitySelectionInput(
+                candidates,
+                villageKey,
+                now))
+            .ReadyItems;
+        if (readyItems.Count == 0)
+        {
+            return (status, true);
+        }
+
+        foreach (var item in readyItems)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            AppendLog(
+                $"[village-status-sweep] collecting detected rewards in '{village.Name}': "
+                + $"task={item.TaskName}.");
+            await ActionPacer.FromOptions(options, AppendLog).DelayAsync(
+                options.ActionPacingTaskMinSeconds,
+                options.ActionPacingTaskMaxSeconds,
+                cancellationToken,
+                "Village Status Sweep: before reward collection");
+            if (!await ExecuteSingleQueueItemAsync(
+                    item,
+                    options,
+                    "[village-status-sweep]",
+                    QueueExecutionMode.ContinuousLoop,
+                    cancellationToken))
+            {
+                return (status, false);
+            }
+
+            MarkContinuousBrowserActivity();
+            await ApplyPostTaskCooldownAsync(item, options, cancellationToken);
+        }
+
+        // Reward collection may change resources and leaves the browser on a task/dialog page.
+        // Return to this village and refresh its selected sweep scope before making more decisions.
+        status = await ReadVillageStatusSweepBaseStatusAsync(options, village, cancellationToken);
+        await Dispatcher.InvokeAsync(() =>
+        {
+            CacheVillageStatus(status, village.Name, triggerDeferredWaitRefresh: false);
+            SetActiveWorkingVillageFromStatus(status);
+            ReconcilePendingBuildingQueueWithLiveStatus(status);
+            SyncDashboardVillageUiFromVillages(
+                status.Villages,
+                status.ActiveVillage,
+                activeVillageCoordX: status.ActiveVillageCoordX,
+                activeVillageCoordY: status.ActiveVillageCoordY);
+            if (IsStatusForSelectedVillage(status))
+            {
+                ApplyVillageStatusToUi(status);
+            }
+        });
+
+        return (status, true);
+    }
+
+    private async Task<VillageStatus> RefreshVillageStatusSweepOptionalStatusesAsync(
+        BotOptions options,
+        VillageSelectionItem village,
+        VillageStatus status,
+        CancellationToken cancellationToken)
+    {
+        var readsTroopTraining = options.VillageStatusSweepDorf2Enabled
+            && (options.VillageStatusSweepBarracksEnabled
+                || options.VillageStatusSweepStableEnabled
+                || options.VillageStatusSweepWorkshopEnabled);
+        if (readsTroopTraining)
+        {
+            try
+            {
+                var trainingOptions = options with
+                {
+                    TargetVillageName = village.Name,
+                    TargetVillageUrl = village.Url,
+                    TroopTrainingBarracksEnabled = options.VillageStatusSweepBarracksEnabled,
+                    TroopTrainingStableEnabled = options.VillageStatusSweepStableEnabled,
+                    TroopTrainingWorkshopEnabled = options.VillageStatusSweepWorkshopEnabled,
+                };
+                var queues = await _botService.ReadTroopTrainingQueuesAsync(
+                    trainingOptions,
+                    AppendLog,
+                    status.Buildings,
+                    cancellationToken);
+                status = status with { TroopTrainingQueues = queues };
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    CacheVillageStatus(status, village.Name, triggerDeferredWaitRefresh: false);
+                    if (IsStatusForSelectedVillage(status))
+                    {
+                        ApplyVillageStatusToUi(status);
+                    }
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                AppendLog(
+                    $"[village-status-sweep] troop-training status read failed for "
+                    + $"'{village.Name}': {FormatExceptionForLog(ex)}");
+            }
+        }
+
+        if (options.VillageStatusSweepDorf2Enabled && options.VillageStatusSweepBreweryEnabled)
+        {
+            try
+            {
+                var breweryStatus = await _botService.ReadBreweryCelebrationStatusAsync(
+                    options with
+                    {
+                        TargetVillageName = village.Name,
+                        TargetVillageUrl = village.Url,
+                    },
+                    AppendLog,
+                    status.Buildings,
+                    cancellationToken);
+                status = status with { BreweryCelebrationStatus = breweryStatus };
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    CacheVillageStatus(status, village.Name, triggerDeferredWaitRefresh: false);
+                    if (IsStatusForSelectedVillage(status))
+                    {
+                        ApplyVillageStatusToUi(status);
+                    }
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                AppendLog(
+                    $"[village-status-sweep] Brewery status read failed for "
+                    + $"'{village.Name}': {FormatExceptionForLog(ex)}");
+            }
+        }
+
+        return status;
+    }
+
+    private async Task RefreshVillageStatusSweepDeferredWaitsAsync(
+        VillageStatus status,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            await RefreshDeferredConstructionWaitsAsync(status, "village_status_sweep");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppendLog(
+                $"[village-status-sweep] construction wait refresh failed for "
+                + $"'{status.ActiveVillage}': {FormatExceptionForLog(ex)}");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            await RefreshDeferredTroopTrainingWaitsAsync(status, "village_status_sweep");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppendLog(
+                $"[village-status-sweep] troop-training wait refresh failed for "
+                + $"'{status.ActiveVillage}': {FormatExceptionForLog(ex)}");
+        }
+    }
+
+    private async Task<bool> ExecuteReadyVillageStatusSweepTasksAsync(
+        BotOptions options,
+        VillageSelectionItem village,
+        CancellationToken cancellationToken)
+    {
+        var villageKey = _villageSettingsStore.ResolveCanonicalKey(GetVillageKey(village));
+        if (string.IsNullOrWhiteSpace(villageKey))
+        {
+            return true;
+        }
+
+        var attemptedItemIds = new HashSet<Guid>();
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var next = SelectNextQueueItemForVillageStatusSweep(villageKey, attemptedItemIds);
+            if (next is null)
+            {
+                return true;
+            }
+
+            attemptedItemIds.Add(next.Id);
+            AppendLog(
+                $"[village-status-sweep] reacting in '{village.Name}': "
+                + $"group={next.Group}, task={next.TaskName}.");
+            await ActionPacer.FromOptions(options, AppendLog).DelayAsync(
+                options.ActionPacingTaskMinSeconds,
+                options.ActionPacingTaskMaxSeconds,
+                cancellationToken,
+                "Village Status Sweep: before task");
+            var shouldContinue = await ExecuteSingleQueueItemAsync(
+                next,
+                options,
+                "[village-status-sweep]",
+                QueueExecutionMode.ContinuousLoop,
+                cancellationToken);
+            MarkContinuousBrowserActivity();
+            if (!shouldContinue)
+            {
+                return false;
+            }
+
+            await ApplyPostTaskCooldownAsync(next, options, cancellationToken);
+        }
+    }
+
+    private QueueItem? SelectNextQueueItemForVillageStatusSweep(
+        string villageKey,
+        IReadOnlySet<Guid> attemptedItemIds)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var candidates = _botService.GetQueueItemsForDisplay()
+            .Select(item => new ContinuousLoopSelectionCandidate(
+                item,
+                GetQueueItemVillageKey(item),
+                IsQueueItemAllowedByAutomationSettings(item),
+                IsUtilityEnabled: false))
+            .Where(candidate => ContinuousLoopSelector.IsVillageStatusSweepCandidate(candidate, villageKey))
+            .ToList();
+        var plan = ContinuousLoopSelector.CreatePlan(new ContinuousLoopSelectionInput(
+            candidates,
+            GetContinuousLoopConsideredGroupsInOrder()));
+        var villageKeys = candidates.ToDictionary(candidate => candidate.Item.Id, candidate => candidate.VillageKey);
+
+        foreach (var group in plan.OrderedGroups)
+        {
+            var villageItems = ContinuousLoopSelector.SelectVillageItems(
+                plan.OrderedItemsByGroup[group],
+                villageKeys,
+                villageKey);
+            if (villageItems.Count == 0)
+            {
+                continue;
+            }
+
+            var candidate = group == QueueGroup.Construction
+                ? SelectNextConstructionQueueItem(villageItems, now, out _)
+                : ContinuousLoopSelector.SelectReadyGroupHead(villageItems, now);
+            if (candidate is not null && !attemptedItemIds.Contains(candidate.Id))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
     private static readonly TimeSpan LoopPickVerboseThrottle = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan GoldClubInactiveRecheckInterval = TimeSpan.FromMinutes(10);
     // Idle loop passes no longer log "[LOOP n] START" + "WAIT" every few seconds. Instead a single
@@ -343,7 +701,10 @@ public partial class MainWindow
         return ordered;
     }
 
-    private async Task EnsureContinuousLoopRuntimeItemsAsync(BotOptions options, CancellationToken cancellationToken)
+    private async Task EnsureContinuousLoopRuntimeItemsAsync(
+        BotOptions options,
+        CancellationToken cancellationToken,
+        VillageSelectionItem? onlyVillage = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var enabledGroups = GetContinuousLoopEnabledGroupsInOrder();
@@ -356,7 +717,7 @@ public partial class MainWindow
         // considered/union set), not just the selected one — otherwise Hero never runs while a village that
         // has it OFF is selected even though the hero-home village has it ON.
         var heroPollingEnabled = consideredGroups.Contains(QueueGroup.Hero) || ShouldKeepHeroAdventurePolling();
-        if (consideredGroups.Count <= 0 && !heroPollingEnabled)
+        if (consideredGroups.Count <= 0 && !heroPollingEnabled && onlyVillage is null)
         {
             return;
         }
@@ -383,9 +744,13 @@ public partial class MainWindow
                 && string.Equals(GetQueueItemVillageKey(item) ?? string.Empty, villageKey, StringComparison.OrdinalIgnoreCase));
         }
 
-        var automationVillages = GetEnabledAutomationVillages();
+        var automationVillages = onlyVillage is null
+            ? GetEnabledAutomationVillages()
+            : _villageSettingsStore.IsEnabledByKey(GetVillageKey(onlyVillage), defaultIfUnknown: false)
+                ? [onlyVillage]
+                : [];
 
-        if (heroPollingEnabled && !HasActiveTask("hero_manage"))
+        if (onlyVillage is null && heroPollingEnabled && !HasActiveTask("hero_manage"))
         {
             var adventureCount = await _botService.RefreshAdventureCountAsync(options, AppendLog, cancellationToken);
             await Dispatcher.InvokeAsync(() => ApplyHeroAdventureAvailability(adventureCount));
@@ -571,7 +936,9 @@ public partial class MainWindow
             // Missing lists is recoverable: enabling Farming must re-enter the bootstrap path, analyze
             // the account's lists, restore their saved selections, and then enqueue send_farmlists.
             && !string.Equals(_farmingBlockedReasonKey, FarmingBlockedReasonNoFarmLists, StringComparison.OrdinalIgnoreCase);
-        if (consideredGroups.Contains(QueueGroup.Farming) && !farmingBlockedForOtherReason)
+        if (onlyVillage is null
+            && consideredGroups.Contains(QueueGroup.Farming)
+            && !farmingBlockedForOtherReason)
         {
             var goldClubEnabled = await ResolveContinuousGoldClubStatusAsync(options, cancellationToken);
             UpdateGoldClubInfo(goldClubEnabled);
@@ -641,7 +1008,9 @@ public partial class MainWindow
             }
         }
 
-        if (enabledGroups.Contains(QueueGroup.ResourceTransfer) && !HasActiveTask("send_resources_between_villages"))
+        if (onlyVillage is null
+            && enabledGroups.Contains(QueueGroup.ResourceTransfer)
+            && !HasActiveTask("send_resources_between_villages"))
         {
             var selectedSources = options.ResourceTransferSourceVillageNames
                 .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -664,7 +1033,9 @@ public partial class MainWindow
             }
         }
 
-        if (enabledGroups.Contains(QueueGroup.Reinforcements) && !HasActiveTask("send_reinforcements_between_villages"))
+        if (onlyVillage is null
+            && enabledGroups.Contains(QueueGroup.Reinforcements)
+            && !HasActiveTask("send_reinforcements_between_villages"))
         {
             var selectedSources = options.ReinforcementsSourceVillageNames
                 .Where(name => !string.IsNullOrWhiteSpace(name))

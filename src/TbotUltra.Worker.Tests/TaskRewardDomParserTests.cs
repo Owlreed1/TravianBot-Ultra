@@ -7,6 +7,7 @@ public sealed class TaskRewardDomParserTests
 {
     [Theory]
     [InlineData("<div class='newQuestSpeechBubble'></div>")]
+    [InlineData("<div class='bigSpeechBubble newQuestSpeechBubble' title=''><img src='/img/x.gif' alt=''></div>")]
     [InlineData("<button id='questmasterButton' class='claimable'></button>")]
     public void HasClaimableTasks_NormalPage_DetectsQuestmasterMarkers(string html)
     {

@@ -275,7 +275,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
 ## Current pitfalls
 
 - Account tribe and active-village tribe are different on special servers. Cache village tribe by stable identity;
-  unknown tribe is deferred, never borrowed from another village/account.
+  unknown tribe is deferred, never borrowed from another village/account. Per-village Smithy option dialogs resolve
+  their troop catalog from the target row's canonical village key, never from the Dashboard's selected village.
 - Verify active village after switching and before state-changing actions. Missing villages are quarantined until
   confirmed, not deleted after one incomplete refresh.
 - Hero ownership and current location are separate. Scope transfers to the active dialog and verify the target.
@@ -298,6 +299,17 @@ Published artifacts belong under `artifacts/`, never beside source files.
   one. The troop recompute needs storage capacities — with capacity 0 the eval falsely reports "ready", so a
   light current-page read (no caps) fills caps/production from the village cache but keeps the LIVE current
   resources; buildings are never cache-filled (empty is handled leniently, a stale list could wrongly exclude).
+- Village Status Sweep finishes ready, automation-enabled work for the freshly read village before applying the
+  inter-village delay. Task permission still comes from village Auto and group settings. Sweep wait reconciliation
+  is awaited before selection so a newly released task runs during the same visit, and selection requires the exact
+  canonical village key.
+- A Village Status Sweep Dorf1 read is authoritative for the visible `.buildingList` construction queue and the
+  active village population in `#sidebarBoxActiveVillage .population span`. Both update cache/UI and queue
+  decisions even when Dorf2 scanning is disabled.
+- The same Dorf1 sweep visit checks the existing Official Questmaster and Daily Quest claimable markers. When the
+  corresponding auto-collect setting and village automation allow it, `collect_tasks` and
+  `collect_daily_quests` run before other village work; afterward the selected sweep scope is re-read because
+  rewards can change resources.
 - After every building-mutation task the desktop ALWAYS re-reads the full dorf1+dorf2 for the just-worked
   village (`RefreshConstructionStatusAfterBuildingMutationAsync` → `RefreshConstructionStatusAsync`, then
   `CacheVillageStatus`). Do not restore the old QueuedOrInProgress/AlreadySatisfied storage-only quick-skip:

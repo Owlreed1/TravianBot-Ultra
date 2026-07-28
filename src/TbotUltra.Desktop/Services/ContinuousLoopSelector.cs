@@ -130,6 +130,27 @@ internal static class ContinuousLoopSelector
         || string.Equals(taskName, "account_snapshot", StringComparison.OrdinalIgnoreCase)
         || string.Equals(taskName, "load_buildings_snapshot", StringComparison.OrdinalIgnoreCase);
 
+    internal static bool IsVillageStatusSweepCandidate(
+        ContinuousLoopSelectionCandidate candidate,
+        string villageKey) =>
+        candidate.IsAllowedByAutomationSettings
+        && !IsUtilityTask(candidate.Item.TaskName)
+        && !string.IsNullOrWhiteSpace(candidate.VillageKey)
+        && string.Equals(candidate.VillageKey, villageKey, StringComparison.OrdinalIgnoreCase);
+
+    internal static bool IsVillageStatusSweepCollectionCandidate(
+        ContinuousLoopSelectionCandidate candidate,
+        string villageKey,
+        DateTimeOffset now) =>
+        candidate.IsAllowedByAutomationSettings
+        && candidate.IsUtilityEnabled
+        && (string.Equals(candidate.Item.TaskName, "collect_tasks", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(candidate.Item.TaskName, "collect_daily_quests", StringComparison.OrdinalIgnoreCase))
+        && candidate.Item.Status == QueueStatus.Pending
+        && candidate.Item.NextAttemptAt <= now
+        && !string.IsNullOrWhiteSpace(candidate.VillageKey)
+        && string.Equals(candidate.VillageKey, villageKey, StringComparison.OrdinalIgnoreCase);
+
     internal static IReadOnlyList<QueueGroup> BuildConsideredGroups(
         IEnumerable<QueueGroup> configuredGroups,
         IEnumerable<QueueItem> queueItems)
