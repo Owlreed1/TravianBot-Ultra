@@ -18,13 +18,80 @@ namespace TbotUltra.Desktop;
 public partial class MainWindow
 {
     private DateTimeOffset _nextVillageStatusSweepUtc = DateTimeOffset.MinValue;
+    private string? _villageStatusSweepScheduleAccountName;
+    private readonly object _villageStatusSweepScheduleSync = new();
+
+    private DateTimeOffset GetVillageStatusSweepNextScanUtc()
+    {
+        lock (_villageStatusSweepScheduleSync)
+        {
+            var accountName = _accountStore.ActiveAccountName();
+            if (string.Equals(_villageStatusSweepScheduleAccountName, accountName, StringComparison.OrdinalIgnoreCase))
+            {
+                return _nextVillageStatusSweepUtc;
+            }
+
+            _villageStatusSweepScheduleAccountName = accountName;
+            _nextVillageStatusSweepUtc = VillageStatusSweepStateStore.LoadNextScanUtc(
+                _projectRoot,
+                accountName,
+                DateTimeOffset.UtcNow) ?? DateTimeOffset.MinValue;
+            return _nextVillageStatusSweepUtc;
+        }
+    }
+
+    private void ResetVillageStatusSweepSchedule()
+    {
+        bool cleared;
+        lock (_villageStatusSweepScheduleSync)
+        {
+            var accountName = _accountStore.ActiveAccountName();
+            _villageStatusSweepScheduleAccountName = accountName;
+            _nextVillageStatusSweepUtc = DateTimeOffset.MinValue;
+            cleared = VillageStatusSweepStateStore.Clear(_projectRoot, accountName);
+        }
+
+        if (!cleared)
+        {
+            AppendLog("[village-status-sweep] could not clear the remembered next-scan deadline; the current session is ready immediately.");
+        }
+    }
+
+    private DateTimeOffset? ScheduleNextVillageStatusSweep(int minMinutes, int maxMinutes, string? accountName)
+    {
+        DateTimeOffset nextScanUtc;
+        bool saved;
+        lock (_villageStatusSweepScheduleSync)
+        {
+            if (!string.Equals(_accountStore.ActiveAccountName(), accountName, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            nextScanUtc = DateTimeOffset.UtcNow.AddMinutes(Random.Shared.Next(minMinutes, maxMinutes + 1));
+            _nextVillageStatusSweepUtc = nextScanUtc;
+            saved = VillageStatusSweepStateStore.SaveNextScanUtc(
+                _projectRoot,
+                accountName,
+                nextScanUtc);
+        }
+
+        if (!saved)
+        {
+            AppendLog("[village-status-sweep] could not persist the next-scan deadline; it may run again after restart.");
+        }
+
+        return nextScanUtc;
+    }
 
     private async Task MaybeRunVillageStatusSweepAsync(BotOptions options, CancellationToken token)
     {
-        if (!options.VillageStatusSweepEnabled || DateTimeOffset.UtcNow < _nextVillageStatusSweepUtc)
+        if (!options.VillageStatusSweepEnabled || DateTimeOffset.UtcNow < GetVillageStatusSweepNextScanUtc())
         {
             return;
         }
+
+        var sweepAccountName = _accountStore.ActiveAccountName();
 
         var villages = await Dispatcher.InvokeAsync(() =>
         {
@@ -87,8 +154,11 @@ public partial class MainWindow
 
         var min = Math.Min(options.VillageStatusSweepRoundMinMinutes, options.VillageStatusSweepRoundMaxMinutes);
         var max = Math.Max(options.VillageStatusSweepRoundMinMinutes, options.VillageStatusSweepRoundMaxMinutes);
-        _nextVillageStatusSweepUtc = DateTimeOffset.UtcNow.AddMinutes(Random.Shared.Next(min, max + 1));
-        AppendLog($"[village-status-sweep] round complete; next round after {_nextVillageStatusSweepUtc:HH:mm}.");
+        var nextScanUtc = ScheduleNextVillageStatusSweep(min, max, sweepAccountName);
+        if (nextScanUtc is not null)
+        {
+            AppendLog($"[village-status-sweep] round complete; next round after {nextScanUtc.Value:HH:mm}.");
+        }
     }
     private static readonly TimeSpan LoopPickVerboseThrottle = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan GoldClubInactiveRecheckInterval = TimeSpan.FromMinutes(10);

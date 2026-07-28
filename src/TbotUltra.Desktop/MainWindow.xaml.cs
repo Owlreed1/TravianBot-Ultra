@@ -761,6 +761,7 @@ public partial class MainWindow : Window
         ApplyAutoCollectTasksConfigToUi(options);
         ApplyAutoCollectDailyQuestsConfigToUi(options);
         ApplyProductionBonusVideoConfigToUi(options);
+        ApplyVillageStatusSweepConfigToUi(options);
 
         // Account + runtime state below (account label, inbox counts, gold-club, hero snapshot) is
         // seeded from caches/disk. That is only correct before login — startup or an account switch — when the

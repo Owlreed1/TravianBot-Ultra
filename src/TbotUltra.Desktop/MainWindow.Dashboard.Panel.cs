@@ -16,6 +16,7 @@ public partial class MainWindow
     private CheckBox AutoCollectTasksCheckBox => DashboardPanelControl.AutoCollectTasks;
     private CheckBox AutoCollectDailyQuestsCheckBox => DashboardPanelControl.AutoCollectDailyQuests;
     private CheckBox ProductionBonusVideoCheckBox => DashboardPanelControl.ProductionBonusVideo;
+    private CheckBox VillageStatusSweepCheckBox => DashboardPanelControl.VillageStatusSweep;
     private ItemsControl DashboardVillageList => DashboardPanelControl.VillageList;
 
     internal void OnResetProgramClicked(object sender, RoutedEventArgs e) => ResetProgramButton_Click(sender, e);
@@ -30,4 +31,6 @@ public partial class MainWindow
     internal void OnGoldSpendingSettingsClicked(object sender, RoutedEventArgs e) => GoldSpendingSettingsButton_Click(sender, e);
     internal void OnProductionBonusVideoSettingChanged(object sender, RoutedEventArgs e) => ProductionBonusVideoSetting_Changed(sender, e);
     internal void OnProductionBonusSettingsClicked(object sender, RoutedEventArgs e) => ProductionBonusSettingsButton_Click(sender, e);
+    internal void OnVillageStatusSweepSettingChanged(object sender, RoutedEventArgs e) => VillageStatusSweepSetting_Changed(sender, e);
+    internal void OnVillageStatusSweepSettingsClicked(object sender, RoutedEventArgs e) => VillageStatusSweepSettingsButton_Click(sender, e);
 }

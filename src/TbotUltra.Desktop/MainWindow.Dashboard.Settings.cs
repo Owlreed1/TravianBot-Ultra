@@ -12,6 +12,7 @@ public partial class MainWindow
     private bool _suppressAutoCollectTasksConfigWrite;
     private bool _suppressAutoCollectDailyQuestsConfigWrite;
     private bool _suppressProductionBonusVideoConfigWrite;
+    private bool _suppressVillageStatusSweepConfigWrite;
 
     private void ApplyAutoCollectTasksConfigToUi(BotOptions options)
     {
@@ -125,6 +126,46 @@ public partial class MainWindow
                 return Task.CompletedTask;
             });
         }
+    }
+
+    private void ApplyVillageStatusSweepConfigToUi(BotOptions options)
+    {
+        _suppressVillageStatusSweepConfigWrite = true;
+        try
+        {
+            VillageStatusSweepCheckBox.IsChecked = options.VillageStatusSweepEnabled;
+        }
+        finally
+        {
+            _suppressVillageStatusSweepConfigWrite = false;
+        }
+
+    }
+
+    private void VillageStatusSweepSetting_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_suppressVillageStatusSweepConfigWrite || _botConfigStore is null)
+        {
+            return;
+        }
+
+        var config = _botConfigStore.Load();
+        var enabled = VillageStatusSweepCheckBox.IsChecked == true;
+        config[BotOptionPayloadKeys.VillageStatusSweepEnabled] = enabled;
+        _botConfigStore.Save(config);
+        if (enabled)
+        {
+            ResetVillageStatusSweepSchedule();
+        }
+
+        AppendLog($"[village-status-sweep] {(enabled ? "enabled" : "disabled")} from Dashboard Auto settings.");
+    }
+
+    private void VillageStatusSweepSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        OpenSettingsWindow(SettingsCategory.Pacing, null);
     }
 
     // Fire the given immediate check only while the continuous loop is actually running and the

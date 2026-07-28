@@ -103,6 +103,11 @@ public static class AccountStoragePaths
         return Path.Combine(AccountDirectory(projectRoot, accountName), "town_hall_state.json");
     }
 
+    public static string VillageStatusSweepStatePath(string projectRoot, string accountName)
+    {
+        return Path.Combine(AccountDirectory(projectRoot, accountName), "village_status_sweep.json");
+    }
+
     public static string ProxyUsagePath(string projectRoot, string accountName)
     {
         return Path.Combine(AccountDirectory(projectRoot, accountName), "proxy_usage.json");

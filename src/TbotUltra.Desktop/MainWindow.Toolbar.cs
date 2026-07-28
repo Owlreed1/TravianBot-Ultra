@@ -198,7 +198,8 @@ public partial class MainWindow
             () => new DailySpendingStore(dailySpendingPath).ResetGold(),
             () => new DailySpendingStore(dailySpendingPath).ResetSilver(),
             dailySpendingState.GoldSpent,
-            dailySpendingState.SilverSpent)
+            dailySpendingState.SilverSpent,
+            GetVillageStatusSweepNextScanUtc)
         {
             Owner = Application.Current.Windows
                 .OfType<Window>()

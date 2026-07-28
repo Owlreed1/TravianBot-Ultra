@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Services;
 
@@ -39,6 +40,8 @@ public partial class SettingsWindow : Window
     private int _dailySilverSpent;
     private bool _suppressDetailedBrowserLoggingConfirmation;
     private string _initialTownHallFingerprint = string.Empty;
+    private readonly Func<DateTimeOffset>? _villageStatusSweepNextScanProvider;
+    private readonly DispatcherTimer _villageStatusSweepTimer;
 
     public ObservableCollection<TownHallOverviewRow> TownHallRows { get; } = [];
     public TownHallQueueSettings TownHallQueue { get; } = new(
@@ -81,7 +84,8 @@ public partial class SettingsWindow : Window
         Action? resetDailyGoldSpending = null,
         Action? resetDailySilverSpending = null,
         int dailyGoldSpent = 0,
-        int dailySilverSpent = 0)
+        int dailySilverSpent = 0,
+        Func<DateTimeOffset>? villageStatusSweepNextScanProvider = null)
     {
         InitializeComponent();
         ThemeChrome.EnableEarlyDarkTitleBar(this);
@@ -93,6 +97,7 @@ public partial class SettingsWindow : Window
         _resetDailySilverSpending = resetDailySilverSpending;
         _dailyGoldSpent = Math.Max(0, dailyGoldSpent);
         _dailySilverSpent = Math.Max(0, dailySilverSpent);
+        _villageStatusSweepNextScanProvider = villageStatusSweepNextScanProvider;
         foreach (var row in townHallRows ?? [])
         {
             TownHallRows.Add(row);
@@ -108,6 +113,28 @@ public partial class SettingsWindow : Window
         ResetDailyGoldLimitButton.IsEnabled = _resetDailyGoldSpending is not null;
         ResetDailySilverLimitButton.IsEnabled = _resetDailySilverSpending is not null;
         UpdateDailySpendingUsage();
+        _villageStatusSweepTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _villageStatusSweepTimer.Tick += (_, _) => UpdateVillageStatusSweepNextScanDisplay();
+        Closed += (_, _) => _villageStatusSweepTimer.Stop();
+        UpdateVillageStatusSweepNextScanDisplay();
+        _villageStatusSweepTimer.Start();
+    }
+
+    private void UpdateVillageStatusSweepNextScanDisplay()
+    {
+        var nextScanUtc = _villageStatusSweepNextScanProvider?.Invoke() ?? DateTimeOffset.MinValue;
+        var remaining = nextScanUtc - DateTimeOffset.UtcNow;
+        if (nextScanUtc == DateTimeOffset.MinValue || remaining <= TimeSpan.Zero)
+        {
+            VillageStatusSweepNextScanTextBlock.Text = "Ready";
+            VillageStatusSweepNextScanTextBlock.Foreground = (System.Windows.Media.Brush)FindResource("SuccessTextBrush");
+            return;
+        }
+
+        VillageStatusSweepNextScanTextBlock.Text = remaining.TotalHours >= 1
+            ? $"{(int)remaining.TotalHours:00}:{remaining.Minutes:00}:{remaining.Seconds:00}"
+            : $"{remaining.Minutes:00}:{remaining.Seconds:00}";
+        VillageStatusSweepNextScanTextBlock.Foreground = (System.Windows.Media.Brush)FindResource("WarningTextBrush");
     }
 
     private void LoadConfig()

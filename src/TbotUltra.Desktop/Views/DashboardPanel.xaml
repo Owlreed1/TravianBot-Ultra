@@ -230,6 +230,7 @@
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
                         <Grid>
@@ -320,6 +321,36 @@
                                     BorderBrush="{DynamicResource BorderBrush}"
                                     ToolTip="Open NPC trade settings"
                                     Click="GoldSpendingSettingsButton_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="20,0,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <CheckBox x:Name="VillageStatusSweepCheckBox" Content="Village Status Sweep"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      Foreground="{DynamicResource TextSecondaryBrush}"
+                                      VerticalAlignment="Center"
+                                      Checked="VillageStatusSweepSetting_Changed" Unchecked="VillageStatusSweepSetting_Changed" />
+                            <ContentControl Style="{StaticResource SettingInfoIconStyle}" Margin="4,0,0,0">
+                                <ContentControl.ToolTip>
+                                    <ToolTip MaxWidth="320">
+                                        <TextBlock TextWrapping="Wrap"
+                                                   Text="Makes one randomized pass through all villages, updating enabled live status before moving to the next village. Detailed scan choices and timing are in Settings &gt; Pacing." />
+                                    </ToolTip>
+                                </ContentControl.ToolTip>
+                            </ContentControl>
+                            <Button x:Name="VillageStatusSweepSettingsButton"
+                                    Content="&#xE713;"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    FontSize="13"
+                                    Width="26"
+                                    Height="22"
+                                    Padding="0"
+                                    Margin="6,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Background="{DynamicResource SurfaceBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    ToolTip="Open Village Status Sweep settings in Pacing"
+                                    Click="VillageStatusSweepSettingsButton_Click" />
                         </StackPanel>
                     </StackPanel>
                 </Grid>
