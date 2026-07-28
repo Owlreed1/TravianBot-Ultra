@@ -40,4 +40,37 @@ public sealed class SettingsNumericInputValidationTests
 
         Assert.Equal(expected, valid);
     }
+
+    [Fact]
+    public void WholeNumberInput_WithComma_RecommendsAValidWholeNumber()
+    {
+        var valid = SettingsWindow.TryValidateNumericInputText(
+            "5,6",
+            wholeNumber: true,
+            min: 1,
+            max: 10080,
+            out var error);
+
+        Assert.False(valid);
+        Assert.Contains("whole number", error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(
+            "5",
+            SettingsWindow.GetNumericInputCorrectionExample("5,6", wholeNumber: true, min: 1, max: 10080));
+    }
+
+    [Theory]
+    [InlineData("5,6", false, 0, 3600, "5.6")]
+    [InlineData("5000", false, 0, 3600, "3600")]
+    [InlineData("", false, 2, 5, "2")]
+    public void CorrectionExample_IsValidForTheField(
+        string text,
+        bool wholeNumber,
+        double min,
+        double max,
+        string expected)
+    {
+        Assert.Equal(
+            expected,
+            SettingsWindow.GetNumericInputCorrectionExample(text, wholeNumber, min, max));
+    }
 }

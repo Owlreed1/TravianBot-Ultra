@@ -41,6 +41,26 @@ public partial class MainWindow
         }
     }
 
+    private void LoadHeroInventorySnapshotForActiveAccount(string accountName)
+    {
+        try
+        {
+            var serverUrl = GetActiveAccountServerUrl();
+            if (_heroInventorySnapshotStore.TryLoad(accountName, serverUrl, out var resources)
+                && resources is not null)
+            {
+                _heroViewModel.ApplyInventory(resources);
+                AppendLog(
+                    $"Loaded cached hero inventory. wood={resources.Wood}, clay={resources.Clay}, "
+                    + $"iron={resources.Iron}, crop={resources.Crop}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Could not load cached hero inventory: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Persists the current attribute priority order to the active account's settings overlay.
     /// Called from <see cref="Views.HeroPanel"/> after a drag-drop reorder.

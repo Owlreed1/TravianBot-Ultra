@@ -290,6 +290,12 @@ public sealed partial class TravianClient
         {
         }
 
+        if (!await _page.EvaluateAsync<bool>("() => !!document.querySelector('.heroItems')"))
+        {
+            throw new InvalidOperationException(
+                "Hero inventory page loaded without the inventory grid; keeping the previous snapshot.");
+        }
+
         string rawJson;
         try
         {
@@ -316,13 +322,16 @@ public sealed partial class TravianClient
         catch (Exception ex)
         {
             Notify($"[hero-inventory] read EvaluateAsync threw: {ex.GetType().Name}: {ex.Message}");
-            return new HeroInventoryResources();
+            throw new InvalidOperationException(
+                "Hero inventory values could not be read; keeping the previous snapshot.",
+                ex);
         }
 
         if (string.IsNullOrWhiteSpace(rawJson))
         {
             Notify("[hero-inventory] read returned empty result");
-            return new HeroInventoryResources();
+            throw new InvalidOperationException(
+                "Hero inventory returned no values; keeping the previous snapshot.");
         }
 
         var resources = JsonSerializer.Deserialize<HeroInventoryResources>(

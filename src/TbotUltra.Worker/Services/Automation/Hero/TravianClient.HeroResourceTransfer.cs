@@ -35,6 +35,97 @@ public sealed partial class TravianClient
         return await TryHeroResourceTransferOnCurrentBuildPageAsync(label, cancellationToken);
     }
 
+    // A build page exposes the same resource-transfer dialog even when the village can already
+    // afford the action. Use it as a one-time read-only inventory source when neither memory nor
+    // disk has a prior value, then close it without transferring anything.
+    private async Task TryLoadMissingHeroInventoryFromCurrentBuildPageAsync(
+        string label,
+        CancellationToken cancellationToken,
+        int? constructBuildingGid = null)
+    {
+        if (TryGetCachedHeroInventory() is not null)
+        {
+            return;
+        }
+
+        var constructBuildingScopeId = BuildHeroTransferConstructScopeId(constructBuildingGid);
+        var opened = false;
+        try
+        {
+            Notify($"[hero-inventory] no cached value; reading from resource dialog at {label}.");
+            opened = await TryClickHeroResourceTransferIconAsync(
+                preferTownHallCelebration: false,
+                townHallCelebrationMode: null,
+                preferBreweryCelebration: false,
+                constructBuildingScopeId,
+                cancellationToken);
+            if (!opened)
+            {
+                Notify($"[hero-inventory] no readable resource icon at {label}; keeping inventory unknown.");
+                return;
+            }
+
+            await _page.WaitForSelectorAsync(
+                "div.resourceTransferDialog, #dialogContent, .toast.toastError",
+                new PageWaitForSelectorOptions { Timeout = 8000 });
+
+            var toastText = await TryReadErrorToastTextAsync();
+            if (toastText?.Contains("no resources to transfer", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                UpdateHeroInventoryCache(new HeroInventoryResources());
+                Notify($"[hero-inventory] resource dialog reported an empty inventory at {label}.");
+                return;
+            }
+
+            await _page.WaitForFunctionAsync(
+                """
+                () => {
+                  const dialog = document.querySelector('div.resourceTransferDialog')
+                    || ((document.querySelector('#dialogContent h3')?.textContent || '').trim().toLowerCase() === 'transfer resources'
+                      ? document.querySelector('#dialogContent')
+                      : null);
+                  return !!dialog?.querySelector('input[name="lumber"], input[name="clay"], input[name="iron"], input[name="crop"]');
+                }
+                """,
+                null,
+                new PageWaitForFunctionOptions { Timeout = 5000 });
+
+            var resources = await ReadHeroInventoryFromTransferDialogAsync(cancellationToken);
+            if (resources is null)
+            {
+                Notify($"[hero-inventory] resource dialog values were unreadable at {label}; keeping inventory unknown.");
+                return;
+            }
+
+            UpdateHeroInventoryCache(resources);
+            Notify(
+                $"[hero-inventory] loaded from resource dialog at {label}: "
+                + $"wood={resources.Wood} clay={resources.Clay} iron={resources.Iron} crop={resources.Crop}.");
+        }
+        catch (TimeoutException)
+        {
+            Notify($"[hero-inventory] resource dialog did not become readable at {label}; keeping inventory unknown.");
+        }
+        catch (PlaywrightException ex) when (IsTransientExecutionContextError(ex))
+        {
+            Notify($"[hero-inventory] transient resource-dialog read failed at {label}: {ex.Message}");
+        }
+        catch (PlaywrightException ex)
+        {
+            Notify($"[hero-inventory] resource-dialog read failed at {label}: {ex.Message}");
+        }
+        finally
+        {
+            if (opened && !cancellationToken.IsCancellationRequested)
+            {
+                if (!await TryDismissResourceTransferDialogAsync(cancellationToken))
+                {
+                    Notify($"[hero-inventory] resource dialog could not be dismissed after read at {label}.");
+                }
+            }
+        }
+    }
+
     // Empty construction-slot pages list several building types at once, potentially across different
     // category tabs. The gid is mandatory here so cost reads and the transfer click can never fall back
     // to another building row. Existing-building upgrades use the single-building method above.
@@ -854,10 +945,10 @@ public sealed partial class TravianClient
         }
     }
 
-    // --- In-memory hero inventory cache (per account+server) -------------------------------------
-    // Lets the bot know how much the hero is carrying without re-reading the page, and lets the
-    // desktop reflect changes live via HeroInventoryUpdated. Single-process, so a static store
-    // keyed by account+server mirrors the existing hero-attribute snapshot cache.
+    // --- Persisted hero inventory cache (per account+server) --------------------------------------
+    // The static dictionary shares current values between short-lived clients in one process. Every
+    // authoritative update is also persisted so quick re-login and process restarts retain the last
+    // analyzed value until a later inventory/dialog read replaces it.
 
     private static readonly object HeroInventoryCacheSync = new();
     private static readonly Dictionary<string, HeroInventoryResources> CachedHeroInventoryByKey =
@@ -1050,17 +1141,46 @@ public sealed partial class TravianClient
         var key = BuildHeroInventoryCacheKey();
         lock (HeroInventoryCacheSync)
         {
-            return CachedHeroInventoryByKey.TryGetValue(key, out var cached) ? cached : null;
+            if (CachedHeroInventoryByKey.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
         }
+
+        if (!_heroInventorySnapshotStore.TryLoad(AccountName, ServerUrl, out var stored)
+            || stored is null)
+        {
+            return null;
+        }
+
+        lock (HeroInventoryCacheSync)
+        {
+            CachedHeroInventoryByKey[key] = stored;
+        }
+
+        Notify(
+            $"[hero-inventory] restored persisted snapshot: "
+            + $"wood={stored.Wood} clay={stored.Clay} iron={stored.Iron} crop={stored.Crop}.");
+        HeroInventoryUpdated?.Invoke(AccountName, stored);
+        return stored;
     }
 
-    // Stores the latest full read and notifies listeners.
+    // Stores the latest full read in memory and on disk, then notifies listeners.
     private void UpdateHeroInventoryCache(HeroInventoryResources resources)
     {
         var key = BuildHeroInventoryCacheKey();
         lock (HeroInventoryCacheSync)
         {
             CachedHeroInventoryByKey[key] = resources;
+        }
+
+        try
+        {
+            _heroInventorySnapshotStore.Save(AccountName, ServerUrl, resources);
+        }
+        catch (Exception ex)
+        {
+            Notify($"[hero-inventory] could not persist snapshot: {ex.Message}");
         }
 
         HeroInventoryUpdated?.Invoke(AccountName, resources);

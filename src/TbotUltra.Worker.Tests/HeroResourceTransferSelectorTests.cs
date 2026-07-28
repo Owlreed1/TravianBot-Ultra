@@ -21,4 +21,39 @@ public sealed class HeroResourceTransferSelectorTests
         Assert.Null(TravianClient.BuildHeroTransferConstructScopeId(null));
         Assert.Null(TravianClient.BuildHeroTransferConstructScopeId(0));
     }
+
+    [Fact]
+    public void ConstructionFlows_LoadMissingInventoryFromTheExistingTransferDialog()
+    {
+        var projectRoot = ProjectRootLocator.FindProjectRoot();
+        var automationRoot = Path.Combine(
+            projectRoot,
+            "src",
+            "TbotUltra.Worker",
+            "Services",
+            "Automation");
+        var transferSource = File.ReadAllText(Path.Combine(
+            automationRoot,
+            "Hero",
+            "TravianClient.HeroResourceTransfer.cs"));
+        var buildingUpgradeSource = File.ReadAllText(Path.Combine(
+            automationRoot,
+            "Buildings",
+            "TravianClient.Buildings.UpgradeFlow.cs"));
+        var constructSource = File.ReadAllText(Path.Combine(
+            automationRoot,
+            "Buildings",
+            "TravianClient.Buildings.ConstructFlow.cs"));
+        var resourceUpgradeSource = File.ReadAllText(Path.Combine(
+            automationRoot,
+            "Resources",
+            "TravianClient.Resources.Upgrade.cs"));
+
+        Assert.Contains("TryLoadMissingHeroInventoryFromCurrentBuildPageAsync", transferSource);
+        Assert.Contains("ReadHeroInventoryFromTransferDialogAsync", transferSource);
+        Assert.Contains("TryDismissResourceTransferDialogAsync", transferSource);
+        Assert.Contains("TryLoadMissingHeroInventoryFromCurrentBuildPageAsync", buildingUpgradeSource);
+        Assert.Contains("TryLoadMissingHeroInventoryFromCurrentBuildPageAsync", constructSource);
+        Assert.Contains("TryLoadMissingHeroInventoryFromCurrentBuildPageAsync", resourceUpgradeSource);
+    }
 }

@@ -71,4 +71,42 @@ public sealed class ContinuousLoopNetworkBackoffTests
             TimeSpan.FromMinutes(minutes),
             MainWindow.ResolveAutomaticProxyRecoveryRetryDelay(attempt));
     }
+
+    [Fact]
+    public void IdleBreak_EndsEarlyWhenSettingsWakeTheContinuousLoop()
+    {
+        var projectRoot = TbotUltra.Worker.ProjectRootLocator.FindProjectRoot();
+        var source = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "src",
+            "TbotUltra.Desktop",
+            "MainWindow.ContinuousLoop.cs"));
+        var methodStart = source.IndexOf(
+            "private async Task MaybeTakeIdleBreakAsync",
+            StringComparison.Ordinal);
+        var methodEnd = source.IndexOf(
+            "    private static TimeSpan RandomIdleBreakInterval",
+            methodStart,
+            StringComparison.Ordinal);
+
+        Assert.True(methodStart >= 0 && methodEnd > methodStart);
+        var methodBody = source[methodStart..methodEnd];
+
+        Assert.Contains(
+            "Volatile.Read(ref _continuousLoopWakeRequested) == 1",
+            methodBody,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "idle break ended early: queue state or settings changed.",
+            methodBody,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "var immediateWorkRequested = Interlocked.Exchange(ref _continuousLoopWakeRequested, 0) == 1;",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "if (!immediateWorkRequested)",
+            source,
+            StringComparison.Ordinal);
+    }
 }

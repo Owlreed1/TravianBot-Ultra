@@ -99,6 +99,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Pass the active cancellation token through every cancellable operation. Never replace it with
   `CancellationToken.None`; cancellation is expected control flow, not an alarm.
 - Sleeping/paused state must preserve work and must not start a competing loop.
+- Continuous-loop wake requests from saved settings or newly enabled automation must also end an active idle break;
+  humanized idle pacing must not delay newly requested work.
 - Known queue deadlines are authoritative and may not be shortened by pacing.
 - Proxy settings are account-scoped. Browser, HTTP client, tests, and bonus video use the same effective route.
   Never log credentials or place them in user-visible URLs.
@@ -372,6 +374,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Hero attribute priority is execution-authoritative from the latest saved account settings. A queued
   `hero_manage` or `spend_hero_attribute_points` payload is only a snapshot and must never overwrite a reorder
   the user made in the UI while the task was waiting.
+- Hero inventory resources are an account+server persisted last-known snapshot. Quick re-login, process restart,
+  and account switching restore it; incomplete inventory reads never replace it with fabricated zeroes. When no
+  snapshot has ever been captured, construction/resource actions may open their existing resource-transfer dialog,
+  read the live inventory, and close it without transferring before continuing the original action.
 - React task-tab changes use Action pacing's click delay before the DOM click. Do not put the delay after the
   General/Village tab click; that makes a Collect-to-tab transition effectively instantaneous.
 - Bonus-video failures use shared protected timing, typed cooldowns, account proxy routing, and sanitized logs.

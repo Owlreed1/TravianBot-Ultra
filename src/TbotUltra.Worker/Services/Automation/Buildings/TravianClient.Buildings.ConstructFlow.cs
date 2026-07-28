@@ -181,6 +181,13 @@ public sealed partial class TravianClient : IBuildingClient
             var durationSeconds = pageAnalysis.DurationSeconds;
             // Read the population the new building grants before clicking (page changes after).
             var populationDelta = pageAnalysis.PopulationDelta;
+            if (!pageAnalysis.LooksBlockedByResources)
+            {
+                await TryLoadMissingHeroInventoryFromCurrentBuildPageAsync(
+                    $"building slot {slotId} construct {buildingName}",
+                    cancellationToken,
+                    constructBuildingGid: gid);
+            }
 
             // Step 3: click the "Construct building" button (scoped to this gid when possible).
             var constructFaster = await TryUseConstructFasterForBuildAsync(

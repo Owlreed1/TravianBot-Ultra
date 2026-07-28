@@ -104,6 +104,12 @@ public sealed partial class TravianClient : IBuildingClient
             var durationSeconds = pageAnalysis.DurationSeconds;
             // Read the population increase this level grants before clicking (page changes after).
             var populationDelta = pageAnalysis.PopulationDelta;
+            if (!pageAnalysis.LooksBlockedByResources)
+            {
+                await TryLoadMissingHeroInventoryFromCurrentBuildPageAsync(
+                    $"building slot {slotId} ({buildingName}) upgrade",
+                    cancellationToken);
+            }
 
             // Step 5: click the "Upgrade to level N" button.
             var constructFaster = await TryUseConstructFasterForBuildAsync(
@@ -946,6 +952,12 @@ public sealed partial class TravianClient : IBuildingClient
             var durationSeconds = pageAnalysis.DurationSeconds;
             // Read the population increase this level grants before clicking (page changes after).
             var populationDelta = pageAnalysis.PopulationDelta;
+            if (!pageAnalysis.LooksBlockedByResources)
+            {
+                await TryLoadMissingHeroInventoryFromCurrentBuildPageAsync(
+                    $"building slot {slotId} ({buildingName}) upgrade-to-max",
+                    cancellationToken);
+            }
 
             // Step 5: click "Upgrade to level N".
             var constructFaster = await TryUseConstructFasterForBuildAsync(

@@ -147,6 +147,9 @@ public sealed partial class TravianClient
                     return $"Resource slot {slotId} blocked ({actionability.Outcome}): {actionability.Reason}";
                 }
 
+                await TryLoadMissingHeroInventoryFromCurrentBuildPageAsync(
+                    $"resource slot {slotId} ({resourceName}) upgrade",
+                    cancellationToken);
                 var pageAnalysis = await ReadConstructionPageAnalysisAsync(
                     slotId,
                     "resource upgrade pre-click",
@@ -386,6 +389,9 @@ public sealed partial class TravianClient
                     {
                         attemptedAny = true;
                         Notify($"[UpgradeAllResourcesToLevelAsync] clicking upgrade for slot={slot} from level={level} toward target={effectiveTarget}.");
+                        await TryLoadMissingHeroInventoryFromCurrentBuildPageAsync(
+                            $"resource slot {slot} ({resourceName}) bulk upgrade",
+                            cancellationToken);
                         var pageAnalysis = await ReadConstructionPageAnalysisAsync(
                             slot,
                             "resource bulk upgrade pre-click",

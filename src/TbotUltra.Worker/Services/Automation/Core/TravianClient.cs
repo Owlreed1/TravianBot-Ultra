@@ -25,6 +25,7 @@ public sealed partial class TravianClient
     private readonly string _projectRoot;
     private readonly string _capitalCachePath;
     private readonly HeroAttributeSnapshotStore _heroAttributeSnapshotStore;
+    private readonly HeroInventorySnapshotStore _heroInventorySnapshotStore;
     private readonly Action<string>? _statusCallback;
     private readonly BrowserTraceLogger _browserTrace;
     // Flips the browser session's consentmanager route block on/off; used only by the bonus-video flow,
@@ -295,6 +296,7 @@ public sealed partial class TravianClient
             : projectRoot;
         _capitalCachePath = AccountStoragePaths.CapitalStatePath(_projectRoot, _account.Name);
         _heroAttributeSnapshotStore = new HeroAttributeSnapshotStore(_projectRoot);
+        _heroInventorySnapshotStore = new HeroInventorySnapshotStore(_projectRoot);
         _statusCallback = callbacks.StatusCallback;
         _browserTrace = browserTrace ?? new BrowserTraceLogger(config.DetailedBrowserLoggingEnabled, callbacks.StatusCallback);
         _browserTrace.AttachPage(page, "travian-client");

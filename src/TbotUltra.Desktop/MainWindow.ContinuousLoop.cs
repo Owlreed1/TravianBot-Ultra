@@ -2295,10 +2295,19 @@ public partial class MainWindow
 
                 // Occasional human-like "stepped away from the computer" pause. Between tasks only, so it
                 // never interrupts a build/click.
-                await MaybeTakeIdleBreakAsync(options, token);
+                var immediateWorkRequested = Interlocked.Exchange(ref _continuousLoopWakeRequested, 0) == 1;
+                if (!immediateWorkRequested)
+                {
+                    await MaybeTakeIdleBreakAsync(options, token);
+                    immediateWorkRequested =
+                        Interlocked.Exchange(ref _continuousLoopWakeRequested, 0) == 1;
+                }
                 // Occasional human-like "look around" — open a non-functional page (map/reports/etc.)
                 // and read nothing. Between tasks only, same as the idle break.
-                await MaybeDoIdleBrowseAsync(options, token);
+                if (!immediateWorkRequested)
+                {
+                    await MaybeDoIdleBrowseAsync(options, token);
+                }
                 await EnsureChromiumInstalledAsync();
                 await HonorPendingVillageSwitchAsync(options, token);
                 var forceVillageStatusSweep =
@@ -2459,7 +2468,7 @@ public partial class MainWindow
                 return;
             }
 
-            var wakeRequested = Interlocked.Exchange(ref _continuousLoopWakeRequested, 0) == 1;
+            var wakeRequested = Volatile.Read(ref _continuousLoopWakeRequested) == 1;
             if (!networkBackoff && wakeRequested)
             {
                 AppendLog($"[LOOP {tickId}] WAIT ended early: queue state or settings changed.");
@@ -2596,12 +2605,19 @@ public partial class MainWindow
 
         var deadline = DateTimeOffset.UtcNow.AddSeconds(totalSeconds);
         var stopped = false;
+        var wakeRequested = false;
         while (DateTimeOffset.UtcNow < deadline)
         {
             token.ThrowIfCancellationRequested();
             if (_loopController.LoopStopRequested)
             {
                 stopped = true;
+                break;
+            }
+
+            if (Volatile.Read(ref _continuousLoopWakeRequested) == 1)
+            {
+                wakeRequested = true;
                 break;
             }
 
@@ -2620,6 +2636,13 @@ public partial class MainWindow
         if (stopped)
         {
             AppendLog("[pacing] idle break canceled by stop.");
+            return;
+        }
+
+        if (wakeRequested)
+        {
+            AppendLog("[pacing] idle break ended early: queue state or settings changed.");
+            _nextIdleBreakDueUtc = DateTimeOffset.UtcNow.Add(RandomIdleBreakInterval(options));
             return;
         }
 

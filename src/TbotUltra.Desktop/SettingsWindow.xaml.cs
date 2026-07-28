@@ -564,31 +564,37 @@ public partial class SettingsWindow : Window
                 continue;
             }
 
-            ShowInvalidNumericInput(field.TextBox, field.Label, error);
+            ShowInvalidNumericInput(
+                field.TextBox,
+                field.Label,
+                error,
+                field.WholeNumber,
+                field.Min,
+                field.Max);
             return false;
         }
 
-        var ranges = new (TextBox Min, TextBox Max, string Label)[]
+        var ranges = new (TextBox Min, TextBox Max, string Label, bool WholeNumber)[]
         {
-            (SessionRunMinMinutesTextBox, SessionRunMaxMinutesTextBox, "Session pacing run"),
-            (SessionSleepMinMinutesTextBox, SessionSleepMaxMinutesTextBox, "Session pacing sleep"),
-            (ActionTaskMinTextBox, ActionTaskMaxTextBox, "Task action delay"),
-            (ActionPageLoadMinTextBox, ActionPageLoadMaxTextBox, "Page-load delay"),
-            (ActionClickMinTextBox, ActionClickMaxTextBox, "Click delay"),
-            (ActionLoopMinTextBox, ActionLoopMaxTextBox, "Loop delay"),
-            (FarmListStepDelayMinTextBox, FarmListStepDelayMaxTextBox, "Farm-list step delay"),
-            (CollectStepDelayMinTextBox, CollectStepDelayMaxTextBox, "Collect step delay"),
-            (IdleBreakIntervalMinTextBox, IdleBreakIntervalMaxTextBox, "Idle-break interval"),
-            (IdleBreakDurationMinTextBox, IdleBreakDurationMaxTextBox, "Idle-break duration"),
-            (IdleBrowseIntervalMinTextBox, IdleBrowseIntervalMaxTextBox, "Idle-browse interval"),
-            (VillageStatusSweepRoundMinTextBox, VillageStatusSweepRoundMaxTextBox, "Village scan function delay"),
-            (VillageStatusSweepVillageMinTextBox, VillageStatusSweepVillageMaxTextBox, "Village scan village delay"),
-            (ConstructionHumanizeQueuePercentMinTextBox, ConstructionHumanizeQueuePercentMaxTextBox, "Construction queue percentage"),
-            (ConstructionHumanizeNoPlusMinTextBox, ConstructionHumanizeNoPlusMaxTextBox, "Construction no-Plus delay"),
-            (HeroAdventureRestartDelayMinTextBox, HeroAdventureRestartDelayMaxTextBox, "Hero adventure restart delay"),
-            (SmithyUpgradeRestartDelayMinTextBox, SmithyUpgradeRestartDelayMaxTextBox, "Smithy restart delay"),
-            (TownHallRestartDelayMinTextBox, TownHallRestartDelayMaxTextBox, "Town Hall restart delay"),
-            (BreweryRestartDelayMinTextBox, BreweryRestartDelayMaxTextBox, "Brewery restart delay"),
+            (SessionRunMinMinutesTextBox, SessionRunMaxMinutesTextBox, "Session pacing run", true),
+            (SessionSleepMinMinutesTextBox, SessionSleepMaxMinutesTextBox, "Session pacing sleep", true),
+            (ActionTaskMinTextBox, ActionTaskMaxTextBox, "Task action delay", false),
+            (ActionPageLoadMinTextBox, ActionPageLoadMaxTextBox, "Page-load delay", false),
+            (ActionClickMinTextBox, ActionClickMaxTextBox, "Click delay", false),
+            (ActionLoopMinTextBox, ActionLoopMaxTextBox, "Loop delay", false),
+            (FarmListStepDelayMinTextBox, FarmListStepDelayMaxTextBox, "Farm-list step delay", false),
+            (CollectStepDelayMinTextBox, CollectStepDelayMaxTextBox, "Collect step delay", false),
+            (IdleBreakIntervalMinTextBox, IdleBreakIntervalMaxTextBox, "Idle-break interval", false),
+            (IdleBreakDurationMinTextBox, IdleBreakDurationMaxTextBox, "Idle-break duration", false),
+            (IdleBrowseIntervalMinTextBox, IdleBrowseIntervalMaxTextBox, "Idle-browse interval", false),
+            (VillageStatusSweepRoundMinTextBox, VillageStatusSweepRoundMaxTextBox, "Village scan function delay", true),
+            (VillageStatusSweepVillageMinTextBox, VillageStatusSweepVillageMaxTextBox, "Village scan village delay", false),
+            (ConstructionHumanizeQueuePercentMinTextBox, ConstructionHumanizeQueuePercentMaxTextBox, "Construction queue percentage", false),
+            (ConstructionHumanizeNoPlusMinTextBox, ConstructionHumanizeNoPlusMaxTextBox, "Construction no-Plus delay", false),
+            (HeroAdventureRestartDelayMinTextBox, HeroAdventureRestartDelayMaxTextBox, "Hero adventure restart delay", false),
+            (SmithyUpgradeRestartDelayMinTextBox, SmithyUpgradeRestartDelayMaxTextBox, "Smithy restart delay", false),
+            (TownHallRestartDelayMinTextBox, TownHallRestartDelayMaxTextBox, "Town Hall restart delay", false),
+            (BreweryRestartDelayMinTextBox, BreweryRestartDelayMaxTextBox, "Brewery restart delay", false),
         };
 
         foreach (var range in ranges)
@@ -603,7 +609,11 @@ public partial class SettingsWindow : Window
             ShowInvalidNumericInput(
                 range.Max,
                 range.Label,
-                "The maximum value must be greater than or equal to the minimum value.");
+                "The maximum value must be greater than or equal to the minimum value.",
+                range.WholeNumber,
+                0,
+                double.MaxValue,
+                range.Min.Text);
             return false;
         }
 
@@ -626,7 +636,9 @@ public partial class SettingsWindow : Window
 
         if (trimmed.Contains(','))
         {
-            error = "Use a period as the decimal separator, for example 5.6 instead of 5,6.";
+            error = wholeNumber
+                ? "Enter a whole number without a decimal separator, for example 5."
+                : "Use a period as the decimal separator, for example 5.6 instead of 5,6.";
             return false;
         }
 
@@ -664,16 +676,150 @@ public partial class SettingsWindow : Window
         return true;
     }
 
-    private void ShowInvalidNumericInput(TextBox textBox, string label, string error)
+    internal static string GetNumericInputCorrectionExample(
+        string? text,
+        bool wholeNumber,
+        double min,
+        double max)
     {
-        AppDialog.Show(
+        var normalized = (text ?? string.Empty).Trim().Replace(',', '.');
+        var parsed = double.TryParse(
+            normalized,
+            NumberStyles.Float,
+            CultureInfo.InvariantCulture,
+            out var numericValue)
+            && double.IsFinite(numericValue);
+
+        var boundedMin = double.IsFinite(min) ? min : 0;
+        var boundedMax = double.IsFinite(max) ? max : double.MaxValue;
+        if (boundedMax < boundedMin)
+        {
+            boundedMax = boundedMin;
+        }
+
+        var value = parsed ? numericValue : boundedMin;
+        value = Math.Clamp(value, boundedMin, boundedMax);
+        if (wholeNumber)
+        {
+            value = parsed ? Math.Truncate(value) : Math.Ceiling(boundedMin);
+            value = Math.Clamp(value, Math.Ceiling(boundedMin), Math.Floor(boundedMax));
+        }
+
+        return value.ToString(wholeNumber ? "0" : "0.###############", CultureInfo.InvariantCulture);
+    }
+
+    private void ShowInvalidNumericInput(
+        TextBox textBox,
+        string label,
+        string error,
+        bool wholeNumber,
+        double min,
+        double max,
+        string? suggestedValue = null)
+    {
+        var enteredValue = string.IsNullOrWhiteSpace(textBox.Text)
+            ? "(empty)"
+            : textBox.Text.Trim();
+        var correctedValue = string.IsNullOrWhiteSpace(suggestedValue)
+            ? GetNumericInputCorrectionExample(textBox.Text, wholeNumber, min, max)
+            : suggestedValue.Trim();
+
+        var content = new StackPanel();
+        content.Children.Add(new TextBlock
+        {
+            Text = label,
+            FontSize = 15,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush"),
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = error,
+            Margin = new Thickness(0, 4, 0, 12),
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush"),
+        });
+
+        var valueCards = new Grid();
+        valueCards.ColumnDefinitions.Add(new ColumnDefinition());
+        valueCards.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
+        valueCards.ColumnDefinitions.Add(new ColumnDefinition());
+
+        var enteredCard = CreateNumericValidationValueCard(
+            "Incorrect",
+            enteredValue,
+            "WarningBgBrush",
+            "WarningBorderBrush",
+            "WarningTextBrush");
+        Grid.SetColumn(enteredCard, 0);
+        valueCards.Children.Add(enteredCard);
+
+        var correctedCard = CreateNumericValidationValueCard(
+            "Correct",
+            correctedValue,
+            "SuccessBgBrush",
+            "SuccessBorderBrush",
+            "SuccessTextBrush");
+        Grid.SetColumn(correctedCard, 2);
+        valueCards.Children.Add(correctedCard);
+        content.Children.Add(valueCards);
+
+        content.Children.Add(new TextBlock
+        {
+            Text = "Settings were not saved.",
+            Margin = new Thickness(0, 12, 0, 0),
+            FontSize = 12,
+            Foreground = (System.Windows.Media.Brush)FindResource("TextSubtleBrush"),
+        });
+
+        AppDialog.ShowCustomContent(
             this,
-            $"{label}: {error}\n\nSettings were not saved.",
+            content,
             "Invalid settings value",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
+            [("OK", MessageBoxResult.OK)],
+            MessageBoxImage.Warning,
+            MessageBoxResult.OK,
+            MessageBoxResult.OK,
+            accentResult: MessageBoxResult.OK,
+            width: 540);
         textBox.Focus();
         textBox.SelectAll();
+    }
+
+    private Border CreateNumericValidationValueCard(
+        string caption,
+        string value,
+        string backgroundResource,
+        string borderResource,
+        string foregroundResource)
+    {
+        var text = new StackPanel();
+        text.Children.Add(new TextBlock
+        {
+            Text = caption,
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (System.Windows.Media.Brush)FindResource(foregroundResource),
+        });
+        text.Children.Add(new TextBlock
+        {
+            Text = value,
+            Margin = new Thickness(0, 4, 0, 0),
+            FontSize = 17,
+            FontWeight = FontWeights.Bold,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (System.Windows.Media.Brush)FindResource(foregroundResource),
+        });
+
+        return new Border
+        {
+            Background = (System.Windows.Media.Brush)FindResource(backgroundResource),
+            BorderBrush = (System.Windows.Media.Brush)FindResource(borderResource),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            Padding = new Thickness(12, 10, 12, 10),
+            Child = text,
+        };
     }
 
     private void SleepNowButton_Click(object sender, RoutedEventArgs e)

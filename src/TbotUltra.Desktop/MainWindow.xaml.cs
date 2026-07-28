@@ -103,6 +103,7 @@ public partial class MainWindow : Window
     private AccountEntry? _uiActiveAccount;
     private readonly AccountAnalysisStore _accountAnalysisStore;
     private readonly HeroAttributeSnapshotStore _heroAttributeSnapshotStore;
+    private readonly HeroInventorySnapshotStore _heroInventorySnapshotStore;
     private readonly AccountDeletionService _accountDeletionService;
     private readonly AccountAutomationHoldStore _accountAutomationHoldStore;
     private readonly ServerCatalogStore _serverCatalogStore;
@@ -418,6 +419,7 @@ public partial class MainWindow : Window
         InitializeSessionPacing();
         _accountAnalysisStore = new AccountAnalysisStore(_projectRoot);
         _heroAttributeSnapshotStore = new HeroAttributeSnapshotStore(_projectRoot);
+        _heroInventorySnapshotStore = new HeroInventorySnapshotStore(_projectRoot);
         _serverCatalogStore = new ServerCatalogStore(_serverCatalogPath);
         var projectContext = new ProjectContext(_projectRoot);
         var taskRunner = new BotTaskRunner(_accountProvider, projectContext);
@@ -779,6 +781,7 @@ public partial class MainWindow : Window
                 UpdateInboxButtons(0, 0);
                 UpdateGoldClubInfoFromStoredAnalysis();
                 LoadHeroAttributeSnapshotForActiveAccount(account.Name);
+                LoadHeroInventorySnapshotForActiveAccount(account.Name);
                 // Show the last analyzed farm lists immediately so the farming panel is never blank
                 // at startup / after an account switch. Fire-and-forget: it is disk-only and self-guards.
                 _ = RestoreFarmListsFromSnapshotForActiveAccount();
@@ -1078,6 +1081,10 @@ public partial class MainWindow : Window
         {
             _heroViewModel.ApplyInventory(heroInventory);
             AppendLog($"[ApplyPostLoginSnapshot] Hero inventory after login: wood={heroInventory.Wood}, clay={heroInventory.Clay}, iron={heroInventory.Iron}, crop={heroInventory.Crop}.");
+        }
+        else
+        {
+            LoadHeroInventorySnapshotForActiveAccount(_accountStore.ActiveAccountName());
         }
     }
 
