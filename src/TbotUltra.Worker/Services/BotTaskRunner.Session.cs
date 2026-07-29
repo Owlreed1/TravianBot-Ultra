@@ -181,8 +181,9 @@ public sealed partial class BotTaskRunner
         log($"Loading post-login data for server {options.ServerName}.");
 
         _accountAnalysisStore.TryLoad(client.AccountName, out var persistedAnalysis, client.ServerUrl);
-        var newAccountAnalysisPending = options.PostLoginAnalyzeNewAccount
-            && (persistedAnalysis is null || persistedAnalysis.NewAccountAnalysisCompleted == false);
+        var newAccountAnalysisPending = NewAccountAnalysisDecisions.IsPending(
+            options.PostLoginAnalyzeNewAccount,
+            persistedAnalysis?.NewAccountAnalysisCompleted);
 
         // When enabled, read the hero inventory FIRST — right after login and before the profile
         // navigation (ReadAccountSnapshotAsync reads villages from spieler.php/profile).

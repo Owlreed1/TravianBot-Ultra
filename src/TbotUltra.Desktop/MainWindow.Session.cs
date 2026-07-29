@@ -85,7 +85,10 @@ public partial class MainWindow
             // Quick re-login: the full post-login stack (snapshot + analyzes) was completed for this
             // account only minutes ago, and nothing meaningful changes server-side that fast. Log in,
             // confirm the session, restore the persisted caches — done.
-            if (!forceNewAccountAnalysis && IsQuickReloginWindowActive(out var minutesSinceFullLogin))
+            var isNewAccountAnalysisPendingBeforeLogin = IsNewAccountAnalysisPending(options);
+            if (!forceNewAccountAnalysis
+                && !isNewAccountAnalysisPendingBeforeLogin
+                && IsQuickReloginWindowActive(out var minutesSinceFullLogin))
             {
                 AppendLog($"[{operationId}] Quick re-login: full post-login stack ran {minutesSinceFullLogin:F0} min ago (<{QuickReloginWindowMinutes} min) — logging in without analyzes.");
                 await _botService.ExecuteLoginAsync(options, AppendLog, keepBrowserOpenAfterLogin: true, operationToken);
@@ -142,6 +145,11 @@ public partial class MainWindow
                 NotifySessionPacingOnlineStarted();
                 CompleteOperation(operationId, operationSw, "Login completed (quick re-login).");
                 return;
+            }
+
+            if (isNewAccountAnalysisPendingBeforeLogin)
+            {
+                AppendLog($"[{operationId}] New-account analysis is pending; running the full post-login stack.");
             }
 
             var snapshot = await _botService.ExecuteLoginAndLoadPostLoginSnapshotAsync(
@@ -1139,6 +1147,23 @@ public partial class MainWindow
             AppendLog($"[login] quick re-login check failed ({ex.Message}); running the full post-login stack.");
             return false;
         }
+    }
+
+    private bool IsNewAccountAnalysisPending(BotOptions options)
+    {
+        var accountName = _accountStore.ActiveAccountName();
+        if (string.IsNullOrWhiteSpace(accountName))
+        {
+            return NewAccountAnalysisDecisions.IsPending(options.PostLoginAnalyzeNewAccount, completed: null);
+        }
+
+        var loaded = _accountAnalysisStore.TryLoad(
+            accountName,
+            out var analysis,
+            GetActiveAccountServerUrl());
+        return NewAccountAnalysisDecisions.IsPending(
+            options.PostLoginAnalyzeNewAccount,
+            loaded ? analysis?.NewAccountAnalysisCompleted : null);
     }
 
     private void PersistLastFullPostLoginTimestamp()

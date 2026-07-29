@@ -727,20 +727,19 @@
                                                 ToolTip="After login, detects villages without cached status and reads their resource fields and buildings from dorf1 and dorf2. Enabled by default." />
                             </StackPanel>
 
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <CheckBox x:Name="PostLoginAnalyzeNewAccountCheckBox"
-                                              Content="New account analysis" />
-                                    <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                    ToolTip="On the first full login for a new account, analyzes hero inventory, hero attributes, and new village startup regardless of their individual settings. Enabled by default." />
-                                </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <CheckBox x:Name="PostLoginAnalyzeNewAccountCheckBox"
+                                          Content="New account analysis" />
+                                <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                ToolTip="On the first full login for a new account, analyzes hero inventory, hero attributes, and new village startup regardless of their individual settings. Enabled by default." />
                                 <Border x:Name="NewAccountAnalysisStatusCard"
                                         Background="{DynamicResource WarningBrush}"
                                         BorderBrush="{DynamicResource WarningBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="5"
-                                        Padding="8,4"
-                                        Margin="0,6,0,0">
+                                        Padding="6,2"
+                                        Margin="8,0,0,0"
+                                        VerticalAlignment="Center">
                                     <TextBlock x:Name="NewAccountAnalysisStatusTextBlock"
                                                Text="Not analyzed"
                                                Foreground="{DynamicResource OnWarningBrush}"
