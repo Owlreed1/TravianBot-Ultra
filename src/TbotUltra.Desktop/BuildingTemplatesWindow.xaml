@@ -301,10 +301,11 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="{Binding StatusText}"
-                               Foreground="{DynamicResource TextSubtleBrush}"
-                               TextWrapping="Wrap"
-                               VerticalAlignment="Center" />
+                    <Button Content="Show building slots"
+                            Width="142"
+                            Height="30"
+                            HorizontalAlignment="Left"
+                            Click="ShowBuildingSlotsButton_Click" />
                     <Button Grid.Column="1"
                             Content="Save"
                             Width="86"

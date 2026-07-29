@@ -1207,6 +1207,7 @@ public partial class MainWindow
         _browserSessionLikelyOpen = false;
         _inboxAutoEnabled = false;
         NotifySessionPacingOnlineStopped();
+        ResetSessionPacing();
         await StopAllAutomationAndWaitAsync();
 
         // bot.json is global, so the previous account's village/farm-list pointers would otherwise leak

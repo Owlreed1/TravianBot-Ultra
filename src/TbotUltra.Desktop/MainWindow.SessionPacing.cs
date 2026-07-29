@@ -149,6 +149,9 @@ public partial class MainWindow
 
     private void ResetSessionPacing()
     {
+        _sleepSnapshot = SleepSnapshot.Idle;
+        _sessionPacingSleepDeferredForManualOperation = false;
+        _pacingPauseRequestCount = 0;
         _sessionPacer.Reset();
     }
 

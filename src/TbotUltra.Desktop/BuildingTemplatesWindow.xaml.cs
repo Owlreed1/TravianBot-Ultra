@@ -143,6 +143,11 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         RefreshPlanPreview();
     }
 
+    private void ShowBuildingSlotsButton_Click(object sender, RoutedEventArgs e)
+    {
+        new BuildingSlotsWindow { Owner = this }.ShowDialog();
+    }
+
     private void LoadBuildingOptions(string tribe)
     {
         BuildingOptions.Clear();
