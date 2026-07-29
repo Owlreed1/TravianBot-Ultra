@@ -271,6 +271,34 @@ public sealed class BuildingTemplatePlannerTests
     }
 
     [Fact]
+    public void FindLaterRowsLosingRequirementsAfterRemoval_ReportsTheAffectedBuilding()
+    {
+        var status = Status("Teutons", Building(30, "Main Building", 3, 15));
+        var rows = new[]
+        {
+            Row(16, "Rally Point", 1, preferredSlot: 39),
+            Row(19, "Barracks", 3),
+            Row(22, "Academy", 5),
+            Row(13, "Smithy", 3),
+            Row(20, "Stable", 1),
+        };
+
+        var losses = _planner.FindLaterRowsLosingRequirementsAfterRemoval(
+            rows,
+            removedRowIndex: 2,
+            status,
+            serverSpeed: 1,
+            mainBuildingLevel: 3);
+
+        Assert.Contains(losses, loss =>
+            loss.BuildingName == "Smithy"
+            && loss.Reason.Contains("Academy", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(losses, loss =>
+            loss.BuildingName == "Stable"
+            && loss.Reason.Contains("Academy", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void Plan_AutoSlot_DoesNotConsumeLaterExplicitSlot()
     {
         var status = Status("Teutons", Building(30, "Main Building", 1, 15));

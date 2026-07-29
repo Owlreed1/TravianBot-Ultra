@@ -108,19 +108,28 @@ public partial class TravcoToolsWindow : Window
         var ignoredPlayers = new TextBox { Text = saved.IgnoredPlayers, MinWidth = 360 };
         var ignoredAlliances = new TextBox { Text = saved.IgnoredAlliances, MinWidth = 360 };
         var content = new StackPanel();
-        content.Children.Add(new TextBlock
+        var savedListText = new TextBlock
         {
-            Text = "All villages and players from the active server will be downloaded and saved in the list 'All villages'.",
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 14),
-        });
+        };
+        void UpdateSavedListText()
+        {
+            var targetListName = string.IsNullOrWhiteSpace(listName.Text) ? "All villages" : listName.Text.Trim();
+            savedListText.Text = "All villages and players from the active server will be downloaded and saved in the list "
+                + $"'{targetListName}'. This list can be used to add to your farmlists.";
+        }
+
+        listName.TextChanged += (_, _) => UpdateSavedListText();
+        UpdateSavedListText();
+        content.Children.Add(savedListText);
         content.Children.Add(includePlayers);
         content.Children.Add(includeNatars);
-        content.Children.Add(new TextBlock { Text = "List name", Margin = new Thickness(0, 0, 0, 4) });
+        content.Children.Add(new TextBlock { Text = "List name (optional)", Margin = new Thickness(0, 0, 0, 4) });
         content.Children.Add(listName);
-        content.Children.Add(new TextBlock { Text = "Ignore players", Margin = new Thickness(0, 0, 0, 4) });
+        content.Children.Add(new TextBlock { Text = "Ignore players (optional)", Margin = new Thickness(0, 0, 0, 4) });
         content.Children.Add(ignoredPlayers);
-        content.Children.Add(new TextBlock { Text = "Ignore alliance", Margin = new Thickness(0, 12, 0, 4) });
+        content.Children.Add(new TextBlock { Text = "Ignore alliance (optional)", Margin = new Thickness(0, 12, 0, 4) });
         content.Children.Add(ignoredAlliances);
         content.Children.Add(new TextBlock
         {
@@ -133,7 +142,7 @@ public partial class TravcoToolsWindow : Window
             this,
             content,
             "Add all villages",
-            [("Yes", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
+            [("Add villages", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
             MessageBoxImage.Information,
             MessageBoxResult.Yes,
             MessageBoxResult.Cancel,
@@ -723,7 +732,8 @@ public partial class TravcoToolsWindow : Window
             [("Yes", MessageBoxResult.Yes), ("No", MessageBoxResult.No)],
             MessageBoxImage.Question,
             MessageBoxResult.No,
-            MessageBoxResult.No);
+            MessageBoxResult.No,
+            successResult: MessageBoxResult.Yes);
         if (result != MessageBoxResult.Yes)
         {
             return;

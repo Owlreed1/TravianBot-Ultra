@@ -147,7 +147,7 @@
                           RowBackground="{DynamicResource SurfaceAltBrush}"
                           AlternatingRowBackground="{DynamicResource SurfaceBrush}">
                     <DataGrid.Columns>
-                        <DataGridTemplateColumn Header="#" Width="42">
+                        <DataGridTemplateColumn Header="#" Width="52">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding Index}" Margin="6,0" />
@@ -233,7 +233,19 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTextColumn Header="Status" Width="*" Binding="{Binding Status}" IsReadOnly="True" />
+                        <DataGridTemplateColumn Header="Action" Width="88">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="Delete"
+                                            Height="24"
+                                            Margin="4,0"
+                                            Background="{DynamicResource DangerBgBrush}"
+                                            Foreground="{DynamicResource DangerTextBrush}"
+                                            BorderBrush="{DynamicResource DangerBorderBrush}"
+                                            Click="DeleteRowButton_Click" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                     </DataGrid.Columns>
                 </DataGrid>
 

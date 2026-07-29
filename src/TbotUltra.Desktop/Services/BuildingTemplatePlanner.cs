@@ -47,6 +47,10 @@ public sealed record BuildingTemplatePrerequisitePlan(
     IReadOnlyList<BuildingTemplateRow> Rows,
     IReadOnlyList<string> Blockers);
 
+public sealed record BuildingTemplatePrerequisiteLoss(
+    string BuildingName,
+    string Reason);
+
 public sealed class BuildingTemplatePlanner
 {
     private static readonly HashSet<int> WallGids = [31, 32, 33, 42, 43];
@@ -243,6 +247,65 @@ public sealed class BuildingTemplatePlanner
         }
 
         return new(BuildingTemplateAvailability.Available, "Available to build at this point in the template.");
+    }
+
+    public IReadOnlyList<BuildingTemplatePrerequisiteLoss> FindLaterRowsLosingRequirementsAfterRemoval(
+        IReadOnlyList<BuildingTemplateRow> rows,
+        int removedRowIndex,
+        VillageStatus status,
+        double serverSpeed,
+        int mainBuildingLevel)
+    {
+        if (removedRowIndex < 0 || removedRowIndex >= rows.Count)
+        {
+            return [];
+        }
+
+        var losses = new List<BuildingTemplatePrerequisiteLoss>();
+        for (var rowIndex = removedRowIndex + 1; rowIndex < rows.Count; rowIndex++)
+        {
+            var candidate = rows[rowIndex];
+            if (candidate.Kind != BuildingTemplateRowKind.Building)
+            {
+                continue;
+            }
+
+            var gid = candidate.Gid ?? BuildingCatalogService.GidForName(candidate.BuildingName);
+            if (gid is null)
+            {
+                continue;
+            }
+
+            var before = EvaluateBuildingAvailability(
+                gid.Value,
+                rows.Take(rowIndex).ToList(),
+                status,
+                serverSpeed,
+                mainBuildingLevel);
+            if (before.Availability == BuildingTemplateAvailability.MissingRequirements)
+            {
+                continue;
+            }
+
+            var after = EvaluateBuildingAvailability(
+                gid.Value,
+                rows.Take(rowIndex).Where((_, index) => index != removedRowIndex).ToList(),
+                status,
+                serverSpeed,
+                mainBuildingLevel);
+            if (after.Availability != BuildingTemplateAvailability.MissingRequirements)
+            {
+                continue;
+            }
+
+            losses.Add(new BuildingTemplatePrerequisiteLoss(
+                string.IsNullOrWhiteSpace(candidate.BuildingName)
+                    ? BuildingCatalogService.NameForGid(gid.Value)
+                    : candidate.BuildingName,
+                after.Reason));
+        }
+
+        return losses;
     }
 
     public BuildingTemplatePrerequisitePlan PlanMissingPrerequisites(

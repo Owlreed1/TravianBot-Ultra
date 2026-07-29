@@ -404,12 +404,57 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
 
     private void RemoveRowButton_Click(object sender, RoutedEventArgs e)
     {
-        if (SelectedRow is null)
+        if (SelectedRow is not null)
+        {
+            RemoveTemplateRow(SelectedRow);
+        }
+    }
+
+    private void DeleteRowButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: BuildingTemplateRowView row })
+        {
+            RemoveTemplateRow(row);
+        }
+    }
+
+    private void RemoveTemplateRow(BuildingTemplateRowView row)
+    {
+        var rowIndex = Rows.IndexOf(row);
+        if (rowIndex < 0)
         {
             return;
         }
 
-        Rows.Remove(SelectedRow);
+        var rows = BuildTemplateRowsFromUi();
+        var losses = _planner.FindLaterRowsLosingRequirementsAfterRemoval(
+            rows,
+            rowIndex,
+            _status,
+            _serverSpeed,
+            _mainBuildingLevel);
+        if (losses.Count > 0)
+        {
+            var affectedRows = string.Join(
+                "\n",
+                losses.Select(loss => $"• {loss.BuildingName}: {loss.Reason}"));
+            var choice = AppDialog.ShowCustom(
+                this,
+                "Deleting this row removes a prerequisite for later building rows:\n\n"
+                + $"{affectedRows}\n\nDelete anyway?",
+                "Delete building template row",
+                [("Delete anyway", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
+                MessageBoxImage.Warning,
+                MessageBoxResult.Cancel,
+                MessageBoxResult.Cancel,
+                dangerResult: MessageBoxResult.Yes);
+            if (choice != MessageBoxResult.Yes)
+            {
+                return;
+            }
+        }
+
+        Rows.Remove(row);
     }
 
     private void MoveRowUpButton_Click(object sender, RoutedEventArgs e)
