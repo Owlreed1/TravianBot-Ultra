@@ -158,6 +158,18 @@
                                     ToolTip="Opens a popup that analyzes map.sql players and sends messages in batches of up to 25 recipients."
                                     ToolTipService.InitialShowDelay="500"
                                     Click="BulkMessagesButton_Click" />
+                            <Button x:Name="RunNewAccountAnalysisButton"
+                                    Style="{DynamicResource DebugActionButtonStyle}"
+                                    Content="Run new account analysis"
+                                    ToolTip="Runs hero inventory, hero attributes, and new-village startup for the active account. Logs in first when needed."
+                                    ToolTipService.InitialShowDelay="500"
+                                    Click="RunNewAccountAnalysisButton_Click" />
+                            <Button x:Name="ClearNewAccountAnalysisButton"
+                                    Style="{DynamicResource DebugActionButtonStyle}"
+                                    Content="Clear new account analysis"
+                                    ToolTip="Marks the active account's new-account analysis as pending without deleting cached game data."
+                                    ToolTipService.InitialShowDelay="500"
+                                    Click="ClearNewAccountAnalysisButton_Click" />
                         </UniformGrid>
                     </StackPanel>
                 </Border>

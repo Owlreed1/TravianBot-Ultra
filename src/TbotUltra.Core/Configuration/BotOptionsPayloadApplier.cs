@@ -79,6 +79,7 @@ public static class BotOptionsPayloadApplier
         var postLoginReadTroopTrainingQueue = postLogin.ReadTroopTrainingQueue;
         var postLoginAnalyzeBrewery = postLogin.AnalyzeBrewery;
         var postLoginAnalyzeNewVillages = postLogin.AnalyzeNewVillages;
+        var postLoginAnalyzeNewAccount = postLogin.AnalyzeNewAccount;
         var automaticallyCheckLanguage = postLogin.AutomaticallyCheckLanguage;
         var troopTraining = TroopTrainingPayloadApplier.Apply(source, payload);
         var troopTrainingBarracksEnabled = troopTraining.Barracks.Enabled;
@@ -200,6 +201,7 @@ public static class BotOptionsPayloadApplier
             PostLoginReadTroopTrainingQueue = postLoginReadTroopTrainingQueue,
             PostLoginAnalyzeBrewery = postLoginAnalyzeBrewery,
             PostLoginAnalyzeNewVillages = postLoginAnalyzeNewVillages,
+            PostLoginAnalyzeNewAccount = postLoginAnalyzeNewAccount,
             AutomaticallyCheckLanguage = automaticallyCheckLanguage,
             TroopTrainingBarracksEnabled = troopTrainingBarracksEnabled,
             TroopTrainingBarracksTroopType = troopTrainingBarracksTroopType,

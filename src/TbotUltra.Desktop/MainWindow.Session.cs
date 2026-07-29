@@ -22,10 +22,10 @@ public partial class MainWindow
 
     // Login button clicked
     private async void LoginButton_Click(object sender, RoutedEventArgs e)
-        => await GuardUiAsync(ExecuteLoginFlowAsync);
+        => await GuardUiAsync(() => ExecuteLoginFlowAsync());
 
     // Login function as the button is clicked
-    private async Task ExecuteLoginFlowAsync()
+    private async Task ExecuteLoginFlowAsync(bool forceNewAccountAnalysis = false)
     {
         AppendLog("[login] ***** Login started. *****");
         if (BlockIfActiveAccountOnHold("Login"))
@@ -74,6 +74,10 @@ public partial class MainWindow
             // navigate away from the landing village to the capital/selected one. The dropdown is synced
             // to the real landing village after the snapshot; use "Switch village" to move on purpose.
             var options = LoadValidatedActiveAccountOptions();
+            if (forceNewAccountAnalysis)
+            {
+                options = options with { PostLoginAnalyzeNewAccount = true };
+            }
             AppendLog($"[{operationId}] INFO server={options.ServerName}");
             BrowserInfoTextBlock.Text = "Browser: starting";
 
@@ -81,7 +85,7 @@ public partial class MainWindow
             // Quick re-login: the full post-login stack (snapshot + analyzes) was completed for this
             // account only minutes ago, and nothing meaningful changes server-side that fast. Log in,
             // confirm the session, restore the persisted caches — done.
-            if (IsQuickReloginWindowActive(out var minutesSinceFullLogin))
+            if (!forceNewAccountAnalysis && IsQuickReloginWindowActive(out var minutesSinceFullLogin))
             {
                 AppendLog($"[{operationId}] Quick re-login: full post-login stack ran {minutesSinceFullLogin:F0} min ago (<{QuickReloginWindowMinutes} min) — logging in without analyzes.");
                 await _botService.ExecuteLoginAsync(options, AppendLog, keepBrowserOpenAfterLogin: true, operationToken);
@@ -183,11 +187,14 @@ public partial class MainWindow
             // Hero inventory is read during the post-login snapshot (step 1). Run the hero ATTRIBUTES
             // analyze right after it (step 2) — before farmlists — so the hero panel + home-village marker
             // update as early as possible.
-            if (options.PostLoginAnalyzeHero)
+            var newAccountAnalysisPending = snapshot.NewAccountAnalysisPending;
+            var heroAttributesAnalyzed = !newAccountAnalysisPending;
+            if (options.PostLoginAnalyzeHero || newAccountAnalysisPending)
             {
                 try
                 {
                     await RefreshHeroStatsAsync(operationToken);
+                    heroAttributesAnalyzed = true;
                 }
                 catch (OperationCanceledException)
                 {
@@ -232,17 +239,27 @@ public partial class MainWindow
             }
 
             var newVillageAnalysisNavigated = false;
-            if (options.PostLoginAnalyzeNewVillages)
+            var newVillagesAnalyzed = !newAccountAnalysisPending;
+            if (options.PostLoginAnalyzeNewVillages || newAccountAnalysisPending)
             {
-                newVillageAnalysisNavigated = await AnalyzeNewVillagesAfterLoginAsync(
+                var villageAnalysis = await AnalyzeNewVillagesAfterLoginAsync(
                     options,
                     snapshot.VillageStatus.Villages,
                     operationToken);
+                newVillageAnalysisNavigated = villageAnalysis.Navigated;
+                newVillagesAnalyzed = villageAnalysis.Succeeded;
+            }
+
+            if (newAccountAnalysisPending)
+            {
+                var completed = snapshot.HeroInventory is not null && heroAttributesAnalyzed && newVillagesAnalyzed;
+                SetNewAccountAnalysisCompleted(completed);
             }
 
             var postLoginAnalysisMayNavigate =
                 options.PostLoginAnalyzeFarmlists
                 || options.PostLoginAnalyzeHero
+                || newAccountAnalysisPending
                 || options.PostLoginAnalyzeBrewery
                 || newVillageAnalysisNavigated;
             if (!officialServer || postLoginAnalysisMayNavigate)

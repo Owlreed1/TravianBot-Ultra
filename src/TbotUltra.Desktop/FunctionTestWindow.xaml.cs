@@ -16,6 +16,8 @@ public partial class FunctionTestWindow : Window
     public event RoutedEventHandler? StartAdventureRequested;
     public event RoutedEventHandler? BulkMessagesRequested;
     public event RoutedEventHandler? SavePageHtmlRequested;
+    public event RoutedEventHandler? RunNewAccountAnalysisRequested;
+    public event RoutedEventHandler? ClearNewAccountAnalysisRequested;
 
     public FunctionTestWindow()
     {
@@ -81,6 +83,16 @@ public partial class FunctionTestWindow : Window
     private void SavePageHtmlButton_Click(object sender, RoutedEventArgs e)
     {
         SavePageHtmlRequested?.Invoke(sender, e);
+    }
+
+    private void RunNewAccountAnalysisButton_Click(object sender, RoutedEventArgs e)
+    {
+        RunNewAccountAnalysisRequested?.Invoke(sender, e);
+    }
+
+    private void ClearNewAccountAnalysisButton_Click(object sender, RoutedEventArgs e)
+    {
+        ClearNewAccountAnalysisRequested?.Invoke(sender, e);
     }
 
 }

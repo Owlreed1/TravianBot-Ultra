@@ -81,6 +81,8 @@ public partial class MainWindow
         _resourceTestFunctionsWindow.StartAdventureRequested += StartAdventureDebugButton_Click;
         _resourceTestFunctionsWindow.BulkMessagesRequested += BulkMessagesButton_Click;
         _resourceTestFunctionsWindow.SavePageHtmlRequested += SavePageHtmlButton_Click;
+        _resourceTestFunctionsWindow.RunNewAccountAnalysisRequested += RunNewAccountAnalysisDebugButton_Click;
+        _resourceTestFunctionsWindow.ClearNewAccountAnalysisRequested += ClearNewAccountAnalysisDebugButton_Click;
         _resourceTestFunctionsWindow.Closed += (_, _) =>
         {
             _resourceTestFunctionsWindow.ResourceProductionTestRequested -= TestResourceProductionButton_Click;
@@ -95,6 +97,8 @@ public partial class MainWindow
             _resourceTestFunctionsWindow.StartAdventureRequested -= StartAdventureDebugButton_Click;
             _resourceTestFunctionsWindow.BulkMessagesRequested -= BulkMessagesButton_Click;
             _resourceTestFunctionsWindow.SavePageHtmlRequested -= SavePageHtmlButton_Click;
+            _resourceTestFunctionsWindow.RunNewAccountAnalysisRequested -= RunNewAccountAnalysisDebugButton_Click;
+            _resourceTestFunctionsWindow.ClearNewAccountAnalysisRequested -= ClearNewAccountAnalysisDebugButton_Click;
             _resourceTestFunctionsWindow = null;
         };
 

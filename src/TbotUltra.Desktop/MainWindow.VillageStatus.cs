@@ -44,7 +44,7 @@ public partial class MainWindow
         await RefreshResourceSnapshotForUiAsync(options, cancellationToken);
     }
 
-    private async Task<bool> AnalyzeNewVillagesAfterLoginAsync(
+    private async Task<(bool Navigated, bool Succeeded)> AnalyzeNewVillagesAfterLoginAsync(
         BotOptions options,
         IReadOnlyList<Village> villages,
         CancellationToken cancellationToken)
@@ -56,7 +56,7 @@ public partial class MainWindow
         if (missingVillages.Count == 0)
         {
             AppendLog("[new-village-startup] All villages already have cached dorf1/dorf2 status.");
-            return false;
+            return (false, true);
         }
 
         AppendLog(
@@ -95,7 +95,7 @@ public partial class MainWindow
 
         SyncDashboardVillageUiFromVillages(villages, selectedVillageName, selectedVillageName);
         AppendLog($"[new-village-startup] Completed: {loaded}/{missingVillages.Count} village(s) cached.");
-        return true;
+        return (loaded > 0, loaded == missingVillages.Count);
     }
 
     private async Task<VillageStatus> ReadVillageStatusWithRetryAsync(BotOptions options, CancellationToken cancellationToken, bool resourceOnly = false, bool forceCurrentVillage = false, bool currentPageOnly = false)

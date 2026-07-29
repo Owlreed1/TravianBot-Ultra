@@ -76,6 +76,7 @@ public sealed class BotConfigStore
         BotOptionPayloadKeys.PostLoginReadTroopTrainingQueue,
         BotOptionPayloadKeys.PostLoginAnalyzeBrewery,
         BotOptionPayloadKeys.PostLoginAnalyzeNewVillages,
+        BotOptionPayloadKeys.PostLoginAnalyzeNewAccount,
         BotOptionPayloadKeys.PostLoginQuickReloginEnabled,
         BotOptionPayloadKeys.PostLoginLastFullLoginAt,
         BotOptionPayloadKeys.SessionPacingEnabled,

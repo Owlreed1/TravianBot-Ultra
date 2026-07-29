@@ -559,11 +559,11 @@
                                     <StackPanel Margin="18,0,0,8">
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                             <CheckBox x:Name="VillageStatusSweepDorf1CheckBox" Content="Dorf1" IsChecked="True" Margin="0,2,8,2" />
-                                            <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Reads resources, hourly production, Warehouse capacity and Granary capacity." />
+                                            <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Reads resources, hourly production, Warehouse and Granary capacity, population, construction queue, tasks and daily quests." />
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal">
                                             <CheckBox x:Name="VillageStatusSweepDorf2CheckBox" Content="Dorf2" Margin="0,2,8,2" Checked="VillageStatusSweepDorf2Changed" Unchecked="VillageStatusSweepDorf2Changed" />
-                                            <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Reads the village buildings and construction queue. Required for the detailed building pages." Margin="0,0,12,0" />
+                                            <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Reads all buildings in the village center. Required before Smithy, Barracks, Stable, Workshop, Town Hall or Brewery can be scanned." Margin="0,0,12,0" />
                                             <CheckBox x:Name="VillageStatusSweepSmithyCheckBox" Content="Smithy" Margin="0,2,12,2" />
                                             <CheckBox x:Name="VillageStatusSweepBarracksCheckBox" Content="Barracks" Margin="0,2,12,2" />
                                             <CheckBox x:Name="VillageStatusSweepStableCheckBox" Content="Stable" Margin="0,2,12,2" />
@@ -720,11 +720,32 @@
                                                 ToolTip="Reads brewery level and current bonus information/timer." />
                             </StackPanel>
 
-                            <StackPanel Orientation="Horizontal">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="PostLoginAnalyzeNewVillagesCheckBox"
                                           Content="Analyze new village startup" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="After login, detects villages without cached status and reads their resource fields and buildings from dorf1 and dorf2. Enabled by default." />
+                            </StackPanel>
+
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="PostLoginAnalyzeNewAccountCheckBox"
+                                              Content="New account analysis" />
+                                    <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                    ToolTip="On the first full login for a new account, analyzes hero inventory, hero attributes, and new village startup regardless of their individual settings. Enabled by default." />
+                                </StackPanel>
+                                <Border x:Name="NewAccountAnalysisStatusCard"
+                                        Background="{DynamicResource WarningBrush}"
+                                        BorderBrush="{DynamicResource WarningBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="5"
+                                        Padding="8,4"
+                                        Margin="0,6,0,0">
+                                    <TextBlock x:Name="NewAccountAnalysisStatusTextBlock"
+                                               Text="Not analyzed"
+                                               Foreground="{DynamicResource OnWarningBrush}"
+                                               FontWeight="SemiBold" />
+                                </Border>
                             </StackPanel>
                         </StackPanel>
                     </Border>

@@ -42,6 +42,7 @@ public partial class SettingsWindow : Window
     private string _initialTownHallFingerprint = string.Empty;
     private readonly Func<DateTimeOffset>? _villageStatusSweepNextScanProvider;
     private readonly Func<Task>? _runVillageStatusSweepNow;
+    private readonly bool _newAccountAnalysisCompleted;
     private readonly DispatcherTimer _villageStatusSweepTimer;
 
     public ObservableCollection<TownHallOverviewRow> TownHallRows { get; } = [];
@@ -87,7 +88,8 @@ public partial class SettingsWindow : Window
         int dailyGoldSpent = 0,
         int dailySilverSpent = 0,
         Func<DateTimeOffset>? villageStatusSweepNextScanProvider = null,
-        Func<Task>? runVillageStatusSweepNow = null)
+        Func<Task>? runVillageStatusSweepNow = null,
+        bool newAccountAnalysisCompleted = false)
     {
         InitializeComponent();
         ThemeChrome.EnableEarlyDarkTitleBar(this);
@@ -101,6 +103,7 @@ public partial class SettingsWindow : Window
         _dailySilverSpent = Math.Max(0, dailySilverSpent);
         _villageStatusSweepNextScanProvider = villageStatusSweepNextScanProvider;
         _runVillageStatusSweepNow = runVillageStatusSweepNow;
+        _newAccountAnalysisCompleted = newAccountAnalysisCompleted;
         foreach (var row in townHallRows ?? [])
         {
             TownHallRows.Add(row);
@@ -110,6 +113,7 @@ public partial class SettingsWindow : Window
         InitializeConstructionChoices();
         PopulateDailyServerResetHours();
         LoadConfig();
+        UpdateNewAccountAnalysisStatus();
         SettingsCategoryTabControl.SelectedIndex = (int)initialCategory;
         _initialTownHallFingerprint = BuildTownHallFingerprint();
         SleepNowButton.IsEnabled = !_sessionSleeping;
@@ -122,6 +126,17 @@ public partial class SettingsWindow : Window
         Closed += (_, _) => _villageStatusSweepTimer.Stop();
         UpdateVillageStatusSweepNextScanDisplay();
         _villageStatusSweepTimer.Start();
+    }
+
+    private void UpdateNewAccountAnalysisStatus()
+    {
+        NewAccountAnalysisStatusTextBlock.Text = _newAccountAnalysisCompleted ? "Analyzed" : "Not analyzed";
+        NewAccountAnalysisStatusCard.SetResourceReference(
+            Border.BackgroundProperty,
+            _newAccountAnalysisCompleted ? "SuccessBrush" : "WarningBrush");
+        NewAccountAnalysisStatusCard.SetResourceReference(
+            Border.BorderBrushProperty,
+            _newAccountAnalysisCompleted ? "SuccessBrush" : "WarningBorderBrush");
     }
 
     private async void VillageStatusSweepScanNowButton_Click(object sender, RoutedEventArgs e)
@@ -206,8 +221,9 @@ public partial class SettingsWindow : Window
         PostLoginAnalyzeHeroCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeHero]?.GetValue<bool>() ?? false;
         PostLoginReadTroopTrainingQueueCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginReadTroopTrainingQueue]?.GetValue<bool>() ?? false;
         PostLoginAnalyzeBreweryCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeBrewery]?.GetValue<bool>() ?? false;
-        PostLoginAnalyzeHeroInventoryCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeHeroInventory]?.GetValue<bool>() ?? true;
+        PostLoginAnalyzeHeroInventoryCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeHeroInventory]?.GetValue<bool>() ?? false;
         PostLoginAnalyzeNewVillagesCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeNewVillages]?.GetValue<bool>() ?? true;
+        PostLoginAnalyzeNewAccountCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeNewAccount]?.GetValue<bool>() ?? true;
         SilverLimitTextBox.Text = Math.Max(
             0,
             _config[BotOptionPayloadKeys.SilverLimit]?.GetValue<int>() ?? DefaultSilverLimit).ToString(CultureInfo.InvariantCulture);
@@ -485,6 +501,7 @@ public partial class SettingsWindow : Window
             _config[BotOptionPayloadKeys.PostLoginAnalyzeBrewery] = PostLoginAnalyzeBreweryCheckBox.IsChecked == true;
             _config[BotOptionPayloadKeys.PostLoginAnalyzeHeroInventory] = PostLoginAnalyzeHeroInventoryCheckBox.IsChecked == true;
             _config[BotOptionPayloadKeys.PostLoginAnalyzeNewVillages] = PostLoginAnalyzeNewVillagesCheckBox.IsChecked == true;
+            _config[BotOptionPayloadKeys.PostLoginAnalyzeNewAccount] = PostLoginAnalyzeNewAccountCheckBox.IsChecked == true;
             _config[BotOptionPayloadKeys.SilverLimit] = silverLimit;
             _config[BotOptionPayloadKeys.DailySilverSpendingLimit] = dailySilverSpendingLimit;
             var validationError = _validateBeforeSave?.Invoke(_config);

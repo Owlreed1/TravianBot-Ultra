@@ -348,6 +348,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   duplicate village names must not share a humanize deadline.
 - Persisted account analysis may seed the stable village list. Cold start without a snapshot reads the profile;
   later full logins merge the live sidebar so new/renamed villages are found without another profile visit.
+- New-account analysis is account+server scoped. A pending first-login analysis forces hero inventory, hero
+  attributes, and new-village startup until all three succeed; legacy account snapshots are already initialized.
 - Browser activity statistics are account-scoped: lifetime counters persist; session counters do not.
 - Farm-list exact timers get a 5-15s render margin; unreadable disabled timers use an estimated 60s wait.
 - Farm lists are always sent ONE AT A TIME via `SendFarmListsSequentiallyAsync`: click each list's Start,

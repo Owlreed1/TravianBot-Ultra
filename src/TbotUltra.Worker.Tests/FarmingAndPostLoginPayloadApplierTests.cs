@@ -25,6 +25,7 @@ public sealed class FarmingAndPostLoginPayloadApplierTests
             [BotOptionPayloadKeys.PostLoginReadTroopTrainingQueue] = "false",
             [BotOptionPayloadKeys.PostLoginAnalyzeBrewery] = "false",
             [BotOptionPayloadKeys.PostLoginAnalyzeNewVillages] = "false",
+            [BotOptionPayloadKeys.PostLoginAnalyzeNewAccount] = "false",
             [BotOptionPayloadKeys.AutomaticallyCheckLanguage] = "false",
         };
 
@@ -45,6 +46,7 @@ public sealed class FarmingAndPostLoginPayloadApplierTests
         Assert.False(result.PostLoginReadTroopTrainingQueue);
         Assert.False(result.PostLoginAnalyzeBrewery);
         Assert.False(result.PostLoginAnalyzeNewVillages);
+        Assert.False(result.PostLoginAnalyzeNewAccount);
         Assert.False(result.AutomaticallyCheckLanguage);
     }
 }

@@ -21,6 +21,17 @@ public sealed class BotOptionsPayloadApplierTests
     }
 
     [Fact]
+    public void FromConfiguration_NewAccountAnalysisDefaultsEnabled_AndHeroInventoryDefaultsDisabled()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+
+        var options = BotOptionsFactory.FromConfiguration(configuration);
+
+        Assert.True(options.PostLoginAnalyzeNewAccount);
+        Assert.False(options.PostLoginAnalyzeHeroInventory);
+    }
+
+    [Fact]
     public void FromConfiguration_AutomaticallyCheckLanguage_DefaultsEnabled()
     {
         var configuration = new ConfigurationBuilder()
@@ -152,6 +163,17 @@ public sealed class BotOptionsPayloadApplierTests
         });
 
         Assert.False(result.PostLoginAnalyzeNewVillages);
+    }
+
+    [Fact]
+    public void Apply_OverridesNewAccountAnalysis()
+    {
+        var result = BotOptionsPayloadApplier.Apply(new BotOptions(), new Dictionary<string, string>
+        {
+            [BotOptionPayloadKeys.PostLoginAnalyzeNewAccount] = "false",
+        });
+
+        Assert.False(result.PostLoginAnalyzeNewAccount);
     }
 
     [Fact]

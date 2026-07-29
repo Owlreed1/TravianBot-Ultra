@@ -35,3 +35,8 @@ _Avoid_: Manual attack flow
 **Sleep Snapshot**:
 What was actually running (logged-in state, continuous loop, queue auto-run) when session sleep began, captured so the next wake restores the same state instead of always starting the continuous loop. Modeled by the `SleepSnapshot` record; the pure wake decisions live in `SessionWakeDecisions`.
 _Avoid_: pre-sleep flags, wake state
+
+**New Account Analysis**:
+The account-and-world-specific first-login initialization that reads hero inventory, hero attributes, and missing
+new-village status. It remains pending until all three reads succeed.
+_Avoid_: every-login analysis, hero inventory cache

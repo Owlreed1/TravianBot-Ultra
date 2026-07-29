@@ -7,6 +7,7 @@ internal sealed record PostLoginPayloadValues(
     bool ReadTroopTrainingQueue,
     bool AnalyzeBrewery,
     bool AnalyzeNewVillages,
+    bool AnalyzeNewAccount,
     bool AutomaticallyCheckLanguage);
 
 internal static class PostLoginPayloadApplier
@@ -20,6 +21,7 @@ internal static class PostLoginPayloadApplier
             source.PostLoginReadTroopTrainingQueue,
             source.PostLoginAnalyzeBrewery,
             source.PostLoginAnalyzeNewVillages,
+            source.PostLoginAnalyzeNewAccount,
             source.AutomaticallyCheckLanguage);
 
         if (payload is null)
@@ -44,6 +46,8 @@ internal static class PostLoginPayloadApplier
                 result = result with { AnalyzeBrewery = brewery };
             else if (TryReadBool(key, value, BotOptionPayloadKeys.PostLoginAnalyzeNewVillages, out var villages))
                 result = result with { AnalyzeNewVillages = villages };
+            else if (TryReadBool(key, value, BotOptionPayloadKeys.PostLoginAnalyzeNewAccount, out var account))
+                result = result with { AnalyzeNewAccount = account };
             else if (TryReadBool(key, value, BotOptionPayloadKeys.AutomaticallyCheckLanguage, out var language))
                 result = result with { AutomaticallyCheckLanguage = language };
         }

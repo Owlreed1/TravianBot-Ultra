@@ -180,10 +180,14 @@ public sealed partial class BotTaskRunner
     {
         log($"Loading post-login data for server {options.ServerName}.");
 
+        _accountAnalysisStore.TryLoad(client.AccountName, out var persistedAnalysis, client.ServerUrl);
+        var newAccountAnalysisPending = options.PostLoginAnalyzeNewAccount
+            && (persistedAnalysis is null || persistedAnalysis.NewAccountAnalysisCompleted == false);
+
         // When enabled, read the hero inventory FIRST — right after login and before the profile
         // navigation (ReadAccountSnapshotAsync reads villages from spieler.php/profile).
         HeroInventoryResources? heroInventory = null;
-        if (options.PostLoginAnalyzeHeroInventory)
+        if (options.PostLoginAnalyzeHeroInventory || newAccountAnalysisPending)
         {
             // Suppress the village/profile UI-sync so the inventory is read before the profile nav.
             // Non-fatal: a transient nav timeout here must NOT abort the whole login (it once left the bot
@@ -203,7 +207,6 @@ public sealed partial class BotTaskRunner
             }
         }
 
-        _accountAnalysisStore.TryLoad(client.AccountName, out var persistedAnalysis, client.ServerUrl);
         var hasPersistedVillageSnapshot = persistedAnalysis?.Villages is { Count: > 0 };
         log(hasPersistedVillageSnapshot
             ? "[post-login] reusing stable village snapshot; merging current sidebar instead of opening profile."
@@ -234,15 +237,21 @@ public sealed partial class BotTaskRunner
         var inboxStatus = new InboxStatus(villageStatus.UnreadMessages, villageStatus.UnreadReports);
         var adventureCount = await client.RefreshAdventureCountAsync(forceReload: false, cancellationToken);
 
-        PersistStableAccountSignals(client, accountSnapshot.Tribe, accountSnapshot.Villages, log);
+        PersistStableAccountSignals(
+            client,
+            accountSnapshot.Tribe,
+            accountSnapshot.Villages,
+            newAccountAnalysisPending,
+            log);
 
-        return new PostLoginSnapshot(villageStatus, inboxStatus, adventureCount, heroInventory);
+        return new PostLoginSnapshot(villageStatus, inboxStatus, adventureCount, heroInventory, newAccountAnalysisPending);
     }
 
     private void PersistStableAccountSignals(
         TravianClient client,
         string? fallbackTribe,
         IReadOnlyList<Village> villages,
+        bool newAccountAnalysisPending,
         Action<string> log)
     {
         var completed = _accountAnalysisStore.Update(client.AccountName, client.ServerUrl, existing =>
@@ -270,7 +279,10 @@ public sealed partial class BotTaskRunner
                 AutomationLoopEnabledGroups: existing?.AutomationLoopEnabledGroups,
                 AutomationLoopVisibleGroups: existing?.AutomationLoopVisibleGroups,
                 WorldUid: existing?.WorldUid,
-                Villages: villages.Count > 0 ? villages.Select(village => village with { }).ToList() : existing?.Villages);
+                Villages: villages.Count > 0 ? villages.Select(village => village with { }).ToList() : existing?.Villages,
+                NewAccountAnalysisCompleted: existing is null
+                    ? (newAccountAnalysisPending ? false : null)
+                    : existing.NewAccountAnalysisCompleted);
         });
         if (completed is null)
         {

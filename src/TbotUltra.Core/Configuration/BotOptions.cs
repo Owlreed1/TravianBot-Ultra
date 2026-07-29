@@ -104,7 +104,7 @@ public sealed record BotOptions
     public bool PostLoginAnalyzeHero { get; init; }
 
     [ConfigurationKeyName(BotOptionPayloadKeys.PostLoginAnalyzeHeroInventory)]
-    public bool PostLoginAnalyzeHeroInventory { get; init; } = true;
+    public bool PostLoginAnalyzeHeroInventory { get; init; }
 
     [ConfigurationKeyName(BotOptionPayloadKeys.PostLoginReadTroopTrainingQueue)]
     public bool PostLoginReadTroopTrainingQueue { get; init; }
@@ -114,6 +114,9 @@ public sealed record BotOptions
 
     [ConfigurationKeyName(BotOptionPayloadKeys.PostLoginAnalyzeNewVillages)]
     public bool PostLoginAnalyzeNewVillages { get; init; } = true;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.PostLoginAnalyzeNewAccount)]
+    public bool PostLoginAnalyzeNewAccount { get; init; } = true;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.AutomaticallyCheckLanguage)]
     public bool AutomaticallyCheckLanguage { get; init; } = true;

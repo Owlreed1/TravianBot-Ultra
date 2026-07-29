@@ -157,6 +157,7 @@ public static class BotOptionPayloadKeys
     public const string PostLoginReadTroopTrainingQueue = "post_login_read_troop_training_queue";
     public const string PostLoginAnalyzeBrewery = "post_login_analyze_brewery";
     public const string PostLoginAnalyzeNewVillages = "post_login_analyze_new_villages";
+    public const string PostLoginAnalyzeNewAccount = "post_login_analyze_new_account";
     // Quick re-login: skip the post-login analyze stack when the last FULL login finished recently.
     public const string PostLoginQuickReloginEnabled = "post_login_quick_relogin_enabled";
     public const string PostLoginLastFullLoginAt = "post_login_last_full_login_at";

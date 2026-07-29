@@ -64,7 +64,8 @@ public sealed record AccountAnalysisSnapshot(
     IReadOnlyList<string>? AutomationLoopEnabledGroups = null,
     IReadOnlyList<string>? AutomationLoopVisibleGroups = null,
     string? WorldUid = null,
-    IReadOnlyList<Village>? Villages = null);
+    IReadOnlyList<Village>? Villages = null,
+    bool? NewAccountAnalysisCompleted = null);
 
 public sealed record TribeBuildingCatalogEntry(
     int Gid,
@@ -303,7 +304,8 @@ public sealed record PostLoginSnapshot(
     VillageStatus VillageStatus,
     InboxStatus InboxStatus,
     int? AdventureCount,
-    HeroInventoryResources? HeroInventory = null);
+    HeroInventoryResources? HeroInventory = null,
+    bool NewAccountAnalysisPending = false);
 
 public sealed record PageHtmlCapture(string Url, string Html);
 

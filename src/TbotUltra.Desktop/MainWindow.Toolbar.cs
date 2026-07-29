@@ -200,7 +200,8 @@ public partial class MainWindow
             dailySpendingState.GoldSpent,
             dailySpendingState.SilverSpent,
             GetVillageStatusSweepNextScanUtc,
-            RunVillageStatusSweepNowFromSettingsAsync)
+            RunVillageStatusSweepNowFromSettingsAsync,
+            HasCompletedNewAccountAnalysis())
         {
             Owner = Application.Current.Windows
                 .OfType<Window>()
@@ -236,6 +237,14 @@ public partial class MainWindow
         {
             RequestManualSessionSleep();
         }
+    }
+
+    private bool HasCompletedNewAccountAnalysis()
+    {
+        var accountName = _accountStore.ActiveAccountName();
+        return !string.IsNullOrWhiteSpace(accountName)
+            && _accountAnalysisStore.TryLoad(accountName, out var analysis, GetActiveAccountServerUrl())
+            && analysis?.NewAccountAnalysisCompleted == true;
     }
 
     private void ResetChangedRestartDelayTasks(BotOptions before, BotOptions after)
