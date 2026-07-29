@@ -136,6 +136,35 @@ public partial class MainWindow
         }
     }
 
+    private async Task RefreshInboxIndicatorsForVillageStatusSweepAsync(
+        BotOptions options,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await _inboxRefreshGate.WaitAsync(cancellationToken);
+
+        try
+        {
+            var status = await _botService.ReadInboxStatusAsync(options, _ => { }, cancellationToken);
+            UpdateInboxButtons(status.UnreadMessages, status.UnreadReports);
+            AppendLog(
+                $"[village-scan] unread messages/reports: messages={status.UnreadMessages}, "
+                + $"reports={status.UnreadReports}.");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[village-scan] unread messages/reports check failed: {FormatExceptionForLog(ex)}");
+        }
+        finally
+        {
+            _inboxRefreshGate.Release();
+        }
+    }
+
     private async Task HandleInboxRefreshTickAsync()
     {
         if (IsFreezeActive)

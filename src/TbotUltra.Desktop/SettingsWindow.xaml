@@ -559,7 +559,7 @@
                                     <StackPanel Margin="18,0,0,8">
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                             <CheckBox x:Name="VillageStatusSweepDorf1CheckBox" Content="Dorf1" IsChecked="True" Margin="0,2,8,2" />
-                                            <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Reads resources, hourly production, Warehouse and Granary capacity, population, construction queue, tasks and daily quests." />
+                                            <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Reads resources, hourly production, Warehouse and Granary capacity, population, construction queue, tasks, daily quests, unread messages and reports." />
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal">
                                             <CheckBox x:Name="VillageStatusSweepDorf2CheckBox" Content="Dorf2" Margin="0,2,8,2" Checked="VillageStatusSweepDorf2Changed" Unchecked="VillageStatusSweepDorf2Changed" />

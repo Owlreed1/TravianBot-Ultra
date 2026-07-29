@@ -186,6 +186,7 @@ public partial class MainWindow
         }
 
         AppendLog($"[village-scan] starting round for {villages.Count} village(s).");
+        var inboxStatusChecked = false;
         foreach (var village in villages)
         {
             token.ThrowIfCancellationRequested();
@@ -207,6 +208,11 @@ public partial class MainWindow
                         ApplyVillageStatusToUi(status);
                     }
                 });
+                if (options.VillageStatusSweepDorf1Enabled && !inboxStatusChecked)
+                {
+                    inboxStatusChecked = true;
+                    await RefreshInboxIndicatorsForVillageStatusSweepAsync(options, token);
+                }
                 var collectionResult = await CollectVillageStatusSweepRewardsAsync(
                     options,
                     village,

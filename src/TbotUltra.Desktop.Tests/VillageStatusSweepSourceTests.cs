@@ -67,6 +67,10 @@ public sealed class VillageStatusSweepSourceTests
             "CollectVillageStatusSweepRewardsAsync(",
             methodBody,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "RefreshInboxIndicatorsForVillageStatusSweepAsync(options, token);",
+            methodBody,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -80,7 +84,7 @@ public sealed class VillageStatusSweepSourceTests
             "SettingsWindow.xaml"));
 
         Assert.Contains(
-            "Reads resources, hourly production, Warehouse and Granary capacity, population, construction queue, tasks and daily quests.",
+            "Reads resources, hourly production, Warehouse and Granary capacity, population, construction queue, tasks, daily quests, unread messages and reports.",
             xaml,
             StringComparison.Ordinal);
         Assert.Contains(

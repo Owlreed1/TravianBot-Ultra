@@ -25,7 +25,7 @@ public sealed class HeroResourceTransferSelectorTests
     [Fact]
     public void ConstructionFlows_LoadMissingInventoryFromTheExistingTransferDialog()
     {
-        var projectRoot = ProjectRootLocator.FindProjectRoot();
+        var projectRoot = FindRepositoryRoot();
         var automationRoot = Path.Combine(
             projectRoot,
             "src",
@@ -55,5 +55,18 @@ public sealed class HeroResourceTransferSelectorTests
         Assert.Contains("TryLoadMissingHeroInventoryFromCurrentBuildPageAsync", buildingUpgradeSource);
         Assert.Contains("TryLoadMissingHeroInventoryFromCurrentBuildPageAsync", constructSource);
         Assert.Contains("TryLoadMissingHeroInventoryFromCurrentBuildPageAsync", resourceUpgradeSource);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "TbotUltra.sln")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new DirectoryNotFoundException("Could not locate TbotUltra.sln from the test output directory.");
     }
 }
