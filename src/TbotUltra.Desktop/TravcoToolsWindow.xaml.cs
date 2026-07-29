@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Desktop.ViewModels;
@@ -10,6 +11,7 @@ namespace TbotUltra.Desktop;
 public partial class TravcoToolsWindow : Window
 {
     private readonly TravcoListStore _store;
+    private readonly AllVillagesImportSettingsStore _allVillagesSettingsStore;
     private readonly Action<string>? _log;
     private readonly CancellationTokenSource _windowCts = new();
     private readonly TravcoToolsViewModel _viewModel = new();
@@ -23,14 +25,17 @@ public partial class TravcoToolsWindow : Window
     public Func<TravcoSearchRequest, IProgress<TravcoSearchProgress>, CancellationToken, Task<TravcoScrapeResult>>? SearchRequested { get; init; }
     public Func<IProgress<(int CurrentPage, int TotalPages)>, CancellationToken, Task<TravcoScrapeResult>>? ScrapeAllPagesRequested { get; init; }
     public Func<MapOasisScanRequest, IProgress<MapOasisScanProgress>, CancellationToken, Task<List<OasisInfo>>>? MapOasisScanRequested { get; init; }
+    public Func<MapSqlVillageImportRequest, IProgress<MapSqlVillageImportProgress>, CancellationToken, Task<MapSqlVillageImportResult>>? AddAllVillagesRequested { get; init; }
     public Func<Task>? CloseRequested { get; init; }
 
     public TravcoToolsWindow(
         TravcoListStore store,
+        AllVillagesImportSettingsStore allVillagesSettingsStore,
         IReadOnlyList<VillageSelectionItem> villages,
         Action<string>? log)
     {
         _store = store;
+        _allVillagesSettingsStore = allVillagesSettingsStore;
         _log = log;
         InitializeComponent();
         ThemeChrome.EnableEarlyDarkTitleBar(this);
@@ -87,6 +92,135 @@ public partial class TravcoToolsWindow : Window
             ReloadSavedLists();
             SetStatus("Saved list updated from Analyze Travco.");
         }
+    }
+
+    private void AddAllVillagesButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || AddAllVillagesRequested is null)
+        {
+            return;
+        }
+
+        var saved = _allVillagesSettingsStore.Load();
+        var includePlayers = new CheckBox { Content = "Players", IsChecked = saved.IncludePlayers, Margin = new Thickness(0, 0, 0, 6) };
+        var includeNatars = new CheckBox { Content = "Natars", IsChecked = saved.IncludeNatars, Margin = new Thickness(0, 0, 0, 14) };
+        var listName = new TextBox { MinWidth = 360, ToolTip = "Leave empty to use All villages." };
+        var ignoredPlayers = new TextBox { Text = saved.IgnoredPlayers, MinWidth = 360 };
+        var ignoredAlliances = new TextBox { Text = saved.IgnoredAlliances, MinWidth = 360 };
+        var content = new StackPanel();
+        content.Children.Add(new TextBlock
+        {
+            Text = "All villages and players from the active server will be downloaded and saved in the list 'All villages'.",
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 14),
+        });
+        content.Children.Add(includePlayers);
+        content.Children.Add(includeNatars);
+        content.Children.Add(new TextBlock { Text = "List name", Margin = new Thickness(0, 0, 0, 4) });
+        content.Children.Add(listName);
+        content.Children.Add(new TextBlock { Text = "Ignore players", Margin = new Thickness(0, 0, 0, 4) });
+        content.Children.Add(ignoredPlayers);
+        content.Children.Add(new TextBlock { Text = "Ignore alliance", Margin = new Thickness(0, 12, 0, 4) });
+        content.Children.Add(ignoredAlliances);
+        content.Children.Add(new TextBlock
+        {
+            Text = "Use commas to separate names. Multihunter is always ignored.",
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 8, 0, 0),
+        });
+
+        var result = AppDialog.ShowCustomContent(
+            this,
+            content,
+            "Add all villages",
+            [("Yes", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
+            MessageBoxImage.Information,
+            MessageBoxResult.Yes,
+            MessageBoxResult.Cancel,
+            successResult: MessageBoxResult.Yes,
+            width: 520);
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var request = new MapSqlVillageImportRequest(
+            includePlayers.IsChecked == true,
+            includeNatars.IsChecked == true,
+            ParseCommaSeparated(ignoredPlayers.Text),
+            ParseCommaSeparated(ignoredAlliances.Text));
+        if (!request.IncludePlayers && !request.IncludeNatars)
+        {
+            SetStatus("Select Players or Natars before adding villages.");
+            return;
+        }
+
+        _allVillagesSettingsStore.Save(new AllVillagesImportSettingsStore.Settings(
+            request.IncludePlayers,
+            request.IncludeNatars,
+            ignoredPlayers.Text.Trim(),
+            ignoredAlliances.Text.Trim()));
+        _ = RunAllVillagesImportAsync(request, listName.Text);
+    }
+
+    private async Task RunAllVillagesImportAsync(MapSqlVillageImportRequest request, string? listName)
+    {
+        if (_busy || AddAllVillagesRequested is null)
+        {
+            return;
+        }
+
+        SetBusy(true);
+        using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(_windowCts.Token);
+        _activeOperationCts = operationCts;
+        BusyOverlay.ShowCancel = true;
+        BusyOverlay.IsIndeterminate = true;
+        BusyOverlay.Show("Add all villages", "Downloading map.sql...");
+        try
+        {
+            var progress = new Progress<MapSqlVillageImportProgress>(value => BusyOverlay.Text = value.Status);
+            var imported = await AddAllVillagesRequested(request, progress, operationCts.Token);
+            var resolvedListName = string.IsNullOrWhiteSpace(listName) ? "All villages" : listName.Trim();
+            _store.ReplaceAllVillages(resolvedListName, imported.Rows.Select(TravcoListRow.FromWorker).Select(row => new TravcoListStore.TravcoSavedRow
+            {
+                Account = row.Account,
+                Village = row.Village,
+                Pop = row.Pop,
+                Coordinates = row.Coordinates,
+                Selected = true,
+            }));
+            var savedList = _store.LoadAll().FirstOrDefault(list => string.Equals(list.Name, resolvedListName, StringComparison.OrdinalIgnoreCase));
+            ReloadSavedLists(savedList?.Id);
+            if (savedList is not null)
+            {
+                _openedSavedListId = savedList.Id;
+                ApplySavedListRows(savedList);
+            }
+
+            SetStatus($"Saved '{resolvedListName}' with {imported.Rows.Count} village(s).");
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus("Adding all villages was canceled.");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Could not add all villages: {ex.Message}");
+        }
+        finally
+        {
+            _activeOperationCts = null;
+            BusyOverlay.ShowCancel = false;
+            BusyOverlay.Hide();
+            SetBusy(false);
+        }
+    }
+
+    private static IReadOnlyList<string> ParseCommaSeparated(string? value)
+    {
+        return (value ?? string.Empty)
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
     }
 
     private void AnalyzeMapOasisButton_Click(object sender, RoutedEventArgs e)
@@ -618,6 +752,7 @@ public partial class TravcoToolsWindow : Window
     private void SetBusy(bool busy)
     {
         _busy = busy;
+        AddAllVillagesButton.IsEnabled = !busy;
         InactiveSearchButton.IsEnabled = !busy;
         AnalyzeMapOasisButton.IsEnabled = !busy;
         CalculateDistanceButton.IsEnabled = !busy;

@@ -80,6 +80,15 @@ public static class AccountStoragePaths
         return Path.Combine(AccountDirectory(projectRoot, accountName), "travco_lists.json");
     }
 
+    public static string AllVillagesImportSettingsPath(string projectRoot, string accountName, string? serverUrl = null)
+    {
+        return Path.Combine(
+            AccountDirectory(projectRoot, accountName),
+            "cache",
+            "all-villages",
+            $"{NormalizeServerKey(serverUrl)}.json");
+    }
+
     public static string SmithyUpgradePath(string projectRoot, string accountName)
     {
         return Path.Combine(AccountDirectory(projectRoot, accountName), "smithy_upgrade.json");

@@ -26,6 +26,16 @@ public sealed record TravcoSearchProgress(
     int TotalSteps,
     string Status);
 
+public sealed record MapSqlVillageImportRequest(
+    bool IncludePlayers,
+    bool IncludeNatars,
+    IReadOnlyList<string> IgnoredPlayers,
+    IReadOnlyList<string> IgnoredAlliances);
+
+public sealed record MapSqlVillageImportProgress(string Status);
+
+public sealed record MapSqlVillageImportResult(IReadOnlyList<TravcoRow> Rows);
+
 public sealed record TravcoRawRow(
     IReadOnlyList<string> Cells,
     string? VillageHref);

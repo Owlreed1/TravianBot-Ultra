@@ -96,6 +96,7 @@ public partial class MainWindow : Window
     private readonly BotConfigStore _botConfigStore;
     private readonly VillageSettingsStore _villageSettingsStore;
     private readonly TravcoListStore _travcoListStore;
+    private readonly AllVillagesImportSettingsStore _allVillagesImportSettingsStore;
     private readonly VillageCacheStore _villageCacheStore;
     private readonly IAccountProvider _accountProvider;
     private readonly EnvAccountStore _accountStore;
@@ -414,7 +415,16 @@ public partial class MainWindow : Window
         _accountAutomationHoldStore = new AccountAutomationHoldStore(_projectRoot, AppendLog);
         _botConfigStore = new BotConfigStore(_botConfigPath, _projectRoot, () => _accountStore.ActiveAccountName());
         _villageSettingsStore = new VillageSettingsStore(_projectRoot, () => _accountStore.ActiveAccountName(), AppendLog);
-        _travcoListStore = new TravcoListStore(_projectRoot, () => _accountStore.ActiveAccountName(), AppendLog);
+        _travcoListStore = new TravcoListStore(
+            _projectRoot,
+            () => _accountStore.ActiveAccountName(),
+            AppendLog,
+            () => LoadBotOptions().BaseUrl);
+        _allVillagesImportSettingsStore = new AllVillagesImportSettingsStore(
+            _projectRoot,
+            () => _accountStore.ActiveAccountName(),
+            () => LoadBotOptions().BaseUrl,
+            AppendLog);
         _villageCacheStore = new VillageCacheStore(_projectRoot, () => _accountStore.ActiveAccountName(), AppendLog);
         InitializeSessionPacing();
         _accountAnalysisStore = new AccountAnalysisStore(_projectRoot);

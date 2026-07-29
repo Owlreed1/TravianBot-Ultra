@@ -136,6 +136,44 @@ public sealed partial class BotTaskRunner
         log($"[bulk-messages] sent-player cache cleared for account '{account.Name}' server '{options.BaseUrl.TrimEnd('/')}'.");
     }
 
+    public async Task<MapSqlVillageImportResult> ImportAllVillagesAsync(
+        BotOptions options,
+        MapSqlVillageImportRequest request,
+        Action<string> log,
+        IProgress<MapSqlVillageImportProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!request.IncludePlayers && !request.IncludeNatars)
+        {
+            throw new ArgumentException("Select Players or Natars before importing villages.", nameof(request));
+        }
+
+        progress?.Report(new MapSqlVillageImportProgress("Downloading map.sql..."));
+        var mapSql = await DownloadMapSqlAsync(options, log, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        progress?.Report(new MapSqlVillageImportProgress("Reading villages from map.sql..."));
+        var villages = MapSqlPlayerParser.ParseVillages(mapSql);
+        var filtered = MapSqlPlayerParser.FilterVillages(
+            villages,
+            request.IncludePlayers,
+            request.IncludeNatars,
+            request.IgnoredPlayers,
+            request.IgnoredAlliances);
+        var rows = filtered
+            .Select(village => new TravcoRow(
+                Distance: null,
+                Account: village.PlayerName,
+                Village: village.VillageName,
+                Pop: village.Population,
+                Coordinates: $"{village.X}|{village.Y}"))
+            .ToList();
+        log($"[all-villages] map.sql rows={villages.Count}, saved={rows.Count}, players={request.IncludePlayers}, natars={request.IncludeNatars}.");
+        progress?.Report(new MapSqlVillageImportProgress($"Prepared {rows.Count} village(s)."));
+        return new MapSqlVillageImportResult(rows);
+    }
+
     private static async Task<string> DownloadMapSqlAsync(
         BotOptions options,
         Action<string> log,

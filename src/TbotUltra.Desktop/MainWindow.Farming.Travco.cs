@@ -46,7 +46,7 @@ public partial class MainWindow
         _travcoSuppressRestart = false;
         await PauseAutomationForTravcoAsync();
 
-        var window = new TravcoToolsWindow(_travcoListStore, villages, AppendLog)
+        var window = new TravcoToolsWindow(_travcoListStore, _allVillagesImportSettingsStore, villages, AppendLog)
         {
             Owner = this,
             SearchRequested = RunTravcoSearchAsync,
@@ -56,11 +56,23 @@ public partial class MainWindow
                     token => _botService.ScrapeAllTravcoPagesAsync(AppendLog, progress, token),
                     cancellationToken),
             MapOasisScanRequested = RunMapOasisScanAsync,
+            AddAllVillagesRequested = RunAllVillagesImportAsync,
             CloseRequested = () => _botService.CloseTravcoTabAsync(AppendLog),
         };
         window.Closed += TravcoToolsWindow_Closed;
         _travcoToolsWindow = window;
         window.Show();
+    }
+
+    private async Task<MapSqlVillageImportResult> RunAllVillagesImportAsync(
+        MapSqlVillageImportRequest request,
+        IProgress<MapSqlVillageImportProgress> progress,
+        CancellationToken cancellationToken)
+    {
+        return await RunManualOperationAsync(
+            "Add all villages",
+            token => _botService.ImportAllVillagesAsync(LoadBotOptions(), request, AppendLog, progress, token),
+            cancellationToken);
     }
 
     private async Task<TravcoScrapeResult> RunTravcoSearchAsync(

@@ -90,6 +90,16 @@ public sealed class DesktopBotService : IDesktopBotService
             cancellationToken);
     }
 
+    public Task<MapSqlVillageImportResult> ImportAllVillagesAsync(
+        BotOptions options,
+        MapSqlVillageImportRequest request,
+        Action<string> log,
+        IProgress<MapSqlVillageImportProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        return _taskRunner.ImportAllVillagesAsync(options, request, log, progress, cancellationToken);
+    }
+
     public Task<bool> IsLoggedInAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken)
     {
         return _taskRunner.IsLoggedInAsync(options, log, null, cancellationToken);

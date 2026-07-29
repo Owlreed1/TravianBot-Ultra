@@ -18,7 +18,17 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0" Margin="0,0,0,12" HorizontalAlignment="Left">
+                <Button x:Name="AddAllVillagesButton"
+                        MinWidth="175"
+                        HorizontalAlignment="Left"
+                        Content="Add all villages"
+                        FontWeight="SemiBold"
+                        Background="{DynamicResource SuccessBgBrush}"
+                        BorderBrush="{DynamicResource SuccessBorderBrush}"
+                        Foreground="{DynamicResource SuccessTextBrush}"
+                        Click="AddAllVillagesButton_Click" />
                 <Button x:Name="InactiveSearchButton"
+                        Margin="0,8,0,0"
                         MinWidth="175"
                         HorizontalAlignment="Left"
                         Content="Analyze Travco"

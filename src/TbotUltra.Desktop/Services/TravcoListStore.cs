@@ -14,6 +14,7 @@ public sealed class TravcoListStore
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public string Name { get; set; } = string.Empty;
+        public string? ServerKey { get; set; }
         public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
         public List<TravcoSavedRow> Rows { get; set; } = [];
 
@@ -53,15 +54,21 @@ public sealed class TravcoListStore
 
     private readonly string _projectRoot;
     private readonly Func<string> _activeAccountNameProvider;
+    private readonly Func<string>? _activeServerUrlProvider;
     private readonly Action<string>? _log;
     private List<TravcoSavedList> _cache = [];
     private string? _cacheAccount;
 
-    public TravcoListStore(string projectRoot, Func<string> activeAccountNameProvider, Action<string>? log = null)
+    public TravcoListStore(
+        string projectRoot,
+        Func<string> activeAccountNameProvider,
+        Action<string>? log = null,
+        Func<string>? activeServerUrlProvider = null)
     {
         _projectRoot = projectRoot;
         _activeAccountNameProvider = activeAccountNameProvider;
         _log = log;
+        _activeServerUrlProvider = activeServerUrlProvider;
     }
 
     public IReadOnlyList<TravcoSavedList> LoadAll()
@@ -70,6 +77,8 @@ public sealed class TravcoListStore
         {
             EnsureCacheLoaded();
             return _cache
+                .Where(list => string.IsNullOrWhiteSpace(list.ServerKey)
+                    || string.Equals(list.ServerKey, ActiveServerKey(), StringComparison.Ordinal))
                 .OrderByDescending(list => list.CreatedUtc)
                 .Select(Clone)
                 .ToList();
@@ -129,6 +138,44 @@ public sealed class TravcoListStore
             }
 
             return removed;
+        }
+    }
+
+    public void ReplaceAllVillages(string? name, IEnumerable<TravcoSavedRow> rows)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        lock (FileIoLock)
+        {
+            EnsureCacheLoaded();
+            var serverKey = ActiveServerKey();
+            var listName = string.IsNullOrWhiteSpace(name) ? "All villages" : name.Trim();
+            var existing = _cache.FirstOrDefault(list =>
+                string.Equals(list.Name, listName, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(list.ServerKey, serverKey, StringComparison.Ordinal));
+            var list = existing ?? new TravcoSavedList
+            {
+                Name = listName,
+                ServerKey = serverKey,
+            };
+            list.CreatedUtc = DateTimeOffset.UtcNow;
+            list.Rows = RemoveDuplicates(rows, out var missingCoordinates);
+            if (missingCoordinates > 0)
+            {
+                _log?.Invoke($"ALARM: All villages skipped {missingCoordinates} village(s) because coordinates were missing or unreadable.");
+            }
+
+            var index = _cache.FindIndex(candidate => candidate.Id == list.Id);
+            if (index >= 0)
+            {
+                _cache[index] = list;
+            }
+            else
+            {
+                _cache.Add(list);
+            }
+
+            SaveFile();
+            _log?.Invoke($"[all-villages] saved {list.Rows.Count} village(s).");
         }
     }
 
@@ -293,6 +340,7 @@ public sealed class TravcoListStore
         {
             Id = list.Id,
             Name = list.Name,
+            ServerKey = list.ServerKey,
             CreatedUtc = list.CreatedUtc,
             Rows = list.Rows.Select(row => new TravcoSavedRow
             {
@@ -326,6 +374,11 @@ public sealed class TravcoListStore
 
         normalized = $"{x}|{y}";
         return true;
+    }
+
+    private string ActiveServerKey()
+    {
+        return AccountStoragePaths.NormalizeServerKey(_activeServerUrlProvider?.Invoke());
     }
 
     private static T RetryFileIo<T>(Func<T> action)

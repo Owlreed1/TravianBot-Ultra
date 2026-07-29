@@ -118,6 +118,44 @@ public sealed class MapSqlPlayerParserTests
     }
 
     [Fact]
+    public void ParseVillages_ReadsOfficialCoordinatesAndFiltersSelectedSources()
+    {
+        const string mapSql = """
+            INSERT INTO `x_world` VALUES
+            (22028,173,146,5,31912,'Natars 173|146',1,'Natars',0,"",498,NULL,FALSE,NULL,NULL,NULL),
+            (22029,-4,12,1,31913,'Player village',2,'Alice',3,'ALLY',99,NULL,FALSE,NULL,NULL,NULL),
+            (22030,5,9,1,31914,'Hunter village',3,'Multihunter',0,"",1,NULL,FALSE,NULL,NULL,NULL);
+            """;
+
+        var villages = MapSqlPlayerParser.ParseVillages(mapSql);
+        var natars = MapSqlPlayerParser.FilterVillages(villages, includePlayers: false, includeNatars: true, [], []);
+        var players = MapSqlPlayerParser.FilterVillages(villages, includePlayers: true, includeNatars: false, [], []);
+
+        var natar = Assert.Single(natars);
+        Assert.Equal(173, natar.X);
+        Assert.Equal(146, natar.Y);
+        Assert.Equal("Natars 173|146", natar.VillageName);
+        Assert.True(natar.IsNatar);
+        var player = Assert.Single(players);
+        Assert.Equal("Alice", player.PlayerName);
+        Assert.Equal("ALLY", player.Alliance);
+    }
+
+    [Fact]
+    public void FilterVillages_ExcludesIgnoredPlayerAndAlliance()
+    {
+        var villages = new[]
+        {
+            new MapSqlVillage(1, 2, "A", "Alice", "ALLY", 10, false),
+            new MapSqlVillage(3, 4, "B", "Bob", "BETA", 20, false),
+        };
+
+        var result = MapSqlPlayerParser.FilterVillages(villages, true, true, [" alice "], ["beta"]);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
     public void TryExtractBulkMessageMissingPlayerName_ReadsOfficialDialogText()
     {
         var name = TravianClient.TryExtractBulkMessageMissingPlayerName("The name grezullallala does not exist.");

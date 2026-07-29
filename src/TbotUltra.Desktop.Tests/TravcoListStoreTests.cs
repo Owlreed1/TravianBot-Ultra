@@ -236,6 +236,32 @@ public sealed class TravcoListStoreTests : IDisposable
         Assert.Single(lists.Single(list => list.Id == other.Id).Rows);
     }
 
+    [Fact]
+    public void ReplaceAllVillages_IsServerScopedAndReplacesThePreviousImport()
+    {
+        var server = "https://ts1.example.travian.com";
+        var store = new TravcoListStore(_root, () => _account, activeServerUrlProvider: () => server);
+        store.ReplaceAllVillages(null, [new TravcoListStore.TravcoSavedRow { Village = "Old", Coordinates = "1|2" }]);
+        store.ReplaceAllVillages(null, [new TravcoListStore.TravcoSavedRow { Village = "New", Coordinates = "3|4" }]);
+
+        var list = Assert.Single(store.LoadAll());
+        Assert.Equal("All villages", list.Name);
+        Assert.Equal("New", Assert.Single(list.Rows).Village);
+
+        server = "https://ts2.example.travian.com";
+        Assert.Empty(store.LoadAll());
+    }
+
+    [Fact]
+    public void ReplaceAllVillages_UsesCustomListName()
+    {
+        var store = CreateStore();
+
+        store.ReplaceAllVillages("Targets", [new TravcoListStore.TravcoSavedRow { Village = "Village", Coordinates = "1|2" }]);
+
+        Assert.Equal("Targets", Assert.Single(store.LoadAll()).Name);
+    }
+
     private TravcoListStore CreateStore() => new(_root, () => _account);
 
     public void Dispose()

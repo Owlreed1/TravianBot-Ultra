@@ -8,6 +8,15 @@ internal sealed record MapSqlVillagePlayer(
     string? Alliance,
     long Population);
 
+internal sealed record MapSqlVillage(
+    int X,
+    int Y,
+    string VillageName,
+    string PlayerName,
+    string? Alliance,
+    long Population,
+    bool IsNatar);
+
 internal static class MapSqlPlayerParser
 {
     private static readonly HashSet<string> ProtectedPlayerNameKeys =
@@ -106,6 +115,53 @@ internal static class MapSqlPlayerParser
         return ProtectedPlayerNameKeys.Contains(NormalizeNameKey(value));
     }
 
+    public static bool IsMultihunterName(string? value)
+    {
+        return string.Equals(NormalizeNameKey(value), "multihunter", StringComparison.Ordinal);
+    }
+
+    public static IReadOnlyList<MapSqlVillage> ParseVillages(string mapSql)
+    {
+        if (string.IsNullOrWhiteSpace(mapSql))
+        {
+            return [];
+        }
+
+        var rows = new List<MapSqlVillage>();
+        var foundValuesBlock = false;
+        var searchIndex = 0;
+        while (TryFindValuesBlock(mapSql, searchIndex, out var valuesIndex))
+        {
+            foundValuesBlock = true;
+            ParseVillageTuplesUntilStatementEnd(mapSql, valuesIndex, rows, out searchIndex);
+        }
+
+        if (!foundValuesBlock)
+        {
+            ParseVillageTuplesUntilStatementEnd(mapSql, 0, rows, out _);
+        }
+
+        return rows;
+    }
+
+    public static IReadOnlyList<MapSqlVillage> FilterVillages(
+        IReadOnlyList<MapSqlVillage> villages,
+        bool includePlayers,
+        bool includeNatars,
+        IReadOnlyCollection<string> ignoredPlayers,
+        IReadOnlyCollection<string> ignoredAlliances)
+    {
+        var playerKeys = ToKeySet(ignoredPlayers);
+        var allianceKeys = ToKeySet(ignoredAlliances);
+        return villages
+            .Where(village => !IsMultihunterName(village.PlayerName))
+            .Where(village => village.IsNatar ? includeNatars : includePlayers)
+            .Where(village => !playerKeys.Contains(NormalizeNameKey(village.PlayerName)))
+            .Where(village => string.IsNullOrWhiteSpace(village.Alliance)
+                || !allianceKeys.Contains(NormalizeNameKey(village.Alliance)))
+            .ToList();
+    }
+
     public static string NormalizeNameKey(string? value)
     {
         return string.Join(
@@ -164,6 +220,37 @@ internal static class MapSqlPlayerParser
                 if (TryCreatePlayer(fields, out var player))
                 {
                     rows.Add(player);
+                }
+
+                index = afterTuple;
+                continue;
+            }
+
+            index++;
+        }
+    }
+
+    private static void ParseVillageTuplesUntilStatementEnd(
+        string text,
+        int startIndex,
+        List<MapSqlVillage> rows,
+        out int nextIndex)
+    {
+        nextIndex = text.Length;
+        var index = Math.Max(0, startIndex);
+        while (index < text.Length)
+        {
+            if (text[index] == ';')
+            {
+                nextIndex = index + 1;
+                return;
+            }
+
+            if (text[index] == '(' && TryParseTuple(text, index, out var fields, out var afterTuple))
+            {
+                if (TryCreateVillage(fields, out var village))
+                {
+                    rows.Add(village);
                 }
 
                 index = afterTuple;
@@ -268,6 +355,36 @@ internal static class MapSqlPlayerParser
             playerName.Trim(),
             string.IsNullOrWhiteSpace(alliance) ? null : alliance.Trim(),
             population);
+        return true;
+    }
+
+    private static bool TryCreateVillage(IReadOnlyList<string> fields, out MapSqlVillage village)
+    {
+        village = new MapSqlVillage(0, 0, string.Empty, string.Empty, null, 0, false);
+        if (fields.Count < 11
+            || !int.TryParse(fields[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var x)
+            || !int.TryParse(fields[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var y))
+        {
+            return false;
+        }
+
+        var villageName = CleanSqlValue(fields[5]);
+        var playerName = CleanSqlValue(fields[7]);
+        if (string.IsNullOrWhiteSpace(villageName) || string.IsNullOrWhiteSpace(playerName))
+        {
+            return false;
+        }
+
+        var alliance = CleanSqlValue(fields[9]);
+        _ = long.TryParse(fields[10], NumberStyles.Integer, CultureInfo.InvariantCulture, out var population);
+        village = new MapSqlVillage(
+            x,
+            y,
+            villageName.Trim(),
+            playerName.Trim(),
+            string.IsNullOrWhiteSpace(alliance) ? null : alliance.Trim(),
+            population,
+            string.Equals(NormalizeNameKey(playerName), "natars", StringComparison.Ordinal));
         return true;
     }
 

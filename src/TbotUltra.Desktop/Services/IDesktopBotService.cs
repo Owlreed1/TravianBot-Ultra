@@ -90,6 +90,7 @@ public interface IDesktopBotService
     Task RefreshCurrentPageAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken);
     Task<InboxStatus> ReadInboxStatusAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken);
     Task<BulkMessageAnalyzeResult> AnalyzeBulkMessagePlayersAsync(BotOptions options, BulkMessageAnalyzeRequest request, Action<string> log, IProgress<BulkMessageProgress>? progress, CancellationToken cancellationToken);
+    Task<MapSqlVillageImportResult> ImportAllVillagesAsync(BotOptions options, MapSqlVillageImportRequest request, Action<string> log, IProgress<MapSqlVillageImportProgress>? progress, CancellationToken cancellationToken);
     Task<BulkMessageSendResult> SendBulkMessagesAsync(BotOptions options, BulkMessageRequest request, Action<string> log, IProgress<BulkMessageProgress>? progress, CancellationToken cancellationToken);
     void ClearBulkMessageSentCache(BotOptions options, Action<string> log);
     Task<HeroAdventureDispatchResult> SendHeroOnAdventureAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken);
