@@ -130,6 +130,37 @@ public sealed class ResourcesViewModel : BaseViewModel
     /// <summary>String form of the build strategy, "smart" or "lowest_first".</summary>
     public string BuildStrategy => IsBuildSmart ? "smart" : "lowest_first";
 
+    private bool _upgradeWood = true;
+    private bool _upgradeClay = true;
+    private bool _upgradeIron = true;
+    private bool _upgradeCrop = true;
+
+    public bool UpgradeWood { get => _upgradeWood; set => SetProperty(ref _upgradeWood, value); }
+    public bool UpgradeClay { get => _upgradeClay; set => SetProperty(ref _upgradeClay, value); }
+    public bool UpgradeIron { get => _upgradeIron; set => SetProperty(ref _upgradeIron, value); }
+    public bool UpgradeCrop { get => _upgradeCrop; set => SetProperty(ref _upgradeCrop, value); }
+
+    public IReadOnlyList<string> SelectedUpgradeTypes =>
+        new[]
+        {
+            (Enabled: UpgradeWood, Type: "wood"),
+            (Enabled: UpgradeClay, Type: "clay"),
+            (Enabled: UpgradeIron, Type: "iron"),
+            (Enabled: UpgradeCrop, Type: "crop"),
+        }
+        .Where(item => item.Enabled)
+        .Select(item => item.Type)
+        .ToList();
+
+    public void LoadResourceUpgradeTypes(IEnumerable<string> types)
+    {
+        var selected = new HashSet<string>(types ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+        UpgradeWood = selected.Contains("wood");
+        UpgradeClay = selected.Contains("clay");
+        UpgradeIron = selected.Contains("iron");
+        UpgradeCrop = selected.Contains("crop");
+    }
+
     /// <summary>Loads the resource build strategy from a freshly read <see cref="BotOptions"/>.</summary>
     public void LoadSettingsFromConfig(BotOptions options)
     {

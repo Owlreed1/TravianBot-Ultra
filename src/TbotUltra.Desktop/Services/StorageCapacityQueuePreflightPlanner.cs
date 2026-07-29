@@ -258,11 +258,15 @@ public static class StorageCapacityQueuePreflightPlanner
                 && payload.TryGetValue(BotOptionPayloadKeys.ResourceUpgradeTargetLevel, out var rawBulkTarget)
                 && int.TryParse(rawBulkTarget, out var bulkTarget))
             {
-                foreach (var slot in fieldsBySlot.Keys.ToList())
+                var selectedTypes = ResourceUpgradeSelection.Parse(
+                    payload.GetValueOrDefault(BotOptionPayloadKeys.ResourceUpgradeTypes));
+                foreach (var field in fieldsBySlot.Values.Where(field =>
+                             ResourceUpgradeSelection.Matches(field.FieldType, field.Name, selectedTypes)).ToList())
                 {
-                    fieldsBySlot[slot] = fieldsBySlot[slot] with
+                    var slot = field.SlotId!.Value;
+                    fieldsBySlot[slot] = field with
                     {
-                        Level = Math.Max(fieldsBySlot[slot].Level ?? 0, bulkTarget),
+                        Level = Math.Max(field.Level ?? 0, bulkTarget),
                     };
                 }
             }
@@ -518,11 +522,15 @@ public static class StorageCapacityQueuePreflightPlanner
                 && item.Payload.TryGetValue(BotOptionPayloadKeys.ResourceUpgradeTargetLevel, out var rawTarget)
                 && int.TryParse(rawTarget, out var targetLevel))
             {
-                foreach (var slot in fieldsBySlot.Keys.ToList())
+                var selectedTypes = ResourceUpgradeSelection.Parse(
+                    item.Payload.GetValueOrDefault(BotOptionPayloadKeys.ResourceUpgradeTypes));
+                foreach (var selectedField in fieldsBySlot.Values.Where(candidate =>
+                             ResourceUpgradeSelection.Matches(candidate.FieldType, candidate.Name, selectedTypes)).ToList())
                 {
-                    fieldsBySlot[slot] = fieldsBySlot[slot] with
+                    var slot = selectedField.SlotId!.Value;
+                    fieldsBySlot[slot] = selectedField with
                     {
-                        Level = Math.Max(fieldsBySlot[slot].Level ?? 0, targetLevel),
+                        Level = Math.Max(selectedField.Level ?? 0, targetLevel),
                     };
                 }
             }
@@ -533,12 +541,16 @@ public static class StorageCapacityQueuePreflightPlanner
         VillageStatus status,
         IReadOnlyList<QueueItem> precedingQueueItems,
         int targetLevel,
-        int storageUpgradeLevelsAhead = ConstructionDefaults.StorageUpgradeLevelsAhead)
+        int storageUpgradeLevelsAhead = ConstructionDefaults.StorageUpgradeLevelsAhead,
+        IReadOnlySet<string>? selectedTypes = null)
     {
+        selectedTypes ??= ResourceUpgradeSelection.Parse(null);
         storageUpgradeLevelsAhead = ConstructionDefaults.NormalizeStorageUpgradeLevelsAhead(storageUpgradeLevelsAhead);
         var requiredWarehouse = 0L;
         var requiredGranary = 0L;
-        foreach (var field in status.ResourceFields.Where(field => (field.Level ?? 0) < targetLevel))
+        foreach (var field in status.ResourceFields.Where(field =>
+                     (field.Level ?? 0) < targetLevel
+                     && ResourceUpgradeSelection.Matches(field.FieldType, field.Name, selectedTypes)))
         {
             var gid = BuildingCatalogService.GidForName(field.FieldType)
                 ?? BuildingCatalogService.GidForName(field.Name);
@@ -596,8 +608,10 @@ public static class StorageCapacityQueuePreflightPlanner
         VillageStatus status,
         IReadOnlyList<QueueItem> precedingQueueItems,
         int targetLevel,
-        int storageUpgradeLevelsAhead = ConstructionDefaults.StorageUpgradeLevelsAhead)
+        int storageUpgradeLevelsAhead = ConstructionDefaults.StorageUpgradeLevelsAhead,
+        IReadOnlySet<string>? selectedTypes = null)
     {
+        selectedTypes ??= ResourceUpgradeSelection.Parse(null);
         storageUpgradeLevelsAhead = ConstructionDefaults.NormalizeStorageUpgradeLevelsAhead(storageUpgradeLevelsAhead);
         var projectedFieldLevels = status.ResourceFields
             .Where(field => field.SlotId is >= 1 and <= 18)
@@ -608,9 +622,14 @@ public static class StorageCapacityQueuePreflightPlanner
                 && item.Payload.TryGetValue(BotOptionPayloadKeys.ResourceUpgradeTargetLevel, out var rawBulkTarget)
                 && int.TryParse(rawBulkTarget, out var bulkTarget))
             {
-                foreach (var slot in projectedFieldLevels.Keys.ToList())
+                var queuedTypes = ResourceUpgradeSelection.Parse(
+                    item.Payload.GetValueOrDefault(BotOptionPayloadKeys.ResourceUpgradeTypes));
+                foreach (var field in status.ResourceFields.Where(field =>
+                             field.SlotId is int slot
+                             && projectedFieldLevels.ContainsKey(slot)
+                             && ResourceUpgradeSelection.Matches(field.FieldType, field.Name, queuedTypes)))
                 {
-                    projectedFieldLevels[slot] = Math.Max(projectedFieldLevels[slot], bulkTarget);
+                    projectedFieldLevels[field.SlotId!.Value] = Math.Max(projectedFieldLevels[field.SlotId!.Value], bulkTarget);
                 }
             }
             else if (string.Equals(item.TaskName, "upgrade_resource_to_level", StringComparison.OrdinalIgnoreCase)
@@ -625,7 +644,9 @@ public static class StorageCapacityQueuePreflightPlanner
         }
 
         var fields = status.ResourceFields
-            .Where(field => field.SlotId is int slot && projectedFieldLevels.ContainsKey(slot))
+            .Where(field => field.SlotId is int slot
+                && projectedFieldLevels.ContainsKey(slot)
+                && ResourceUpgradeSelection.Matches(field.FieldType, field.Name, selectedTypes))
             .Select(field => (Field: field, Level: projectedFieldLevels[field.SlotId!.Value]))
             .ToList();
         if (!fields.Any(field => field.Level < targetLevel))

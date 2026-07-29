@@ -95,7 +95,11 @@ public sealed partial class BotTaskRunner
             context.Log("Task 'upgrade_all_resources_to_level' requires config value resource_upgrade_target_level.");
             return;
         }
-        var result = await context.Client.UpgradeAllResourcesToLevelAsync(context.Options.ResourceUpgradeTargetLevel.Value, context.Options.ResourceBuildStrategy, context.CancellationToken);
+        var result = await context.Client.UpgradeAllResourcesToLevelAsync(
+            context.Options.ResourceUpgradeTargetLevel.Value,
+            context.Options.ResourceBuildStrategy,
+            context.Options.ResourceUpgradeTypes,
+            context.CancellationToken);
         context.Log(result);
         context.RecordTaskResult("upgrade_all_resources_to_level", result);
         ThrowIfTaskBlocked("upgrade_all_resources_to_level", result);

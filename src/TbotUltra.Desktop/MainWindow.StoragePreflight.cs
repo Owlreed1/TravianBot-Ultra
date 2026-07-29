@@ -139,7 +139,8 @@ public partial class MainWindow
             status,
             precedingItems,
             targetLevel,
-            storageUpgradeLevelsAhead);
+            storageUpgradeLevelsAhead,
+            ResourceUpgradeSelection.Parse(parentPayload.GetValueOrDefault(BotOptionPayloadKeys.ResourceUpgradeTypes)));
         if (!string.IsNullOrWhiteSpace(result.CannotPlanReason))
         {
             AppDialog.Show(

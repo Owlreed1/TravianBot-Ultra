@@ -1516,8 +1516,12 @@ public partial class MainWindow
             }
             else if (string.Equals(item.TaskName, "upgrade_all_resources_to_level", StringComparison.OrdinalIgnoreCase))
             {
-                target = TryGetIntPayloadValue(payload, BotOptionPayloadKeys.ResourceUpgradeTargetLevel)
-                    ?? TryGetIntPayloadValue(payload, BotOptionPayloadKeys.TargetLevel);
+                if (ResourceUpgradeSelection.Parse(payload.GetValueOrDefault(BotOptionPayloadKeys.ResourceUpgradeTypes))
+                    .Contains(reqCategory))
+                {
+                    target = TryGetIntPayloadValue(payload, BotOptionPayloadKeys.ResourceUpgradeTargetLevel)
+                        ?? TryGetIntPayloadValue(payload, BotOptionPayloadKeys.TargetLevel);
+                }
             }
 
             if (target is int value)

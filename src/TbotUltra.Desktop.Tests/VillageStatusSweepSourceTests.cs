@@ -68,4 +68,24 @@ public sealed class VillageStatusSweepSourceTests
             methodBody,
             StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void DorfTooltips_DescribeTheirActualScanResponsibilities()
+    {
+        var projectRoot = ProjectRootLocator.FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "src",
+            "TbotUltra.Desktop",
+            "SettingsWindow.xaml"));
+
+        Assert.Contains(
+            "Reads resources, hourly production, Warehouse and Granary capacity, population, construction queue, tasks and daily quests.",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Reads all buildings in the village center. Required before Smithy, Barracks, Stable, Workshop, Town Hall or Brewery can be scanned.",
+            xaml,
+            StringComparison.Ordinal);
+    }
 }

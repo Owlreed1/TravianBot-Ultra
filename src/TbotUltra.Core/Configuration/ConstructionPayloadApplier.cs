@@ -7,6 +7,7 @@ internal sealed record ConstructionPayloadValues(
     int? ResourceUpgradeTargetLevel,
     int ResourceUpgradeMaxAttempts,
     string ResourceBuildStrategy,
+    string ResourceUpgradeTypes,
     string? SmithyUpgradeTargets,
     int? BuildingUpgradeSlotId,
     int? BuildingUpgradeTargetLevel,
@@ -39,6 +40,7 @@ internal static class ConstructionPayloadApplier
             source.ResourceUpgradeTargetLevel,
             source.ResourceUpgradeMaxAttempts,
             source.ResourceBuildStrategy,
+            source.ResourceUpgradeTypes,
             source.SmithyUpgradeTargets,
             source.BuildingUpgradeSlotId,
             source.BuildingUpgradeTargetLevel,
@@ -82,6 +84,8 @@ internal static class ConstructionPayloadApplier
                 result = result with { ResourceUpgradeMaxAttempts = resourceAttempts };
             else if (key.Equals(BotOptionPayloadKeys.ResourceBuildStrategy, StringComparison.OrdinalIgnoreCase))
                 result = result with { ResourceBuildStrategy = value.Equals("smart", StringComparison.OrdinalIgnoreCase) ? "smart" : "lowest_first" };
+            else if (key.Equals(BotOptionPayloadKeys.ResourceUpgradeTypes, StringComparison.OrdinalIgnoreCase))
+                result = result with { ResourceUpgradeTypes = value };
             else if (key.Equals(BotOptionPayloadKeys.SmithyUpgradeTargets, StringComparison.OrdinalIgnoreCase))
                 result = result with { SmithyUpgradeTargets = value };
             else if (TryReadInt(key, value, BotOptionPayloadKeys.BuildingUpgradeSlotId, out var buildingSlot))

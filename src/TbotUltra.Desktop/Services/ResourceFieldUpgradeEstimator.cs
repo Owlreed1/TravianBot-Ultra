@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TbotUltra.Core.Tasks;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Worker.Services;
 
@@ -23,10 +24,12 @@ public static class ResourceFieldUpgradeEstimator
         double serverSpeed,
         int mainBuildingLevel,
         out ResourceFieldUpgradeEstimate estimate,
-        out string? failureReason)
+        out string? failureReason,
+        IReadOnlySet<string>? selectedTypes = null)
     {
         estimate = default;
         failureReason = null;
+        selectedTypes ??= ResourceUpgradeSelection.Parse(null);
 
         if (fields.Count != ExpectedResourceFieldCount
             || fields.Select(field => field.SlotId).Distinct().Count() != ExpectedResourceFieldCount)
@@ -39,6 +42,11 @@ public static class ResourceFieldUpgradeEstimator
         long wood = 0, clay = 0, iron = 0, crop = 0;
         foreach (var field in fields)
         {
+            if (!ResourceUpgradeSelection.Matches(field.FieldType, field.Name, selectedTypes))
+            {
+                continue;
+            }
+
             if (field.Level is not int currentLevel || currentLevel < 0)
             {
                 failureReason = $"resource slot {field.SlotId} has no current level";

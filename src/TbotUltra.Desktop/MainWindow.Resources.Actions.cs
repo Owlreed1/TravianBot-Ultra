@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using TbotUltra.Core.Configuration;
+using TbotUltra.Core.Tasks;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Worker;
 using TbotUltra.Worker.Domain;
@@ -15,6 +16,7 @@ namespace TbotUltra.Desktop;
 
 public partial class MainWindow
 {
+    private bool _loadingResourceUpgradeTypes;
     private async void LoadResourcesButton_Click(object sender, RoutedEventArgs e)
         => await GuardUiAsync(LoadResourcesButtonClickAsync);
 
@@ -901,12 +903,22 @@ public partial class MainWindow
 
     private void QueueUpgradeAllResources(string operationId, int targetLevel)
     {
+        var selectedTypes = _resourcesViewModel.SelectedUpgradeTypes;
+        if (selectedTypes.Count == 0)
+        {
+            const string message = "Select at least one resource type in Resource settings before queuing an upgrade.";
+            AppDialog.Show(this, message, "Upgrade resources", MessageBoxButton.OK, MessageBoxImage.Warning);
+            AppendLog($"[{operationId}] CANCELLED | {message}");
+            return;
+        }
+
         var requestedTargetLevel = Math.Clamp(targetLevel, 1, ResolveSelectedVillageResourceMaxLevel());
         var buildStrategy = _resourcesViewModel.BuildStrategy;
         var payload = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             [BotOptionPayloadKeys.ResourceUpgradeTargetLevel] = requestedTargetLevel.ToString(),
             [BotOptionPayloadKeys.ResourceBuildStrategy] = buildStrategy,
+            [BotOptionPayloadKeys.ResourceUpgradeTypes] = ResourceUpgradeSelection.Serialize(selectedTypes),
         };
 
         ApplySelectedVillageToPayload(payload);
@@ -948,7 +960,7 @@ public partial class MainWindow
         var storageText = storageUpgrades.Count == 0
             ? string.Empty
             : $" Added {storageUpgrades.Count} storage prerequisite(s) across staged resource targets.";
-        AppendLog($"[{operationId}] OK 0.0s | Queued upgrade-all toward level {requestedTargetLevel}.{storageText} The worker will upgrade {strategyText}.");
+        AppendLog($"[{operationId}] OK 0.0s | Queued {string.Join(", ", selectedTypes)} upgrade-all toward level {requestedTargetLevel}.{storageText} The worker will upgrade {strategyText}.");
     }
 
     private int ResolveSelectedVillageResourceMaxLevel()
@@ -964,6 +976,37 @@ public partial class MainWindow
     private void ResourceBuildStrategyRadio_Click(object sender, RoutedEventArgs e)
     {
         PersistResourceBuildStrategyToConfig();
+    }
+
+    private void ResourceUpgradeTypesCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loadingResourceUpgradeTypes)
+        {
+            return;
+        }
+
+        var village = GetSelectedVillageKeyInfoOrNull();
+        if (village is null)
+        {
+            return;
+        }
+
+        _villageSettingsStore.SetResourceUpgradeTypes(village, _resourcesViewModel.SelectedUpgradeTypes);
+        AppendLog($"Resource upgrade types for '{village.Name}' set to {ResourceUpgradeSelection.Serialize(_resourcesViewModel.SelectedUpgradeTypes)}.");
+    }
+
+    private void LoadResourceUpgradeTypesForSelectedVillage(VillageSelectionItem village)
+    {
+        _loadingResourceUpgradeTypes = true;
+        try
+        {
+            _resourcesViewModel.LoadResourceUpgradeTypes(
+                _villageSettingsStore.GetResourceUpgradeTypes(BuildVillageKeyInfo(village)));
+        }
+        finally
+        {
+            _loadingResourceUpgradeTypes = false;
+        }
     }
 
     private void PersistResourceBuildStrategyToConfig()

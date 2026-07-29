@@ -39,6 +39,10 @@ public partial class MainWindow
     // Snapshot of what was actually running when sleep started, so wake restores the same state instead
     // of always starting the continuous loop (the toggle defaults to ON even when the bot was idle).
     private SleepSnapshot _sleepSnapshot = SleepSnapshot.Idle;
+    // A bonus video can run for up to two minutes, followed by bounded browser cleanup. Sleep first
+    // requests a graceful stop so an in-flight video and its own confirmation can complete, but never
+    // lets a wedged video block the session indefinitely.
+    private static readonly TimeSpan GracefulSleepStopTimeout = TimeSpan.FromSeconds(130);
     private bool IsSessionSleeping => _sessionPacer.Phase == SessionPacerPhase.Sleeping;
 
     private void InitializeSessionPacing()
@@ -195,33 +199,15 @@ public partial class MainWindow
             return;
         }
 
-        if (!manual && _loopController.HasActiveOperation)
+        if (_loopController.HasActiveOperation)
         {
             if (!_sessionPacingSleepDeferredForManualOperation)
             {
-                AppendLog("[pacing] automatic sleep delayed until the active manual operation finishes.");
+                AppendLog("[pacing] sleep delayed until the active manual operation finishes.");
             }
 
             _sessionPacingSleepDeferredForManualOperation = true;
             return;
-        }
-
-        // Give a due/running pre-sleep fill construction start a short, bounded chance to finish so
-        // the final build slot is occupied before the browser closes. The loop is still running here
-        // (the pacer only raised SleepStarting; BeginSleep happens below).
-        if (!manual)
-        {
-            // Final sweep closes the race where the last 15-second clock sweep ran before a row
-            // entered its humanize defer. Make every eligible final start due before waiting.
-            try
-            {
-                RunPreSleepConstructionFillSweep(DateTimeOffset.UtcNow, TimeSpan.Zero);
-            }
-            catch (Exception ex)
-            {
-                AppendLog($"[pre-sleep-fill] final sweep failed: {ex.Message}");
-            }
-            await WaitBrieflyForPreSleepFillItemsAsync();
         }
 
         _sessionPacingSleepInProgress = true;
@@ -234,6 +220,12 @@ public partial class MainWindow
                 WasQueueAutoRunning: _autoQueueRunning);
             AppendLog($"[pacing] pre-sleep state: loggedIn={_sleepSnapshot.WasLoggedIn}, "
                 + $"continuousLoop={_sleepSnapshot.WasContinuousLoopRunning}, queueAutoRun={_sleepSnapshot.WasQueueAutoRunning}.");
+
+            var stoppedGracefully = await RequestGracefulAutomationStopForSleepAsync();
+            if (!stoppedGracefully)
+            {
+                AppendLog("[pacing] graceful stop timed out; canceling the remaining automation.");
+            }
 
             AppendLog("[pacing] controlled session stop requested.");
             _loopController.RequestLoopStop();
@@ -286,6 +278,33 @@ public partial class MainWindow
         {
             _sessionPacingSleepInProgress = false;
         }
+    }
+
+    private async Task<bool> RequestGracefulAutomationStopForSleepAsync()
+    {
+        _loopController.RequestLoopStop();
+        _loopController.RequestQueueStop();
+        var deadline = DateTimeOffset.UtcNow + GracefulSleepStopTimeout;
+        var announced = false;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (!_autoQueueRunning
+                && (_loopTask is null || _loopTask.IsCompleted)
+                && !_loopController.HasActiveOperation)
+            {
+                return true;
+            }
+
+            if (!announced)
+            {
+                announced = true;
+                AppendLog("[pacing] waiting for the current action to finish before sleep; no new action will start.");
+            }
+
+            await Task.Delay(Random.Shared.Next(150, 350));
+        }
+
+        return false;
     }
 
     private void TryStartDeferredSessionPacingSleepAfterOperation()

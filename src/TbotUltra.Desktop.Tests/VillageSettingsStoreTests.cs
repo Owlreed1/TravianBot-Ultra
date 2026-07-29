@@ -290,6 +290,24 @@ public sealed class VillageSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void ResourceUpgradeTypes_DefaultToAllAndPersistPerVillage()
+    {
+        var store = CreateStore();
+        var village = new Info("did:2", "Second", 5, -3, IsCapital: false);
+        store.Merge(new[] { village });
+
+        Assert.Equal(["wood", "clay", "iron", "crop"], store.GetResourceUpgradeTypes(village));
+
+        store.SetResourceUpgradeTypes(village, ["crop"]);
+
+        var reloaded = CreateStore();
+        Assert.Equal(["crop"], reloaded.GetResourceUpgradeTypes(village));
+
+        reloaded.SetResourceUpgradeTypes(village, []);
+        Assert.Empty(CreateStore().GetResourceUpgradeTypes(village));
+    }
+
+    [Fact]
     public void HeroResourceSettings_DefaultConstructionOnlyAndPersistPerVillageSettings()
     {
         var store = CreateStore();

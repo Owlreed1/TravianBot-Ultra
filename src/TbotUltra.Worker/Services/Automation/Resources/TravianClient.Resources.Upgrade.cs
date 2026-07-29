@@ -1,5 +1,6 @@
 using Microsoft.Playwright;
 using System.Text.Json;
+using TbotUltra.Core.Tasks;
 using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Worker.Services;
@@ -232,14 +233,23 @@ public sealed partial class TravianClient
         return $"Resource slot {slotId}: hit safety cap of {safetyCap} iterations while targeting level {targetLevel}. Upgrades performed: {upgrades}. Last known level: {levelText}.";
     }
 
-    public async Task<string> UpgradeAllResourcesToLevelAsync(int targetLevel, string buildStrategy = "lowest_first", CancellationToken cancellationToken = default)
+    public async Task<string> UpgradeAllResourcesToLevelAsync(
+        int targetLevel,
+        string buildStrategy = "lowest_first",
+        string? resourceTypes = null,
+        CancellationToken cancellationToken = default)
     {
+        var selectedTypes = ResourceUpgradeSelection.Parse(resourceTypes);
         using var navDiagnostics = BeginConstructionNavigationDiagnostics($"upgrade_all_resources_to_level target={targetLevel}");
         var smartStrategy = string.Equals(buildStrategy, "smart", StringComparison.OrdinalIgnoreCase);
-        Notify($"[UpgradeAllResourcesToLevelAsync] targetLevel={targetLevel} strategy={(smartStrategy ? "smart" : "lowest_first")} started");
+        Notify($"[UpgradeAllResourcesToLevelAsync] targetLevel={targetLevel} strategy={(smartStrategy ? "smart" : "lowest_first")} types={ResourceUpgradeSelection.Serialize(selectedTypes)} started");
         if (targetLevel < 0)
         {
             throw new InvalidOperationException("Target level must be 0 or higher.");
+        }
+        if (selectedTypes.Count == 0)
+        {
+            return "No resource types were selected for this bulk upgrade.";
         }
 
         var upgrades = 0;
@@ -257,6 +267,9 @@ public sealed partial class TravianClient
                     cancellationToken,
                     "Manual verification appeared while reading resource fields.");
                 var resourceFields = await ReadResourceFieldsAsync(cancellationToken);
+                resourceFields = resourceFields
+                    .Where(field => ResourceUpgradeSelection.Matches(field.FieldType, field.Name, selectedTypes))
+                    .ToList();
                 var buildQueueAtScan = await ReadBuildQueueAsync(cancellationToken);
                 // Note: each successful upgrade is already announced by WaitForResourceLevelAdvanceAsync
                 // at the moment the level advances. We deliberately do NOT diff levels again here, as

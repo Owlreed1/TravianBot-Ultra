@@ -1305,6 +1305,7 @@ public partial class MainWindow
         _buildingLastQueuedTargetBySlot.Clear();
         _buildingLastQueuedConstructBySlot.Clear();
 
+        LoadResourceUpgradeTypesForSelectedVillage(selected);
         ApplySelectedVillageTribeFromCache(selected);
         var hasCachedStatus = TryGetCachedVillageStatus(selected, out var cached);
         if (hasCachedStatus)

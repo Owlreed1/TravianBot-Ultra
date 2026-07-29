@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TbotUltra.Core.Configuration;
+using TbotUltra.Core.Tasks;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
@@ -216,7 +217,8 @@ public partial class MainWindow
                     serverSpeed,
                     mainBuildingLevel,
                     out var estimate,
-                    out var failureReason))
+                    out var failureReason,
+                    ResourceUpgradeSelection.Parse(payload.GetValueOrDefault(BotOptionPayloadKeys.ResourceUpgradeTypes))))
             {
                 RaiseEstimateAlarm(item, failureReason ?? "resource field estimate failed");
                 return QueueItemEstimate.None;

@@ -12,5 +12,6 @@ public partial class MainWindow
     internal void OnUpgradeAllResourcesClicked(object sender, RoutedEventArgs e) => UpgradeAllResourcesButton_Click(sender, e);
     internal void OnUpgradeAllResourcesToMaxClicked(object sender, RoutedEventArgs e) => UpgradeAllResourcesToMaxButton_Click(sender, e);
     internal void OnResourceBuildStrategyChanged(object sender, RoutedEventArgs e) => ResourceBuildStrategyRadio_Click(sender, e);
+    internal void OnResourceUpgradeTypesChanged(object sender, RoutedEventArgs e) => ResourceUpgradeTypesCheckBox_Changed(sender, e);
     internal void OnResourceLevelBadgeClicked(object sender, RoutedEventArgs e) => ResourceLevelBadge_Click(sender, e);
 }

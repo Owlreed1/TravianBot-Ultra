@@ -519,6 +519,9 @@ public sealed record BotOptions
     [ConfigurationKeyName("resource_build_strategy")]
     public string ResourceBuildStrategy { get; init; } = "smart"; // "lowest_first" or "smart"
 
+    [ConfigurationKeyName("resource_upgrade_types")]
+    public string ResourceUpgradeTypes { get; init; } = "wood,clay,iron,crop";
+
     // Smithy troop-upgrade targets, supplied only via task payload (not persisted in bot.json/settings.json;
     // the Desktop popup keeps them in config/accounts/<account>/smithy_upgrade.json). Compact form
     // "u21=20;u24=10". Null/empty => the smithy task is a no-op. Parsed by SmithyUpgradePayload.

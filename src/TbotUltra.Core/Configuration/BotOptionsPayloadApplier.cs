@@ -11,6 +11,7 @@ public static class BotOptionsPayloadApplier
         var resourceUpgradeTargetLevel = construction.ResourceUpgradeTargetLevel;
         var resourceUpgradeMaxAttempts = construction.ResourceUpgradeMaxAttempts;
         var resourceBuildStrategy = construction.ResourceBuildStrategy;
+        var resourceUpgradeTypes = construction.ResourceUpgradeTypes;
         var smithyUpgradeTargets = construction.SmithyUpgradeTargets;
         var buildingUpgradeSlotId = construction.BuildingUpgradeSlotId;
         var buildingUpgradeTargetLevel = construction.BuildingUpgradeTargetLevel;
@@ -292,6 +293,7 @@ public static class BotOptionsPayloadApplier
             ResourceUpgradeTargetLevel = resourceUpgradeTargetLevel,
             ResourceUpgradeMaxAttempts = resourceUpgradeMaxAttempts,
             ResourceBuildStrategy = resourceBuildStrategy,
+            ResourceUpgradeTypes = resourceUpgradeTypes,
             SmithyUpgradeTargets = smithyUpgradeTargets,
             BuildingUpgradeSlotId = buildingUpgradeSlotId,
             BuildingUpgradeTargetLevel = buildingUpgradeTargetLevel,

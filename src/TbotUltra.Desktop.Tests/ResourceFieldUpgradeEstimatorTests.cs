@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
+using TbotUltra.Core.Tasks;
 using TbotUltra.Worker.Services;
 using Xunit;
 
@@ -106,5 +107,36 @@ public sealed class ResourceFieldUpgradeEstimatorTests
         Assert.Equal(levelOneCost.Clay * 18L, estimate.Clay);
         Assert.Equal(levelOneCost.Iron * 18L, estimate.Iron);
         Assert.Equal(levelOneCost.Crop * 18L, estimate.Crop);
+    }
+
+    [Fact]
+    public void TryEstimate_SelectedTypes_SumsOnlySelectedResourceFields()
+    {
+        var fields = new List<ResourceFieldRow>();
+        for (var slotId = 1; slotId <= 18; slotId++)
+        {
+            fields.Add(new ResourceFieldRow
+            {
+                SlotId = slotId,
+                Name = slotId % 2 == 0 ? "Cropland" : "Woodcutter",
+                Level = 1,
+            });
+        }
+
+        var success = ResourceFieldUpgradeEstimator.TryEstimate(
+            fields,
+            targetLevel: 2,
+            serverSpeed: 1,
+            mainBuildingLevel: 1,
+            out var estimate,
+            out var failureReason,
+            ResourceUpgradeSelection.Parse("crop"));
+
+        Assert.True(success, failureReason);
+        var cropCost = BuildingCatalogService.CostFor(BuildingCatalogService.GidForName("Cropland")!.Value, 2)!;
+        Assert.Equal(cropCost.Wood * 9L, estimate.Wood);
+        Assert.Equal(cropCost.Clay * 9L, estimate.Clay);
+        Assert.Equal(cropCost.Iron * 9L, estimate.Iron);
+        Assert.Equal(cropCost.Crop * 9L, estimate.Crop);
     }
 }

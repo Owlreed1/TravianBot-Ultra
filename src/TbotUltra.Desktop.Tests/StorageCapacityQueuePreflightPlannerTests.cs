@@ -71,6 +71,25 @@ public sealed class StorageCapacityQueuePreflightPlannerTests
     }
 
     [Fact]
+    public void PlanUpgradeAllResources_SelectedTypes_ExcludesUnselectedFields()
+    {
+        var status = CreateStatus(
+            [new ResourceField(1, "Woodcutter", "Woodcutter", 5, null)],
+            warehouseCapacity: 1_200,
+            granaryCapacity: 1_200);
+
+        var result = StorageCapacityQueuePreflightPlanner.PlanUpgradeAllResources(
+            status,
+            [],
+            6,
+            selectedTypes: ResourceUpgradeSelection.Parse("crop"));
+
+        Assert.Empty(result.Upgrades);
+        Assert.Equal(0, result.RequiredWarehouseCapacity);
+        Assert.Equal(0, result.RequiredGranaryCapacity);
+    }
+
+    [Fact]
     public void PlanUpgradeAllResources_RecognizesStorageByNameWhenSnapshotGidIsMissing()
     {
         var status = CreateStatusWithoutStorage(

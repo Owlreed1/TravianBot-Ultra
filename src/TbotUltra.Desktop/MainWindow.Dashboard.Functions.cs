@@ -13,32 +13,43 @@ public partial class MainWindow
     {
         var selectedVillageName = NormalizeVillageName(GetSelectedVillageName());
         var selectedVillageKey = GetSelectedVillageKey();
-        if (string.IsNullOrWhiteSpace(selectedVillageName))
-        {
-            AppDialog.Show(
-                this,
-                "Select a village before clearing timers.",
-                "Clear timers",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
-        }
-
-        var confirmation = AppDialog.Show(
+        var choice = AppDialog.ShowCustom(
             this,
-            $"Clear cached timers for '{selectedVillageName}' and request fresh status reads?\n\n"
-                + "This also clears that village's construction build-queue snapshot and resets all deferred "
-                + "group retry timers for the selected village, so stuck \"waiting\" states can retry now. "
-                + "Queue page items will not be removed.",
+            "Choose which cached timers to clear. Queue page items will not be removed.",
             "Clear timers",
-            MessageBoxButton.YesNo,
+            [("Clear village timers", MessageBoxResult.Yes), ("Clear account timers", MessageBoxResult.No), ("Cancel", MessageBoxResult.Cancel)],
             MessageBoxImage.Warning,
-            MessageBoxResult.No);
-        if (confirmation != MessageBoxResult.Yes)
+            MessageBoxResult.Cancel,
+            MessageBoxResult.Cancel,
+            successResult: MessageBoxResult.Yes,
+            dangerResult: MessageBoxResult.No);
+        if (choice == MessageBoxResult.Cancel)
         {
             return;
         }
 
+        if (choice == MessageBoxResult.Yes)
+        {
+            if (string.IsNullOrWhiteSpace(selectedVillageName))
+            {
+                AppDialog.Show(
+                    this,
+                    "Select a village before clearing village timers.",
+                    "Clear timers",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            ClearVillageTimers(selectedVillageName, selectedVillageKey);
+            return;
+        }
+
+        ClearAccountTimers();
+    }
+
+    private void ClearVillageTimers(string selectedVillageName, string? selectedVillageKey)
+    {
         // "Clear timers" clears the selected village's cached activity timers + construction snapshot and
         // resets that village's deferred group retries (manual escape hatch for a stuck wait). It does not
         // start the bot from stopped, but it wakes an already-running loop so the groups retry promptly.
@@ -57,6 +68,42 @@ public partial class MainWindow
         RefreshVillageActivityIndicatorsOnDashboard();
         UpdateAutomationLoopRunningIndicators();
         AppendLog($"Cleared cached timers and reset {resetCount} deferred group timer(s) for village '{selectedVillageName}'. Queue items were kept.");
+    }
+
+    private void ClearAccountTimers()
+    {
+        _continuousLoopConstructionStatusNeedsSync = true;
+        _smithyUpgradeRemainingSeconds.Clear();
+        _troopTrainingViewModel.ClearRuntimeTimers();
+        _heroViewModel.AdventureStatusText = "Status refresh requested.";
+
+        var clearedStatuses = _villageStatusCache.Snapshot
+            .ToDictionary(pair => pair.Key, pair => ClearCachedActivityTimers(pair.Value), StringComparer.OrdinalIgnoreCase);
+        _villageStatusCache.LoadFrom(clearedStatuses);
+        _villageCacheStore.Save(_villageStatusCache.Snapshot);
+        if (_lastBuildingStatus is not null)
+        {
+            _lastBuildingStatus = ClearCachedActivityTimers(_lastBuildingStatus);
+        }
+
+        var resetCount = ResetAllDeferredQueueTimers();
+        _continuousConstructionRotationVillageKey = null;
+        SetContinuousGroupRotationVillageKey(QueueGroup.TroopTraining, null);
+        SetContinuousGroupRotationVillageKey(QueueGroup.Troops, null);
+        SetContinuousGroupRotationVillageKey(QueueGroup.Farming, null);
+        if (IsContinuousLoopRunning() || _autoQueueRunning)
+        {
+            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        }
+
+        _buildQueueActiveCount = 0;
+        _buildQueueRemainingSeconds = -1;
+        _buildQueueReachedZeroPendingCompletion = false;
+        UpdateBuildQueueStatusText();
+        RequestQueueUiRefresh(immediate: true);
+        RefreshVillageActivityIndicatorsOnDashboard();
+        UpdateAutomationLoopRunningIndicators();
+        AppendLog($"Cleared cached timers and reset {resetCount} deferred group timer(s) for the active account. Queue items were kept.");
     }
 
     private void ClearSelectedVillageRuntimeTimerCache(string selectedVillageName, string? selectedVillageKey)
@@ -131,6 +178,24 @@ public partial class MainWindow
         if (reset > 0)
         {
             AppendLog($"Reset {reset} deferred group retry timer(s) for village '{villageName}'.");
+        }
+
+        return reset;
+    }
+
+    private int ResetAllDeferredQueueTimers()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var deferred = _botService.GetQueueItemsForDisplay()
+            .Where(item => item.Status == QueueStatus.Pending && item.NextAttemptAt > now)
+            .ToList();
+        var reset = 0;
+        foreach (var item in deferred)
+        {
+            if (_botService.UpdateDeferredQueueItem(item.Id, null, TimeSpan.Zero))
+            {
+                reset += 1;
+            }
         }
 
         return reset;

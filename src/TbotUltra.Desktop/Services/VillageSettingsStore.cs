@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using TbotUltra.Core.Accounts;
+using TbotUltra.Core.Tasks;
 
 namespace TbotUltra.Desktop.Services;
 
@@ -61,6 +62,8 @@ public sealed partial class VillageSettingsStore
         public bool? HeroResourceUseTownHall { get; set; }
         public bool? HeroResourceMaxUseEnabled { get; set; }
         public int? HeroResourceMaxUsePerResource { get; set; }
+        // Bulk resource upgrades are scoped per village. Null is the legacy/default all-resource selection.
+        public List<string>? ResourceUpgradeTypes { get; set; }
         public DateTimeOffset LastSeenUtc { get; set; } = DateTimeOffset.UtcNow;
         // When this village first went missing from a CONFIRMED login/scan village list (coordinate
         // identity), or null while it is live. Set/cleared only by DisableVillagesMissingFromConfirmedList.
@@ -205,6 +208,12 @@ public sealed partial class VillageSettingsStore
                     migratedAnything = true;
                 }
 
+                if (record.ResourceUpgradeTypes is null)
+                {
+                    record.ResourceUpgradeTypes = ResourceUpgradeSelection.AllTypes.ToList();
+                    migratedAnything = true;
+                }
+
                 if (enableVillagesForNewDefault)
                 {
                     record.IsEnabled = DefaultAutomationEnabled;
@@ -265,6 +274,7 @@ public sealed partial class VillageSettingsStore
         winner.HeroResourceUseTownHall ??= loser.HeroResourceUseTownHall;
         winner.HeroResourceMaxUseEnabled ??= loser.HeroResourceMaxUseEnabled;
         winner.HeroResourceMaxUsePerResource ??= loser.HeroResourceMaxUsePerResource;
+        winner.ResourceUpgradeTypes ??= loser.ResourceUpgradeTypes;
         winner.IsEnabled = winner.IsEnabled || loser.IsEnabled;
         if (winner.LastSeenUtc < loser.LastSeenUtc)
         {

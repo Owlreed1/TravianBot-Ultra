@@ -41,6 +41,17 @@
             </StackPanel>
             <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0">
                 <StackPanel>
+                    <TextBlock Text="Resource settings" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" Margin="0,0,0,6" />
+                    <WrapPanel>
+                        <CheckBox Content="Wood" IsChecked="{Binding UpgradeWood}" Checked="ResourceUpgradeTypeCheckBox_Changed" Unchecked="ResourceUpgradeTypeCheckBox_Changed" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,16,0" />
+                        <CheckBox Content="Clay" IsChecked="{Binding UpgradeClay}" Checked="ResourceUpgradeTypeCheckBox_Changed" Unchecked="ResourceUpgradeTypeCheckBox_Changed" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,16,0" />
+                        <CheckBox Content="Iron" IsChecked="{Binding UpgradeIron}" Checked="ResourceUpgradeTypeCheckBox_Changed" Unchecked="ResourceUpgradeTypeCheckBox_Changed" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,16,0" />
+                        <CheckBox Content="Crop" IsChecked="{Binding UpgradeCrop}" Checked="ResourceUpgradeTypeCheckBox_Changed" Unchecked="ResourceUpgradeTypeCheckBox_Changed" IsEnabled="{Binding ActionsEnabled}" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+            <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0">
+                <StackPanel>
                     <DockPanel Margin="0,0,0,8">
                         <TextBlock Text="Production" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
                     </DockPanel>
