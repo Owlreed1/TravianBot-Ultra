@@ -278,9 +278,8 @@ public partial class MainWindow
                     GetSelectedVillageName(),
                     GetSelectedVillageUrl(),
                     cancellationToken: operationToken);
-                SetActiveWorkingVillage(
-                    GetSelectedVillageKey(),
-                    GetSelectedVillageName());
+                await ApplyCurrentVillageToUiAsync(options, operationToken);
+                AppendLog("[post-login] Refreshed current village UI after post-login analysis.");
             }
 
             _browserSessionLikelyOpen = true;
