@@ -568,6 +568,7 @@ public sealed partial class TravianClient
         {
             cancellationToken.ThrowIfCancellationRequested();
             await Task.Delay(ConstructFasterVideoPollIntervalMs, cancellationToken);
+            await TryClickBonusVideoSkipAdAsync("construct-faster", "[construct-faster:verbose]", cancellationToken);
 
             string rawJson;
             try

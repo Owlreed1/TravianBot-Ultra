@@ -248,10 +248,14 @@
                                Foreground="{DynamicResource TextSubtleBrush}"
                                TextWrapping="Wrap"
                                Margin="0,6,0,10" />
-                    <Button Content="Demolish overview" Height="30" Click="DemolishOverviewButton_Click" />
+                    <Button Content="Demolish overview" Height="30" Margin="0"
+                            HorizontalAlignment="Stretch"
+                            Click="DemolishOverviewButton_Click" />
                     <Button Content="Stop demolition" Height="30" Margin="0,6,0,0"
-                            Background="{DynamicResource DangerTextBrush}" Foreground="White"
-                            BorderBrush="{DynamicResource DangerDarkBrush}"
+                            HorizontalAlignment="Stretch"
+                            Background="{DynamicResource DangerBgBrush}"
+                            Foreground="{DynamicResource DangerTextBrush}"
+                            BorderBrush="{DynamicResource DangerBorderBrush}"
                             Click="StopDemolitionButton_Click" />
                 </StackPanel>
             </Border>

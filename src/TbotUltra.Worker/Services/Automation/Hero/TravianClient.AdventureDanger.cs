@@ -583,6 +583,7 @@ public sealed partial class TravianClient
 
                 if (clickedPlayControl)
                 {
+                    await TryClickBonusVideoSkipAdAsync(label, logPrefix, cancellationToken);
                     await MuteBonusVideoAsync(label, logPrefix, cancellationToken);
                 }
                 else
@@ -610,6 +611,7 @@ public sealed partial class TravianClient
                     await _page.Mouse.ClickAsync(x, y);
                     clickConfirmedAtUtc = DateTimeOffset.UtcNow;
                     Notify($"{logPrefix} {label}: actual play control was not found; clicked the video-area center fallback ({x:0},{y:0}) attempt={clickAttempt}.");
+                    await TryClickBonusVideoSkipAdAsync(label, logPrefix, cancellationToken);
                     await MuteBonusVideoAsync(label, logPrefix, cancellationToken);
                 }
             }
@@ -737,6 +739,36 @@ public sealed partial class TravianClient
         }
     }
 
+    // The ad provider can reveal Skip Ad at any point after playback starts. It is optional: a
+    // transient frame/actionability failure must leave the normal protected video flow untouched.
+    private async Task TryClickBonusVideoSkipAdAsync(
+        string label,
+        string logPrefix,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (var frame in _page.Frames)
+        {
+            try
+            {
+                var skip = frame.Locator("[data-ck-tag='skip'][aria-label='Skip Ad']:visible").First;
+                if (await skip.CountAsync() == 0)
+                {
+                    continue;
+                }
+
+                await skip.ClickAsync(new LocatorClickOptions { Timeout = 2000 });
+                Notify($"{logPrefix} {label}: clicked Skip Ad.");
+                return;
+            }
+            catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
+            {
+                // Skip is a provider-owned optional control. The next poll may try again if it stays visible.
+                return;
+            }
+        }
+    }
+
     /// <summary>
     /// Accepts the consentmanager (CMP/TCF) consent dialog when present so the bonus-video ad stack
     /// (oadts/adscale/Google IMA) is allowed to initialize. Without consent the player never loads in
@@ -859,6 +891,7 @@ public sealed partial class TravianClient
         {
             cancellationToken.ThrowIfCancellationRequested();
             await Task.Delay(AdventureVideoPollIntervalMs, cancellationToken);
+            await TryClickBonusVideoSkipAdAsync(label, "[adventure-video:verbose]", cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var elapsedSeconds = (now - playClickedAtUtc).TotalSeconds;

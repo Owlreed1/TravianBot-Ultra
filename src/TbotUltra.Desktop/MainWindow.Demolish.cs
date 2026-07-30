@@ -41,7 +41,7 @@ public partial class MainWindow
     {
         if (item is null)
         {
-            return overview ? "—" : "No demolition queued for this village.";
+            return overview ? "No active demolition" : "No demolition queued for this village.";
         }
 
         var target = item.Payload.GetValueOrDefault(BotOptionPayloadKeys.DemolishTargetName)

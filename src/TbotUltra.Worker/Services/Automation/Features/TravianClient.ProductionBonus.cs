@@ -448,6 +448,7 @@ public sealed partial class TravianClient
         {
             cancellationToken.ThrowIfCancellationRequested();
             await Task.Delay(ProductionBonusVideoPollIntervalMs, cancellationToken);
+            await TryClickBonusVideoSkipAdAsync("production bonus", "[production-bonus:verbose]", cancellationToken);
 
             string rawJson;
             try
