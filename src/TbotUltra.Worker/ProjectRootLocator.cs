@@ -2,13 +2,14 @@ namespace TbotUltra.Worker;
 
 public static class ProjectRootLocator
 {
-    public static string FindProjectRoot()
+    public static string FindProjectRoot(string? startPath = null)
     {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        var current = new DirectoryInfo(startPath ?? AppContext.BaseDirectory);
         while (current is not null)
         {
+            var solutionPath = Path.Combine(current.FullName, "TbotUltra.sln");
             var configPath = Path.Combine(current.FullName, "config", "bot.json");
-            if (File.Exists(configPath))
+            if (File.Exists(solutionPath) || File.Exists(configPath))
             {
                 return current.FullName;
             }
@@ -16,6 +17,6 @@ public static class ProjectRootLocator
             current = current.Parent;
         }
 
-        throw new InvalidOperationException("Could not locate project root (missing config/bot.json).");
+        throw new InvalidOperationException("Could not locate project root (missing TbotUltra.sln or config/bot.json).");
     }
 }

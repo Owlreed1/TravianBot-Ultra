@@ -76,6 +76,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - `bot.json` is application-wide; account settings are account-scoped; village settings and queue state are
   village-scoped; runtime snapshots are Worker-owned observations, not user configuration.
 - Use the existing path provider. Never derive data paths from the executable working directory.
+- `ProjectRootLocator` uses the versioned solution file in source/CI and `config/bot.json` in deployed runtime;
+  source tests must not depend on ignored runtime configuration.
 - Interruptible writes use the atomic file helper. Retry bounded transient lock/sharing failures.
 - Quarantine and log corrupt queue/state files instead of silently overwriting them.
 - New settings require the complete pipeline: model, defaults, load/save, ViewModel, UI, and tests.
