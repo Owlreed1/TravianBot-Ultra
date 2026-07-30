@@ -691,43 +691,50 @@ public sealed partial class TravianClient
 
     private async Task MuteBonusVideoAsync(string label, string logPrefix, CancellationToken cancellationToken)
     {
-        for (var attempt = 1; attempt <= 10; attempt++)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            foreach (var frame in _page.Frames)
+            for (var attempt = 1; attempt <= 10; attempt++)
             {
-                var disabled = frame.Locator(".atg-gima-audio-button-disabled:not(.atg-gima-hidden)").First;
-                if (await disabled.CountAsync() > 0 && await disabled.IsVisibleAsync())
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var frame in _page.Frames)
                 {
-                    Notify($"{logPrefix} {label}: video audio is muted.");
+                    var disabled = frame.Locator(".atg-gima-audio-button-disabled:not(.atg-gima-hidden)").First;
+                    if (await disabled.CountAsync() > 0 && await disabled.IsVisibleAsync())
+                    {
+                        Notify($"{logPrefix} {label}: video audio is muted.");
+                        return;
+                    }
+
+                    var enabled = frame.Locator(".atg-gima-audio-button:has(.atg-gima-audio-button-enabled:not(.atg-gima-hidden))").First;
+                    if (await enabled.CountAsync() == 0 || !await enabled.IsVisibleAsync())
+                    {
+                        continue;
+                    }
+
+                    await enabled.ClickAsync(new LocatorClickOptions { Timeout = 3000 });
+                    for (var verifyAttempt = 1; verifyAttempt <= 4; verifyAttempt++)
+                    {
+                        await Task.Delay(250, cancellationToken);
+                        if (await disabled.CountAsync() > 0 && await disabled.IsVisibleAsync())
+                        {
+                            Notify($"{logPrefix} {label}: clicked the audio control and confirmed the video is muted.");
+                            return;
+                        }
+                    }
+
+                    Notify($"{logPrefix} {label}: clicked the audio control, but muted state was not confirmed.");
                     return;
                 }
 
-                var enabled = frame.Locator(".atg-gima-audio-button:has(.atg-gima-audio-button-enabled:not(.atg-gima-hidden))").First;
-                if (await enabled.CountAsync() == 0 || !await enabled.IsVisibleAsync())
-                {
-                    continue;
-                }
-
-                await enabled.ClickAsync(new LocatorClickOptions { Timeout = 3000 });
-                for (var verifyAttempt = 1; verifyAttempt <= 4; verifyAttempt++)
-                {
-                    await Task.Delay(250, cancellationToken);
-                    if (await disabled.CountAsync() > 0 && await disabled.IsVisibleAsync())
-                    {
-                        Notify($"{logPrefix} {label}: clicked the audio control and confirmed the video is muted.");
-                        return;
-                    }
-                }
-
-                Notify($"{logPrefix} {label}: clicked the audio control, but muted state was not confirmed.");
-                return;
+                await Task.Delay(300, cancellationToken);
             }
 
-            await Task.Delay(300, cancellationToken);
+            Notify($"{logPrefix} {label}: audio control was not found; continuing the video.");
         }
-
-        Notify($"{logPrefix} {label}: audio control was not found; continuing the video.");
+        catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
+        {
+            Notify($"{logPrefix} {label}: audio mute skipped ({ex.Message}); continuing the video.");
+        }
     }
 
     /// <summary>

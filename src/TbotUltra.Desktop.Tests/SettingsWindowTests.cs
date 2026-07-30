@@ -48,8 +48,8 @@ public sealed class SettingsWindowTests : IDisposable
             Assert.Equal("5", window.BreweryRestartDelay.DelayMinMinutes);
             Assert.Equal("40", window.BreweryRestartDelay.DelayMaxMinutes);
             Assert.True(window.HeroAdventureRestartDelay.IsEnabled);
-            Assert.Equal("5", window.HeroAdventureRestartDelay.DelayMinMinutes);
-            Assert.Equal("20", window.HeroAdventureRestartDelay.DelayMaxMinutes);
+            Assert.Equal("3", window.HeroAdventureRestartDelay.DelayMinMinutes);
+            Assert.Equal("15", window.HeroAdventureRestartDelay.DelayMaxMinutes);
             Assert.True(window.SmithyUpgradeRestartDelay.IsEnabled);
             Assert.Equal("10", window.SmithyUpgradeRestartDelay.DelayMinMinutes);
             Assert.Equal("30", window.SmithyUpgradeRestartDelay.DelayMaxMinutes);

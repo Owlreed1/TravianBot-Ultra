@@ -474,23 +474,23 @@ public sealed partial class TravianClient
             _config.ConstructionHumanizeNoPlusMinMinutes,
             _config.ConstructionHumanizeNoPlusMaxMinutes,
             RandomInRange);
-        var delaySeconds = decision.DelaySeconds;
+        var humanizeDelaySeconds = decision.HumanizeDelaySeconds;
         var reason = decision.Reason;
 
-        if (delaySeconds < 1)
+        if (humanizeDelaySeconds < 1)
         {
             return null;
         }
 
-        extraSeconds = (int)Math.Ceiling(delaySeconds);
-        var combinedWait = slotFreeWaitSeconds + extraSeconds;
-        _session.ConstructionHumanizeUntilBySlot[slotKey] = now.AddSeconds(combinedWait);
+        var queueRetrySeconds = decision.QueueRetrySeconds;
+        extraSeconds = Math.Max(0, queueRetrySeconds - slotFreeWaitSeconds);
+        _session.ConstructionHumanizeUntilBySlot[slotKey] = now.AddSeconds(queueRetrySeconds);
         _session.ConstructionOngoingByKey[ConstructionCategoryKey(kind, isRomans, villageToken)] = relevantActive.Count;
         Notify(
             $"[construction-humanize] slot {slotId}: scheduled from queue overview; " +
-            $"slotFree={slotFreeWaitSeconds}s delay={Math.Ceiling(delaySeconds):F0}s total={combinedWait}s ({reason}). " +
-            $"queue_wait_seconds={combinedWait}");
-        return combinedWait;
+            $"slotFree={slotFreeWaitSeconds}s humanizeDelay={Math.Ceiling(humanizeDelaySeconds):F0}s " +
+            $"retry={queueRetrySeconds}s ({reason}). queue_wait_seconds={queueRetrySeconds}");
+        return queueRetrySeconds;
     }
 
     // Human-like pause before starting the next construction, so the bot does not react to a freed

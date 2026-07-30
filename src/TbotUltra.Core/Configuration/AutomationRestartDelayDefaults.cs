@@ -3,8 +3,8 @@ namespace TbotUltra.Core.Configuration;
 public static class HeroAdventureRestartDelayDefaults
 {
     public const bool Enabled = true;
-    public const double MinMinutes = 5;
-    public const double MaxMinutes = 20;
+    public const double MinMinutes = 3;
+    public const double MaxMinutes = 15;
 }
 
 public static class SmithyUpgradeRestartDelayDefaults
