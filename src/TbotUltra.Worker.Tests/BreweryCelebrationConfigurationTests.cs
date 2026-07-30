@@ -19,8 +19,8 @@ public sealed class BreweryCelebrationConfigurationTests
         Assert.True(options.BreweryCelebrationRestartDelayEnabled);
         Assert.True(options.TownHallCelebrationRestartDelayEnabled);
         Assert.True(options.HeroAdventureRestartDelayEnabled);
-        Assert.Equal(5, options.HeroAdventureRestartDelayMinMinutes);
-        Assert.Equal(20, options.HeroAdventureRestartDelayMaxMinutes);
+        Assert.Equal(3, options.HeroAdventureRestartDelayMinMinutes);
+        Assert.Equal(15, options.HeroAdventureRestartDelayMaxMinutes);
         Assert.True(options.SmithyUpgradeRestartDelayEnabled);
         Assert.Equal(10, options.SmithyUpgradeRestartDelayMinMinutes);
         Assert.Equal(30, options.SmithyUpgradeRestartDelayMaxMinutes);
