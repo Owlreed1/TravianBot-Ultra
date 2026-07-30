@@ -80,6 +80,59 @@ public sealed class WindowSmokeTests
     }
 
     [Fact]
+    public void UpdateAvailableWindow_LoadsAsModelessReleaseNotification()
+    {
+        _wpf.Run(() =>
+        {
+            var window = new UpdateAvailableWindow("1.0.0", "1.1.0");
+            var dismissed = 0;
+            window.DismissRequested += (_, _) => dismissed++;
+            try
+            {
+                window.Measure(new Size(510, 332));
+                window.Arrange(new Rect(0, 0, 510, 332));
+
+                Assert.False(window.ShowInTaskbar);
+                Assert.Equal(ResizeMode.NoResize, window.ResizeMode);
+                Assert.Equal("v1.0.0", Assert.IsType<TextBlock>(window.FindName("CurrentVersionText")).Text);
+                Assert.Equal("v1.1.0", Assert.IsType<TextBlock>(window.FindName("LatestVersionText")).Text);
+                Assert.Equal("Update", Assert.IsType<Button>(window.FindName("UpdateButton")).Content);
+                Assert.Equal("Dont update now", Assert.IsType<Button>(window.FindName("DontUpdateNowButton")).Content);
+            }
+            finally
+            {
+                window.Close();
+            }
+
+            Assert.Equal(1, dismissed);
+        });
+    }
+
+    [Fact]
+    public void DebugWindow_ProvidesSideEffectFreeUpdateVersionPreview()
+    {
+        _wpf.Run(() =>
+        {
+            var window = new FunctionTestWindow();
+            try
+            {
+                var requested = false;
+                window.UpdateVersionPreviewRequested += (_, _) => requested = true;
+                var button = Assert.IsType<Button>(window.FindName("UpdateVersionPreviewButton"));
+
+                button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+                Assert.True(requested);
+                Assert.Equal("Update version", button.Content);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void BuildingSlotsWindow_LoadsWithTheImageAndACloseButton()
     {
         _wpf.Run(() =>

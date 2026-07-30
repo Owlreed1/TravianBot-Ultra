@@ -96,6 +96,7 @@ public static class BotOptionPayloadKeys
     public const string TargetBuildingSlotOrName = "target_building_slot_or_name";
     public const string TargetLevel = "target_level";
     public const string DontNotifyNewVersion = "dont_notify_new_version";
+    public const string LastAcknowledgedUpdateVersion = "last_acknowledged_update_version";
     public const string AutomaticallyCheckLanguage = "automatically_check_language";
     public const string DetailedBrowserLoggingEnabled = "detailed_browser_logging_enabled";
     public const string HeroMinHpForAdventure = "hero_min_hp_for_adventure";

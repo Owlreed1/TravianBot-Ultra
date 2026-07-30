@@ -176,6 +176,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _chromiumInstallCts;
     private bool _updateCheckRunning;
     private string? _announcedUpdateVersion;
+    private UpdateAvailableWindow? _updateAvailableWindow;
     private bool _suppressAccountSelectionChange;
     private bool _suppressVillageSelectionChange;
     private bool _resourceSnapshotRefreshRunning;
@@ -849,8 +850,8 @@ public partial class MainWindow : Window
 
     // Best-effort background check against GitHub's latest release. Runs at startup and then hourly while
     // the app is open. On a newer version, the Support (message) button breathes gold unless update
-    // notifications are muted in settings. Never blocks startup and never alarms — offline/rate-limited
-    // leaves the latest known status unchanged.
+    // notifications are muted in settings, and a modeless prompt is shown once for that release. Never
+    // blocks startup and never alarms — offline/rate-limited leaves the latest known status unchanged.
     private async Task CheckForUpdatesAsync()
     {
         if (_updateCheckRunning)
@@ -886,6 +887,16 @@ public partial class MainWindow : Window
                     _announcedUpdateVersion = status.Release.LatestVersion;
                     AppendLog($"Update available: v{status.Release.LatestVersion} (current v{_currentVersion}).");
                 }
+
+                if (!_loopController.IsClosing
+                    && UpdateNotificationDecisions.ShouldShow(
+                        status,
+                        muted,
+                        ReadLastAcknowledgedUpdateVersion(),
+                        _updateAvailableWindow is not null))
+                {
+                    ShowUpdateAvailableWindow(status.Release);
+                }
             }
             else
             {
@@ -914,6 +925,83 @@ public partial class MainWindow : Window
         {
             return false;
         }
+    }
+
+    private string? ReadLastAcknowledgedUpdateVersion()
+    {
+        try
+        {
+            return _botConfigStore.LoadGlobal()[BotOptionPayloadKeys.LastAcknowledgedUpdateVersion]
+                ?.GetValue<string>();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void ShowUpdateAvailableWindow(UpdateChecker.ReleaseInfo release)
+    {
+        if (_updateAvailableWindow is not null)
+        {
+            return;
+        }
+
+        var notification = new UpdateAvailableWindow(_currentVersion, release.LatestVersion)
+        {
+            Owner = this,
+        };
+        var updateStatus = new UpdateChecker.UpdateStatus(_currentVersion, release, UpdateAvailable: true);
+        EventHandler updateRequested = (_, _) =>
+        {
+            AcknowledgeUpdateVersion(release.LatestVersion);
+            _ = Dispatcher.BeginInvoke(() => OpenVersionWindow(updateStatus));
+        };
+        EventHandler dismissRequested = (_, _) => AcknowledgeUpdateVersion(release.LatestVersion);
+        notification.UpdateRequested += updateRequested;
+        notification.DismissRequested += dismissRequested;
+        notification.Closed += (_, _) =>
+        {
+            notification.UpdateRequested -= updateRequested;
+            notification.DismissRequested -= dismissRequested;
+            if (ReferenceEquals(_updateAvailableWindow, notification))
+            {
+                _updateAvailableWindow = null;
+            }
+        };
+
+        _updateAvailableWindow = notification;
+        notification.Show();
+        AppendLog($"[update] notification shown for v{release.LatestVersion}.");
+    }
+
+    private void AcknowledgeUpdateVersion(string latestVersion)
+    {
+        try
+        {
+            var config = _botConfigStore.LoadGlobal();
+            config[BotOptionPayloadKeys.LastAcknowledgedUpdateVersion] = latestVersion;
+            _botConfigStore.SaveGlobal(config);
+            AppendLog($"[update] notification acknowledged for v{latestVersion}.");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[update] could not save notification acknowledgement: {ex.Message}");
+        }
+    }
+
+    private void OpenVersionWindow(UpdateChecker.UpdateStatus status)
+    {
+        if (_loopController.IsClosing)
+        {
+            return;
+        }
+
+        var window = new VersionWindow(_currentVersion, status)
+        {
+            Owner = this,
+        };
+        window.ShowDialog();
     }
 
     private void RefreshUpdateNotificationState()

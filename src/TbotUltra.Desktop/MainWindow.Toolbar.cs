@@ -200,6 +200,7 @@ public partial class MainWindow
             dailySpendingState.GoldSpent,
             dailySpendingState.SilverSpent,
             GetVillageStatusSweepNextScanUtc,
+            GetContinuousKeepAliveNextReloadUtc,
             RunVillageStatusSweepNowFromSettingsAsync,
             HasCompletedNewAccountAnalysis())
         {

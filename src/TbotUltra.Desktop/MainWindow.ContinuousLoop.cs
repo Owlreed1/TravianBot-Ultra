@@ -23,6 +23,9 @@ public partial class MainWindow
     private int _villageStatusSweepForceRequested;
     private int _villageStatusSweepManualRunInProgress;
 
+    private DateTimeOffset GetContinuousKeepAliveNextReloadUtc()
+        => _nextContinuousKeepAliveAtUtc;
+
     private DateTimeOffset GetVillageStatusSweepNextScanUtc()
     {
         lock (_villageStatusSweepScheduleSync)

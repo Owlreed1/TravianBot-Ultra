@@ -531,16 +531,37 @@
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
                                         <CheckBox x:Name="ContinuousKeepAliveEnabledCheckBox" Content="Keep Alive" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="Reloads the current page occasionally while continuous-loop work is due soon, to prevent the session from becoming stale." />
+                                        <Border x:Name="ContinuousKeepAliveNextReloadBadge"
+                                                MinWidth="112"
+                                                Padding="9,2"
+                                                Margin="22,0,0,0"
+                                                Background="{DynamicResource SuccessBgBrush}"
+                                                BorderBrush="{DynamicResource SuccessBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                ToolTip="Time remaining until the next Keep Alive reload.">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                <TextBlock Text="Next reload:"
+                                                           Margin="0,0,7,0"
+                                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                                <TextBlock x:Name="ContinuousKeepAliveNextReloadTextBlock"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource SuccessTextBrush}"
+                                                           Text="Ready" />
+                                            </StackPanel>
+                                        </Border>
                                     </StackPanel>
-                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="Min min" FontWeight="SemiBold" />
-                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Max min" FontWeight="SemiBold" />
-                                    <TextBox x:Name="ContinuousKeepAliveMinMinutesTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                    <TextBox x:Name="ContinuousKeepAliveMaxMinutesTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="Min min" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Row="1" Grid.Column="2" Text="Max min" FontWeight="SemiBold" />
+                                    <TextBox x:Name="ContinuousKeepAliveMinMinutesTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" />
+                                    <TextBox x:Name="ContinuousKeepAliveMaxMinutesTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" />
                                 </Grid>
                             </Border>
                             <Border Style="{StaticResource SettingsGroupBox}" BorderThickness="0" Padding="0" Margin="0">

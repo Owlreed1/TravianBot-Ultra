@@ -481,6 +481,15 @@ public partial class MainWindow
         return long.TryParse(normalized, out var parsed) ? parsed : null;
     }
 
+    private bool HasTrustedCurrentPageResourceSnapshot(VillageStatus status)
+    {
+        // The deferred queue must never treat a partial page read as zero resources or attach it to an
+        // ambiguous village. Capacity and production may safely come from the existing cache afterwards.
+        return ResolveStatusVillageKey(status) is not null
+            && new[] { "wood", "clay", "iron", "crop" }
+                .All(key => TryParseResourceValueForUi(status.Resources, key) is >= 0);
+    }
+
     private async Task<VillageStatus?> RefreshResourceSnapshotForUiAsync(
         BotOptions? options = null,
         CancellationToken cancellationToken = default,
@@ -511,6 +520,12 @@ public partial class MainWindow
                     resourceOnly: true,
                     forceCurrentVillage: forceCurrentVillage,
                     currentPageOnly: currentPageOnly);
+
+            if (currentPageOnly && !HasTrustedCurrentPageResourceSnapshot(status))
+            {
+                AppendLog($"[resource-refresh:verbose] discarded incomplete current-page resource snapshot for '{status.ActiveVillage ?? "-"}'.");
+                return null;
+            }
 
             await Dispatcher.InvokeAsync(() => MeasureUiWork("resource snapshot apply", () =>
             {

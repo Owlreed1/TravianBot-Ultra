@@ -41,6 +41,7 @@ public partial class SettingsWindow : Window
     private bool _suppressDetailedBrowserLoggingConfirmation;
     private string _initialTownHallFingerprint = string.Empty;
     private readonly Func<DateTimeOffset>? _villageStatusSweepNextScanProvider;
+    private readonly Func<DateTimeOffset>? _continuousKeepAliveNextReloadProvider;
     private readonly Func<Task>? _runVillageStatusSweepNow;
     private readonly bool _newAccountAnalysisCompleted;
     private readonly DispatcherTimer _villageStatusSweepTimer;
@@ -88,6 +89,7 @@ public partial class SettingsWindow : Window
         int dailyGoldSpent = 0,
         int dailySilverSpent = 0,
         Func<DateTimeOffset>? villageStatusSweepNextScanProvider = null,
+        Func<DateTimeOffset>? continuousKeepAliveNextReloadProvider = null,
         Func<Task>? runVillageStatusSweepNow = null,
         bool newAccountAnalysisCompleted = false)
     {
@@ -102,6 +104,7 @@ public partial class SettingsWindow : Window
         _dailyGoldSpent = Math.Max(0, dailyGoldSpent);
         _dailySilverSpent = Math.Max(0, dailySilverSpent);
         _villageStatusSweepNextScanProvider = villageStatusSweepNextScanProvider;
+        _continuousKeepAliveNextReloadProvider = continuousKeepAliveNextReloadProvider;
         _runVillageStatusSweepNow = runVillageStatusSweepNow;
         _newAccountAnalysisCompleted = newAccountAnalysisCompleted;
         foreach (var row in townHallRows ?? [])
@@ -122,9 +125,14 @@ public partial class SettingsWindow : Window
         VillageStatusSweepScanNowButton.IsEnabled = _runVillageStatusSweepNow is not null;
         UpdateDailySpendingUsage();
         _villageStatusSweepTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _villageStatusSweepTimer.Tick += (_, _) => UpdateVillageStatusSweepNextScanDisplay();
+        _villageStatusSweepTimer.Tick += (_, _) =>
+        {
+            UpdateVillageStatusSweepNextScanDisplay();
+            UpdateContinuousKeepAliveNextReloadDisplay();
+        };
         Closed += (_, _) => _villageStatusSweepTimer.Stop();
         UpdateVillageStatusSweepNextScanDisplay();
+        UpdateContinuousKeepAliveNextReloadDisplay();
         _villageStatusSweepTimer.Start();
     }
 
@@ -162,28 +170,60 @@ public partial class SettingsWindow : Window
 
     private void UpdateVillageStatusSweepNextScanDisplay()
     {
-        var nextScanUtc = _villageStatusSweepNextScanProvider?.Invoke() ?? DateTimeOffset.MinValue;
-        var remaining = nextScanUtc - DateTimeOffset.UtcNow;
-        if (nextScanUtc == DateTimeOffset.MinValue || remaining <= TimeSpan.Zero)
+        UpdateNextScheduledDisplay(
+            _villageStatusSweepNextScanProvider,
+            VillageStatusSweepNextScanTextBlock,
+            VillageStatusSweepNextScanBadge,
+            "Ready");
+    }
+
+    private void UpdateContinuousKeepAliveNextReloadDisplay()
+    {
+        if (ContinuousKeepAliveEnabledCheckBox.IsChecked != true)
         {
-            VillageStatusSweepNextScanTextBlock.Text = "Ready";
-            ApplyVillageStatusSweepNextScanBadgeTheme(isReady: true);
+            ContinuousKeepAliveNextReloadTextBlock.Text = "Off";
+            ApplyNextScheduleBadgeTheme(
+                ContinuousKeepAliveNextReloadTextBlock,
+                ContinuousKeepAliveNextReloadBadge,
+                isReady: true);
             return;
         }
 
-        VillageStatusSweepNextScanTextBlock.Text = remaining.TotalHours >= 1
-            ? $"{(int)remaining.TotalHours:00}:{remaining.Minutes:00}:{remaining.Seconds:00}"
-            : $"{remaining.Minutes:00}:{remaining.Seconds:00}";
-        ApplyVillageStatusSweepNextScanBadgeTheme(isReady: false);
+        UpdateNextScheduledDisplay(
+            _continuousKeepAliveNextReloadProvider,
+            ContinuousKeepAliveNextReloadTextBlock,
+            ContinuousKeepAliveNextReloadBadge,
+            "Ready");
     }
 
-    private void ApplyVillageStatusSweepNextScanBadgeTheme(bool isReady)
+    private static void UpdateNextScheduledDisplay(
+        Func<DateTimeOffset>? nextScheduleProvider,
+        TextBlock textBlock,
+        Border badge,
+        string emptyText)
     {
-        VillageStatusSweepNextScanTextBlock.Foreground = (System.Windows.Media.Brush)FindResource(
+        var nextScheduleUtc = nextScheduleProvider?.Invoke() ?? DateTimeOffset.MinValue;
+        var remaining = nextScheduleUtc - DateTimeOffset.UtcNow;
+        if (nextScheduleUtc == DateTimeOffset.MinValue || remaining <= TimeSpan.Zero)
+        {
+            textBlock.Text = emptyText;
+            ApplyNextScheduleBadgeTheme(textBlock, badge, isReady: true);
+            return;
+        }
+
+        textBlock.Text = remaining.TotalHours >= 1
+            ? $"{(int)remaining.TotalHours:00}:{remaining.Minutes:00}:{remaining.Seconds:00}"
+            : $"{remaining.Minutes:00}:{remaining.Seconds:00}";
+        ApplyNextScheduleBadgeTheme(textBlock, badge, isReady: false);
+    }
+
+    private static void ApplyNextScheduleBadgeTheme(TextBlock textBlock, Border badge, bool isReady)
+    {
+        textBlock.Foreground = (System.Windows.Media.Brush)badge.FindResource(
             isReady ? "SuccessTextBrush" : "WarningTextBrush");
-        VillageStatusSweepNextScanBadge.Background = (System.Windows.Media.Brush)FindResource(
+        badge.Background = (System.Windows.Media.Brush)badge.FindResource(
             isReady ? "SuccessBgBrush" : "WarningBgBrush");
-        VillageStatusSweepNextScanBadge.BorderBrush = (System.Windows.Media.Brush)FindResource(
+        badge.BorderBrush = (System.Windows.Media.Brush)badge.FindResource(
             isReady ? "SuccessBorderBrush" : "WarningBorderBrush");
     }
 

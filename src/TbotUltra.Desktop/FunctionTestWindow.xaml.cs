@@ -18,6 +18,7 @@ public partial class FunctionTestWindow : Window
     public event RoutedEventHandler? SavePageHtmlRequested;
     public event RoutedEventHandler? RunNewAccountAnalysisRequested;
     public event RoutedEventHandler? ClearNewAccountAnalysisRequested;
+    public event RoutedEventHandler? UpdateVersionPreviewRequested;
 
     public FunctionTestWindow()
     {
@@ -93,6 +94,11 @@ public partial class FunctionTestWindow : Window
     private void ClearNewAccountAnalysisButton_Click(object sender, RoutedEventArgs e)
     {
         ClearNewAccountAnalysisRequested?.Invoke(sender, e);
+    }
+
+    private void UpdateVersionPreviewButton_Click(object sender, RoutedEventArgs e)
+    {
+        UpdateVersionPreviewRequested?.Invoke(sender, e);
     }
 
 }

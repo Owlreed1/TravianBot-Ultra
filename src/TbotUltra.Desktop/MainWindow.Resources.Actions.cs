@@ -85,6 +85,7 @@ public partial class MainWindow
         _resourceTestFunctionsWindow.SavePageHtmlRequested += SavePageHtmlButton_Click;
         _resourceTestFunctionsWindow.RunNewAccountAnalysisRequested += RunNewAccountAnalysisDebugButton_Click;
         _resourceTestFunctionsWindow.ClearNewAccountAnalysisRequested += ClearNewAccountAnalysisDebugButton_Click;
+        _resourceTestFunctionsWindow.UpdateVersionPreviewRequested += UpdateVersionPreviewButton_Click;
         _resourceTestFunctionsWindow.Closed += (_, _) =>
         {
             _resourceTestFunctionsWindow.ResourceProductionTestRequested -= TestResourceProductionButton_Click;
@@ -101,10 +102,20 @@ public partial class MainWindow
             _resourceTestFunctionsWindow.SavePageHtmlRequested -= SavePageHtmlButton_Click;
             _resourceTestFunctionsWindow.RunNewAccountAnalysisRequested -= RunNewAccountAnalysisDebugButton_Click;
             _resourceTestFunctionsWindow.ClearNewAccountAnalysisRequested -= ClearNewAccountAnalysisDebugButton_Click;
+            _resourceTestFunctionsWindow.UpdateVersionPreviewRequested -= UpdateVersionPreviewButton_Click;
             _resourceTestFunctionsWindow = null;
         };
 
         _resourceTestFunctionsWindow.Show();
+    }
+
+    private void UpdateVersionPreviewButton_Click(object sender, RoutedEventArgs e)
+    {
+        var preview = new UpdateAvailableWindow("1.0.0", "1.1.0")
+        {
+            Owner = (Window?)_resourceTestFunctionsWindow ?? this,
+        };
+        preview.Show();
     }
 
     private void BulkMessagesButton_Click(object sender, RoutedEventArgs e)

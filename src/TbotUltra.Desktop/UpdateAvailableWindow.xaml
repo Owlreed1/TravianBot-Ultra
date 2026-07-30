@@ -1,0 +1,122 @@
+<Window x:Class="TbotUltra.Desktop.UpdateAvailableWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Title="Update available"
+        Height="332"
+        Width="510"
+        MinHeight="332"
+        MinWidth="510"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,6">
+            <TextBlock Text="A newer version is ready"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <TextBlock Text="Your automation keeps running while you decide."
+                       Margin="0,4,0,0"
+                       Foreground="{DynamicResource TextMutedBrush}" />
+        </StackPanel>
+
+        <Border Grid.Row="1"
+                Background="{DynamicResource InfoBgBrush}"
+                BorderBrush="{DynamicResource InfoBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="10,8"
+                Margin="0,8,0,16">
+            <TextBlock Text="Open update options to download or install the latest release."
+                       Foreground="{DynamicResource InfoTextBrush}"
+                       TextWrapping="Wrap" />
+        </Border>
+
+        <Grid Grid.Row="2" VerticalAlignment="Top">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="38" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderSubtleBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="14">
+                <StackPanel>
+                    <TextBlock Text="CURRENT VERSION"
+                               FontSize="10"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSubtleBrush}" />
+                    <TextBlock x:Name="CurrentVersionText"
+                               Margin="0,6,0,0"
+                               FontSize="19"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Grid.Column="1"
+                       Text="→"
+                       FontSize="19"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextSubtleBrush}"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+
+            <Border Grid.Column="2"
+                    Background="{DynamicResource SuccessBgBrush}"
+                    BorderBrush="{DynamicResource SuccessBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="14">
+                <StackPanel>
+                    <TextBlock Text="LATEST VERSION"
+                               FontSize="10"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource SuccessTextBrush}" />
+                    <TextBlock x:Name="LatestVersionText"
+                               Margin="0,6,0,0"
+                               FontSize="19"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource SuccessTextStrongBrush}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,18,0,0">
+            <Button x:Name="UpdateButton"
+                    Content="Update"
+                    Width="104"
+                    Height="32"
+                    Margin="0,0,8,0"
+                    IsDefault="True"
+                    Background="{DynamicResource SuccessBgBrush}"
+                    BorderBrush="{DynamicResource SuccessBorderBrush}"
+                    Foreground="{DynamicResource SuccessTextBrush}"
+                    Click="UpdateButton_Click" />
+            <Button x:Name="DontUpdateNowButton"
+                    Content="Dont update now"
+                    Width="136"
+                    Height="32"
+                    IsCancel="True"
+                    Background="{DynamicResource DangerBgBrush}"
+                    BorderBrush="{DynamicResource DangerBorderBrush}"
+                    Foreground="{DynamicResource DangerTextBrush}"
+                    Click="DontUpdateNowButton_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

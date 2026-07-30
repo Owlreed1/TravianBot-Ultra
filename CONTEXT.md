@@ -40,3 +40,8 @@ _Avoid_: pre-sleep flags, wake state
 The account-and-world-specific first-login initialization that reads hero inventory, hero attributes, and missing
 new-village status. It remains pending until all three reads succeed.
 _Avoid_: every-login analysis, hero inventory cache
+
+**Update Notification Acknowledgement**:
+The application-wide saved release version that the user has already handled in the new-version notification.
+It suppresses only that release; a later release is eligible to notify again.
+_Avoid_: update mute, per-account update state

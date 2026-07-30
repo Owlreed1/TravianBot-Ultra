@@ -315,7 +315,7 @@ jobs:
         run: |
           $outputRoot = Join-Path $PWD "temp_build_out\dist"
           $zipPath = Join-Path $outputRoot $env:PORTABLE_NAME
-          $checksumPath = "$zipPath.sha256"
+          $checksumPath = Join-Path $outputRoot "$env:PORTABLE_NAME.sha256 (dont download this)"
           $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
           [System.IO.File]::WriteAllText($checksumPath, "$hash *$env:PORTABLE_NAME`n")
           if (-not (Test-Path -LiteralPath $checksumPath -PathType Leaf)) {
@@ -332,7 +332,7 @@ jobs:
         shell: pwsh
         run: |
           $portablePath = Join-Path $PWD "temp_build_out\dist\$env:PORTABLE_NAME"
-          $checksumPath = "$portablePath.sha256"
+          $checksumPath = Join-Path (Split-Path -Parent $portablePath) "$env:PORTABLE_NAME.sha256 (dont download this)"
 
           if (-not (Test-Path $portablePath)) {
             throw "Portable zip is missing: $portablePath"
@@ -348,7 +348,7 @@ jobs:
           move or rename the folder wherever you like (e.g. your Desktop), then run
           Tbot Ultra.exe inside it.
 
-          The matching $env:PORTABLE_NAME.sha256 asset can be used to verify the downloaded zip.
+          The matching checksum asset is only for verifying the downloaded zip; ordinary users should download the portable zip above.
 
           Set up your account and server inside the app (Account -> Manage). No manual editing of .env or config files is needed.
 

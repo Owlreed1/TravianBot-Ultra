@@ -173,6 +173,25 @@
                         </UniformGrid>
                     </StackPanel>
                 </Border>
+
+                <Border Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderSubtleBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="10"
+                        Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="Popups" FontWeight="SemiBold" Margin="0,0,0,8" />
+                        <UniformGrid Columns="2">
+                            <Button x:Name="UpdateVersionPreviewButton"
+                                    Style="{DynamicResource DebugActionButtonStyle}"
+                                    Content="Update version"
+                                    ToolTip="Opens a side-effect-free preview of the new-version notification."
+                                    ToolTipService.InitialShowDelay="500"
+                                    Click="UpdateVersionPreviewButton_Click" />
+                        </UniformGrid>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
     </Grid>
