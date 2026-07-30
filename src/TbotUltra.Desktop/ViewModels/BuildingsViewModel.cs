@@ -17,6 +17,14 @@ namespace TbotUltra.Desktop.ViewModels;
 /// </summary>
 public sealed class BuildingsViewModel : BaseViewModel
 {
+    private string _demolishStatusText = "No demolition queued for this village.";
+
+    public string DemolishStatusText
+    {
+        get => _demolishStatusText;
+        set => SetProperty(ref _demolishStatusText, value);
+    }
+
     /// <summary>
     /// Building slots shown on the Buildings tab. Created once and mutated in
     /// place so the panel's CollectionViewSource bindings stay stable.

@@ -19,6 +19,7 @@ public static class QueueGroupCatalog
             [QueueGroup.Reinforcements] = ("reinforcements", "Reinforcements", "Send troops between own villages."),
             [QueueGroup.TownHallCelebration] = ("town_hall_celebration", "Town Hall celebration", "Small/big Town Hall celebrations."),
             [QueueGroup.Account] = ("account", "Account", "Account and read-only status tasks."),
+            [QueueGroup.Demolish] = ("demolish", "Demolish", "Queued building demolitions."),
         };
 
     public static IReadOnlyList<QueueGroup> AllGroups => Metadata.Keys.ToList();
@@ -63,6 +64,7 @@ public static class QueueGroupCatalog
             TaskGroup.Reinforcements => QueueGroup.Reinforcements,
             TaskGroup.TownHallCelebration => QueueGroup.TownHallCelebration,
             TaskGroup.Account => QueueGroup.Account,
+            TaskGroup.Demolish => QueueGroup.Demolish,
             _ => QueueGroup.Construction,
         };
     }

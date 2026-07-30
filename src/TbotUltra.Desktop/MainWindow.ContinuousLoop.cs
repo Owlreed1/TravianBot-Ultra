@@ -725,12 +725,17 @@ public partial class MainWindow
             return Dispatcher.Invoke(GetContinuousLoopEnabledGroupsInOrder);
         }
 
-        return _automationLoopTasks
+        var groups = _automationLoopTasks
             .Where(item => item.IsEnabled)
             .Select(item => QueueGroupCatalog.TryParse(item.TaskName, out var group) ? group : (QueueGroup?)null)
             .Where(group => group.HasValue)
             .Select(group => group!.Value)
             .ToList();
+        if (!groups.Contains(QueueGroup.Demolish))
+        {
+            groups.Add(QueueGroup.Demolish);
+        }
+        return groups;
     }
 
     // Union of automation-loop groups enabled across the selected village (live UI toggles) plus every
@@ -1607,6 +1612,10 @@ public partial class MainWindow
     // tasks and unknown villages fall back to the account default group set.
     private bool IsQueueItemGroupEnabledForItsVillage(QueueItem item)
     {
+        if (item.Group == QueueGroup.Demolish)
+        {
+            return true;
+        }
         return IsGroupEnabledForVillage(GetQueueItemVillageKey(item), item.Group);
     }
 

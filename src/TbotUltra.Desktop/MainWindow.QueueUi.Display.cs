@@ -48,6 +48,7 @@ public partial class MainWindow
 
     private void RefreshQueueUi(Guid? selectId = null)
     {
+        RefreshDemolishStatusForSelectedVillage();
         _isRefreshingQueueUi = true;
         try
         {

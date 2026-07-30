@@ -478,6 +478,7 @@ public partial class MainWindow : Window
                 TickAutomationLoopCountdowns();
 
                 TickBuildQueueCountdown();
+                RefreshDemolishStatusForSelectedVillage();
 
                 // The "Next task" value runs the loop selector (reads the queue/options). Queue reads now
                 // come from the in-memory cache, so recompute every second; also refreshed on real

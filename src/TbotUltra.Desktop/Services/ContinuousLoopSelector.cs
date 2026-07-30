@@ -221,6 +221,9 @@ internal static class ContinuousLoopSelector
             .Where(candidate =>
                 candidate.IsAllowedByAutomationSettings
                 && !IsUtilityTask(candidate.Item.TaskName)
+                // Demolition's authoritative server timer never owns the browser. Holding the active
+                // village for its final seconds would therefore stall unrelated groups for no benefit.
+                && candidate.Item.Group != QueueGroup.Demolish
                 && candidate.Item.Status == QueueStatus.Pending
                 && candidate.Item.NextAttemptAt > now
                 && candidate.Item.NextAttemptAt <= now.Add(ShortVillageDeferThreshold)

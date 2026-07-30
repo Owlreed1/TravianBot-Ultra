@@ -1,8 +1,5 @@
 using Microsoft.Playwright;
 using System.Globalization;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Core.Tasks;
 using TbotUltra.Core.Travian;
@@ -35,9 +32,7 @@ public sealed partial class TravianClient : IBuildingClient
             throw new InvalidOperationException($"Demolish slot {slotId} is outside the building range.");
         }
 
-        const int safetyCap = 30;
-
-        // One-shot: read dorf2 to get original level + main building slot id.
+        // One-shot: read dorf2 to get the live target level and Main Building slot.
         await ReloadOrGotoAsync(Paths.Buildings, cancellationToken);
 
         var initialSlots = await ReadBuildingInfosAsync(cancellationToken);
@@ -60,77 +55,49 @@ public sealed partial class TravianClient : IBuildingClient
             throw new InvalidOperationException("Demolition requires Main Building.");
         }
 
-        var originalLevel = initialInfo.Level;
         var targetBuildingName = string.IsNullOrWhiteSpace(initialInfo.BuildingName)
             ? $"slot {slotId}"
             : initialInfo.BuildingName;
-        var demolitions = 0;
-        var currentLevel = originalLevel;
-
-        // Stay on the Main Building page across iterations — only reload there between steps.
         var mainBuildingPath = Paths.BuildBySlot(mainSlot.Value);
+        await GotoAsync(mainBuildingPath, cancellationToken);
 
-        for (var iter = 0; iter < safetyCap && currentLevel > targetLevel; iter++)
+        var activeSeconds = await ReadActiveDemolitionSecondsOnCurrentPageAsync(cancellationToken);
+        if (activeSeconds is > 0)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            // Select target + click demolish. TryStartDemolitionStepAsync navigates to the
-            // main building page (or reloads it if already there), so each step starts fresh.
-            var started = await TryStartDemolitionStepAsync(
-                mainBuildingSlotId: mainSlot.Value,
-                targetSlotId: slotId,
-                targetBuildingName: targetBuildingName,
-                cancellationToken);
-            if (!started)
-            {
-                // The demolish form is hidden while a demolition is already running.
-                // Wait for any in-progress demolition to finish, then retry once before giving up.
-                var pending = await WaitForActiveDemolitionToFinishAsync(mainBuildingPath, cancellationToken);
-                if (pending)
-                {
-                    started = await TryStartDemolitionStepAsync(
-                        mainBuildingSlotId: mainSlot.Value,
-                        targetSlotId: slotId,
-                        targetBuildingName: targetBuildingName,
-                        cancellationToken);
-                }
-            }
-
-            if (!started)
-            {
-                return $"Slot {slotId}: could not start demolition (main building page didn't expose a demolish action). Steps: {demolitions}.";
-            }
-
-            try
-            {
-                await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded)
-                    .WaitAsync(cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                // Continue — the wait loop below copes with partial loads.
-            }
-
-            demolitions += 1;
-            currentLevel -= 1;
-            Notify($"Slot {slotId}: demolish step {demolitions} queued (was level {currentLevel + 1}). Waiting for it to complete.");
-
-            // Wait for this demolition to actually complete (read its real countdown timer)
-            // before reloading and starting the next level — otherwise the form is unavailable.
-            await WaitForActiveDemolitionToFinishAsync(mainBuildingPath, cancellationToken);
+            return $"Demolition already running for {activeSeconds.Value}s. queue_wait_seconds={activeSeconds.Value}";
         }
 
-        return $"Demolished slot {slotId} from level {originalLevel} to {currentLevel} in {demolitions} step(s).";
+        var started = await TryStartDemolitionStepAsync(
+            mainBuildingSlotId: mainSlot.Value,
+            targetSlotId: slotId,
+            cancellationToken);
+        if (!started)
+        {
+            return $"Slot {slotId}: could not start demolition (Main Building did not expose the Official demolish form).";
+        }
+
+        // The Official page updates in place after the POST. This is a short DOM settle only; the
+        // long server countdown is returned to the persistent queue below.
+        await Task.Delay(TimeSpan.FromMilliseconds(750), cancellationToken);
+        activeSeconds = await ReadActiveDemolitionSecondsOnCurrentPageAsync(cancellationToken);
+        if (activeSeconds is not > 0)
+        {
+            await ReloadOrGotoAsync(mainBuildingPath, cancellationToken);
+            activeSeconds = await ReadActiveDemolitionSecondsOnCurrentPageAsync(cancellationToken);
+        }
+
+        if (activeSeconds is not > 0)
+        {
+            return $"Slot {slotId}: demolish click was not confirmed by an active demolition timer.";
+        }
+
+        Notify($"Slot {slotId}: started one demolish step for {targetBuildingName}; server timer {activeSeconds.Value}s.");
+        return $"Started demolition for {targetBuildingName}. queue_wait_seconds={activeSeconds.Value}";
     }
 
     private async Task<bool> TryStartDemolitionStepAsync(
         int mainBuildingSlotId,
         int targetSlotId,
-        string targetBuildingName,
         CancellationToken cancellationToken)
     {
         await GotoAsync(Paths.BuildBySlot(mainBuildingSlotId), cancellationToken);
@@ -138,51 +105,15 @@ public sealed partial class TravianClient : IBuildingClient
         var selected = await _page.EvaluateAsync<bool>(
             """
             (args) => {
-              const slotId = Number(args.slotId);
-              const normalized = (args.name || '').toLowerCase();
-              const selectCandidates = [
-                'select[name*="demolish" i]',
-                'form[action*="build.php" i] select',
-                '#build.gid15 select',
-                '.demolish select',
-                '#content select'
-              ];
-
-              const getCandidates = () => {
-                const nodes = [];
-                for (const selector of selectCandidates) {
-                  for (const node of document.querySelectorAll(selector)) {
-                    if (!nodes.includes(node)) nodes.push(node);
-                  }
-                }
-                return nodes;
-              };
-
-              const selects = getCandidates();
-              for (const select of selects) {
-                const options = Array.from(select.options || []);
-                const direct = options.find(option => Number(option.value) === slotId);
-                if (direct) {
-                  select.value = direct.value;
-                  select.dispatchEvent(new Event('change', { bubbles: true }));
-                  return true;
-                }
-
-                const byText = options.find(option => {
-                  const text = (option.textContent || '').toLowerCase();
-                  return text.includes(normalized) || text.includes(`(${slotId})`) || text.includes(` ${slotId} `);
-                });
-                if (byText) {
-                  select.value = byText.value;
-                  select.dispatchEvent(new Event('change', { bubbles: true }));
-                  return true;
-                }
-              }
-
-              return false;
+              const select = document.querySelector('form.demolish_building select#demolish[name="abriss"]');
+              const option = select && Array.from(select.options).find(item => Number(item.value) === Number(args.slotId));
+              if (!select || !option) return false;
+              select.value = option.value;
+              select.dispatchEvent(new Event('change', { bubbles: true }));
+              return true;
             }
             """,
-            new { slotId = targetSlotId, name = targetBuildingName });
+            new { slotId = targetSlotId });
 
         if (!selected)
         {
@@ -190,96 +121,33 @@ public sealed partial class TravianClient : IBuildingClient
         }
 
         await DelayBeforeClickAsync(cancellationToken); // Action pacing "Click" delay
+        // Stop demolition can cancel this narrow action scope while the page is being prepared.
+        // Do the final check immediately before the state-changing Official click.
+        cancellationToken.ThrowIfCancellationRequested();
         return await _page.EvaluateAsync<bool>(
             """
             () => {
-              const clickables = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
-              const safe = clickables.filter(node => {
-                const text = ((node.textContent || '') + ' ' + (node.getAttribute('value') || '') + ' ' + (node.getAttribute('title') || '')).toLowerCase();
-                const cls = (node.className || '').toLowerCase();
-                const id = (node.id || '').toLowerCase();
-                const isDemolish = text.includes('demolish') || text.includes('abbrechen') || text.includes('riva') || text.includes('demoliera');
-                const isGold = text.includes('gold') || text.includes('instant') || cls.includes('gold') || id.includes('gold');
-                const disabled = node.hasAttribute('disabled') || cls.includes('disabled');
-                return isDemolish && !isGold && !disabled;
-              });
-
-              if (!safe.length) return false;
-              safe[0].click();
+              const button = document.querySelector('form.demolish_building button.textButtonV1.green[value="Demolish"]');
+              if (!button || button.disabled) return false;
+              button.click();
               return true;
             }
             """);
     }
 
-    // Reads the remaining seconds of an in-progress demolition (or any build queue timer)
-    // from the Main Building page. Travian countdown timers carry a `value` attribute with
-    // the seconds remaining, which is far more reliable than parsing the displayed text.
+    // The active Official demolition row is rendered separately from the form as table#demolish.
+    // Restricting the read to that table avoids the unrelated server-clock and construction timers.
     private async Task<int?> ReadActiveDemolitionSecondsOnCurrentPageAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var rawJson = await _page.EvaluateAsync<string>(
+        return await _page.EvaluateAsync<int?>(
             """
             () => {
-              const seconds = [];
-              const pushTimer = (node) => {
-                if (!node) return;
-                const attr = node.getAttribute && node.getAttribute('value');
-                const n = attr != null ? Number(attr) : NaN;
-                if (Number.isFinite(n) && n > 0) seconds.push(n);
-              };
-              const containers = document.querySelectorAll(
-                '.buildingList, #building_contract, .underConstruction, .demolish, #demolish, .boxes-contents, .content');
-              for (const c of containers) {
-                for (const t of c.querySelectorAll('.timer, [id^="timer"], [counting="down"]')) {
-                  pushTimer(t);
-                }
-              }
-              return JSON.stringify(seconds);
+              const timer = document.querySelector('table#demolish .timer[value]');
+              const seconds = timer ? Number(timer.getAttribute('value')) : NaN;
+              return Number.isFinite(seconds) && seconds > 0 && seconds < 86400 ? Math.ceil(seconds) : null;
             }
             """);
-
-        var raw = string.IsNullOrWhiteSpace(rawJson)
-            ? new List<int>()
-            : JsonSerializer.Deserialize<List<int>>(rawJson) ?? new List<int>();
-        if (raw.Count == 0)
-        {
-            return null;
-        }
-
-        // The longest timer represents the active demolition/construction we must outlast.
-        return raw.Max();
-    }
-
-    // Polls the Main Building page until no demolition/build countdown remains.
-    // Returns true if a demolition was actually in progress and we waited for it.
-    private async Task<bool> WaitForActiveDemolitionToFinishAsync(string mainBuildingPath, CancellationToken cancellationToken)
-    {
-        const int maxTotalWaitSeconds = 20 * 60; // safety cap
-        const int maxChunkSeconds = 30;
-        var waitedSeconds = 0;
-        var waitedAtLeastOnce = false;
-
-        while (waitedSeconds < maxTotalWaitSeconds)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var remaining = await ReadActiveDemolitionSecondsOnCurrentPageAsync(cancellationToken);
-            if (remaining is not > 0)
-            {
-                return waitedAtLeastOnce;
-            }
-
-            waitedAtLeastOnce = true;
-            var chunk = Math.Min(remaining.Value, maxChunkSeconds);
-            Notify($"Demolition/build in progress (~{remaining.Value}s remaining). Waiting {chunk}s.");
-            await Task.Delay(chunk * 1000 + 500, cancellationToken);
-            waitedSeconds += chunk + 1;
-
-            await ReloadOrGotoAsync(mainBuildingPath, cancellationToken);
-        }
-
-        Notify("Stopped waiting for demolition: safety cap reached.");
-        return waitedAtLeastOnce;
     }
 
 

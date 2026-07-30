@@ -57,6 +57,16 @@ public partial class BuildingsPanel : UserControl
         Host?.OnShowBuildingSlotsClicked();
     }
 
+    private void DemolishOverviewButton_Click(object sender, RoutedEventArgs e)
+    {
+        Host?.OnDemolishOverviewClicked();
+    }
+
+    private void StopDemolitionButton_Click(object sender, RoutedEventArgs e)
+    {
+        Host?.OnStopDemolitionClicked();
+    }
+
     private void BuildingTopSlotsView_Filter(object sender, FilterEventArgs e)
     {
         e.Accepted = e.Item is BuildingSlotRow row && BuildingsViewModel.IsPinnedBuildingTopSlot(row.SlotId);

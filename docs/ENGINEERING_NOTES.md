@@ -79,6 +79,7 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Interruptible writes use the atomic file helper. Retry bounded transient lock/sharing failures.
 - Quarantine and log corrupt queue/state files instead of silently overwriting them.
 - New settings require the complete pipeline: model, defaults, load/save, ViewModel, UI, and tests.
+- Demolition is a village-scoped queue group: start one Official `table#demolish` step, persist the server timer plus its random delay as `NextAttemptAt`, and never poll or sleep through it in the browser.
 - Persist village identity by coordinates/key, not display name. Names may collide or change; queue items retain
   their target village identity.
 - Duplicate village names are valid. Fresh Official sidebar `data-did` plus `.coordinateX/.coordinateY` values

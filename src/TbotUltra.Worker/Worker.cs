@@ -71,7 +71,9 @@ public sealed class Worker : BackgroundService
                         // Transient block (e.g. waiting for resources, build queue full). Defer
                         // without bumping Retries — the task should NOT eventually be marked Failed
                         // just because a slow resource accumulation took many ticks.
-                        var delay = ClampDeferDelay(wait.DelaySeconds);
+                        var delay = string.Equals(next.TaskName, "demolish_building_to_level", StringComparison.OrdinalIgnoreCase)
+                            ? TimeSpan.FromSeconds(Math.Max(1, wait.DelaySeconds))
+                            : ClampDeferDelay(wait.DelaySeconds);
                         _queueStore.MarkDeferred(next.Id, delay);
                         _logger.LogInformation(
                             "Queue item deferred. Task={Task}, Delay={DelaySeconds}s, Reason={Reason}",

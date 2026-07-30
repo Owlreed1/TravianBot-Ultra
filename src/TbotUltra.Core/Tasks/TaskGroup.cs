@@ -13,4 +13,5 @@ public enum TaskGroup
     Reinforcements = 8,
     TownHallCelebration = 9,
     Account = 10,
+    Demolish = 11,
 }

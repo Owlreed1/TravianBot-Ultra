@@ -13,7 +13,7 @@ public static class TaskCatalog
         new("upgrade_building_to_max", TaskGroup.Construction, "Upgrade building to max", false, TaskPayloadKind.BuildingUpgrade),
         new("construct_building", TaskGroup.Construction, "Construct building", false, TaskPayloadKind.BuildingConstruct),
         new("load_buildings_snapshot", TaskGroup.Account, "Load buildings snapshot", false, TaskPayloadKind.None),
-        new("demolish_building_to_level", TaskGroup.Construction, "Demolish building to level", false, TaskPayloadKind.BuildingDemolish),
+        new("demolish_building_to_level", TaskGroup.Demolish, "Demolish building to level", false, TaskPayloadKind.BuildingDemolish),
         new("hero_manage", TaskGroup.Hero, "Hero manage", true, TaskPayloadKind.Hero),
         new("spend_hero_attribute_points", TaskGroup.Hero, "Spend hero attribute points", true, TaskPayloadKind.Hero),
         new("upgrade_troops_at_smithy", TaskGroup.Troops, "Upgrade troops at smithy", true, TaskPayloadKind.SmithyUpgrade),

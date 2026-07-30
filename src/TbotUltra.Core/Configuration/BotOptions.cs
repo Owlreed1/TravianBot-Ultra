@@ -582,6 +582,12 @@ public sealed record BotOptions
     [ConfigurationKeyName("target_level")]
     public int? TargetLevel { get; init; }
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.DemolishDelayMinMinutes)]
+    public int DemolishDelayMinMinutes { get; init; } = DemolishDefaults.DefaultDelayMinMinutes;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.DemolishDelayMaxMinutes)]
+    public int DemolishDelayMaxMinutes { get; init; } = DemolishDefaults.DefaultDelayMaxMinutes;
+
     [ConfigurationKeyName("hero_min_hp_for_adventure")]
     public int HeroMinHpForAdventure { get; init; } = 50;
 

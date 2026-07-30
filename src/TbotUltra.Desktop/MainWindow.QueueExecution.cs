@@ -421,7 +421,10 @@ public partial class MainWindow
             }
 
             var effectiveOptions = ApplyHeroResourceSettingsForQueueItem(options, item);
-            var executionResult = await _botService.ExecuteQueueItemAsync(effectiveOptions, item, AppendLog, cancellationToken);
+            var executionToken = IsDemolishQueueItem(item)
+                ? BeginDemolishOperation(item, cancellationToken)
+                : cancellationToken;
+            var executionResult = await _botService.ExecuteQueueItemAsync(effectiveOptions, item, AppendLog, executionToken);
             if (await TryRecoverMissingBuildingUpgradeAsync(
                     item,
                     options,
@@ -453,6 +456,11 @@ public partial class MainWindow
 
             return true;
         }
+        catch (OperationCanceledException) when (IsDemolishQueueItem(item) && WasDemolishOperationStopped(item.Id))
+        {
+            AppendLog($"{logPrefix} STOPPED {tickSw.Elapsed.TotalSeconds:F1}s task={item.TaskName} | canceled before the Official demolish click");
+            return false;
+        }
         catch (OperationCanceledException)
         {
             _botService.MarkQueueItemDeferred(item.Id, TimeSpan.Zero);
@@ -465,6 +473,10 @@ public partial class MainWindow
         }
         finally
         {
+            if (IsDemolishQueueItem(item))
+            {
+                CompleteDemolishOperation(item.Id);
+            }
             SetActiveAutomationTask(null);
             SetActiveFunctionExecution(null);
             RefreshQueueUiOnUiThread(item.Id);
@@ -1143,6 +1155,15 @@ public partial class MainWindow
                     ? FormatQueueDeferredConstructionSuffix(mode)
                     : string.Empty;
                 var payloadChanged = TryExtractDeferredUpgradePayload(ex.Message, item.Payload, out var updatedPayload);
+                if (IsDemolishQueueItem(item)
+                    && TryExtractPayloadInt(ex.Message, "demolish_server_wait_seconds", out var serverWaitSeconds)
+                    && TryExtractPayloadInt(ex.Message, BotOptionPayloadKeys.DemolishDelaySeconds, out var demolishDelaySeconds))
+                {
+                    updatedPayload[BotOptionPayloadKeys.DemolishServerFinishAtUnixSeconds] =
+                        DateTimeOffset.UtcNow.AddSeconds(serverWaitSeconds).ToUnixTimeSeconds().ToString();
+                    updatedPayload[BotOptionPayloadKeys.DemolishDelaySeconds] = demolishDelaySeconds.ToString();
+                    payloadChanged = true;
+                }
                 if (IsConstructionQueueTask(item.TaskName))
                 {
                     // Record WHY this construction item deferred so the resource-driven refresh

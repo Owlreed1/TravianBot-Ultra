@@ -20,6 +20,10 @@ _Avoid_: Map data response, scan output
 The application of a confirmed live village construction status to pending construction queue items, including satisfied targets, slot rebinding, and required dependencies.
 _Avoid_: Queue repair, build queue sync
 
+**Demolition Sequence**:
+A village-scoped queued target that lowers one building level at a time. Each confirmed Travian demolition stores an absolute next-attempt deadline made from the server timer plus the configured human delay.
+_Avoid_: Blocking demolish loop, demolition sleep
+
 **Village Status Round**:
 One randomized pass through every known village that reads the enabled live game state, updates the per-village status cache and lets already-enabled automation react before moving to the next village. It leaves the browser on the final naturally visited village; the next round is scheduled separately.
 _Avoid_: Village scan loop, village refresh

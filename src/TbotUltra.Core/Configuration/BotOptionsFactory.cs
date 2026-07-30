@@ -244,6 +244,8 @@ public static class BotOptionsFactory
             ConstructFasterRandomChancePercent = Math.Clamp(configuration.GetValue(BotOptionPayloadKeys.ConstructFasterRandomChancePercent, 50), 0, 100),
             TargetBuildingSlotOrName = configuration[BotOptionPayloadKeys.TargetBuildingSlotOrName] ?? string.Empty,
             TargetLevel = configuration.GetValue<int?>(BotOptionPayloadKeys.TargetLevel),
+            DemolishDelayMinMinutes = Math.Clamp(configuration.GetValue(BotOptionPayloadKeys.DemolishDelayMinMinutes, DemolishDefaults.DefaultDelayMinMinutes), 0, 1440),
+            DemolishDelayMaxMinutes = Math.Clamp(configuration.GetValue(BotOptionPayloadKeys.DemolishDelayMaxMinutes, DemolishDefaults.DefaultDelayMaxMinutes), 0, 1440),
             HeroMinHpForAdventure = configuration.GetValue(BotOptionPayloadKeys.HeroMinHpForAdventure, 50),
             HeroHpRegenPerDayPercent = Math.Clamp(configuration.GetValue(BotOptionPayloadKeys.HeroHpRegenPerDayPercent, 40), 20, 100),
             HeroAutoRevive = configuration.GetValue(BotOptionPayloadKeys.HeroAutoRevive, false),

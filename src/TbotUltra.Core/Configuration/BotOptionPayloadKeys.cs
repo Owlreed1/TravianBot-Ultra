@@ -66,6 +66,13 @@ public static class BotOptionPayloadKeys
     public const string BuildingUpgradeMaxAttempts = "building_upgrade_max_attempts";
     public const string BuildingUpgradeName = "building_upgrade_name";
 
+    // Demolition state is persisted on the queue item. The server deadline and the following
+    // randomized delay are separate so the UI can distinguish an active Travian demolition from
+    // a humanized wait before the next step after a restart.
+    public const string DemolishTargetName = "demolish_target_name";
+    public const string DemolishServerFinishAtUnixSeconds = "demolish_server_finish_at_unix_seconds";
+    public const string DemolishDelaySeconds = "demolish_delay_seconds";
+
     // Compact list of smithy troop-upgrade targets, e.g. "u21=20;u24=10" (unit/troop key = target level).
     // Empty/absent means "no troops selected" and the task is a no-op. See SmithyUpgradePayload.
     public const string SmithyUpgradeTargets = "smithy_upgrade_targets";
@@ -95,6 +102,8 @@ public static class BotOptionPayloadKeys
     public const string DailyServerResetManualHour = "daily_server_reset_manual_hour";
     public const string TargetBuildingSlotOrName = "target_building_slot_or_name";
     public const string TargetLevel = "target_level";
+    public const string DemolishDelayMinMinutes = "demolish_delay_min_minutes";
+    public const string DemolishDelayMaxMinutes = "demolish_delay_max_minutes";
     public const string DontNotifyNewVersion = "dont_notify_new_version";
     public const string LastAcknowledgedUpdateVersion = "last_acknowledged_update_version";
     public const string AutomaticallyCheckLanguage = "automatically_check_language";

@@ -994,6 +994,7 @@ public partial class MainWindow
         {
             [BotOptionPayloadKeys.TargetBuildingSlotOrName] = row.SlotId.ToString(),
             [BotOptionPayloadKeys.TargetLevel] = targetLevel.ToString(),
+            [BotOptionPayloadKeys.DemolishTargetName] = row.Name,
         };
         EnqueueQuickTask("demolish_building_to_level", $"Demolish {row.Name} to level {targetLevel}", payload);
         SetDemolishingFlag(row.SlotId, true);

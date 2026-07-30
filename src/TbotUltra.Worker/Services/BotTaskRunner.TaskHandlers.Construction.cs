@@ -72,6 +72,18 @@ public sealed partial class BotTaskRunner
             return;
         }
         var result = await context.Client.DemolishBuildingToLevelAsync(context.Options.TargetBuildingSlotOrName, context.Options.TargetLevel.Value, context.CancellationToken);
+        if (TryExtractQueueWaitSeconds(result, out var serverWaitSeconds))
+        {
+            var delay = DemolishDefaults.CalculateDelay(
+                context.Options.DemolishDelayMinMinutes,
+                context.Options.DemolishDelayMaxMinutes);
+            var totalWaitSeconds = checked(serverWaitSeconds + (int)Math.Ceiling(delay.TotalSeconds));
+            throw new TaskWaitException(
+                totalWaitSeconds,
+                $"{result} demolish_server_wait_seconds={serverWaitSeconds} " +
+                $"demolish_delay_seconds={(int)delay.TotalSeconds} queue_wait_seconds={totalWaitSeconds}",
+                TaskWaitReasons.WorkQueued);
+        }
         context.Log(result);
     }
 

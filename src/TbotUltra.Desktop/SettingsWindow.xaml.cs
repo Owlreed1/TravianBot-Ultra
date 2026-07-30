@@ -360,6 +360,12 @@ public partial class SettingsWindow : Window
         ConstructionHumanizeNoPlusMaxTextBox.Text = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.ConstructionHumanizeNoPlusMaxMinutes,
             PacingDefaults.ConstructionHumanizeNoPlusMaxMinutes));
+        DemolishDelayMinTextBox.Text = ReadInt(
+            BotOptionPayloadKeys.DemolishDelayMinMinutes,
+            DemolishDefaults.DefaultDelayMinMinutes).ToString(CultureInfo.InvariantCulture);
+        DemolishDelayMaxTextBox.Text = ReadInt(
+            BotOptionPayloadKeys.DemolishDelayMaxMinutes,
+            DemolishDefaults.DefaultDelayMaxMinutes).ToString(CultureInfo.InvariantCulture);
     }
 
     private void SaveConstructionHumanizeConfigFromUi()
@@ -390,6 +396,8 @@ public partial class SettingsWindow : Window
         _config[BotOptionPayloadKeys.ConstructionHumanizeMaxDelayMinutes] = maxDelay;
         _config[BotOptionPayloadKeys.ConstructionHumanizeNoPlusMinMinutes] = noPlusMin;
         _config[BotOptionPayloadKeys.ConstructionHumanizeNoPlusMaxMinutes] = noPlusMax;
+        _config[BotOptionPayloadKeys.DemolishDelayMinMinutes] = ReadIntText(DemolishDelayMinTextBox, DemolishDefaults.DefaultDelayMinMinutes, 0, 1440);
+        _config[BotOptionPayloadKeys.DemolishDelayMaxMinutes] = ReadIntText(DemolishDelayMaxTextBox, DemolishDefaults.DefaultDelayMaxMinutes, 0, 1440);
         if (wasEnabled != enabled)
         {
             var stateVersion = ReadInt(BotOptionPayloadKeys.ConstructionHumanizeStateVersion, 0);
@@ -597,6 +605,8 @@ public partial class SettingsWindow : Window
             (ConstructionHumanizeMaxDelayTextBox, "Construction maximum delay", false, 0, 600),
             (ConstructionHumanizeNoPlusMinTextBox, "Construction no-Plus delay minimum", false, 0, 600),
             (ConstructionHumanizeNoPlusMaxTextBox, "Construction no-Plus delay maximum", false, 0, 600),
+            (DemolishDelayMinTextBox, "Demolish delay minimum", true, 0, 1440),
+            (DemolishDelayMaxTextBox, "Demolish delay maximum", true, 0, 1440),
             (HeroAdventureRestartDelayMinTextBox, "Hero adventure restart delay minimum", false, 0, double.MaxValue),
             (HeroAdventureRestartDelayMaxTextBox, "Hero adventure restart delay maximum", false, 0, double.MaxValue),
             (SmithyUpgradeRestartDelayMinTextBox, "Smithy restart delay minimum", false, 0, double.MaxValue),
@@ -651,6 +661,7 @@ public partial class SettingsWindow : Window
             (VillageStatusSweepVillageMinTextBox, VillageStatusSweepVillageMaxTextBox, "Village scan village delay", false),
             (ConstructionHumanizeQueuePercentMinTextBox, ConstructionHumanizeQueuePercentMaxTextBox, "Construction queue percentage", false),
             (ConstructionHumanizeNoPlusMinTextBox, ConstructionHumanizeNoPlusMaxTextBox, "Construction no-Plus delay", false),
+            (DemolishDelayMinTextBox, DemolishDelayMaxTextBox, "Demolish delay", true),
             (HeroAdventureRestartDelayMinTextBox, HeroAdventureRestartDelayMaxTextBox, "Hero adventure restart delay", false),
             (SmithyUpgradeRestartDelayMinTextBox, SmithyUpgradeRestartDelayMaxTextBox, "Smithy restart delay", false),
             (TownHallRestartDelayMinTextBox, TownHallRestartDelayMaxTextBox, "Town Hall restart delay", false),
