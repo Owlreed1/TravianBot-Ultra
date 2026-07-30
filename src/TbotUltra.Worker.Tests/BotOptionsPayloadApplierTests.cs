@@ -475,7 +475,7 @@ public sealed class BotOptionsPayloadApplierTests
     }
 
     [Fact]
-    public void FromConfiguration_DefaultsConstructFasterOff()
+    public void FromConfiguration_DefaultsConstructFasterOn()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -487,7 +487,7 @@ public sealed class BotOptionsPayloadApplierTests
 
         var options = BotOptionsFactory.FromConfiguration(configuration);
 
-        Assert.False(options.ConstructFasterEnabled);
+        Assert.True(options.ConstructFasterEnabled);
         Assert.True(options.ConstructFasterMinBuildTimeEnabled);
         Assert.Equal(30, options.ConstructFasterMinBuildMinutes);
         Assert.False(options.ConstructFasterRandomEnabled);
@@ -692,7 +692,9 @@ public sealed class BotOptionsPayloadApplierTests
         Assert.Equal(90, options.TroopTrainingBarracksMinimumResourcesPercent);
         Assert.Equal(90, options.TroopTrainingStableMinimumResourcesPercent);
         Assert.Equal(90, options.TroopTrainingWorkshopMinimumResourcesPercent);
-        Assert.False(options.IncreaseAdventuresToHard);
+        Assert.True(options.IncreaseAdventuresToHard);
+        Assert.True(options.ProductionBonusVideoEnabled);
+        Assert.True(options.ConstructFasterEnabled);
         Assert.Equal(70, options.HeroAdventureVideoChancePercent);
     }
 

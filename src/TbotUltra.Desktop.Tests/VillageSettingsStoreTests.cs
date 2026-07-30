@@ -17,7 +17,7 @@ public sealed class VillageSettingsStoreTests : IDisposable
     }
 
     [Fact]
-    public void Merge_OnlyInitialVillage_AutoEnabledAndConstructionOnly()
+    public void Merge_OnlyInitialVillage_AutoEnabledWithConstructFaster()
     {
         var store = CreateStore();
         var village = new Info("did:1", "Only", 0, 0, IsCapital: true);
@@ -27,7 +27,7 @@ public sealed class VillageSettingsStoreTests : IDisposable
         Assert.True(store.GetEnabled(village));
         Assert.Equal(new[] { "construction" }, store.GetEnabledGroups(village));
         Assert.False(store.GetNpcTrade(village));
-        Assert.False(store.GetConstructFaster(village));
+        Assert.True(store.GetConstructFaster(village));
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class VillageSettingsStoreTests : IDisposable
     }
 
     [Fact]
-    public void Merge_VillageDiscoveredLater_AutoEnabled()
+    public void Merge_VillageDiscoveredLater_AutoEnabledWithConstructFaster()
     {
         var store = CreateStore();
         var first = new Info("did:1", "First", 0, 0, IsCapital: true);
@@ -59,7 +59,7 @@ public sealed class VillageSettingsStoreTests : IDisposable
         Assert.True(store.GetEnabled(later));
         Assert.Equal(new[] { "construction" }, store.GetEnabledGroups(later));
         Assert.False(store.GetNpcTrade(later));
-        Assert.False(store.GetConstructFaster(later));
+        Assert.True(store.GetConstructFaster(later));
     }
 
     [Fact]
@@ -273,14 +273,14 @@ public sealed class VillageSettingsStoreTests : IDisposable
     }
 
     [Fact]
-    public void ConstructFaster_DefaultOffAndPersistsPerVillage()
+    public void ConstructFaster_DefaultsOnAndPersistsPerVillage()
     {
         var store = CreateStore();
         var village = new Info("did:2", "Second", 5, -3, IsCapital: false);
         store.Merge(new[] { village });
 
-        Assert.False(store.GetConstructFaster(village));
-        Assert.False(store.IsConstructFasterEnabledByKey("name:second", defaultIfUnknown: false));
+        Assert.True(store.GetConstructFaster(village));
+        Assert.True(store.IsConstructFasterEnabledByKey("name:second", defaultIfUnknown: false));
 
         store.SetConstructFaster(village, enabled: true);
 

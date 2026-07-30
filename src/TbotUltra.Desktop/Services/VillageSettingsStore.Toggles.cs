@@ -101,7 +101,7 @@ public sealed partial class VillageSettingsStore
                     IsEnabled = enabled,
                     EnabledGroups = CreateDefaultEnabledGroups(),
                     NpcTrade = false,
-                    ConstructFasterEnabled = false,
+                    ConstructFasterEnabled = true,
                     HeroResourcesEnabled = true,
                     LastSeenUtc = DateTimeOffset.UtcNow,
                 };
@@ -232,7 +232,7 @@ public sealed partial class VillageSettingsStore
                     IsEnabled = DefaultAutomationEnabled,
                     EnabledGroups = CreateDefaultEnabledGroups(),
                     NpcTrade = enabled,
-                    ConstructFasterEnabled = false,
+                    ConstructFasterEnabled = true,
                     HeroResourcesEnabled = true,
                     LastSeenUtc = DateTimeOffset.UtcNow,
                 };
@@ -369,7 +369,7 @@ public sealed partial class VillageSettingsStore
                     IsEnabled = DefaultAutomationEnabled,
                     EnabledGroups = list,
                     NpcTrade = false,
-                    ConstructFasterEnabled = false,
+                    ConstructFasterEnabled = true,
                     LastSeenUtc = DateTimeOffset.UtcNow,
                 };
             }
