@@ -1082,6 +1082,8 @@ public partial class MainWindow
 
         _lastContinuousInboxCheckUtc = DateTimeOffset.MinValue;
         _lastContinuousBrowserActivityUtc = DateTimeOffset.MinValue;
+        _nextContinuousKeepAliveAtUtc = DateTimeOffset.MinValue;
+        _continuousKeepAliveEnabledLastApplied = null;
         _lastContinuousKeepAliveFailureUtc = DateTimeOffset.MinValue;
         _inlineWaitUntilUtc = DateTimeOffset.MinValue;
         _npcTradeSessionCount = 0;

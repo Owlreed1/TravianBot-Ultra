@@ -44,8 +44,6 @@ public partial class MainWindow : Window
     private const int MaxSessionLogFiles = 5;
     private const int ContinuousLoopMaxSleepSliceSeconds = 1;
     private const int ContinuousInboxCheckIntervalSeconds = 15;
-    private const int ContinuousKeepAliveMinIntervalSeconds = 60;
-    private const int ContinuousKeepAliveMaxIntervalSeconds = 600;
     private const int ContinuousKeepAliveDueSoonSeconds = 120;
     private const int UpdateCheckIntervalMinutes = 60;
     private const int NpcTradeGoldCost = 3;
@@ -262,6 +260,7 @@ public partial class MainWindow : Window
     private DateTimeOffset _lastContinuousInboxCheckUtc = DateTimeOffset.MinValue;
     private DateTimeOffset _lastContinuousBrowserActivityUtc = DateTimeOffset.MinValue;
     private DateTimeOffset _nextContinuousKeepAliveAtUtc = DateTimeOffset.MinValue;
+    private bool? _continuousKeepAliveEnabledLastApplied;
     private DateTimeOffset _lastContinuousKeepAliveFailureUtc = DateTimeOffset.MinValue;
     private string? _lastConservativeAutomationWarningSignature;
     private volatile bool _isLoggedIn;

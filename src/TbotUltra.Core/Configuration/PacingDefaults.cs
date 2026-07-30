@@ -25,8 +25,11 @@ public static class PacingDefaults
     public const double ActionPacingClickMaxSeconds = 1.5;
     public const double ActionPacingLoopMinSeconds = 4.0;
     public const double ActionPacingLoopMaxSeconds = 25.0;
-    public const bool VillageStatusSweepEnabled = false;
-    public const int VillageStatusSweepRoundMinMinutes = 15;
+    public const bool ContinuousKeepAliveEnabled = true;
+    public const int ContinuousKeepAliveMinMinutes = 4;
+    public const int ContinuousKeepAliveMaxMinutes = 15;
+    public const bool VillageStatusSweepEnabled = true;
+    public const int VillageStatusSweepRoundMinMinutes = 10;
     public const int VillageStatusSweepRoundMaxMinutes = 30;
     public const double VillageStatusSweepVillageMinSeconds = 2.0;
     public const double VillageStatusSweepVillageMaxSeconds = 5.0;

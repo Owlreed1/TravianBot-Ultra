@@ -109,4 +109,27 @@ public sealed class ContinuousLoopNetworkBackoffTests
             source,
             StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void KeepAlive_DisabledAndReenabled_ResetTheSchedule()
+    {
+        var projectRoot = TbotUltra.Worker.ProjectRootLocator.FindProjectRoot();
+        var continuousLoopSource = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "src",
+            "TbotUltra.Desktop",
+            "MainWindow.ContinuousLoop.cs"));
+        var sessionSource = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "src",
+            "TbotUltra.Desktop",
+            "MainWindow.Session.cs"));
+
+        Assert.Contains("if (!options.ContinuousKeepAliveEnabled)", continuousLoopSource, StringComparison.Ordinal);
+        Assert.Contains("_continuousKeepAliveEnabledLastApplied = false;", continuousLoopSource, StringComparison.Ordinal);
+        Assert.Contains("if (_continuousKeepAliveEnabledLastApplied == false)", continuousLoopSource, StringComparison.Ordinal);
+        Assert.Contains("_nextContinuousKeepAliveAtUtc = now.Add(ResolveContinuousKeepAliveDelay(options));", continuousLoopSource, StringComparison.Ordinal);
+        Assert.Contains("_nextContinuousKeepAliveAtUtc = DateTimeOffset.MinValue;", sessionSource, StringComparison.Ordinal);
+        Assert.Contains("_continuousKeepAliveEnabledLastApplied = null;", sessionSource, StringComparison.Ordinal);
+    }
 }

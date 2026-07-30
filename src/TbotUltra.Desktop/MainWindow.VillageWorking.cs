@@ -594,7 +594,7 @@ public partial class MainWindow
             await _botService.NavigateToVillageResourceFieldsAsync(options, AppendLog, name, url, token);
             AppendLog($"Switch village: browser moved to '{name}'.");
             await ApplyCurrentVillageToUiAsync(options, token);
-            MarkContinuousBrowserActivity();
+            MarkContinuousBrowserActivity(options);
         }
         catch (OperationCanceledException)
         {

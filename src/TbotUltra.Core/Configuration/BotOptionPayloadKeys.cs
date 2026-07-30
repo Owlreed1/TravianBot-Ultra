@@ -264,6 +264,9 @@ public static class BotOptionPayloadKeys
     public const string ActionPacingClickMaxSeconds = "action_pacing_click_max_seconds";
     public const string ActionPacingLoopMinSeconds = "action_pacing_loop_min_seconds";
     public const string ActionPacingLoopMaxSeconds = "action_pacing_loop_max_seconds";
+    public const string ContinuousKeepAliveEnabled = "continuous_keep_alive_enabled";
+    public const string ContinuousKeepAliveMinMinutes = "continuous_keep_alive_min_minutes";
+    public const string ContinuousKeepAliveMaxMinutes = "continuous_keep_alive_max_minutes";
     public const string FarmListStepDelayMinSeconds = "farm_list_step_delay_min_seconds";
     public const string FarmListStepDelayMaxSeconds = "farm_list_step_delay_max_seconds";
     public const string VillageStatusSweepEnabled = "village_status_sweep_enabled";

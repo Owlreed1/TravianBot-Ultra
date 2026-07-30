@@ -344,7 +344,7 @@ public partial class MainWindow
                 return (status, false);
             }
 
-            MarkContinuousBrowserActivity();
+            MarkContinuousBrowserActivity(options);
             await ApplyPostTaskCooldownAsync(item, options, cancellationToken);
         }
 
@@ -531,7 +531,7 @@ public partial class MainWindow
                 "[village-scan]",
                 QueueExecutionMode.ContinuousLoop,
                 cancellationToken);
-            MarkContinuousBrowserActivity();
+            MarkContinuousBrowserActivity(options);
             if (!shouldContinue)
             {
                 return false;
@@ -2132,18 +2132,21 @@ public partial class MainWindow
         await RefreshInboxIndicatorsAsync(logErrors: false, force: true, cancellationToken);
     }
 
-    private void MarkContinuousBrowserActivity()
+    private void MarkContinuousBrowserActivity(BotOptions options)
     {
         var now = DateTimeOffset.UtcNow;
         _lastContinuousBrowserActivityUtc = now;
-        _nextContinuousKeepAliveAtUtc = now.Add(ResolveContinuousKeepAliveDelay());
+        _continuousKeepAliveEnabledLastApplied = options.ContinuousKeepAliveEnabled;
+        _nextContinuousKeepAliveAtUtc = options.ContinuousKeepAliveEnabled
+            ? now.Add(ResolveContinuousKeepAliveDelay(options))
+            : DateTimeOffset.MinValue;
     }
 
-    private static TimeSpan ResolveContinuousKeepAliveDelay()
+    private static TimeSpan ResolveContinuousKeepAliveDelay(BotOptions options)
     {
-        return TimeSpan.FromSeconds(Random.Shared.Next(
-            ContinuousKeepAliveMinIntervalSeconds,
-            ContinuousKeepAliveMaxIntervalSeconds + 1));
+        var minMinutes = Math.Clamp(options.ContinuousKeepAliveMinMinutes, 1, 1440);
+        var maxMinutes = Math.Clamp(options.ContinuousKeepAliveMaxMinutes, minMinutes, 1440);
+        return TimeSpan.FromMinutes(Random.Shared.Next(minMinutes, maxMinutes + 1));
     }
 
     // Keep the Travian page from going stale while the loop is idle-waiting, but only when queued work is
@@ -2151,12 +2154,29 @@ public partial class MainWindow
     private async Task MaybeKeepBrowserFreshDuringContinuousLoopAsync(BotOptions options, CancellationToken token)
     {
         var now = DateTimeOffset.UtcNow;
+        if (!options.ContinuousKeepAliveEnabled)
+        {
+            _nextContinuousKeepAliveAtUtc = DateTimeOffset.MinValue;
+            _continuousKeepAliveEnabledLastApplied = false;
+            return;
+        }
+
+        if (_continuousKeepAliveEnabledLastApplied == false)
+        {
+            // Re-enabling must start a fresh full interval rather than inheriting an expired schedule
+            // and unexpectedly reloading the page immediately.
+            _continuousKeepAliveEnabledLastApplied = true;
+            _nextContinuousKeepAliveAtUtc = now.Add(ResolveContinuousKeepAliveDelay(options));
+            return;
+        }
+
+        _continuousKeepAliveEnabledLastApplied = true;
         if (_nextContinuousKeepAliveAtUtc == DateTimeOffset.MinValue)
         {
             var anchor = _lastContinuousBrowserActivityUtc == DateTimeOffset.MinValue
                 ? now
                 : _lastContinuousBrowserActivityUtc;
-            _nextContinuousKeepAliveAtUtc = anchor.Add(ResolveContinuousKeepAliveDelay());
+            _nextContinuousKeepAliveAtUtc = anchor.Add(ResolveContinuousKeepAliveDelay(options));
         }
 
         if (now < _nextContinuousKeepAliveAtUtc)
@@ -2174,21 +2194,21 @@ public partial class MainWindow
             // A sleeping session must stay idle: refreshing here would log in and reload the page,
             // waking it and breaking the sleep throttle. Mark activity so this only logs once per
             // keep-alive interval instead of every wait tick.
-            MarkContinuousBrowserActivity();
+            MarkContinuousBrowserActivity(options);
             AppendLog("[keep-alive:verbose] skipped because the session is sleeping.");
             return;
         }
 
         if (_resourceSnapshotRefreshRunning)
         {
-            MarkContinuousBrowserActivity();
+            MarkContinuousBrowserActivity(options);
             AppendLog("[keep-alive:verbose] skipped because resource refresh is already reading the browser.");
             return;
         }
 
         if (!HasContinuousLoopWorkDueSoon(now))
         {
-            _nextContinuousKeepAliveAtUtc = now.Add(ResolveContinuousKeepAliveDelay());
+            _nextContinuousKeepAliveAtUtc = now.Add(ResolveContinuousKeepAliveDelay(options));
             AppendLog("[keep-alive:verbose] skipped because no continuous-loop work is due soon.");
             return;
         }
@@ -2201,7 +2221,7 @@ public partial class MainWindow
             return;
         }
 
-        MarkContinuousBrowserActivity();
+        MarkContinuousBrowserActivity(options);
 
         try
         {
@@ -2350,7 +2370,7 @@ public partial class MainWindow
                         $"[LOOP {tickId}]",
                         QueueExecutionMode.ContinuousLoop,
                         token);
-                    MarkContinuousBrowserActivity();
+                    MarkContinuousBrowserActivity(options);
                     if (!shouldContinue)
                     {
                         break;

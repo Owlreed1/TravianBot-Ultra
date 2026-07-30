@@ -367,6 +367,15 @@ public sealed record BotOptions
     [ConfigurationKeyName(BotOptionPayloadKeys.ActionPacingLoopMaxSeconds)]
     public double ActionPacingLoopMaxSeconds { get; init; } = PacingDefaults.ActionPacingLoopMaxSeconds;
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousKeepAliveEnabled)]
+    public bool ContinuousKeepAliveEnabled { get; init; } = PacingDefaults.ContinuousKeepAliveEnabled;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousKeepAliveMinMinutes)]
+    public int ContinuousKeepAliveMinMinutes { get; init; } = PacingDefaults.ContinuousKeepAliveMinMinutes;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousKeepAliveMaxMinutes)]
+    public int ContinuousKeepAliveMaxMinutes { get; init; } = PacingDefaults.ContinuousKeepAliveMaxMinutes;
+
     [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepEnabled)]
     public bool VillageStatusSweepEnabled { get; init; } = PacingDefaults.VillageStatusSweepEnabled;
     [ConfigurationKeyName(BotOptionPayloadKeys.VillageStatusSweepDorf1Enabled)]

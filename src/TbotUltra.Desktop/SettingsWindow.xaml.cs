@@ -536,6 +536,8 @@ public partial class SettingsWindow : Window
             (ActionClickMaxTextBox, "Click delay maximum", false, 0, 3600),
             (ActionLoopMinTextBox, "Loop delay minimum", false, 0, 3600),
             (ActionLoopMaxTextBox, "Loop delay maximum", false, 0, 3600),
+            (ContinuousKeepAliveMinMinutesTextBox, "Keep Alive minimum", true, 1, 1440),
+            (ContinuousKeepAliveMaxMinutesTextBox, "Keep Alive maximum", true, 1, 1440),
             (FarmListStepDelayMinTextBox, "Farm-list step delay minimum", false, 0, 3600),
             (FarmListStepDelayMaxTextBox, "Farm-list step delay maximum", false, 0, 3600),
             (CollectStepDelayMinTextBox, "Collect step delay minimum", false, 0, 3600),
@@ -599,6 +601,7 @@ public partial class SettingsWindow : Window
             (ActionPageLoadMinTextBox, ActionPageLoadMaxTextBox, "Page-load delay", false),
             (ActionClickMinTextBox, ActionClickMaxTextBox, "Click delay", false),
             (ActionLoopMinTextBox, ActionLoopMaxTextBox, "Loop delay", false),
+            (ContinuousKeepAliveMinMinutesTextBox, ContinuousKeepAliveMaxMinutesTextBox, "Keep Alive", true),
             (FarmListStepDelayMinTextBox, FarmListStepDelayMaxTextBox, "Farm-list step delay", false),
             (CollectStepDelayMinTextBox, CollectStepDelayMaxTextBox, "Collect step delay", false),
             (IdleBreakIntervalMinTextBox, IdleBreakIntervalMaxTextBox, "Idle-break interval", false),
@@ -1106,6 +1109,9 @@ public partial class SettingsWindow : Window
         ActionClickMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingClickMaxSeconds, PacingDefaults.ActionPacingClickMaxSeconds));
         ActionLoopMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingLoopMinSeconds, PacingDefaults.ActionPacingLoopMinSeconds));
         ActionLoopMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingLoopMaxSeconds, PacingDefaults.ActionPacingLoopMaxSeconds));
+        ContinuousKeepAliveEnabledCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ContinuousKeepAliveEnabled, PacingDefaults.ContinuousKeepAliveEnabled);
+        ContinuousKeepAliveMinMinutesTextBox.Text = ReadInt(BotOptionPayloadKeys.ContinuousKeepAliveMinMinutes, PacingDefaults.ContinuousKeepAliveMinMinutes).ToString();
+        ContinuousKeepAliveMaxMinutesTextBox.Text = ReadInt(BotOptionPayloadKeys.ContinuousKeepAliveMaxMinutes, PacingDefaults.ContinuousKeepAliveMaxMinutes).ToString();
         FarmListStepDelayMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.FarmListStepDelayMinSeconds, PacingDefaults.FarmListStepDelayMinSeconds));
         FarmListStepDelayMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.FarmListStepDelayMaxSeconds, PacingDefaults.FarmListStepDelayMaxSeconds));
         VillageStatusSweepEnabledCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepEnabled, PacingDefaults.VillageStatusSweepEnabled);
@@ -1167,6 +1173,9 @@ public partial class SettingsWindow : Window
         WriteDelayRange(BotOptionPayloadKeys.ActionPacingPageLoadMinSeconds, BotOptionPayloadKeys.ActionPacingPageLoadMaxSeconds, ActionPageLoadMinTextBox, ActionPageLoadMaxTextBox, PacingDefaults.ActionPacingPageLoadMinSeconds, PacingDefaults.ActionPacingPageLoadMaxSeconds);
         WriteDelayRange(BotOptionPayloadKeys.ActionPacingClickMinSeconds, BotOptionPayloadKeys.ActionPacingClickMaxSeconds, ActionClickMinTextBox, ActionClickMaxTextBox, PacingDefaults.ActionPacingClickMinSeconds, PacingDefaults.ActionPacingClickMaxSeconds);
         WriteDelayRange(BotOptionPayloadKeys.ActionPacingLoopMinSeconds, BotOptionPayloadKeys.ActionPacingLoopMaxSeconds, ActionLoopMinTextBox, ActionLoopMaxTextBox, PacingDefaults.ActionPacingLoopMinSeconds, PacingDefaults.ActionPacingLoopMaxSeconds);
+        _config[BotOptionPayloadKeys.ContinuousKeepAliveEnabled] = ContinuousKeepAliveEnabledCheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.ContinuousKeepAliveMinMinutes] = ReadIntText(ContinuousKeepAliveMinMinutesTextBox, PacingDefaults.ContinuousKeepAliveMinMinutes, 1, 1440);
+        _config[BotOptionPayloadKeys.ContinuousKeepAliveMaxMinutes] = ReadIntText(ContinuousKeepAliveMaxMinutesTextBox, PacingDefaults.ContinuousKeepAliveMaxMinutes, 1, 1440);
         WriteDelayRange(
             BotOptionPayloadKeys.FarmListStepDelayMinSeconds,
             BotOptionPayloadKeys.FarmListStepDelayMaxSeconds,
@@ -1282,6 +1291,9 @@ public partial class SettingsWindow : Window
         ActionClickMaxTextBox.Text = FormatDelay(PacingDefaults.ActionPacingClickMaxSeconds);
         ActionLoopMinTextBox.Text = FormatDelay(PacingDefaults.ActionPacingLoopMinSeconds);
         ActionLoopMaxTextBox.Text = FormatDelay(PacingDefaults.ActionPacingLoopMaxSeconds);
+        ContinuousKeepAliveEnabledCheckBox.IsChecked = PacingDefaults.ContinuousKeepAliveEnabled;
+        ContinuousKeepAliveMinMinutesTextBox.Text = PacingDefaults.ContinuousKeepAliveMinMinutes.ToString();
+        ContinuousKeepAliveMaxMinutesTextBox.Text = PacingDefaults.ContinuousKeepAliveMaxMinutes.ToString();
         FarmListStepDelayMinTextBox.Text = FormatDelay(PacingDefaults.FarmListStepDelayMinSeconds);
         FarmListStepDelayMaxTextBox.Text = FormatDelay(PacingDefaults.FarmListStepDelayMaxSeconds);
         VillageStatusSweepEnabledCheckBox.IsChecked = PacingDefaults.VillageStatusSweepEnabled;

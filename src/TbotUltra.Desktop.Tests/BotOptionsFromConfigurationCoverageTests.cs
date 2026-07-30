@@ -64,6 +64,26 @@ public sealed class BotOptionsFromConfigurationCoverageTests
             "BotConfigStore.AccountScopedKeyValues): " + string.Join(", ", missing));
     }
 
+    [Fact]
+    public void FromConfiguration_defaults_village_scan_to_enabled_every_10_to_30_minutes()
+    {
+        var options = BotOptionsFactory.FromConfiguration(new AccessRecordingConfiguration());
+
+        Assert.True(options.VillageStatusSweepEnabled);
+        Assert.Equal(10, options.VillageStatusSweepRoundMinMinutes);
+        Assert.Equal(30, options.VillageStatusSweepRoundMaxMinutes);
+    }
+
+    [Fact]
+    public void FromConfiguration_defaults_keep_alive_to_enabled_every_4_to_15_minutes()
+    {
+        var options = BotOptionsFactory.FromConfiguration(new AccessRecordingConfiguration());
+
+        Assert.True(options.ContinuousKeepAliveEnabled);
+        Assert.Equal(4, options.ContinuousKeepAliveMinMinutes);
+        Assert.Equal(15, options.ContinuousKeepAliveMaxMinutes);
+    }
+
     /// <summary>
     /// An empty <see cref="IConfiguration"/> that records every key requested through the
     /// indexer or <see cref="GetSection"/>. All lookups return "absent", so FromConfiguration
