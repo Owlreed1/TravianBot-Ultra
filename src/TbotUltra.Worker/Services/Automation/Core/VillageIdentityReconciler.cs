@@ -95,6 +95,21 @@ internal static class VillageIdentityReconciler
         && left.X.Value == right.X.Value
         && left.Y.Value == right.Y.Value;
 
+    internal static (int? X, int? Y) ParseCoordinateKey(string? villageKey)
+    {
+        if (string.IsNullOrWhiteSpace(villageKey))
+        {
+            return (null, null);
+        }
+
+        var match = Regex.Match(villageKey.Trim(), @"^xy:(-?\d+)\|(-?\d+)$", RegexOptions.IgnoreCase);
+        return match.Success
+            && int.TryParse(match.Groups[1].Value, out var x)
+            && int.TryParse(match.Groups[2].Value, out var y)
+                ? (x, y)
+                : (null, null);
+    }
+
     internal static IReadOnlyList<Village>? ReconcileRenamedByCoordinates(
         IReadOnlyList<Village> cached,
         string activeVillageName,

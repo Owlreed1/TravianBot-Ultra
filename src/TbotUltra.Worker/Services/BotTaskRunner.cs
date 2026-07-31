@@ -815,7 +815,16 @@ public sealed partial class BotTaskRunner
             return;
         }
 
-        await client.SwitchToVillageAsync(targetName, targetUrl, cancellationToken, skipFeatureRefresh);
+        var targetVillageKey = string.IsNullOrWhiteSpace(explicitVillageName)
+            && string.IsNullOrWhiteSpace(explicitVillageUrl)
+                ? options.TargetVillageKey
+                : null;
+        await client.SwitchToVillageByIdentityAsync(
+            targetName,
+            targetUrl,
+            targetVillageKey,
+            cancellationToken,
+            skipFeatureRefresh);
         var label = !string.IsNullOrWhiteSpace(targetName) ? targetName : targetUrl;
         log($"[village-switch:verbose] target village applied: {label}");
     }

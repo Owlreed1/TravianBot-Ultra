@@ -7,6 +7,19 @@ namespace TbotUltra.Worker.Tests;
 public sealed class BotOptionsPayloadApplierTests
 {
     [Fact]
+    public void Apply_PreservesStableVillageKeyForRenamedVillage()
+    {
+        var result = BotOptionsPayloadApplier.Apply(new BotOptions(), new Dictionary<string, string>
+        {
+            [BotOptionPayloadKeys.TargetVillageName] = "Old name",
+            [BotOptionPayloadKeys.TargetVillageUrl] = "/dorf1.php?newdid=70873",
+            [BotOptionPayloadKeys.TargetVillageKey] = "xy:96|24",
+        });
+
+        Assert.Equal("xy:96|24", result.TargetVillageKey);
+    }
+
+    [Fact]
     public void FromConfiguration_NewVillageStartupAnalysis_DefaultsEnabled()
     {
         var configuration = new ConfigurationBuilder()

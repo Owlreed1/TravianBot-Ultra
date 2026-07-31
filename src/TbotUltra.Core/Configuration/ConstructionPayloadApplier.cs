@@ -3,6 +3,7 @@ namespace TbotUltra.Core.Configuration;
 internal sealed record ConstructionPayloadValues(
     string TargetVillageName,
     string TargetVillageUrl,
+    string TargetVillageKey,
     int? ResourceUpgradeSlotId,
     int? ResourceUpgradeTargetLevel,
     int ResourceUpgradeMaxAttempts,
@@ -36,6 +37,7 @@ internal static class ConstructionPayloadApplier
         var result = new ConstructionPayloadValues(
             source.TargetVillageName,
             source.TargetVillageUrl,
+            source.TargetVillageKey,
             source.ResourceUpgradeSlotId,
             source.ResourceUpgradeTargetLevel,
             source.ResourceUpgradeMaxAttempts,
@@ -76,6 +78,8 @@ internal static class ConstructionPayloadApplier
                 result = result with { TargetVillageName = value };
             else if (key.Equals(BotOptionPayloadKeys.TargetVillageUrl, StringComparison.OrdinalIgnoreCase))
                 result = result with { TargetVillageUrl = value };
+            else if (key.Equals(BotOptionPayloadKeys.TargetVillageKey, StringComparison.OrdinalIgnoreCase))
+                result = result with { TargetVillageKey = value };
             else if (TryReadInt(key, value, BotOptionPayloadKeys.ResourceUpgradeSlotId, out var resourceSlot))
                 result = result with { ResourceUpgradeSlotId = resourceSlot };
             else if (TryReadInt(key, value, BotOptionPayloadKeys.ResourceUpgradeTargetLevel, out var resourceTarget))

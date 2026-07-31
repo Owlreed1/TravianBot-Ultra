@@ -498,6 +498,9 @@ public sealed record BotOptions
     [ConfigurationKeyName(BotOptionPayloadKeys.TargetVillageUrl)]
     public string TargetVillageUrl { get; init; } = string.Empty;
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.TargetVillageKey)]
+    public string TargetVillageKey { get; init; } = string.Empty;
+
     [ConfigurationKeyName(BotOptionPayloadKeys.AllowGoldSpending)]
     public bool AllowGoldSpending { get; init; } = false;
 

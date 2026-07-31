@@ -7,6 +7,7 @@ public static class BotOptionsPayloadApplier
         var construction = ConstructionPayloadApplier.Apply(source, payload);
         var targetVillageName = construction.TargetVillageName;
         var targetVillageUrl = construction.TargetVillageUrl;
+        var targetVillageKey = construction.TargetVillageKey;
         var resourceUpgradeSlotId = construction.ResourceUpgradeSlotId;
         var resourceUpgradeTargetLevel = construction.ResourceUpgradeTargetLevel;
         var resourceUpgradeMaxAttempts = construction.ResourceUpgradeMaxAttempts;
@@ -289,6 +290,7 @@ public static class BotOptionsPayloadApplier
             ConstructionLoginFillExpiresAtUnixSeconds = construction.ConstructionLoginFillExpiresAtUnixSeconds,
             TargetVillageName = targetVillageName,
             TargetVillageUrl = targetVillageUrl,
+            TargetVillageKey = targetVillageKey,
             ResourceUpgradeSlotId = resourceUpgradeSlotId,
             ResourceUpgradeTargetLevel = resourceUpgradeTargetLevel,
             ResourceUpgradeMaxAttempts = resourceUpgradeMaxAttempts,

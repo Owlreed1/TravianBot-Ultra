@@ -135,4 +135,14 @@ public sealed class VillageIdentityReconcilerTests
         Assert.Equal("2", second);
         Assert.Equal("xy:30|40", coordinateFallback);
     }
+
+    [Theory]
+    [InlineData("xy:96|24", 96, 24)]
+    [InlineData("XY:-12|34", -12, 34)]
+    public void ParseCoordinateKey_ReturnsStableCoordinates(string key, int expectedX, int expectedY)
+    {
+        var coordinates = VillageIdentityReconciler.ParseCoordinateKey(key);
+
+        Assert.Equal((expectedX, expectedY), coordinates);
+    }
 }

@@ -218,6 +218,7 @@ public static class BotOptionsFactory
             ConstructionLoginFillExpiresAtUnixSeconds = configuration.GetValue<long?>(BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds),
             TargetVillageName = configuration[BotOptionPayloadKeys.TargetVillageName] ?? string.Empty,
             TargetVillageUrl = configuration[BotOptionPayloadKeys.TargetVillageUrl] ?? string.Empty,
+            TargetVillageKey = configuration[BotOptionPayloadKeys.TargetVillageKey] ?? string.Empty,
             AllowGoldSpending = GetValueOrDefault(configuration, BotOptionPayloadKeys.AllowGoldSpending, defaultValue: false),
             AllowSilverSpending = configuration.GetValue("allow_silver_spending", false),
             GoldLimit = Math.Max(0, configuration.GetValue(BotOptionPayloadKeys.GoldLimit, 100)),

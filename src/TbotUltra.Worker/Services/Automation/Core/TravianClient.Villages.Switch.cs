@@ -16,6 +16,21 @@ public sealed partial class TravianClient
 {
     public async Task SwitchToVillageAsync(string villageName = "", string? villageUrl = null, CancellationToken cancellationToken = default, bool skipFeatureRefresh = false)
     {
+        await SwitchToVillageByIdentityAsync(
+            villageName,
+            villageUrl,
+            targetVillageKey: null,
+            cancellationToken,
+            skipFeatureRefresh);
+    }
+
+    internal async Task SwitchToVillageByIdentityAsync(
+        string villageName,
+        string? villageUrl,
+        string? targetVillageKey,
+        CancellationToken cancellationToken,
+        bool skipFeatureRefresh = false)
+    {
         var activeVillageBeforeSwitch = await TryReadActiveVillageNameSafeAsync(cancellationToken);
         var requestedLabel = !string.IsNullOrWhiteSpace(villageName)
             ? $"'{villageName}'"
@@ -25,7 +40,11 @@ public sealed partial class TravianClient
             ? await TryResolveVillageForSwitchAsync(villageName, villageUrl, cancellationToken)
             : null;
         var resolvedVillageName = string.IsNullOrWhiteSpace(requestedVillage?.Name) ? villageName : requestedVillage!.Name;
-        var requestedCoords = ResolveVillageCoords(villageName, requestedVillage);
+        var requestedCoords = VillageIdentityReconciler.ParseCoordinateKey(targetVillageKey);
+        if (!VillageIdentityReconciler.HasCoordinates(requestedCoords))
+        {
+            requestedCoords = ResolveVillageCoords(villageName, requestedVillage);
+        }
         var requestedDid = TravianUrls.TryParseNewdid(villageUrl);
 
         // If we are already on the requested village, no navigation is needed.
