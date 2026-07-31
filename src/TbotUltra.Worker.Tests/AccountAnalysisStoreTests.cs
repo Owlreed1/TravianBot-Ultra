@@ -200,6 +200,19 @@ public sealed class AccountAnalysisStoreTests : IDisposable
     }
 
     [Fact]
+    public void SaveNewAccountAnalysisStatus_WithoutAnalysis_PersistsStatusWithoutMarkingAccountAnalyzed()
+    {
+        const string accountName = "new-account";
+        const string serverUrl = "https://ts50.x5.arabics.travian.com";
+
+        _store.SaveNewAccountAnalysisStatus(accountName, serverUrl, completed: true);
+
+        Assert.True(_store.TryLoad(accountName, out var loaded, serverUrl));
+        Assert.True(loaded!.NewAccountAnalysisCompleted);
+        Assert.False(_store.IsAnalyzed(accountName, serverUrl));
+    }
+
+    [Fact]
     public void ConcurrentFieldUpdates_DoNotLoseWorldUidOrAnalysisFields()
     {
         const string accountName = "race-account";

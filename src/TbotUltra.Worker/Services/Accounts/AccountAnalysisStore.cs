@@ -147,6 +147,25 @@ public sealed class AccountAnalysisStore
             });
     }
 
+    public void SaveNewAccountAnalysisStatus(string accountName, string serverUrl, bool completed)
+    {
+        Update(accountName, serverUrl, existing => existing is null
+            ? new AccountAnalysisSnapshot(
+                SchemaVersion: 0,
+                AnalyzedAtUtc: DateTimeOffset.UtcNow,
+                AccountName: accountName,
+                ServerUrl: serverUrl,
+                Tribe: "Unknown",
+                GoldClubEnabled: false,
+                BuildingCatalog: [],
+                NewAccountAnalysisCompleted: completed)
+            : existing with
+            {
+                AnalyzedAtUtc = DateTimeOffset.UtcNow,
+                NewAccountAnalysisCompleted = completed,
+            });
+    }
+
     public AccountAnalysisSnapshot? Update(
         string accountName,
         string serverUrl,

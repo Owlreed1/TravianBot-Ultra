@@ -16,9 +16,7 @@ public partial class MainWindow
             return;
         }
 
-        _accountAnalysisStore.Update(accountName, serverUrl, existing => existing is null
-            ? null
-            : existing with { NewAccountAnalysisCompleted = completed, AnalyzedAtUtc = DateTimeOffset.UtcNow });
+        _accountAnalysisStore.SaveNewAccountAnalysisStatus(accountName, serverUrl, completed);
         AppendLog($"[new-account-analysis] status={(completed ? "completed" : "pending")}.");
     }
 
