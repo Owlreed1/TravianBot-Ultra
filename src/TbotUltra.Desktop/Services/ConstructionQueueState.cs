@@ -55,6 +55,7 @@ public sealed record ConstructionHumanizeToggleReset(
 public static class ConstructionQueueState
 {
     public const string CurrentDeferClassificationVersion = "3";
+    private const string PageTimerWaitReason = "page_timer";
 
     public static bool IsActiveQueueStatus(QueueStatus status)
     {
@@ -172,6 +173,44 @@ public static class ConstructionQueueState
         }
 
         return IsQueueOccupancyDeferred(item);
+    }
+
+    public static bool ShouldPrepareConfirmedEmptyQueueHead(QueueItem item, DateTimeOffset now)
+    {
+        return item.NextAttemptAt > now
+            && ResolveDeferReason(item) == ConstructionDeferReason.Resources
+            && item.Payload.TryGetValue(BotOptionPayloadKeys.UpgradeWaitReason, out var waitReason)
+            && string.Equals(waitReason, PageTimerWaitReason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static QueueItem? SelectFirstUnstartedHead(IEnumerable<QueueItem> items)
+    {
+        return items.SkipWhile(IsConstructionInProgressDeferred).FirstOrDefault();
+    }
+
+    public static IReadOnlyList<QueueItem> SelectResourceDeferredHeadsToRelease(
+        IEnumerable<(QueueItem Item, string VillageKey)> items,
+        DateTimeOffset now)
+    {
+        return items
+            .GroupBy(entry => entry.VillageKey, StringComparer.OrdinalIgnoreCase)
+            .Select(village => SelectFirstUnstartedHead(village.Select(entry => entry.Item)))
+            .Where(head => head is not null
+                && head.NextAttemptAt > now
+                && ResolveDeferReason(head) == ConstructionDeferReason.Resources)
+            .Cast<QueueItem>()
+            .ToList();
+    }
+
+    public static bool HasHeroInventoryIncreased(
+        HeroInventoryResources? previous,
+        HeroInventoryResources current)
+    {
+        return previous is not null
+            && (current.Wood > previous.Wood
+                || current.Clay > previous.Clay
+                || current.Iron > previous.Iron
+                || current.Crop > previous.Crop);
     }
 
     public static ConstructionHumanizeToggleReset ResolveHumanizeToggleReset(

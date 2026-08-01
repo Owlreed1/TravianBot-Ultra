@@ -562,6 +562,100 @@ public sealed class ConstructionQueueStateTests
     }
 
     [Fact]
+    public void ShouldPrepareConfirmedEmptyQueueHead_ReleasesFuturePageTimerResourceWait()
+    {
+        var now = new DateTimeOffset(2026, 8, 1, 8, 55, 28, TimeSpan.Zero);
+        var resourceWait = new QueueItem
+        {
+            NextAttemptAt = now.AddHours(2),
+            Payload = new Dictionary<string, string>
+            {
+                [BotOptionPayloadKeys.UpgradeDeferReason] = BotOptionPayloadKeys.UpgradeDeferReasonResources,
+                [BotOptionPayloadKeys.UpgradeWaitReason] = "page_timer",
+            },
+        };
+
+        Assert.True(ConstructionQueueState.ShouldPrepareConfirmedEmptyQueueHead(resourceWait, now));
+    }
+
+    [Fact]
+    public void SelectFirstUnstartedHead_PreservesStrictOrderAfterInProgressPrefix()
+    {
+        var alreadyStarted = new QueueItem
+        {
+            Payload = new Dictionary<string, string>
+            {
+                [BotOptionPayloadKeys.UpgradeDeferReason] = BotOptionPayloadKeys.UpgradeDeferReasonInProgress,
+            },
+        };
+        var resourceHead = new QueueItem
+        {
+            Payload = new Dictionary<string, string>
+            {
+                [BotOptionPayloadKeys.UpgradeDeferReason] = BotOptionPayloadKeys.UpgradeDeferReasonResources,
+            },
+        };
+        var laterReadyItem = new QueueItem();
+
+        var result = ConstructionQueueState.SelectFirstUnstartedHead(
+            [alreadyStarted, resourceHead, laterReadyItem]);
+
+        Assert.Same(resourceHead, result);
+    }
+
+    [Fact]
+    public void SelectResourceDeferredHeadsToRelease_SelectsOnlyStrictHeadPerVillage()
+    {
+        var alreadyStarted = DeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress, Now.AddHours(1));
+        var swollsterHead = DeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonResources, Now.AddHours(2));
+        var swollsterLater = DeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonResources, Now.AddHours(3));
+        var secondVillageHead = DeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonResources, Now.AddHours(1));
+        var readyHead = DeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonResources, Now.AddMinutes(-1));
+
+        var result = ConstructionQueueState.SelectResourceDeferredHeadsToRelease(
+            [
+                (alreadyStarted, "swollster"),
+                (swollsterHead, "swollster"),
+                (swollsterLater, "swollster"),
+                (secondVillageHead, "second"),
+                (readyHead, "ready"),
+            ],
+            Now);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(swollsterHead, result);
+        Assert.Contains(secondVillageHead, result);
+        Assert.DoesNotContain(swollsterLater, result);
+    }
+
+    [Fact]
+    public void HasHeroInventoryIncreased_RequiresObservedIncrease()
+    {
+        var baseline = new HeroInventoryResources(100, 200, 300, 400);
+
+        Assert.False(ConstructionQueueState.HasHeroInventoryIncreased(null, baseline));
+        Assert.False(ConstructionQueueState.HasHeroInventoryIncreased(baseline, baseline));
+        Assert.False(ConstructionQueueState.HasHeroInventoryIncreased(
+            baseline,
+            new HeroInventoryResources(99, 199, 299, 399)));
+        Assert.True(ConstructionQueueState.HasHeroInventoryIncreased(
+            baseline,
+            new HeroInventoryResources(101, 200, 300, 400)));
+    }
+
+    private static QueueItem DeferredItem(string reason, DateTimeOffset nextAttemptAt)
+    {
+        return new QueueItem
+        {
+            NextAttemptAt = nextAttemptAt,
+            Payload = new Dictionary<string, string>
+            {
+                [BotOptionPayloadKeys.UpgradeDeferReason] = reason,
+            },
+        };
+    }
+
+    [Fact]
     public void ResolveHumanizeToggleReset_ReleasesPureHumanizeWait()
     {
         var now = new DateTimeOffset(2026, 7, 17, 12, 0, 0, TimeSpan.Zero);

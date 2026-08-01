@@ -328,20 +328,33 @@ public partial class MainWindow
     }
 
     // A fresh login represents a new player visit. Ready, queue-full and humanize-waiting rows get
-    // one attempt to fill available Travian slots immediately. Resource, prerequisite and storage
-    // waits keep their authoritative deadlines.
-    private void PrepareConstructionLoginFill()
+    // one attempt to fill available Travian slots immediately. A confirmed empty overview also
+    // revalidates the first stale page-timer resource head once; other resource, prerequisite and
+    // storage waits keep their authoritative deadlines.
+    private void PrepareConstructionLoginFill(
+        string source = "login",
+        string? villageName = null,
+        string? villageKey = null,
+        bool releaseResourceHeadForConfirmedEmptyQueue = false)
     {
         var now = DateTimeOffset.UtcNow;
+        var pendingItems = _botService.GetQueueItemsForDisplay()
+            .Where(item => item.Status == QueueStatus.Pending)
+            .Where(item => IsConstructionQueueTask(item.TaskName))
+            .Where(item => string.IsNullOrWhiteSpace(villageName) || IsQueueItemForVillage(item, villageName, villageKey))
+            .Where(IsQueueItemAllowedByAutomationSettings)
+            .ToList();
+        var confirmedEmptyQueueHead = releaseResourceHeadForConfirmedEmptyQueue
+            ? ConstructionQueueState.SelectFirstUnstartedHead(pendingItems)
+            : null;
         if (!LoadBotOptions().ConstructionHumanizeDelayEnabled)
         {
             ApplyConstructionHumanizeToggleTransition(enabled: false);
             var released = 0;
-            foreach (var item in _botService.GetQueueItemsForDisplay()
-                         .Where(item => item.Status == QueueStatus.Pending)
-                         .Where(item => IsConstructionQueueTask(item.TaskName))
-                         .Where(IsQueueItemAllowedByAutomationSettings)
-                         .Where(ConstructionQueueState.IsQueueOccupancyDeferred))
+            foreach (var item in pendingItems.Where(item =>
+                         ConstructionQueueState.IsQueueOccupancyDeferred(item)
+                         || (item.Id == confirmedEmptyQueueHead?.Id
+                             && ConstructionQueueState.ShouldPrepareConfirmedEmptyQueueHead(item, now))))
             {
                 if (_botService.PatchDeferredQueueItem(
                         item.Id,
@@ -358,7 +371,7 @@ public partial class MainWindow
 
             if (released > 0)
             {
-                AppendLog($"[construction-login-fill] released {released} stale queue-full row(s) for immediate live validation while humanization is disabled.");
+                AppendLog($"[construction-{source}-fill] released {released} construction row(s) for immediate live validation while humanization is disabled.");
                 Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
                 RefreshQueueUi();
             }
@@ -367,14 +380,14 @@ public partial class MainWindow
 
         var prepared = 0;
         var expiresAt = now.AddMinutes(PacingDefaults.ConstructionLoginFillWindowMinutes).ToUnixTimeSeconds();
-        foreach (var item in _botService.GetQueueItemsForDisplay()
-                     .Where(item => item.Status == QueueStatus.Pending)
-                     .Where(item => IsConstructionQueueTask(item.TaskName))
-                     .Where(IsQueueItemAllowedByAutomationSettings))
+        foreach (var item in pendingItems)
         {
             var isHumanizeWait = ConstructionQueueState.IsConstructionHumanizeDeferred(item);
             var isQueueWait = ConstructionQueueState.IsQueueOccupancyDeferred(item);
-            if (!ConstructionQueueState.ShouldPrepareLoginFill(item, now))
+            var releaseConfirmedEmptyQueueHead = item.Id == confirmedEmptyQueueHead?.Id
+                && ConstructionQueueState.ShouldPrepareConfirmedEmptyQueueHead(item, now);
+            if (!ConstructionQueueState.ShouldPrepareLoginFill(item, now)
+                && !releaseConfirmedEmptyQueueHead)
             {
                 continue;
             }
@@ -397,11 +410,13 @@ public partial class MainWindow
                 BotOptionPayloadKeys.ConstructionPreSleepFill,
                 BotOptionPayloadKeys.QueueHumanizeExtraSeconds,
             ];
-            var delay = isHumanizeWait || isQueueWait ? TimeSpan.Zero : (TimeSpan?)null;
+            var delay = isHumanizeWait || isQueueWait || releaseConfirmedEmptyQueueHead
+                ? TimeSpan.Zero
+                : (TimeSpan?)null;
             var updated = _botService.PatchDeferredQueueItem(item.Id, valuesToSet, keysToRemove, delay);
             if (!updated)
             {
-                AppendLog($"[construction-login-fill] could not prepare id={item.Id} task='{item.TaskName}'.");
+                AppendLog($"[construction-{source}-fill] could not prepare id={item.Id} task='{item.TaskName}'.");
                 continue;
             }
 
@@ -411,13 +426,13 @@ public partial class MainWindow
 
         if (prepared > 0)
         {
-            AppendLog($"[construction-login-fill] prepared {prepared} construction row(s) to fill available slots without construction start delay.");
+            AppendLog($"[construction-{source}-fill] prepared {prepared} construction row(s) to fill available slots without construction start delay.");
             Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
             RefreshQueueUi();
         }
     }
 
-    // Once a category is full, the login burst is complete for every later row competing for that
+    // Once a category is full, the immediate-fill burst is complete for every later row competing for that
     // category. Removing the flag here ensures the next online timer completion is humanized normally.
     private void ClearConstructionLoginFillForFullSlots(
         VillageStatus status,
@@ -458,7 +473,74 @@ public partial class MainWindow
 
         if (cleared > 0)
         {
-            AppendLog($"[construction-login-fill] completed for {cleared} row(s): live construction category is full (source='{source}').");
+            AppendLog($"[construction-{source}-fill] completed for {cleared} row(s): live construction category is full.");
+        }
+    }
+
+    private void ReleaseDeferredConstructionResourceHeadsNow(string source)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var released = 0;
+        var pendingByVillage = _botService.GetQueueItemsForDisplay()
+            .Where(item => item.Status == QueueStatus.Pending)
+            .Where(item => IsConstructionQueueTask(item.TaskName))
+            .Where(IsQueueItemAllowedByAutomationSettings)
+            .Select(item => (Item: item, VillageKey: GetQueueItemVillageKey(item)))
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.VillageKey))
+            .Select(entry => (entry.Item, VillageKey: entry.VillageKey!));
+
+        foreach (var head in ConstructionQueueState.SelectResourceDeferredHeadsToRelease(pendingByVillage, now))
+        {
+            if (_botService.PatchDeferredQueueItem(head.Id, null, null, TimeSpan.Zero))
+            {
+                released++;
+            }
+        }
+
+        if (released <= 0)
+        {
+            return;
+        }
+
+        AppendLog($"Construction resource waits released ({source}): {released} village head(s) will retry now.");
+        Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RefreshQueueUi();
+    }
+
+    private void ClearConstructionLoginFillForBlockedHead(QueueItem blocker, string source)
+    {
+        var villageKey = GetQueueItemVillageKey(blocker);
+        if (string.IsNullOrWhiteSpace(villageKey))
+        {
+            return;
+        }
+
+        var cleared = 0;
+        foreach (var item in _botService.GetQueueItemsForDisplay()
+                     .Where(item => item.Id != blocker.Id)
+                     .Where(item => item.Status == QueueStatus.Pending)
+                     .Where(item => IsConstructionQueueTask(item.TaskName))
+                     .Where(item => string.Equals(GetQueueItemVillageKey(item), villageKey, StringComparison.OrdinalIgnoreCase))
+                     .Where(item => item.Payload.ContainsKey(BotOptionPayloadKeys.ConstructionLoginFill)))
+        {
+            if (_botService.PatchDeferredQueueItem(
+                    item.Id,
+                    null,
+                    [
+                        BotOptionPayloadKeys.ConstructionLoginFill,
+                        BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds,
+                    ]))
+            {
+                item.Payload.Remove(BotOptionPayloadKeys.ConstructionLoginFill);
+                item.Payload.Remove(BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds);
+                cleared++;
+            }
+        }
+
+        if (cleared > 0)
+        {
+            AppendLog($"[construction-{source}-fill] stopped for {cleared} later row(s): " +
+                $"head task='{blocker.TaskName}' could not start.");
         }
     }
 

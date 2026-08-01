@@ -853,6 +853,8 @@ public partial class MainWindow
         // Persist only on full reads so the durable structure is saved without thrashing the file every
         // 20s; lighter refreshes still update memory.
         var isFullRead = status.Buildings is { Count: > 0 } || status.ResourceFields is { Count: > 0 };
+        var confirmedEmptyConstructionQueue = isFullRead
+            && ConstructionQueueState.ResolveSnapshot(status).Knowledge == ConstructionQueueKnowledge.ConfirmedEmpty;
 
         var statusKey = VillageStatusCache.TryResolveCoordinateKey(name, status);
         if (statusKey is null && IsVillageNameAmbiguous(name))
@@ -906,6 +908,18 @@ public partial class MainWindow
         }
 
         StoreVillageStatusCacheEntry(name, status);
+
+        // An empty queue is confirmed only by a current dorf1/dorf2 overview read. Treat that visit as
+        // a human deciding to queue work now: arm the short-lived fill override for this village so all
+        // available official resource/building slots start before normal construction pacing resumes.
+        if (confirmedEmptyConstructionQueue)
+        {
+            PrepareConstructionLoginFill(
+                "empty-queue",
+                name,
+                statusKey,
+                releaseResourceHeadForConfirmedEmptyQueue: true);
+        }
 
         if (isFullRead)
         {

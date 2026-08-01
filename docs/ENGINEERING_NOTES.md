@@ -239,6 +239,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   not a user-toggleable automation group; do not show it on the Dashboard or in per-village group settings.
 - `ActiveConstructions` is the source of truth for occupied construction slots. A full queue is a normal blocked
   state, not an exception.
+- A confirmed empty overview gives the first stale resource `page_timer` head one immediate live validation so a
+  free slot cannot idle behind an obsolete timer. Hero inventory is never polled for this: only an observed inventory
+  increase wakes the first resource-deferred construction head per village; identical reads and transfer deductions do not.
 - Construction follows visible per-village queue order. A deferred head blocks later construction in that village;
   verified automatic prerequisite repair may be promoted only when a live slot is available.
 - Check storage, prerequisites, available slots, and resources before a Build/Upgrade click.
