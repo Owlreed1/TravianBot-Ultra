@@ -24,6 +24,8 @@ public partial class FarmingPanel : UserControl
     internal TextBox DispatchDelayMax => FarmDispatchDelayMaxTextBox;
     internal CheckBox DeactivateLossesOption => DeactivateFarmLossesCheckBox;
     internal CheckBox DeactivateOasisLossesOption => DeactivateFarmOasisLossesCheckBox;
+    internal CheckBox MoveLossesOption => MoveFarmLossesCheckBox;
+    internal ComboBox LossDestinationOption => FarmLossDestinationComboBox;
     internal Button TravcoSearchButton => TravcoInactiveSearchButton;
 
     private void AnalyzeFarmListsButton_Click(object sender, RoutedEventArgs e) => Host?.OnAnalyzeFarmListsClicked(sender, e);
@@ -33,5 +35,6 @@ public partial class FarmingPanel : UserControl
     private void FarmListSendNowButton_Click(object sender, RoutedEventArgs e) => Host?.OnFarmListSendNowClicked(sender, e);
     private void CancelFarmingOperationButton_Click(object sender, RoutedEventArgs e) => Host?.OnCancelFarmingOperationClicked(sender, e);
     private void FarmingSettings_Changed(object sender, RoutedEventArgs e) => Host?.OnFarmingSettingsChanged(sender, e);
+    private void MoveFarmLossesCheckBox_Checked(object sender, RoutedEventArgs e) => Host?.OnMoveFarmLossesChecked(sender, e);
     private void TravcoInactiveSearchButton_Click(object sender, RoutedEventArgs e) => Host?.OnTravcoInactiveSearchClicked(sender, e);
 }

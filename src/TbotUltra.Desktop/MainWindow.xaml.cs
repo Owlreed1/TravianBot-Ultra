@@ -444,6 +444,7 @@ public partial class MainWindow : Window
         var queueScheduler = new PriorityFifoQueueScheduler();
         var queueExecutor = new QueueExecutor(taskRunner);
         _botService = new DesktopBotService(taskRunner, queueStore, queueScheduler, queueExecutor);
+        _botService.FarmLossDestinationChanged += OnFarmLossDestinationChanged;
         if (ShouldClearQueueOnStartup())
         {
             _botService.ClearQueue();

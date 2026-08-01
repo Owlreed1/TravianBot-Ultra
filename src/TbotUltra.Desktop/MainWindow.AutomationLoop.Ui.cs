@@ -643,18 +643,8 @@ public partial class MainWindow
             return;
         }
 
-        if (availability == ConstructionQueueAvailability.Full)
-        {
-            item.StateText = "Waiting";
-            item.DetailText = "Travian build queue full.";
-            item.RemainingSeconds = snapshot.RemainingSeconds;
-            return;
-        }
-
-        var deferred = groupItems
-            .Where(entry => entry.Status == QueueStatus.Pending && entry.NextAttemptAt > now)
-            .FirstOrDefault();
-        if (deferred is not null)
+        var wait = ConstructionQueueState.ResolveLoopWait(groupItems, snapshot, availability, now);
+        if (wait.Kind == ConstructionLoopWaitKind.DeferredTask && wait.DeferredItem is { } deferred)
         {
             var retryLabel = FormatQueueServerTime(deferred.NextAttemptAt);
             item.StateText = "Waiting";
@@ -670,17 +660,23 @@ public partial class MainWindow
                     $"Waiting for building requirements. Next try {retryLabel}",
                 _ => $"Waiting to retry. Next try {retryLabel}",
             };
-            item.RemainingSeconds = Math.Max(
-                0,
-                (int)Math.Ceiling((deferred.NextAttemptAt - now).TotalSeconds));
+            item.RemainingSeconds = wait.RemainingSeconds;
             return;
         }
 
-        if (snapshot.Knowledge == ConstructionQueueKnowledge.Active)
+        if (wait.Kind == ConstructionLoopWaitKind.QueueFull)
+        {
+            item.StateText = "Waiting";
+            item.DetailText = "Travian build queue full.";
+            item.RemainingSeconds = wait.RemainingSeconds;
+            return;
+        }
+
+        if (wait.Kind == ConstructionLoopWaitKind.ActiveQueue)
         {
             item.StateText = "Waiting";
             item.DetailText = "Travian build queue active.";
-            item.RemainingSeconds = snapshot.RemainingSeconds;
+            item.RemainingSeconds = wait.RemainingSeconds;
             return;
         }
 

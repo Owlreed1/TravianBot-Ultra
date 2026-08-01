@@ -7,6 +7,46 @@ namespace TbotUltra.Desktop.Tests;
 
 public sealed class ConstructionQueueStateTests
 {
+    private static readonly DateTimeOffset Now = new(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void ResolveLoopWait_FullQueueUsesExactDeferredTaskTimerWhenSnapshotTimerIsMissing()
+    {
+        var deferred = new QueueItem
+        {
+            Status = QueueStatus.Pending,
+            NextAttemptAt = Now.AddMinutes(15),
+            Payload = new Dictionary<string, string>
+            {
+                [BotOptionPayloadKeys.UpgradeDeferReason] = BotOptionPayloadKeys.UpgradeDeferReasonQueueFull,
+            },
+        };
+
+        var result = ConstructionQueueState.ResolveLoopWait(
+            [deferred],
+            new ConstructionQueueSnapshot(ConstructionQueueKnowledge.Active, 1, null),
+            ConstructionQueueAvailability.Full,
+            Now);
+
+        Assert.Equal(ConstructionLoopWaitKind.DeferredTask, result.Kind);
+        Assert.Equal(900, result.RemainingSeconds);
+        Assert.Same(deferred, result.DeferredItem);
+    }
+
+    [Fact]
+    public void ResolveLoopWait_FullQueueWithoutDeferredTaskUsesSnapshotTimer()
+    {
+        var result = ConstructionQueueState.ResolveLoopWait(
+            [],
+            new ConstructionQueueSnapshot(ConstructionQueueKnowledge.Active, 1, 600),
+            ConstructionQueueAvailability.Full,
+            Now);
+
+        Assert.Equal(ConstructionLoopWaitKind.QueueFull, result.Kind);
+        Assert.Equal(600, result.RemainingSeconds);
+        Assert.Null(result.DeferredItem);
+    }
+
     [Theory]
     [InlineData("Slot 20: build queue full. queue_wait_seconds=3600")]
     [InlineData("Slot 20 blocked by queue. queue_wait_seconds=3600")]

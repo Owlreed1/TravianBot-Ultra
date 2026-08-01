@@ -20,6 +20,12 @@ public sealed class DesktopBotService : IDesktopBotService
         _queueExecutor = queueExecutor;
     }
 
+    public event Action<FarmLossDestinationChange>? FarmLossDestinationChanged
+    {
+        add => _taskRunner.FarmLossDestinationChanged += value;
+        remove => _taskRunner.FarmLossDestinationChanged -= value;
+    }
+
     public QueueItem Enqueue(string taskName, Dictionary<string, string>? payload, int priority, int maxRetries)
     {
         return _queueStore.Add(taskName, payload, priority, maxRetries);

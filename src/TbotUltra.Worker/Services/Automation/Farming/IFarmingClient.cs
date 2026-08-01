@@ -33,6 +33,10 @@ public interface IFarmingClient
         bool includeUnoccupiedOasis,
         CancellationToken cancellationToken = default);
 
+    Task<FarmListLossDeactivationResult> HandleFarmListLossTargetsAsync(
+        FarmListLossHandlingRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<FarmListCreateBatchResult> CreateFarmListsAsync(
         FarmListCreateRequest request,
         IProgress<FarmListCreateProgress>? progress = null,

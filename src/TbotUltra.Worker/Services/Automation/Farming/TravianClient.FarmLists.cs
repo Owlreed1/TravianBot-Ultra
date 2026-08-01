@@ -447,6 +447,407 @@ public sealed partial class TravianClient : IFarmingClient
         return new FarmListLossDeactivationResult(lossRows.Count, deactivated, skippedOasisRows);
     }
 
+    public async Task<FarmListLossDeactivationResult> HandleFarmListLossTargetsAsync(
+        FarmListLossHandlingRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!request.MoveLosses)
+        {
+            return await DeactivateFarmListLossTargetsAsync(request.IncludeUnoccupiedOasis, cancellationToken);
+        }
+
+        LogFunctionStarted();
+        await EnsureLoggedInAsync(cancellationToken: cancellationToken);
+        if (!await ReadGoldClubEnabledAsync(cancellationToken))
+        {
+            throw new InvalidOperationException("Gold Club is not enabled for this account.");
+        }
+
+        await EnsureRallyPointAndOpenFarmListPageAsync(cancellationToken);
+        await DismissDeactivatedTargetsNoticeAsync(cancellationToken);
+        await WaitForPageReadyAsync(cancellationToken);
+        await WaitForFarmListsRenderedAsync(cancellationToken);
+        await EnsureOfficialFarmListsExpandedAsync(cancellationToken);
+
+        LossDestinationResolution destination;
+        try
+        {
+            destination = await ResolveLossDestinationAsync(request, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Notify($"ALARM: [farm-list] loss destination could not be prepared: {ex.Message}. Falling back to deactivation only.");
+            var fallback = await DeactivateFarmListLossTargetsAsync(request.IncludeUnoccupiedOasis, cancellationToken);
+            return fallback with { MoveFailures = fallback.RowsDeactivated };
+        }
+
+        var initialRows = await ReadFarmListLossRowsFromCurrentPageAsync(cancellationToken);
+        var lossRows = initialRows.Where(IsFarmListLossRow).ToList();
+        var skippedOasisRows = lossRows.Count(row =>
+            !request.IncludeUnoccupiedOasis && FarmListLossStateClassifier.IsUnoccupiedOasis(row.TargetName));
+        var deactivated = 0;
+        var moved = 0;
+        var moveFailures = 0;
+        var ignoredRows = new HashSet<string>(StringComparer.Ordinal);
+        string? unavailableDestinationReason = null;
+        Notify($"[farm-list] combined loss handling started: found={lossRows.Count}; destination='{destination.Name}' ({destination.Id}).");
+
+        for (var attempt = 1; attempt <= MaxFarmsPerFarmList * 2; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var rows = attempt == 1
+                ? initialRows
+                : await ReadFarmListLossRowsFromCurrentPageAsync(cancellationToken);
+            var candidate = rows.FirstOrDefault(row =>
+                IsFarmListLossRow(row)
+                && !ignoredRows.Contains(FarmListLossRowKey(row)));
+            if (candidate is null)
+            {
+                break;
+            }
+
+            var isOasis = FarmListLossStateClassifier.IsUnoccupiedOasis(candidate.TargetName);
+            if (isOasis)
+            {
+                if (!request.IncludeUnoccupiedOasis)
+                {
+                    ignoredRows.Add(FarmListLossRowKey(candidate));
+                    continue;
+                }
+
+                if (await TryDeactivateFarmListLossRowAsync(candidate, cancellationToken))
+                {
+                    deactivated++;
+                    Notify($"[farm-list] deactivated oasis loss target='{candidate.TargetName}' slot='{candidate.SlotId}'; oasis was not moved.");
+                }
+                else
+                {
+                    ignoredRows.Add(FarmListLossRowKey(candidate));
+                    Notify($"ALARM: [farm-list] could not deactivate oasis loss target='{candidate.TargetName}' slot='{candidate.SlotId}'.");
+                }
+                continue;
+            }
+
+            if (string.Equals(candidate.ListId, destination.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                if (await TryDeactivateFarmListLossRowAsync(candidate, cancellationToken))
+                {
+                    deactivated++;
+                }
+                else
+                {
+                    ignoredRows.Add(FarmListLossRowKey(candidate));
+                    Notify($"ALARM: [farm-list] target='{candidate.TargetName}' is already in destination '{destination.Name}' but could not be deactivated.");
+                }
+                continue;
+            }
+
+            if (unavailableDestinationReason is null && destination.TotalFarmCount >= destination.Capacity)
+            {
+                try
+                {
+                    destination = await CreateNextLossDestinationAsync(request, destination, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    unavailableDestinationReason = ex.Message;
+                    Notify($"ALARM: [farm-list] loss destination rollover failed: {ex.Message}. Remaining loss targets will only be deactivated.");
+                }
+            }
+
+            if (unavailableDestinationReason is not null)
+            {
+                moveFailures++;
+                if (await TryDeactivateFarmListLossRowAsync(candidate, cancellationToken))
+                {
+                    deactivated++;
+                }
+                else
+                {
+                    ignoredRows.Add(FarmListLossRowKey(candidate));
+                    Notify($"ALARM: [farm-list] fallback deactivation failed target='{candidate.TargetName}' slot='{candidate.SlotId}' after rollover error='{unavailableDestinationReason}'.");
+                }
+                continue;
+            }
+
+            var combinedSucceeded = false;
+            for (var moveAttempt = 1; moveAttempt <= 2 && !combinedSucceeded; moveAttempt++)
+            {
+                combinedSucceeded = await TryMoveAndDeactivateFarmListLossRowAsync(candidate, destination, cancellationToken);
+                if (!combinedSucceeded)
+                {
+                    Notify($"[farm-list] combined move/deactivate retry {moveAttempt}/2 failed target='{candidate.TargetName}' slot='{candidate.SlotId}' destination='{destination.Name}'.");
+                    await CloseFarmListSlotDialogIfVisibleAsync(cancellationToken);
+                }
+            }
+
+            if (combinedSucceeded)
+            {
+                deactivated++;
+                moved++;
+                destination = destination with { TotalFarmCount = destination.TotalFarmCount + 1 };
+                Notify($"[farm-list] moved and deactivated target='{candidate.TargetName}' slot='{candidate.SlotId}' to '{destination.Name}'.");
+                continue;
+            }
+
+            moveFailures++;
+            var fallbackDeactivated = await TryDeactivateFarmListLossRowAsync(candidate, cancellationToken);
+            if (fallbackDeactivated)
+            {
+                deactivated++;
+            }
+            else
+            {
+                ignoredRows.Add(FarmListLossRowKey(candidate));
+            }
+            Notify($"ALARM: [farm-list] could not move loss target='{candidate.TargetName}' slot='{candidate.SlotId}' to '{destination.Name}' after 2 attempts; fallbackDeactivated={fallbackDeactivated}.");
+        }
+
+        Notify($"[farm-list] combined loss handling done: found={lossRows.Count}, deactivated={deactivated}, moved={moved}, moveFailures={moveFailures}, skippedOasis={skippedOasisRows}.");
+        return new FarmListLossDeactivationResult(
+            lossRows.Count,
+            deactivated,
+            skippedOasisRows,
+            moved,
+            moveFailures,
+            destination.Id,
+            destination.Name,
+            destination.Changed);
+    }
+
+    private async Task<LossDestinationResolution> ResolveLossDestinationAsync(
+        FarmListLossHandlingRequest request,
+        CancellationToken cancellationToken)
+    {
+        var overview = await ReadFarmListsFromCurrentPageAsync(cancellationToken);
+        var destination = overview.FirstOrDefault(item =>
+                !string.IsNullOrWhiteSpace(request.DestinationListId)
+                && string.Equals(item.ListId, request.DestinationListId, StringComparison.OrdinalIgnoreCase))
+            ?? overview.FirstOrDefault(item =>
+                !string.IsNullOrWhiteSpace(request.DestinationListName)
+                && string.Equals(item.Name, request.DestinationListName, StringComparison.OrdinalIgnoreCase));
+        if (destination is null)
+        {
+            if (request.CreateTemplate is null || string.IsNullOrWhiteSpace(request.DestinationListName))
+            {
+                throw new InvalidOperationException("The configured loss destination list is missing and no create template is available.");
+            }
+
+            await CreateFarmListsAsync(
+                request.CreateTemplate with { Names = [request.DestinationListName.Trim()] },
+                cancellationToken: cancellationToken);
+            await EnsureOfficialFarmListsExpandedAsync(cancellationToken);
+            overview = await ReadFarmListsFromCurrentPageAsync(cancellationToken);
+            destination = overview.FirstOrDefault(item =>
+                string.Equals(item.Name, request.DestinationListName, StringComparison.OrdinalIgnoreCase));
+            if (destination is null)
+            {
+                throw new InvalidOperationException($"Recreated loss destination '{request.DestinationListName}' was not found.");
+            }
+        }
+
+        var resolved = ToLossDestination(destination,
+            !string.Equals(destination.ListId, request.DestinationListId, StringComparison.OrdinalIgnoreCase));
+        if (resolved.TotalFarmCount >= resolved.Capacity)
+        {
+            return await CreateNextLossDestinationAsync(request, resolved, cancellationToken);
+        }
+
+        return resolved;
+    }
+
+    private async Task<LossDestinationResolution> CreateNextLossDestinationAsync(
+        FarmListLossHandlingRequest request,
+        LossDestinationResolution current,
+        CancellationToken cancellationToken)
+    {
+        if (request.CreateTemplate is null)
+        {
+            throw new InvalidOperationException($"Loss destination '{current.Name}' is full and no create template is available.");
+        }
+
+        var overview = await ReadFarmListsFromCurrentPageAsync(cancellationToken);
+        var baseName = string.IsNullOrWhiteSpace(request.DestinationBaseName)
+            ? current.Name
+            : request.DestinationBaseName.Trim();
+        var nextName = FarmLossListNaming.NextAvailable(baseName, overview.Select(item => item.Name));
+        Notify($"[farm-list] loss destination '{current.Name}' is full; creating rollover '{nextName}'.");
+        await CreateFarmListsAsync(
+            request.CreateTemplate with { Names = [nextName] },
+            cancellationToken: cancellationToken);
+        await EnsureOfficialFarmListsExpandedAsync(cancellationToken);
+        overview = await ReadFarmListsFromCurrentPageAsync(cancellationToken);
+        var created = overview.FirstOrDefault(item => string.Equals(item.Name, nextName, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException($"Rollover loss destination '{nextName}' was not found after creation.");
+        return ToLossDestination(created, changed: true);
+    }
+
+    private static LossDestinationResolution ToLossDestination(FarmListOverview item, bool changed)
+    {
+        if (string.IsNullOrWhiteSpace(item.ListId))
+        {
+            throw new InvalidOperationException($"Loss destination '{item.Name}' has no stable list id.");
+        }
+
+        return new LossDestinationResolution(
+            item.ListId.Trim(),
+            item.Name.Trim(),
+            Math.Max(0, item.TotalFarmCount),
+            item.Capacity is > 0 ? item.Capacity.Value : MaxFarmsPerFarmList,
+            changed);
+    }
+
+    private async Task<bool> TryMoveAndDeactivateFarmListLossRowAsync(
+        FarmListLossRowJs row,
+        LossDestinationResolution destination,
+        CancellationToken cancellationToken)
+    {
+        var farmRow = ResolveFarmListLossRowLocator(row);
+        var menuTrigger = farmRow.Locator("td.openContextMenu a, td.openContextMenu button, td.openContextMenu").First;
+        if (!await TryRealClickFarmButtonAsync(
+                menuTrigger,
+                () => JsOpenFarmListRowMenuAsync(row),
+                $"open loss-row menu for combined move slot '{row.SlotId}'",
+                cancellationToken))
+        {
+            return false;
+        }
+
+        var editEntry = _page.Locator(".entry.edit:visible, button.entry.edit:visible, [class~='edit']:visible").First;
+        try
+        {
+            await editEntry.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = _config.TimeoutMs,
+            }).WaitAsync(cancellationToken);
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
+
+        if (!await TryRealClickFarmButtonAsync(
+                editEntry,
+                JsClickVisibleFarmListEditEntryAsync,
+                $"edit loss row slot '{row.SlotId}'",
+                cancellationToken))
+        {
+            return false;
+        }
+
+        var dialog = _page.Locator(".dialog.basic.slotDialog:visible").First;
+        try
+        {
+            await dialog.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = _config.TimeoutMs,
+            }).WaitAsync(cancellationToken);
+            var listSelect = dialog.Locator("select[name='listId']").First;
+            await SelectFarmListOptionAsync(listSelect, destination.Id, "move loss target: destination list", cancellationToken);
+            var deactivate = dialog.Locator("input[name='isActive'][type='checkbox']").First;
+            if (!await deactivate.IsCheckedAsync())
+            {
+                if (!await TryRealClickFarmButtonAsync(
+                        deactivate,
+                        () => Task.FromResult(false),
+                        "move loss target: deactivate checkbox",
+                        cancellationToken))
+                {
+                    return false;
+                }
+
+                if (!await deactivate.IsCheckedAsync())
+                {
+                    Notify($"[farm-list] deactivate checkbox did not become checked for slot '{row.SlotId}'.");
+                    return false;
+                }
+            }
+
+            var save = dialog.Locator("button.save[type='submit'], button.save").First;
+            if (!await TryRealClickFarmButtonAsync(save, () => Task.FromResult(false), $"save moved loss row slot '{row.SlotId}'", cancellationToken))
+            {
+                return false;
+            }
+
+            await _page.WaitForFunctionAsync(
+                """
+                (candidate) => {
+                  const wrapper = Array.from(document.querySelectorAll('#rallyPointFarmList .farmListWrapper'))
+                    .find(item => item.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') === candidate.destinationId);
+                  const input = wrapper?.querySelector(`tr.slot input[data-slot-id="${CSS.escape(candidate.slotId)}"]`);
+                  const movedRow = input?.closest('tr.slot');
+                  return !!movedRow && movedRow.classList.contains('disabled');
+                }
+                """,
+                new { slotId = row.SlotId ?? string.Empty, destinationId = destination.Id },
+                new PageWaitForFunctionOptions { Timeout = _config.TimeoutMs }).WaitAsync(cancellationToken);
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Notify($"[farm-list] combined move/deactivate did not confirm target='{row.TargetName}' slot='{row.SlotId}': {ex.Message}");
+            return false;
+        }
+    }
+
+    private ILocator ResolveFarmListLossRowLocator(FarmListLossRowJs row)
+    {
+        var rows = _page.Locator("#rallyPointFarmList tr.slot, tr.slot");
+        return !string.IsNullOrWhiteSpace(row.SlotId) && row.SlotId.All(char.IsAsciiDigit)
+            ? _page.Locator($"#rallyPointFarmList tr.slot:has(input[data-slot-id='{row.SlotId}']), tr.slot:has(input[data-slot-id='{row.SlotId}'])").First
+            : rows.Nth(row.RowIndex);
+    }
+
+    private async Task<bool> JsClickVisibleFarmListEditEntryAsync()
+    {
+        return await _page.EvaluateAsync<bool>(
+            """
+            () => {
+              const clean = value => (value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+              const entries = Array.from(document.querySelectorAll('.entry.edit, button.entry.edit, [class~="edit"]'));
+              const entry = entries.find(node => node.getClientRects().length > 0 && clean(node.textContent).includes('edit'));
+              if (!entry) return false;
+              entry.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+              entry.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+              entry.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+              return true;
+            }
+            """);
+    }
+
+    private async Task CloseFarmListSlotDialogIfVisibleAsync(CancellationToken cancellationToken)
+    {
+        var cancel = _page.Locator(".dialog.basic.slotDialog:visible button.cancel").First;
+        if (await cancel.CountAsync() > 0 && await cancel.IsVisibleAsync())
+        {
+            await TryRealClickFarmButtonAsync(cancel, () => Task.FromResult(false), "cancel failed loss-row edit", cancellationToken);
+        }
+    }
+
+    private async Task SelectFarmListOptionAsync(
+        ILocator select,
+        string value,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        Notify($"[farm-list:verbose] selecting option value='{value}' reason='{reason}'.");
+        await select.SelectOptionAsync(value).WaitAsync(cancellationToken);
+    }
+
+    private sealed record LossDestinationResolution(
+        string Id,
+        string Name,
+        int TotalFarmCount,
+        int Capacity,
+        bool Changed);
+
     private async Task DismissDeactivatedTargetsNoticeAsync(CancellationToken cancellationToken)
     {
         var notice = _page.Locator("#rallyPointFarmList .noticeBox.deactivatedTargets").First;
@@ -1059,6 +1460,7 @@ public sealed partial class TravianClient : IFarmingClient
                 return {
                   rowIndex,
                   slotId: input?.getAttribute('data-slot-id') || '',
+                  listId: wrapper?.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') || '',
                   listName: clean(wrapper?.querySelector('.farmListName .name')?.textContent || ''),
                   targetName: clean(row.querySelector('td.target a')?.textContent || row.querySelector('td.target')?.textContent || ''),
                   rowClass: classText(row),
@@ -1076,6 +1478,9 @@ public sealed partial class TravianClient : IFarmingClient
         return row is { Disabled: false }
             && FarmListLossStateClassifier.Classify(row.RaidClass) == FarmListLossState.Loss;
     }
+
+    private static string FarmListLossRowKey(FarmListLossRowJs row)
+        => string.IsNullOrWhiteSpace(row.SlotId) ? $"row:{row.RowIndex}" : row.SlotId;
 
     private static bool IsFarmListLossDeactivationCandidate(FarmListLossRowJs row, bool includeUnoccupiedOasis)
     {

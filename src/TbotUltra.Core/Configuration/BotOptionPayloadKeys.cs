@@ -161,6 +161,10 @@ public static class BotOptionPayloadKeys
     public const string SmithyUpgradeRestartDelayMaxMinutes = "smithy_upgrade_restart_delay_max_minutes";
     public const string ContinuousFarmDeactivateLosses = "continuous_farm_deactivate_losses";
     public const string ContinuousFarmDeactivateOasisLosses = "continuous_farm_deactivate_oasis_losses";
+    public const string ContinuousFarmMoveLosses = "continuous_farm_move_losses";
+    public const string ContinuousFarmLossDestinationListId = "continuous_farm_loss_destination_list_id";
+    public const string ContinuousFarmLossDestinationListName = "continuous_farm_loss_destination_list_name";
+    public const string ContinuousFarmLossDestinationBaseName = "continuous_farm_loss_destination_base_name";
     public const string ContinuousFarmNextListIndex = "continuous_farm_next_list_index";
     public const string PostLoginAnalyzeFarmlists = "post_login_analyze_farmlists";
     public const string PostLoginAnalyzeHero = "post_login_analyze_hero";

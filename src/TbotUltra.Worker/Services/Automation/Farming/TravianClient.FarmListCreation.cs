@@ -36,7 +36,7 @@ public sealed partial class TravianClient
             throw new InvalidOperationException($"Farm list name '{duplicateRequestName}' is entered more than once.");
         }
 
-        var troopIndex = TroopCatalog.ResolveTroopIndex(request.TroopType);
+        var troopIndex = request.TroopIndexOverride ?? TroopCatalog.ResolveTroopIndex(request.TroopType);
         if (troopIndex is null || request.TroopCount <= 0)
         {
             throw new InvalidOperationException("Select one troop type and enter a troop count greater than 0.");
@@ -213,9 +213,11 @@ public sealed partial class TravianClient
                 villageName,
                 villageId,
                 cancellationToken);
-            await form.Locator("select[name='villageId']").First
-                .SelectOptionAsync(villageValue)
-                .WaitAsync(cancellationToken);
+            await SelectFarmListOptionAsync(
+                form.Locator("select[name='villageId']").First,
+                villageValue,
+                "create farm list: village",
+                cancellationToken);
             await _page.WaitForFunctionAsync(
                 "value => document.querySelector('#createFarmListForm select[name=\"villageId\"]')?.value === value",
                 villageValue,

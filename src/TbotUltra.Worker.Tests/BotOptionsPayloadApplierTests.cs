@@ -82,6 +82,20 @@ public sealed class BotOptionsPayloadApplierTests
     }
 
     [Fact]
+    public void FromConfiguration_DisablesLossMoveWithoutLossDeactivation()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [BotOptionPayloadKeys.ContinuousFarmDeactivateLosses] = "false",
+                [BotOptionPayloadKeys.ContinuousFarmMoveLosses] = "true",
+            })
+            .Build();
+
+        Assert.False(BotOptionsFactory.FromConfiguration(configuration).ContinuousFarmMoveLosses);
+    }
+
+    [Fact]
     public void FromConfiguration_StorageUpgradeLevelsAheadDefaultsAndClamps()
     {
         var defaults = new ConfigurationBuilder().AddInMemoryCollection().Build();

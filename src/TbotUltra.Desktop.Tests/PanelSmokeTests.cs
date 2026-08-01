@@ -60,4 +60,16 @@ public sealed class PanelSmokeTests
 
         Assert.False(string.IsNullOrEmpty(name));
     }
+
+    [Fact]
+    public void FarmingPanel_ContainsLossMoveControls()
+    {
+        _wpf.Run(() =>
+        {
+            var panel = new FarmingPanel();
+
+            Assert.Equal("Move red/yellow farms to list", panel.MoveLossesOption.Content);
+            Assert.Equal("DisplayText", panel.LossDestinationOption.DisplayMemberPath);
+        });
+    }
 }

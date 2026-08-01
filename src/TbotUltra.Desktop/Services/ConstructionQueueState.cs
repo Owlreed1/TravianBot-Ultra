@@ -34,6 +34,19 @@ public sealed record ConstructionQueueSnapshot(
     int ActiveCount,
     int? RemainingSeconds);
 
+public enum ConstructionLoopWaitKind
+{
+    None,
+    DeferredTask,
+    QueueFull,
+    ActiveQueue,
+}
+
+public sealed record ConstructionLoopWait(
+    ConstructionLoopWaitKind Kind,
+    int? RemainingSeconds,
+    QueueItem? DeferredItem = null);
+
 public sealed record ConstructionHumanizeToggleReset(
     Dictionary<string, string> Payload,
     TimeSpan? Delay,
@@ -267,6 +280,34 @@ public static class ConstructionQueueState
         return status.ActiveConstructionsFromOverview
             ? new ConstructionQueueSnapshot(ConstructionQueueKnowledge.ConfirmedEmpty, 0, null)
             : new ConstructionQueueSnapshot(ConstructionQueueKnowledge.Unknown, 0, null);
+    }
+
+    public static ConstructionLoopWait ResolveLoopWait(
+        IReadOnlyList<QueueItem> groupItems,
+        ConstructionQueueSnapshot snapshot,
+        ConstructionQueueAvailability availability,
+        DateTimeOffset now)
+    {
+        var deferred = groupItems
+            .Where(item => item.Status == QueueStatus.Pending && item.NextAttemptAt > now)
+            .OrderBy(item => item.NextAttemptAt)
+            .FirstOrDefault();
+        if (deferred is not null)
+        {
+            return new ConstructionLoopWait(
+                ConstructionLoopWaitKind.DeferredTask,
+                Math.Max(0, (int)Math.Ceiling((deferred.NextAttemptAt - now).TotalSeconds)),
+                deferred);
+        }
+
+        if (availability == ConstructionQueueAvailability.Full)
+        {
+            return new ConstructionLoopWait(ConstructionLoopWaitKind.QueueFull, snapshot.RemainingSeconds);
+        }
+
+        return snapshot.Knowledge == ConstructionQueueKnowledge.Active
+            ? new ConstructionLoopWait(ConstructionLoopWaitKind.ActiveQueue, snapshot.RemainingSeconds)
+            : new ConstructionLoopWait(ConstructionLoopWaitKind.None, null);
     }
 
     public static IReadOnlyList<ActiveConstruction> ResolveCurrentActiveConstructions(

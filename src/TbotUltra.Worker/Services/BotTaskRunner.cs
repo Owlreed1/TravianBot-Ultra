@@ -98,6 +98,10 @@ public sealed partial class BotTaskRunner
 
     public Func<LobbyWorldSelectionRequest, CancellationToken, Task<string?>>? LobbyWorldSelectionRequested { get; set; }
     public Func<LobbyWorldServerResolution, CancellationToken, Task>? LobbyWorldServerResolved { get; set; }
+    public event Action<FarmLossDestinationChange>? FarmLossDestinationChanged;
+
+    private void RaiseFarmLossDestinationChanged(FarmLossDestinationChange change)
+        => FarmLossDestinationChanged?.Invoke(change);
 
     public static IReadOnlyList<string> RegisteredTaskNames => TaskHandlers.Keys.ToList();
 

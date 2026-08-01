@@ -368,6 +368,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   separate groups; the heading label is the village name plus coordinates. The farm page exposes no village
   id/coordinates on the wrapper, so coordinates are resolved from the known village list by name and only when
   that name is unique (a duplicated name is ambiguous → name only). A village rename just re-groups next read.
+- Moving a loss target uses the live-verified Official route `/build.php?id=39&gid=16&tt=99` and row-edit
+  contract: `td.openContextMenu` → `.entry.edit` → `.dialog.basic.slotDialog`, then
+  `select[name='listId']`, `input[name='isActive']`, and `button.save`. Keep the list `lid` as the stable
+  destination identity; display name is only for rebind/recreation when a configured list disappears.
 - Analyzed farm lists persist per account (`FarmListsSnapshotPath`) and are restored into the panel at
   startup / account switch so it is never blank; restored timers are re-based on the capture time and
   `_lastFarmListsAnalysisAt` stays `MinValue` so a real re-analyze still fires when due.

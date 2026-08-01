@@ -65,6 +65,15 @@ public sealed class BotOptionsFromConfigurationCoverageTests
     }
 
     [Fact]
+    public void LossMoveSettings_AreAccountScoped()
+    {
+        Assert.Contains(BotOptionPayloadKeys.ContinuousFarmMoveLosses, BotConfigStore.AccountScopedKeyValues);
+        Assert.Contains(BotOptionPayloadKeys.ContinuousFarmLossDestinationListId, BotConfigStore.AccountScopedKeyValues);
+        Assert.Contains(BotOptionPayloadKeys.ContinuousFarmLossDestinationListName, BotConfigStore.AccountScopedKeyValues);
+        Assert.Contains(BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName, BotConfigStore.AccountScopedKeyValues);
+    }
+
+    [Fact]
     public void FromConfiguration_defaults_village_scan_to_enabled_every_10_to_30_minutes()
     {
         var options = BotOptionsFactory.FromConfiguration(new AccessRecordingConfiguration());

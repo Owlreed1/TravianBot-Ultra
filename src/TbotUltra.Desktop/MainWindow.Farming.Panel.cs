@@ -17,6 +17,8 @@ public partial class MainWindow
     private System.Windows.Controls.TextBox FarmDispatchDelayMaxTextBox => FarmingPanelControl.DispatchDelayMax;
     private System.Windows.Controls.CheckBox DeactivateFarmLossesCheckBox => FarmingPanelControl.DeactivateLossesOption;
     private System.Windows.Controls.CheckBox DeactivateFarmOasisLossesCheckBox => FarmingPanelControl.DeactivateOasisLossesOption;
+    private System.Windows.Controls.CheckBox MoveFarmLossesCheckBox => FarmingPanelControl.MoveLossesOption;
+    private System.Windows.Controls.ComboBox FarmLossDestinationComboBox => FarmingPanelControl.LossDestinationOption;
     private System.Windows.Controls.Button TravcoInactiveSearchButton => FarmingPanelControl.TravcoSearchButton;
 
     internal void OnAnalyzeFarmListsClicked(object sender, RoutedEventArgs e) => AnalyzeFarmListsButton_Click(sender, e);
@@ -26,5 +28,6 @@ public partial class MainWindow
     internal void OnFarmListSendNowClicked(object sender, RoutedEventArgs e) => FarmListSendNowButton_Click(sender, e);
     internal void OnCancelFarmingOperationClicked(object sender, RoutedEventArgs e) => CancelFarmingOperationButton_Click(sender, e);
     internal void OnFarmingSettingsChanged(object sender, RoutedEventArgs e) => FarmingSettings_Changed(sender, e);
+    internal void OnMoveFarmLossesChecked(object sender, RoutedEventArgs e) => MoveFarmLossesCheckBox_Checked(sender, e);
     internal void OnTravcoInactiveSearchClicked(object sender, RoutedEventArgs e) => TravcoInactiveSearchButton_Click(sender, e);
 }

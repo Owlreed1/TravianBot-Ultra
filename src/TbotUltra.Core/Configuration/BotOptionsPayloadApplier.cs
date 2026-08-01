@@ -73,6 +73,10 @@ public static class BotOptionsPayloadApplier
         var smithyUpgradeRestartDelayMaxMinutes = source.SmithyUpgradeRestartDelayMaxMinutes;
         var continuousFarmDeactivateLosses = farming.DeactivateLosses;
         var continuousFarmDeactivateOasisLosses = farming.DeactivateOasisLosses;
+        var continuousFarmMoveLosses = continuousFarmDeactivateLosses && farming.MoveLosses;
+        var continuousFarmLossDestinationListId = farming.LossDestinationListId;
+        var continuousFarmLossDestinationListName = farming.LossDestinationListName;
+        var continuousFarmLossDestinationBaseName = farming.LossDestinationBaseName;
         var continuousFarmNextListIndex = farming.NextListIndex;
         var postLogin = PostLoginPayloadApplier.Apply(source, payload);
         var postLoginAnalyzeFarmlists = postLogin.AnalyzeFarmlists;
@@ -196,6 +200,10 @@ public static class BotOptionsPayloadApplier
             SmithyUpgradeRestartDelayMaxMinutes = smithyUpgradeRestartDelayMaxMinutes,
             ContinuousFarmDeactivateLosses = continuousFarmDeactivateLosses,
             ContinuousFarmDeactivateOasisLosses = continuousFarmDeactivateOasisLosses,
+            ContinuousFarmMoveLosses = continuousFarmMoveLosses,
+            ContinuousFarmLossDestinationListId = continuousFarmLossDestinationListId,
+            ContinuousFarmLossDestinationListName = continuousFarmLossDestinationListName,
+            ContinuousFarmLossDestinationBaseName = continuousFarmLossDestinationBaseName,
             ContinuousFarmNextListIndex = continuousFarmNextListIndex,
             PostLoginAnalyzeFarmlists = postLoginAnalyzeFarmlists,
             PostLoginAnalyzeHero = postLoginAnalyzeHero,

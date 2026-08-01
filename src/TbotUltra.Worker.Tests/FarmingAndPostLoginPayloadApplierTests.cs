@@ -18,6 +18,10 @@ public sealed class FarmingAndPostLoginPayloadApplierTests
             [BotOptionPayloadKeys.TownHallCelebrationMode] = "great",
             [BotOptionPayloadKeys.ContinuousFarmDeactivateLosses] = "true",
             [BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses] = "true",
+            [BotOptionPayloadKeys.ContinuousFarmMoveLosses] = "true",
+            [BotOptionPayloadKeys.ContinuousFarmLossDestinationListId] = "4711",
+            [BotOptionPayloadKeys.ContinuousFarmLossDestinationListName] = "Yellow farms",
+            [BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] = "Yellow farms",
             [BotOptionPayloadKeys.ContinuousFarmNextListIndex] = "-4",
             [BotOptionPayloadKeys.PostLoginAnalyzeFarmlists] = "false",
             [BotOptionPayloadKeys.PostLoginAnalyzeHero] = "false",
@@ -39,6 +43,10 @@ public sealed class FarmingAndPostLoginPayloadApplierTests
         Assert.Equal(TownHallCelebrationDefaults.Big, result.TownHallCelebrationMode);
         Assert.True(result.ContinuousFarmDeactivateLosses);
         Assert.True(result.ContinuousFarmDeactivateOasisLosses);
+        Assert.True(result.ContinuousFarmMoveLosses);
+        Assert.Equal("4711", result.ContinuousFarmLossDestinationListId);
+        Assert.Equal("Yellow farms", result.ContinuousFarmLossDestinationListName);
+        Assert.Equal("Yellow farms", result.ContinuousFarmLossDestinationBaseName);
         Assert.Equal(0, result.ContinuousFarmNextListIndex);
         Assert.False(result.PostLoginAnalyzeFarmlists);
         Assert.False(result.PostLoginAnalyzeHero);
@@ -48,5 +56,17 @@ public sealed class FarmingAndPostLoginPayloadApplierTests
         Assert.False(result.PostLoginAnalyzeNewVillages);
         Assert.False(result.PostLoginAnalyzeNewAccount);
         Assert.False(result.AutomaticallyCheckLanguage);
+    }
+
+    [Fact]
+    public void Apply_DisablesMovingWhenLossDeactivationIsDisabled()
+    {
+        var result = BotOptionsPayloadApplier.Apply(new BotOptions(), new Dictionary<string, string>
+        {
+            [BotOptionPayloadKeys.ContinuousFarmDeactivateLosses] = "false",
+            [BotOptionPayloadKeys.ContinuousFarmMoveLosses] = "true",
+        });
+
+        Assert.False(result.ContinuousFarmMoveLosses);
     }
 }

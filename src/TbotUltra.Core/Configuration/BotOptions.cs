@@ -94,6 +94,18 @@ public sealed record BotOptions
     [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses)]
     public bool ContinuousFarmDeactivateOasisLosses { get; init; }
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmMoveLosses)]
+    public bool ContinuousFarmMoveLosses { get; init; }
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmLossDestinationListId)]
+    public string ContinuousFarmLossDestinationListId { get; init; } = string.Empty;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmLossDestinationListName)]
+    public string ContinuousFarmLossDestinationListName { get; init; } = string.Empty;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName)]
+    public string ContinuousFarmLossDestinationBaseName { get; init; } = string.Empty;
+
     [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmNextListIndex)]
     public int ContinuousFarmNextListIndex { get; init; }
 

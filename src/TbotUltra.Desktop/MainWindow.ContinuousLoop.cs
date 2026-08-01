@@ -1056,7 +1056,13 @@ public partial class MainWindow
 
                 if (selectedFarmLists.Count > 0 || (sendsAllListsAtOnce && availableFarmListCount > 0))
                 {
-                    var farmingPayload = new FarmingPayload(selectedFarmLists, selectedSnapshot.Ids).ToDictionary();
+                    var farmingPayload = new FarmingPayload(
+                        selectedFarmLists,
+                        selectedSnapshot.Ids,
+                        options.ContinuousFarmMoveLosses,
+                        options.ContinuousFarmLossDestinationListId,
+                        options.ContinuousFarmLossDestinationListName,
+                        options.ContinuousFarmLossDestinationBaseName).ToDictionary();
                     foreach (var farmingVillage in automationVillages)
                     {
                         if (!IsGroupEnabledForVillage(GetVillageKey(farmingVillage), QueueGroup.Farming)

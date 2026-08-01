@@ -9,13 +9,25 @@ namespace TbotUltra.Core.Tasks;
 // FarmListIds carries the stable Travian list ids (lid) for the selected lists so matching survives
 // a village/list rename. FarmListNames is still carried for display and as a fallback when ids are
 // unavailable (e.g. selections saved before lids existed).
-public sealed record FarmingPayload(IReadOnlyList<string> FarmListNames, IReadOnlyList<string>? FarmListIds = null)
+public sealed record FarmingPayload(
+    IReadOnlyList<string> FarmListNames,
+    IReadOnlyList<string>? FarmListIds = null,
+    bool MoveLosses = false,
+    string? LossDestinationListId = null,
+    string? LossDestinationListName = null,
+    string? LossDestinationBaseName = null)
 {
     public static bool TryFromDictionary(IReadOnlyDictionary<string, string> payload, out FarmingPayload? result)
     {
         var names = ParseList(ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmListNames));
         var ids = ParseList(ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmListIds));
-        result = new FarmingPayload(names, ids);
+        result = new FarmingPayload(
+            names,
+            ids,
+            ReadBool(payload, BotOptionPayloadKeys.ContinuousFarmMoveLosses),
+            ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmLossDestinationListId),
+            ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmLossDestinationListName),
+            ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName));
         return true;
     }
 
@@ -31,6 +43,14 @@ public sealed record FarmingPayload(IReadOnlyList<string> FarmListNames, IReadOn
         {
             dictionary[BotOptionPayloadKeys.ContinuousFarmListIds] = ids;
         }
+
+        if (MoveLosses)
+        {
+            dictionary[BotOptionPayloadKeys.ContinuousFarmMoveLosses] = bool.TrueString;
+        }
+        AddIfPresent(dictionary, BotOptionPayloadKeys.ContinuousFarmLossDestinationListId, LossDestinationListId);
+        AddIfPresent(dictionary, BotOptionPayloadKeys.ContinuousFarmLossDestinationListName, LossDestinationListName);
+        AddIfPresent(dictionary, BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName, LossDestinationBaseName);
 
         return dictionary;
     }
@@ -58,6 +78,17 @@ public sealed record FarmingPayload(IReadOnlyList<string> FarmListNames, IReadOn
         payload.Remove(BotOptionPayloadKeys.ContinuousFarmNextListIndex);
         return payload;
     }
+
+    private static void AddIfPresent(Dictionary<string, string> payload, string key, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            payload[key] = value.Trim();
+        }
+    }
+
+    private static bool ReadBool(IReadOnlyDictionary<string, string> payload, string key)
+        => payload.TryGetValue(key, out var value) && bool.TryParse(value, out var parsed) && parsed;
 
     private static string JoinDistinct(IReadOnlyList<string> values)
     {

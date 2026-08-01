@@ -25,6 +25,9 @@ public static class BotOptionsFactory
         var continuousFarmDispatchDelayVariationPercent = FarmingDefaults.NormalizeDispatchDelayMaxMinutes(
             configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmDispatchDelayMaxMinutes, FarmingDefaults.DefaultDispatchDelayMaxMinutes));
         var continuousFarmSendMode = FarmingDefaults.NormalizeSendMode(configuration[BotOptionPayloadKeys.ContinuousFarmSendMode]);
+        var continuousFarmDeactivateLosses = configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmDeactivateLosses, false);
+        var configuredContinuousFarmMoveLosses = configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmMoveLosses, false);
+        var continuousFarmMoveLosses = continuousFarmDeactivateLosses && configuredContinuousFarmMoveLosses;
         var townHallCelebrationMode = TownHallCelebrationDefaults.NormalizeMode(configuration[BotOptionPayloadKeys.TownHallCelebrationMode]);
         var townHallCelebrationCount = TownHallCelebrationDefaults.NormalizeCount(
             configuration.GetValue(BotOptionPayloadKeys.TownHallCelebrationCount, TownHallCelebrationDefaults.DefaultCount));
@@ -76,8 +79,12 @@ public static class BotOptionsFactory
             SmithyUpgradeRestartDelayEnabled = configuration.GetValue(BotOptionPayloadKeys.SmithyUpgradeRestartDelayEnabled, SmithyUpgradeRestartDelayDefaults.Enabled),
             SmithyUpgradeRestartDelayMinMinutes = configuration.GetValue(BotOptionPayloadKeys.SmithyUpgradeRestartDelayMinMinutes, SmithyUpgradeRestartDelayDefaults.MinMinutes),
             SmithyUpgradeRestartDelayMaxMinutes = configuration.GetValue(BotOptionPayloadKeys.SmithyUpgradeRestartDelayMaxMinutes, SmithyUpgradeRestartDelayDefaults.MaxMinutes),
-            ContinuousFarmDeactivateLosses = configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmDeactivateLosses, false),
+            ContinuousFarmDeactivateLosses = continuousFarmDeactivateLosses,
             ContinuousFarmDeactivateOasisLosses = configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses, false),
+            ContinuousFarmMoveLosses = continuousFarmMoveLosses,
+            ContinuousFarmLossDestinationListId = configuration[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId] ?? string.Empty,
+            ContinuousFarmLossDestinationListName = configuration[BotOptionPayloadKeys.ContinuousFarmLossDestinationListName] ?? string.Empty,
+            ContinuousFarmLossDestinationBaseName = configuration[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] ?? string.Empty,
             PostLoginAnalyzeFarmlists = configuration.GetValue(BotOptionPayloadKeys.PostLoginAnalyzeFarmlists, false),
             PostLoginAnalyzeHero = configuration.GetValue(BotOptionPayloadKeys.PostLoginAnalyzeHero, false),
             PostLoginAnalyzeHeroInventory = configuration.GetValue(BotOptionPayloadKeys.PostLoginAnalyzeHeroInventory, false),

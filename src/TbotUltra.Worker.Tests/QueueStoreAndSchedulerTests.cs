@@ -543,6 +543,27 @@ public sealed class QueueStoreAndSchedulerTests : IDisposable
     }
 
     [Fact]
+    public void FarmingPayload_RoundTripsLossDestination()
+    {
+        var payload = new FarmingPayload(
+            ["Raiders"],
+            ["39"],
+            true,
+            "4711",
+            "Yellow farms1",
+            "Yellow farms");
+
+        var serialized = payload.ToDictionary();
+        Assert.True(FarmingPayload.TryFromDictionary(serialized, out var parsed));
+
+        Assert.NotNull(parsed);
+        Assert.True(parsed!.MoveLosses);
+        Assert.Equal("4711", parsed.LossDestinationListId);
+        Assert.Equal("Yellow farms1", parsed.LossDestinationListName);
+        Assert.Equal("Yellow farms", parsed.LossDestinationBaseName);
+    }
+
+    [Fact]
     public void FarmingPayload_OmitsListIdsKeyWhenEmpty()
     {
         var parsed = new FarmingPayload(["List A"]);

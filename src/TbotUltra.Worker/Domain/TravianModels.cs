@@ -330,7 +330,27 @@ public sealed record FarmListOverview(
 public sealed record FarmListLossDeactivationResult(
     int RowsFound,
     int RowsDeactivated,
-    int SkippedOasisRows);
+    int SkippedOasisRows,
+    int RowsMoved = 0,
+    int MoveFailures = 0,
+    string? DestinationListId = null,
+    string? DestinationListName = null,
+    bool DestinationChanged = false);
+
+public sealed record FarmListLossHandlingRequest(
+    bool IncludeUnoccupiedOasis,
+    bool MoveLosses,
+    string DestinationListId,
+    string DestinationListName,
+    string DestinationBaseName,
+    FarmListCreateRequest? CreateTemplate = null);
+
+public sealed record FarmLossDestinationChange(
+    string AccountName,
+    string ListId,
+    string ListName,
+    string BaseName,
+    string VillageName);
 
 public sealed record FarmCoordinate(int X, int Y, bool RequireUnoccupiedOasis = false);
 
@@ -368,7 +388,8 @@ public sealed record FarmListCreateRequest(
     string VillageName,
     string? VillageId,
     string TroopType,
-    int TroopCount);
+    int TroopCount,
+    int? TroopIndexOverride = null);
 
 public sealed record FarmListCreateProgress(
     string Phase,

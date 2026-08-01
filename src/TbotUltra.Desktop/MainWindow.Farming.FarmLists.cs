@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -15,6 +16,7 @@ using System.Windows.Threading;
 using TbotUltra.Core.Accounts;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Core.Tasks;
+using TbotUltra.Core.Travian;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Desktop.ViewModels;
@@ -111,6 +113,7 @@ public partial class MainWindow
             {
                 _farmLists.Clear();
                 EnsureFarmListPlaceholderRow();
+                RefreshFarmLossDestinationOptions();
                 SetFarmingFeatureAvailability(false, "Farming unavailable: Gold Club is not active on this account.");
             });
             return false;
@@ -1261,6 +1264,14 @@ public partial class MainWindow
             {
                 DeactivateFarmOasisLossesCheckBox.IsChecked = options.ContinuousFarmDeactivateOasisLosses;
             }
+
+            RefreshFarmLossDestinationOptions(options);
+            if (MoveFarmLossesCheckBox is not null)
+            {
+                MoveFarmLossesCheckBox.IsChecked = options.ContinuousFarmDeactivateLosses
+                    && options.ContinuousFarmMoveLosses;
+            }
+            SyncFarmLossMoveControls();
         }
         finally
         {
@@ -1277,6 +1288,14 @@ public partial class MainWindow
 
         try
         {
+            if (DeactivateFarmLossesCheckBox?.IsChecked != true && MoveFarmLossesCheckBox?.IsChecked == true)
+            {
+                _suppressFarmingSettingsConfigWrite = true;
+                MoveFarmLossesCheckBox.IsChecked = false;
+                _suppressFarmingSettingsConfigWrite = false;
+            }
+
+            SyncFarmLossMoveControls();
             var config = _botConfigStore.Load();
             var mode = FarmSendAllAtOnceRadioButton?.IsChecked == true
                 ? FarmingDefaults.SendModeAllAtOnce
@@ -1288,13 +1307,263 @@ public partial class MainWindow
             config[BotOptionPayloadKeys.ContinuousFarmDispatchDelayMaxMinutes] = delayMaxMinutes;
             config[BotOptionPayloadKeys.ContinuousFarmDeactivateLosses] = DeactivateFarmLossesCheckBox?.IsChecked == true;
             config[BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses] = DeactivateFarmOasisLossesCheckBox?.IsChecked == true;
+            var destination = FarmLossDestinationComboBox?.SelectedItem as FarmLossDestinationOption;
+            var moveEnabled = DeactivateFarmLossesCheckBox?.IsChecked == true
+                && MoveFarmLossesCheckBox?.IsChecked == true
+                && destination is not null;
+            var existingDestinationId = config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId]?.GetValue<string>() ?? string.Empty;
+            config[BotOptionPayloadKeys.ContinuousFarmMoveLosses] = moveEnabled;
+            config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId] = destination?.ListId ?? string.Empty;
+            config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListName] = destination?.Name ?? string.Empty;
+            var priorBaseName = config[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName]?.GetValue<string>();
+            var destinationChangedByUser = destination is not null
+                && !string.Equals(existingDestinationId, destination.ListId, StringComparison.OrdinalIgnoreCase);
+            config[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] = destinationChangedByUser || string.IsNullOrWhiteSpace(priorBaseName)
+                ? destination?.Name ?? string.Empty
+                : priorBaseName;
             _botConfigStore.Save(config);
-            AppendLog($"[farm-settings] mode={mode}; delay={delayMinMinutes}-{delayMaxMinutes}m; deactivateLosses={DeactivateFarmLossesCheckBox?.IsChecked == true}; deactivateOasis={DeactivateFarmOasisLossesCheckBox?.IsChecked == true}");
+            AppendLog($"[farm-settings] mode={mode}; delay={delayMinMinutes}-{delayMaxMinutes}m; deactivateLosses={DeactivateFarmLossesCheckBox?.IsChecked == true}; deactivateOasis={DeactivateFarmOasisLossesCheckBox?.IsChecked == true}; moveLosses={moveEnabled}; destination='{destination?.Name ?? "-"}'");
             UpdateAutomationLoopRunningIndicators();
+            RefreshQueuedFarmLossDestinationSettings();
         }
         catch (Exception ex)
         {
             AppendLog($"Could not save farm settings: {ex.Message}");
+        }
+    }
+
+    private void OnFarmLossDestinationChanged(FarmLossDestinationChange change)
+    {
+        if (!string.Equals(change.AccountName, _accountStore.ActiveAccountName(), StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            try
+            {
+                var config = _botConfigStore.Load();
+                config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId] = change.ListId;
+                config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListName] = change.ListName;
+                config[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] = change.BaseName;
+                config[BotOptionPayloadKeys.ContinuousFarmMoveLosses] = true;
+                _botConfigStore.Save(config);
+                SelectChangedFarmLossDestination(change);
+                RefreshQueuedFarmLossDestinationSettings();
+                AppendLog($"[farm-list] loss destination changed to '{change.ListName}' ({change.ListId}).");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"ALARM: Could not persist loss destination change: {ex.Message}");
+            }
+        });
+    }
+
+    private void SelectChangedFarmLossDestination(FarmLossDestinationChange change)
+    {
+        if (FarmLossDestinationComboBox is null)
+        {
+            return;
+        }
+
+        var options = (FarmLossDestinationComboBox.ItemsSource as IEnumerable<FarmLossDestinationOption> ?? [])
+            .Where(option => !string.Equals(option.ListId, change.ListId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var selected = new FarmLossDestinationOption(change.ListId, change.ListName, change.VillageName, 0, 100);
+        options.Add(selected);
+
+        _suppressFarmingSettingsConfigWrite = true;
+        try
+        {
+            FarmLossDestinationComboBox.ItemsSource = options;
+            FarmLossDestinationComboBox.SelectedItem = selected;
+            MoveFarmLossesCheckBox.IsChecked = true;
+            SyncFarmLossMoveControls();
+        }
+        finally
+        {
+            _suppressFarmingSettingsConfigWrite = false;
+        }
+    }
+
+    private void RefreshQueuedFarmLossDestinationSettings()
+    {
+        var options = LoadBotOptions();
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [BotOptionPayloadKeys.ContinuousFarmMoveLosses] = options.ContinuousFarmMoveLosses.ToString(),
+            [BotOptionPayloadKeys.ContinuousFarmLossDestinationListId] = options.ContinuousFarmLossDestinationListId,
+            [BotOptionPayloadKeys.ContinuousFarmLossDestinationListName] = options.ContinuousFarmLossDestinationListName,
+            [BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] = options.ContinuousFarmLossDestinationBaseName,
+        };
+
+        foreach (var item in _botService.GetQueueItemsForDisplay())
+        {
+            if (!string.Equals(item.TaskName, "send_farmlists", StringComparison.OrdinalIgnoreCase)
+                || item.Status != QueueStatus.Pending)
+            {
+                continue;
+            }
+
+            var payload = new Dictionary<string, string>(item.Payload, StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in values)
+            {
+                payload[pair.Key] = pair.Value;
+            }
+            _botService.UpdateDeferredQueueItem(item.Id, payload);
+        }
+    }
+
+    private void SyncFarmLossMoveControls()
+    {
+        var deactivationEnabled = DeactivateFarmLossesCheckBox?.IsChecked == true;
+        if (MoveFarmLossesCheckBox is not null)
+        {
+            MoveFarmLossesCheckBox.IsEnabled = deactivationEnabled;
+        }
+
+        if (FarmLossDestinationComboBox is not null)
+        {
+            FarmLossDestinationComboBox.IsEnabled = deactivationEnabled;
+        }
+    }
+
+    private void RefreshFarmLossDestinationOptions(BotOptions? loadedOptions = null)
+    {
+        if (FarmLossDestinationComboBox is null)
+        {
+            return;
+        }
+
+        loadedOptions ??= LoadBotOptions();
+        var options = _farmLists
+            .Where(IsRealFarmListRow)
+            .Where(row => !string.IsNullOrWhiteSpace(row.ListId))
+            .Select(row => new FarmLossDestinationOption(
+                row.ListId!.Trim(),
+                row.Name.Trim(),
+                row.VillageName?.Trim() ?? string.Empty,
+                Math.Max(0, row.TotalFarmCount),
+                row.Capacity is > 0 ? row.Capacity.Value : 100))
+            .ToList();
+
+        var selected = options.FirstOrDefault(option =>
+                !string.IsNullOrWhiteSpace(loadedOptions.ContinuousFarmLossDestinationListId)
+                && string.Equals(option.ListId, loadedOptions.ContinuousFarmLossDestinationListId, StringComparison.OrdinalIgnoreCase))
+            ?? options.FirstOrDefault(option =>
+                !string.IsNullOrWhiteSpace(loadedOptions.ContinuousFarmLossDestinationListName)
+                && string.Equals(option.Name, loadedOptions.ContinuousFarmLossDestinationListName, StringComparison.OrdinalIgnoreCase));
+
+        if (selected is null && !string.IsNullOrWhiteSpace(loadedOptions.ContinuousFarmLossDestinationListName))
+        {
+            selected = new FarmLossDestinationOption(
+                loadedOptions.ContinuousFarmLossDestinationListId,
+                loadedOptions.ContinuousFarmLossDestinationListName,
+                "Missing",
+                0,
+                100);
+            options.Add(selected);
+        }
+
+        FarmLossDestinationComboBox.ItemsSource = options;
+        FarmLossDestinationComboBox.SelectedItem = selected;
+    }
+
+    private async void MoveFarmLossesCheckBox_Checked(object sender, RoutedEventArgs e)
+        => await GuardUiAsync(EnsureFarmLossDestinationSelectedAsync);
+
+    private async Task EnsureFarmLossDestinationSelectedAsync()
+    {
+        if (_suppressFarmingSettingsConfigWrite || MoveFarmLossesCheckBox?.IsChecked != true)
+        {
+            return;
+        }
+
+        if (DeactivateFarmLossesCheckBox?.IsChecked != true)
+        {
+            MoveFarmLossesCheckBox.IsChecked = false;
+            return;
+        }
+
+        if (FarmLossDestinationComboBox?.SelectedItem is FarmLossDestinationOption)
+        {
+            FarmingSettings_Changed(MoveFarmLossesCheckBox, new RoutedEventArgs());
+            return;
+        }
+
+        var existingNames = _farmLists.Where(IsRealFarmListRow).Select(row => row.Name).ToList();
+        var suggestedName = FarmLossListNaming.NextAvailable("Yellow farms", existingNames);
+        var dialog = new CreateLossFarmListWindow(suggestedName) { Owner = this };
+        if (dialog.ShowDialog() != true)
+        {
+            MoveFarmLossesCheckBox.IsChecked = false;
+            return;
+        }
+
+        var options = ApplySelectedVillageToOptions(LoadBotOptions());
+        var villages = GetFarmListCreationVillages();
+        var village = villages.FirstOrDefault(item =>
+                !string.IsNullOrWhiteSpace(options.TargetVillageUrl)
+                && string.Equals(item.Url, options.TargetVillageUrl, StringComparison.OrdinalIgnoreCase))
+            ?? villages.FirstOrDefault(item =>
+                !string.IsNullOrWhiteSpace(options.TargetVillageName)
+                && string.Equals(item.Name, options.TargetVillageName, StringComparison.OrdinalIgnoreCase))
+            ?? villages.FirstOrDefault(item => item.IsCapital)
+            ?? villages.FirstOrDefault();
+        if (village is null)
+        {
+            MoveFarmLossesCheckBox.IsChecked = false;
+            AppDialog.Show(this, "Load at least one village before creating a loss farmlist.", "Create loss farmlist", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var tribe = TroopCatalog.IsKnownTribe(village.Tribe) ? village.Tribe : ResolveCurrentTribeForFarming();
+        var troopType = TroopCatalog.ResolveTroopTypesForTribe(tribe).FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(troopType))
+        {
+            MoveFarmLossesCheckBox.IsChecked = false;
+            AppDialog.Show(this, "Could not resolve a default troop type for the selected village.", "Create loss farmlist", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var villageIdMatch = Regex.Match(village.Url ?? string.Empty, @"[?&]newdid=(\d+)", RegexOptions.IgnoreCase);
+        var request = new FarmListCreateRequest(
+            [dialog.ListName],
+            village.Name,
+            villageIdMatch.Success ? villageIdMatch.Groups[1].Value : null,
+            troopType,
+            1);
+
+        try
+        {
+            ShowBusyOverlay("Creating loss farmlist", $"Creating '{dialog.ListName}'...");
+            await EnsureChromiumInstalledAsync();
+            await _botService.CreateFarmListsAsync(options, request, AppendLog, null, _loopController.AcquireSessionScopeToken());
+            await RefreshFarmListsFromServerAsync(options, _loopController.AcquireSessionScopeToken());
+            var destinationOptions = FarmLossDestinationComboBox!.ItemsSource as IEnumerable<FarmLossDestinationOption>;
+            var created = destinationOptions?
+                .FirstOrDefault(item => string.Equals(item.Name, dialog.ListName, StringComparison.OrdinalIgnoreCase));
+            if (created is null)
+            {
+                throw new InvalidOperationException($"Created farmlist '{dialog.ListName}' was not found after refresh.");
+            }
+
+            FarmLossDestinationComboBox.SelectedItem = created;
+            var config = _botConfigStore.Load();
+            config[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] = dialog.ListName;
+            _botConfigStore.Save(config);
+            FarmingSettings_Changed(MoveFarmLossesCheckBox, new RoutedEventArgs());
+        }
+        catch (Exception ex)
+        {
+            MoveFarmLossesCheckBox.IsChecked = false;
+            AppendLog($"ALARM: Could not create loss farmlist: {ex.Message}");
+            AppDialog.Show(this, ex.Message, "Create loss farmlist", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            HideBusyOverlay();
         }
     }
 

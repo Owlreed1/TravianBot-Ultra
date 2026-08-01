@@ -4,6 +4,7 @@ using TbotUltra.Core.Tasks;
 using TbotUltra.Worker.Domain;
 using TbotUltra.Worker.Infrastructure;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace TbotUltra.Worker.Services;
 
@@ -113,8 +114,48 @@ public sealed partial class BotTaskRunner
             return;
         }
 
-        var result = await context.Client.DeactivateFarmListLossTargetsAsync(context.Options.ContinuousFarmDeactivateOasisLosses, context.CancellationToken);
-        context.Log($"Continuous farming loss deactivation result: found={result.RowsFound}, deactivated={result.RowsDeactivated}, skippedOasis={result.SkippedOasisRows}.");
+        var moveEnabled = context.Options.ContinuousFarmDeactivateLosses
+            && context.Options.ContinuousFarmMoveLosses
+            && !string.IsNullOrWhiteSpace(context.Options.ContinuousFarmLossDestinationListName);
+        var villageIdMatch = Regex.Match(
+            context.Options.TargetVillageUrl ?? string.Empty,
+            @"[?&]newdid=(\d+)",
+            RegexOptions.IgnoreCase);
+        var createTemplate = string.IsNullOrWhiteSpace(context.Options.TargetVillageName)
+            ? null
+            : new FarmListCreateRequest(
+                [context.Options.ContinuousFarmLossDestinationListName],
+                context.Options.TargetVillageName,
+                villageIdMatch.Success ? villageIdMatch.Groups[1].Value : null,
+                "First available troop",
+                1,
+                TroopIndexOverride: 1);
+        var result = await context.Client.HandleFarmListLossTargetsAsync(
+            new FarmListLossHandlingRequest(
+                context.Options.ContinuousFarmDeactivateOasisLosses,
+                moveEnabled,
+                context.Options.ContinuousFarmLossDestinationListId,
+                context.Options.ContinuousFarmLossDestinationListName,
+                string.IsNullOrWhiteSpace(context.Options.ContinuousFarmLossDestinationBaseName)
+                    ? context.Options.ContinuousFarmLossDestinationListName
+                    : context.Options.ContinuousFarmLossDestinationBaseName,
+                createTemplate),
+            context.CancellationToken);
+        context.Log($"Continuous farming loss handling result: found={result.RowsFound}, deactivated={result.RowsDeactivated}, moved={result.RowsMoved}, moveFailures={result.MoveFailures}, skippedOasis={result.SkippedOasisRows}.");
+        if (result.DestinationChanged
+            && !string.IsNullOrWhiteSpace(result.DestinationListId)
+            && !string.IsNullOrWhiteSpace(result.DestinationListName))
+        {
+            var accountName = context.Runner._accountProvider.LoadAccount().Name;
+            context.Runner.RaiseFarmLossDestinationChanged(new FarmLossDestinationChange(
+                accountName,
+                result.DestinationListId,
+                result.DestinationListName,
+                string.IsNullOrWhiteSpace(context.Options.ContinuousFarmLossDestinationBaseName)
+                    ? context.Options.ContinuousFarmLossDestinationListName
+                    : context.Options.ContinuousFarmLossDestinationBaseName,
+                context.Options.TargetVillageName));
+        }
     }
 
     private static void LogContinuousFarmNextSchedule(TaskExecutionContext context, int waitSeconds, int nextIndex)

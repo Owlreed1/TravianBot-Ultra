@@ -9,6 +9,10 @@ internal sealed record FarmingPayloadValues(
     string TownHallCelebrationMode,
     bool DeactivateLosses,
     bool DeactivateOasisLosses,
+    bool MoveLosses,
+    string LossDestinationListId,
+    string LossDestinationListName,
+    string LossDestinationBaseName,
     int NextListIndex);
 
 internal static class FarmingPayloadApplier
@@ -24,6 +28,10 @@ internal static class FarmingPayloadApplier
             source.TownHallCelebrationMode,
             source.ContinuousFarmDeactivateLosses,
             source.ContinuousFarmDeactivateOasisLosses,
+            source.ContinuousFarmMoveLosses,
+            source.ContinuousFarmLossDestinationListId,
+            source.ContinuousFarmLossDestinationListName,
+            source.ContinuousFarmLossDestinationBaseName,
             source.ContinuousFarmNextListIndex);
 
         if (payload is null)
@@ -52,6 +60,14 @@ internal static class FarmingPayloadApplier
                 result = result with { DeactivateLosses = losses };
             else if (TryReadBool(key, value, BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses, out var oasisLosses))
                 result = result with { DeactivateOasisLosses = oasisLosses };
+            else if (TryReadBool(key, value, BotOptionPayloadKeys.ContinuousFarmMoveLosses, out var moveLosses))
+                result = result with { MoveLosses = moveLosses };
+            else if (key.Equals(BotOptionPayloadKeys.ContinuousFarmLossDestinationListId, StringComparison.OrdinalIgnoreCase))
+                result = result with { LossDestinationListId = value };
+            else if (key.Equals(BotOptionPayloadKeys.ContinuousFarmLossDestinationListName, StringComparison.OrdinalIgnoreCase))
+                result = result with { LossDestinationListName = value };
+            else if (key.Equals(BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName, StringComparison.OrdinalIgnoreCase))
+                result = result with { LossDestinationBaseName = value };
             else if (TryReadInt(key, value, BotOptionPayloadKeys.ContinuousFarmNextListIndex, out var nextIndex))
                 result = result with { NextListIndex = Math.Max(0, nextIndex) };
         }
