@@ -538,6 +538,7 @@ public partial class MainWindow
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(5),
             Padding = new Thickness(10, 8, 10, 8),
+            Margin = new Thickness(0, 12, 0, 0),
             Child = description,
         };
         var picker = new ComboBox
@@ -558,7 +559,6 @@ public partial class MainWindow
             FontSize = 16,
             FontWeight = FontWeights.SemiBold,
         });
-        content.Children.Add(descriptionCard);
         content.Children.Add(new TextBlock
         {
             Text = "Extend by",
@@ -568,6 +568,7 @@ public partial class MainWindow
             FontSize = 12,
         });
         content.Children.Add(picker);
+        content.Children.Add(descriptionCard);
 
         void UpdateDescription()
         {
