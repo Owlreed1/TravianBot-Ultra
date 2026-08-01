@@ -651,7 +651,7 @@ public partial class MainWindow
                 ? "Travian construction active."
                 : $"{snapshot.ActiveCount} Travian constructions active.";
             item.CardPrefix = null;
-            item.CardTone = "Success";
+            item.CardTone = "Warning";
             item.RemainingSeconds = snapshot.RemainingSeconds;
             return;
         }
