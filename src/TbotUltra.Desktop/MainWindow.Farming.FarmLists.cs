@@ -1584,14 +1584,48 @@ public partial class MainWindow
         {
             ShowBusyOverlay("Creating loss farmlist", $"Creating '{dialog.ListName}'...");
             await EnsureChromiumInstalledAsync();
-            await _botService.CreateFarmListsAsync(options, request, AppendLog, null, _loopController.AcquireSessionScopeToken());
+            var createResult = await _botService.CreateFarmListsAsync(
+                options,
+                request,
+                AppendLog,
+                null,
+                _loopController.AcquireSessionScopeToken());
+            if (createResult.CreatedCount != 1
+                || !createResult.CreatedNames.Contains(dialog.ListName, StringComparer.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Travian did not confirm creation of farmlist '{dialog.ListName}'.");
+            }
+
             await RefreshFarmListsFromServerAsync(options, _loopController.AcquireSessionScopeToken());
-            var destinationOptions = FarmLossDestinationComboBox!.ItemsSource as IEnumerable<FarmLossDestinationOption>;
-            var created = destinationOptions?
+            var destinationOptions = (FarmLossDestinationComboBox!.ItemsSource as IEnumerable<FarmLossDestinationOption> ?? [])
+                .ToList();
+            var created = destinationOptions
                 .FirstOrDefault(item => string.Equals(item.Name, dialog.ListName, StringComparison.OrdinalIgnoreCase));
             if (created is null)
             {
-                throw new InvalidOperationException($"Created farmlist '{dialog.ListName}' was not found after refresh.");
+                // The panel intentionally limits displayed rows, but a holding list created beyond that
+                // limit is still valid. Read the complete overview to obtain its stable lid, then add
+                // just this destination to the picker instead of reporting a false creation failure.
+                var verifiedLists = await _botService.ReadFarmListsOverviewAsync(
+                    options,
+                    AppendLog,
+                    _loopController.AcquireSessionScopeToken());
+                var verified = verifiedLists.FirstOrDefault(item =>
+                    string.Equals(item.Name, dialog.ListName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(item.VillageName, village.Name, StringComparison.OrdinalIgnoreCase));
+                if (verified is null || string.IsNullOrWhiteSpace(verified.ListId))
+                {
+                    throw new InvalidOperationException($"Created farmlist '{dialog.ListName}' could not be verified after refresh.");
+                }
+
+                created = new FarmLossDestinationOption(
+                    verified.ListId.Trim(),
+                    verified.Name.Trim(),
+                    verified.VillageName?.Trim() ?? village.Name,
+                    Math.Max(0, verified.TotalFarmCount),
+                    verified.Capacity is > 0 ? verified.Capacity.Value : 100);
+                destinationOptions.Add(created);
+                FarmLossDestinationComboBox.ItemsSource = destinationOptions;
             }
 
             FarmLossDestinationComboBox.SelectedItem = created;
