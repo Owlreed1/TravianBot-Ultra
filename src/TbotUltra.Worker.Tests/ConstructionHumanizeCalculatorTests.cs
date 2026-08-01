@@ -78,4 +78,31 @@ public sealed class ConstructionHumanizeCalculatorTests
         Assert.Equal(100, result.QueueRetrySeconds);
         Assert.Equal(10, result.HumanizeDelaySeconds);
     }
+
+    [Fact]
+    public void CalculateBoundedQueueDelaySeconds_ClampsConfiguredPercentageBelowActiveBuildFinish()
+    {
+        var result = ConstructionHumanizeCalculator.CalculateBoundedQueueDelaySeconds(
+            300,
+            100,
+            100,
+            25,
+            (_, _) => 100);
+
+        Assert.Equal(297, result);
+        Assert.True(result < 300);
+    }
+
+    [Fact]
+    public void CalculateBoundedQueueDelaySeconds_LeavesOneSecondBeforeShortActiveBuildFinishes()
+    {
+        var result = ConstructionHumanizeCalculator.CalculateBoundedQueueDelaySeconds(
+            2,
+            99,
+            99,
+            25,
+            (_, _) => 99);
+
+        Assert.Equal(1, result);
+    }
 }

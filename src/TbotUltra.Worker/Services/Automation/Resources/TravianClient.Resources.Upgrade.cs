@@ -328,6 +328,7 @@ public sealed partial class TravianClient
                 var attemptedAny = false;
                 var anyQueuedTowardTarget = false;
                 var blockReasons = new List<string>();
+                UpgradeResourceWaitSnapshot? earliestResourceWait = null;
                 foreach (var candidate in candidateRows)
                 {
                     var slot = candidate.SlotId ?? 0;
@@ -364,7 +365,8 @@ public sealed partial class TravianClient
                         slot,
                         upgrades,
                         cancellationToken,
-                        allowNavigationToBuildings: false);
+                        allowNavigationToBuildings: false,
+                        retryUncertainResourceSlot: true);
                     if (preflightQueueDeferMessage is not null)
                     {
                         Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} deferred by dorf1 queue gate before opening upgrade page. message={preflightQueueDeferMessage}");
@@ -450,7 +452,8 @@ public sealed partial class TravianClient
                                 slot,
                                 upgrades,
                                 cancellationToken,
-                                allowNavigationToBuildings: false);
+                                allowNavigationToBuildings: false,
+                                retryUncertainResourceSlot: true);
                             if (queueDeferMessage is not null)
                             {
                                 Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} deferred by dorf1 queue gate after unconfirmed click. message={queueDeferMessage}");
@@ -467,7 +470,12 @@ public sealed partial class TravianClient
 
                     if (actionability.Outcome == UpgradeAttemptOutcome.BlockedByQueue)
                     {
-                        var queueDeferMessage = await CheckQueueOrDeferAsync(ConstructionKind.Resource, slot, upgrades, cancellationToken);
+                        var queueDeferMessage = await CheckQueueOrDeferAsync(
+                            ConstructionKind.Resource,
+                            slot,
+                            upgrades,
+                            cancellationToken,
+                            retryUncertainResourceSlot: true);
                         if (queueDeferMessage is not null)
                         {
                             Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} deferred by queue gate after analysis. message={queueDeferMessage}");
@@ -515,8 +523,12 @@ public sealed partial class TravianClient
                             UpgradeMath.ClampResourceWaitSeconds(actionability.QueueWaitSeconds),
                             cancellationToken);
                         blockReasons.Add($"slot {slot}: {actionability.Outcome} ({actionability.Reason})");
-                        Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} blocked by resources. Deferring construction for {snapshot.WaitSeconds}s instead of scanning more slots. reason={snapshot.WaitReason}.");
-                        return UpgradeResourceWaitCalculator.BuildBlockedResultMessage(snapshot);
+                        if (earliestResourceWait is null || snapshot.WaitSeconds < earliestResourceWait.WaitSeconds)
+                        {
+                            earliestResourceWait = snapshot;
+                        }
+                        Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} blocked by resources. Continuing scan for an affordable resource field; current earliest wait is {earliestResourceWait.WaitSeconds}s ({earliestResourceWait.WaitReason}).");
+                        continue;
                     }
 
                     blockReasons.Add($"slot {slot}: {actionability.Outcome} ({actionability.Reason})");
@@ -536,6 +548,12 @@ public sealed partial class TravianClient
                     if (blockReasons.Count == 0)
                     {
                         return $"All resource fields are at or above target level {targetLevel}. Upgrades made: {upgrades}.";
+                    }
+
+                    if (earliestResourceWait is not null)
+                    {
+                        Notify($"[UpgradeAllResourcesToLevelAsync] no affordable resource field found. Deferring until earliest resource deadline in {earliestResourceWait.WaitSeconds}s ({earliestResourceWait.WaitReason}).");
+                        return UpgradeResourceWaitCalculator.BuildBlockedResultMessage(earliestResourceWait);
                     }
 
                     var reasonSuffix = blockReasons.Count > 0 ? $" Blockers: {string.Join(", ", blockReasons)}." : string.Empty;

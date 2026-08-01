@@ -342,18 +342,19 @@ public sealed partial class TravianClient
         return ConstructionSlots.Compute(active, tribe, travianPlusActive);
     }
 
-    private async Task<(string Tribe, bool PlusActive)> GetCachedTribeAndPlusAsync(CancellationToken cancellationToken)
+    private async Task<(string Tribe, bool PlusActive, bool PlusStateKnown)> GetCachedTribeAndPlusAsync(CancellationToken cancellationToken)
     {
         // Construction capacity belongs to the active village tribe, not the avatar/account tribe.
         var tribe = await ReadActiveVillageTribeAsync(cancellationToken);
 
-        var plusActive = await IsTravianPlusActiveAsync(cancellationToken);
+        var plusState = await ReadTravianPlusStateAsync(cancellationToken);
+        var plusActive = plusState == PlusState.On;
         if (_cachedTravianPlusActive != plusActive)
         {
             Notify($"[plus] active={plusActive} (changed)");
             _cachedTravianPlusActive = plusActive;
         }
-        return (tribe!, plusActive);
+        return (tribe!, plusActive, plusState != PlusState.Unknown);
     }
 
     // Non-blocking pre-flight check. Returns null if a slot is free for `kind`, otherwise
@@ -365,10 +366,11 @@ public sealed partial class TravianClient
         int slotId,
         int upgrades,
         CancellationToken cancellationToken,
-        bool allowNavigationToBuildings = true)
+        bool allowNavigationToBuildings = true,
+        bool retryUncertainResourceSlot = false)
     {
         SynchronizeConstructionHumanizeState();
-        var (tribe, plusActive) = await GetCachedTribeAndPlusAsync(cancellationToken);
+        var (tribe, plusActive, plusStateKnown) = await GetCachedTribeAndPlusAsync(cancellationToken);
         if (!TbotUltra.Core.Travian.TroopCatalog.IsKnownTribe(tribe))
         {
             Notify($"[tribe] construction deferred because the active village tribe is unknown (slot={slotId}, kind={kind}).");
@@ -384,11 +386,24 @@ public sealed partial class TravianClient
         var canStart = kind == ConstructionKind.Resource ? status.CanStartResource : status.CanStartBuilding;
         if (canStart)
         {
+            if (kind == ConstructionKind.Resource)
+            {
+                var knownVillageToken = await ResolveConstructionHumanizeVillageTokenAsync(cancellationToken);
+                _session.ConstructionUncertainPlusRetriesByVillage.Remove(knownVillageToken);
+            }
             return null;
         }
 
         var isRomans = string.Equals(tribe, "Romans", StringComparison.OrdinalIgnoreCase);
         var villageToken = await ResolveConstructionHumanizeVillageTokenAsync(cancellationToken);
+        if (retryUncertainResourceSlot
+            && kind == ConstructionKind.Resource
+            && !plusStateKnown
+            && TryGetUncertainPlusRetryWaitSeconds(villageToken, out var retryWaitSeconds, out var retryAttempt))
+        {
+            Notify($"[construction-queue] Plus status could not be confirmed for village={villageToken}; retrying resource capacity check in {retryWaitSeconds}s (attempt {retryAttempt}/3).");
+            return $"Resource slot {slotId}: Plus status could not be confirmed. Retrying capacity check (attempt {retryAttempt}/3). queue_wait_seconds={retryWaitSeconds}";
+        }
 
         // Keep the humanize transition memory fresh while the slot is full. This records the category
         // as "occupied" during the queue-full wait, so when the slot finally frees the humanize gate
@@ -439,6 +454,26 @@ public sealed partial class TravianClient
         var wait = relevantWait > 0 ? relevantWait + 1 : 5;
         var label = kind == ConstructionKind.Resource ? "Resource slot" : "Slot";
         return $"{label} {slotId}: build queue full ({status.ResourceSlotsUsed}/{status.ResourceSlotsMax} resource, {status.BuildingSlotsUsed}/{status.BuildingSlotsMax} building, plus={plusActive}). Deferring upgrade. Upgrades performed: {upgrades}. queue_wait_seconds={wait} queue_humanize_extra_seconds={humanizeExtraSeconds}";
+    }
+
+    private bool TryGetUncertainPlusRetryWaitSeconds(
+        string villageToken,
+        out int retryWaitSeconds,
+        out int retryAttempt)
+    {
+        var retries = _session.ConstructionUncertainPlusRetriesByVillage.GetValueOrDefault(villageToken, 0);
+        if (retries >= 3)
+        {
+            retryWaitSeconds = 0;
+            retryAttempt = retries;
+            return false;
+        }
+
+        var multiplier = 1 << retries;
+        retryWaitSeconds = (int)Math.Ceiling(RandomInRange(20 * multiplier, 60 * multiplier));
+        retryAttempt = retries + 1;
+        _session.ConstructionUncertainPlusRetriesByVillage[villageToken] = retryAttempt;
+        return true;
     }
 
     private int? TryScheduleHumanizedStartAfterFullQueue(
@@ -529,7 +564,7 @@ public sealed partial class TravianClient
             var slotKey = $"{villageToken}:{kind}:{slotId}";
             var now = DateTimeOffset.UtcNow;
 
-            var (tribe, plusActive) = await GetCachedTribeAndPlusAsync(cancellationToken);
+            var (tribe, plusActive, _) = await GetCachedTribeAndPlusAsync(cancellationToken);
             var status = await EvaluateConstructionSlotsAsync(
                 tribe,
                 plusActive,
@@ -564,11 +599,13 @@ public sealed partial class TravianClient
                 // Placing behind a running build (Plus queue). Use the shortest remaining timer so the
                 // delay stays below every ongoing build → the queued one is placed before any finish.
                 var refRemaining = ongoingRemaining.Min();
-                var pct = RandomInRange(
+                delaySeconds = ConstructionHumanizeCalculator.CalculateBoundedQueueDelaySeconds(
+                    refRemaining,
                     _config.ConstructionHumanizeQueuePercentMin,
-                    _config.ConstructionHumanizeQueuePercentMax) / 100.0;
-                var capSeconds = Math.Max(0, _config.ConstructionHumanizeMaxDelayMinutes) * 60.0;
-                delaySeconds = Math.Min(refRemaining * pct, capSeconds);
+                    _config.ConstructionHumanizeQueuePercentMax,
+                    _config.ConstructionHumanizeMaxDelayMinutes,
+                    RandomInRange);
+                var pct = refRemaining > 0 ? delaySeconds / refRemaining : 0;
                 reason = $"percent {pct * 100:F0}% of {refRemaining}s remaining, cap {_config.ConstructionHumanizeMaxDelayMinutes:F0}m";
             }
             else if (previousOngoingCount > 0)
@@ -706,7 +743,7 @@ public sealed partial class TravianClient
         CancellationToken cancellationToken = default)
     {
         LogFunctionStarted();
-        var (tribe, plusActive) = await GetCachedTribeAndPlusAsync(cancellationToken);
+        var (tribe, plusActive, _) = await GetCachedTribeAndPlusAsync(cancellationToken);
         if (!TbotUltra.Core.Travian.TroopCatalog.IsKnownTribe(tribe))
         {
             Notify("[tribe] construction slot wait deferred because the active village tribe is unknown. queue_wait_seconds=60");

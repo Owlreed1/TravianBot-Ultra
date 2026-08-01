@@ -376,10 +376,10 @@ public partial class SettingsWindow : Window
         var enabled = ConstructionHumanizeCheckBox.IsChecked == true;
         var percentMin = Math.Clamp(ReadDoubleText(
             ConstructionHumanizeQueuePercentMinTextBox,
-            PacingDefaults.ConstructionHumanizeQueuePercentMin), 0, 100);
+            PacingDefaults.ConstructionHumanizeQueuePercentMin), 0, 99);
         var percentMax = Math.Clamp(Math.Max(percentMin, ReadDoubleText(
             ConstructionHumanizeQueuePercentMaxTextBox,
-            PacingDefaults.ConstructionHumanizeQueuePercentMax)), 0, 100);
+            PacingDefaults.ConstructionHumanizeQueuePercentMax)), 0, 99);
         var maxDelay = Math.Clamp(ReadDoubleText(
             ConstructionHumanizeMaxDelayTextBox,
             PacingDefaults.ConstructionHumanizeMaxDelayMinutes), 0, 600);
@@ -600,8 +600,8 @@ public partial class SettingsWindow : Window
             (VillageStatusSweepRoundMaxTextBox, "Village scan function delay maximum", true, 1, 1440),
             (VillageStatusSweepVillageMinTextBox, "Village scan village delay minimum", false, 0, 3600),
             (VillageStatusSweepVillageMaxTextBox, "Village scan village delay maximum", false, 0, 3600),
-            (ConstructionHumanizeQueuePercentMinTextBox, "Construction queue percentage minimum", false, 0, 100),
-            (ConstructionHumanizeQueuePercentMaxTextBox, "Construction queue percentage maximum", false, 0, 100),
+            (ConstructionHumanizeQueuePercentMinTextBox, "Construction queue percentage minimum", false, 0, 99),
+            (ConstructionHumanizeQueuePercentMaxTextBox, "Construction queue percentage maximum", false, 0, 99),
             (ConstructionHumanizeMaxDelayTextBox, "Construction maximum delay", false, 0, 600),
             (ConstructionHumanizeNoPlusMinTextBox, "Construction no-Plus delay minimum", false, 0, 600),
             (ConstructionHumanizeNoPlusMaxTextBox, "Construction no-Plus delay maximum", false, 0, 600),

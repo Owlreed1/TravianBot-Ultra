@@ -23,6 +23,12 @@ public sealed partial class TravianClient : IBuildingClient
 
     public async Task<bool> IsTravianPlusActiveAsync(CancellationToken cancellationToken = default)
     {
+        var state = await ReadTravianPlusStateAsync(cancellationToken);
+        return state == PlusState.On;
+    }
+
+    private async Task<string> ReadTravianPlusStateAsync(CancellationToken cancellationToken)
+    {
         var state = await EvaluatePlusStateOnCurrentPageAsync(cancellationToken);
         Notify($"[plus:verbose] state='{state}' url='{_page.Url}'");
 
@@ -38,9 +44,7 @@ public sealed partial class TravianClient : IBuildingClient
             Notify($"[plus:verbose] dorf2 re-read state='{state}' url='{_page.Url}'");
         }
 
-        // Conservative fallback: only a positive "on" signal counts as Plus active. Anything
-        // unknown is treated as inactive so we never over-fill the build queue (1 slot, not 2).
-        return state == PlusState.On;
+        return state;
     }
 
     private static class PlusState

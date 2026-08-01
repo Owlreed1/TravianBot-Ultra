@@ -15,6 +15,30 @@ internal sealed record ConstructionHumanizeDecision(
 /// </summary>
 internal static class ConstructionHumanizeCalculator
 {
+    internal static double CalculateBoundedQueueDelaySeconds(
+        int referenceSeconds,
+        double queuePercentMin,
+        double queuePercentMax,
+        double maxDelayMinutes,
+        Func<double, double, double> randomInRange)
+    {
+        ArgumentNullException.ThrowIfNull(randomInRange);
+        if (referenceSeconds <= 1)
+        {
+            return 0;
+        }
+
+        var minimumPercent = Math.Clamp(queuePercentMin, 0, 99);
+        var maximumPercent = Math.Clamp(Math.Max(minimumPercent, queuePercentMax), 0, 99);
+        var selectedPercent = Math.Clamp(
+            randomInRange(minimumPercent, maximumPercent),
+            minimumPercent,
+            maximumPercent);
+        var percent = selectedPercent / 100.0;
+        var capSeconds = Math.Max(0, maxDelayMinutes) * 60.0;
+        return Math.Min(referenceSeconds - 1, Math.Min(referenceSeconds * percent, capSeconds));
+    }
+
     public static int ResolveExistingWaitSeconds(DateTimeOffset now, DateTimeOffset scheduledUntil)
     {
         var remainingSeconds = (scheduledUntil - now).TotalSeconds;
@@ -44,10 +68,13 @@ internal static class ConstructionHumanizeCalculator
         if (relevantRemainingSeconds.Count(seconds => seconds > 0) > 1)
         {
             var referenceSeconds = slotFreeWaitSeconds;
-            var percent = randomInRange(queuePercentMin, queuePercentMax) / 100.0;
-            var delaySeconds = Math.Min(
-                referenceSeconds * percent,
-                Math.Max(0, maxDelayMinutes) * 60.0);
+            var delaySeconds = CalculateBoundedQueueDelaySeconds(
+                referenceSeconds,
+                queuePercentMin,
+                queuePercentMax,
+                maxDelayMinutes,
+                randomInRange);
+            var percent = referenceSeconds > 0 ? delaySeconds / referenceSeconds : 0;
             return new ConstructionHumanizeDecision(
                 slotFreeWaitSeconds,
                 delaySeconds,

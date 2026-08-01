@@ -71,6 +71,10 @@ public sealed class TravianSessionCache
     // would defer forever). Survives per-operation TravianClient instances like the other caches.
     public System.Collections.Generic.Dictionary<string, System.DateTimeOffset> ConstructionHumanizeUntilBySlot { get; } = new();
 
+    // Consecutive live construction-overview reads where the Plus marker was unavailable. Kept per
+    // village so bulk resource upgrades retry cautiously instead of assuming that a Plus slot is full.
+    public System.Collections.Generic.Dictionary<string, int> ConstructionUncertainPlusRetriesByVillage { get; } = new();
+
     /// <summary>The persisted humanize generation currently represented by the two caches above.</summary>
     public int? ConstructionHumanizeStateVersion { get; private set; }
 

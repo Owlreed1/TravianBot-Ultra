@@ -39,7 +39,7 @@ public sealed partial class TravianClient
         // Travian Plus grants a second concurrent Smithy research slot (same idea as the second build queue
         // slot for construction). Read it once so the loop greedily fills BOTH slots before deferring,
         // instead of stopping after one. Unknown Plus is treated as 1 slot (conservative, never over-fills).
-        var (_, smithyPlusActive) = await GetCachedTribeAndPlusAsync(cancellationToken);
+        var (_, smithyPlusActive, _) = await GetCachedTribeAndPlusAsync(cancellationToken);
         var maxConcurrentUpgrades = smithyPlusActive ? 2 : 1;
         Notify($"Smithy: Plus={smithyPlusActive}; max concurrent upgrades={maxConcurrentUpgrades}.");
 
