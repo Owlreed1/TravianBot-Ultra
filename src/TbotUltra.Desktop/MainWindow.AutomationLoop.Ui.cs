@@ -634,6 +634,16 @@ public partial class MainWindow
 
         var snapshot = ConstructionQueueState.ResolveSnapshot(status, now);
         var availability = ConstructionQueueState.ResolveAvailability(status, _travianPlusActive, now);
+        if (TryGetSelectedVillageConstructionHumanizeWaitSeconds(out var humanizeWaitSeconds))
+        {
+            item.StateText = "Waiting";
+            item.DetailText = "Waiting for the configured construction delay.";
+            item.CardPrefix = null;
+            item.CardTone = "Warning";
+            item.RemainingSeconds = humanizeWaitSeconds;
+            return;
+        }
+
         if (snapshot.ActiveCount > 0)
         {
             item.StateText = "Running";
@@ -643,16 +653,6 @@ public partial class MainWindow
             item.CardPrefix = snapshot.ActiveCount == 1 ? "Building" : $"Building ({snapshot.ActiveCount})";
             item.CardTone = "Success";
             item.RemainingSeconds = snapshot.RemainingSeconds;
-            return;
-        }
-
-        if (TryGetSelectedVillageConstructionHumanizeWaitSeconds(out var humanizeWaitSeconds))
-        {
-            item.StateText = "Waiting";
-            item.DetailText = "Waiting for the configured construction delay.";
-            item.CardPrefix = "Waiting";
-            item.CardTone = "Warning";
-            item.RemainingSeconds = humanizeWaitSeconds;
             return;
         }
 
