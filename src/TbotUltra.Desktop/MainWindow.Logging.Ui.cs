@@ -195,9 +195,7 @@ public partial class MainWindow
     {
         if (highlighted)
         {
-            AcknowledgeAlarmButton.Background = new SolidColorBrush(ThemeColors.Get("DangerBrush"));
-            AcknowledgeAlarmButton.Foreground = Brushes.White;
-            AcknowledgeAlarmButton.BorderBrush = new SolidColorBrush(ThemeColors.Get("DangerStrongBrush"));
+            ApplySoftButtonVisual(AcknowledgeAlarmButton, "DangerBgBrush", "DangerBorderBrush", "DangerTextBrush");
             return;
         }
 

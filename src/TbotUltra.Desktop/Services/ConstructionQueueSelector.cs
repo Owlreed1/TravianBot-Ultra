@@ -26,9 +26,9 @@ public static class ConstructionQueueSelector
                 false);
         }
 
-        // Construction remains strictly ordered per village. A contiguous prefix of already-started
-        // rows has no remaining queue priority to protect, so the first unstarted row may use its own
-        // free slot. Never skip an unstarted row, even when its category is full.
+        // Construction remains strictly ordered per village. A parent task such as Upgrade all resources
+        // stays pending while it starts its individual fields, so an in-progress row must still hold every
+        // later row until that parent task finishes.
         var item = orderedItems[0];
         if (item.Status != QueueStatus.Pending)
         {
@@ -61,39 +61,6 @@ public static class ConstructionQueueSelector
                     $"group=Construction build queue full; next validation in {queueWaitSeconds:F0}s; holding queue order",
                     item,
                     false);
-            }
-
-            if (ConstructionQueueState.IsConstructionInProgressDeferred(item)
-                && orderedItems.Count > 1)
-            {
-                var nextIndex = 1;
-                while (nextIndex < orderedItems.Count
-                    && orderedItems[nextIndex].Status == QueueStatus.Pending
-                    && orderedItems[nextIndex].NextAttemptAt > now
-                    && ConstructionQueueState.IsConstructionInProgressDeferred(orderedItems[nextIndex]))
-                {
-                    nextIndex++;
-                }
-
-                if (nextIndex >= orderedItems.Count)
-                {
-                    var inProgressWaitSeconds = Math.Max(0, (item.NextAttemptAt - now).TotalSeconds);
-                    return new ConstructionQueueSelection(
-                        null,
-                        $"group=Construction task='{item.TaskName}' waiting {inProgressWaitSeconds:F0}s; holding queue order",
-                        null,
-                        false);
-                }
-
-                var next = orderedItems[nextIndex];
-                var nextAvailability = availabilityForIndex?.Invoke(nextIndex) ?? availability;
-                if (next.Status == QueueStatus.Pending
-                    && next.NextAttemptAt <= now
-                    && nextAvailability != ConstructionQueueAvailability.Full
-                    && isBlockedByEarlierDependency?.Invoke(nextIndex) != true)
-                {
-                    return new ConstructionQueueSelection(next, null, null, false);
-                }
             }
 
             var waitSeconds = Math.Max(0, (item.NextAttemptAt - now).TotalSeconds);

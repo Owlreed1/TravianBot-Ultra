@@ -31,11 +31,11 @@ public partial class MainWindow
         }
     }
 
-    private void SetFarmingFunctionRunning(bool running, bool showCancelButton = true)
+    private void SetFarmingFunctionRunning(bool running)
     {
         if (!Dispatcher.CheckAccess())
         {
-            _ = Dispatcher.BeginInvoke(() => SetFarmingFunctionRunning(running, showCancelButton));
+            _ = Dispatcher.BeginInvoke(() => SetFarmingFunctionRunning(running));
             return;
         }
 
@@ -44,15 +44,6 @@ public partial class MainWindow
             if (running)
             {
                 EnsureManualExecutionTracking();
-            }
-
-            if (CancelFarmingOperationButton is not null)
-            {
-                var showButton = running && showCancelButton;
-                CancelFarmingOperationButton.Visibility = showButton
-                    ? System.Windows.Visibility.Visible
-                    : System.Windows.Visibility.Collapsed;
-                CancelFarmingOperationButton.IsEnabled = showButton;
             }
 
             UpdateExecutionStateIndicator();
@@ -64,17 +55,6 @@ public partial class MainWindow
                 CompleteManualExecutionTrackingIfNeeded();
             }
         }
-    }
-
-    private void CancelFarmingOperationButton_Click(object sender, System.Windows.RoutedEventArgs e)
-    {
-        if (CancelFarmingOperationButton is not null)
-        {
-            CancelFarmingOperationButton.IsEnabled = false;
-        }
-
-        AppendLog("Cancel requested for the running farming operation.");
-        _loopController.CancelOperation();
     }
 
 }

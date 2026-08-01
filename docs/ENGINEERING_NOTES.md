@@ -248,9 +248,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - A confirmed empty dorf1/dorf2 construction overview arms a short per-village immediate-fill burst: start all
   available official resource/building slots without the construction start delay, then resume normal humanized
   timing. Romans have one resource plus one building slot without Plus; Plus adds one flexible third slot (up to
-  two resources or two buildings, three total). Only the first unstarted row after a contiguous prefix of already
-  started rows may use a free slot; every other unstarted resource, storage, requirement, retry, or humanize defer
-  preserves visible queue order and ends the burst.
+  two resources or two buildings, three total). Every pending construction row, including an in-progress parent such
+  as `upgrade_all_resources_to_level`, preserves visible queue order and blocks later rows until it is complete.
 - A confirmed empty overview gives the first stale resource `page_timer` head one immediate live validation so a
   free slot cannot idle behind an obsolete timer. Hero inventory is never polled for this: only an observed inventory
   increase wakes the first resource-deferred construction head per village; identical reads and transfer deductions do not.

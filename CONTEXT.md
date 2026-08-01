@@ -68,6 +68,38 @@ _Avoid_: Ready, idle
 The countdown shown while an eligible Construction Queue Head waits only for the normal humanized construction pacing delay, for example `Waiting: 00:00:12`.
 _Avoid_: Starting, ready
 
+**Plus Resource Slot Fill**:
+When `Upgrade all resources to level` finds an eligible resource field and a Plus construction slot is free, it retains normal humanized pacing but must queue the field before the currently active construction finishes.
+_Avoid_: Immediate bulk fill, wait for build completion
+
+**Queue Delay Bound**:
+The Plus queue humanization percentage is strictly below 100%, both when configuration is saved and when it is used by the Worker. The delay is additionally bounded to end before the active construction finishes.
+_Avoid_: 100% delay, missed Plus slot
+
+**Construction Queue Order**:
+A free Plus resource slot may receive a resource upgrade only when Travian permits it without bypassing an earlier queued construction. Resource queue filling never starts a later Barracks or other building task ahead of the existing queue.
+_Avoid_: Queue bypass, out-of-order construction
+
+**Plus Slot Verification**:
+Before deferring a resource upgrade until an active construction finishes, uncertain Plus status or slot occupancy is re-read from the live Official construction overview.
+_Avoid_: Cached Plus state, assumed full queue
+
+**Uncertain Plus Slot Retry**:
+If the live construction overview cannot confirm whether a Plus resource slot is free, the worker retries after a bounded short delay instead of treating the queue as full. The retry is rate-limited to avoid repeated navigation and logging.
+_Avoid_: Full-queue assumption, request spam
+
+**Uncertain Plus Slot Backoff**:
+An uncertain Plus resource slot is retried at most three times. The delay is randomized within 20–60 seconds, then doubles for each subsequent retry (40–120, then 80–240 seconds). After the third failed verification, the worker returns to its ordinary construction pass.
+_Avoid_: Fixed retry cadence, unlimited retry loop
+
+**Affordable Bulk Resource Candidate**:
+For `Upgrade all resources to level`, a resource-blocked candidate does not end the pass. The operation continues in its selected order until it finds an eligible candidate affordable for a live free Plus resource slot.
+_Avoid_: First blocked field, bulk stop
+
+**Bulk Resource Wait Deadline**:
+When no affordable bulk-resource candidate can start, the resource wait is the earliest live affordability deadline among eligible candidates, not the first candidate's deadline.
+_Avoid_: First wait, strategy wait
+
 **Construction Card Waiting Color**:
 Amber/yellow is used for `Res:`, `Req:`, `Waiting:`, and `Retry:` Construction card messages. Blue is reserved for `Empty queue`.
 _Avoid_: Green waiting state, mixed status colors

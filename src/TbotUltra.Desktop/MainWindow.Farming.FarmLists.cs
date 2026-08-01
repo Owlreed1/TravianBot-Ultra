@@ -516,7 +516,7 @@ public partial class MainWindow
         var operationId = BeginOperation("Analyze Farmlists");
         var operationSw = Stopwatch.StartNew();
         var operationToken = _loopController.StartOperation("operation");
-        SetFarmingFunctionRunning(true, showCancelButton: false);
+        SetFarmingFunctionRunning(true);
         BusyOverlay.ShowCancel = true;
         ShowBusyOverlay("Analyze farmlists", "Reading current farmlists...");
         BeginManualFunctionPacingPause();
@@ -982,7 +982,7 @@ public partial class MainWindow
         var operationSw = Stopwatch.StartNew();
         var operationToken = _loopController.StartOperation("operation");
         // Use the shared busy overlay with its built-in cancel instead of the separate cancel button.
-        SetFarmingFunctionRunning(true, showCancelButton: false);
+        SetFarmingFunctionRunning(true);
         BusyOverlay.ShowCancel = true;
         ShowBusyOverlay("Send now", $"Sending '{list.Name}'...");
         try
@@ -1062,7 +1062,7 @@ public partial class MainWindow
         var operationId = BeginOperation("Farm Send All Now");
         var operationSw = Stopwatch.StartNew();
         var operationToken = _loopController.StartOperation("operation");
-        SetFarmingFunctionRunning(true, showCancelButton: false);
+        SetFarmingFunctionRunning(true);
         BusyOverlay.ShowCancel = true;
         ShowBusyOverlay("Send all now", sendToggled ? "Sending toggled farmlists..." : "Sending all farmlists...");
         try

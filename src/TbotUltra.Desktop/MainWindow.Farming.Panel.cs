@@ -10,7 +10,6 @@ public partial class MainWindow
     private System.Windows.Controls.TextBlock FarmingStatusTextBlock => FarmingPanelControl.StatusText;
     private System.Windows.Controls.Button FarmListSendAllNowButton => FarmingPanelControl.SendAllButton;
     private System.Windows.Controls.ItemsControl FarmListsItemsControl => FarmingPanelControl.FarmLists;
-    private System.Windows.Controls.Button CancelFarmingOperationButton => FarmingPanelControl.CancelOperationButton;
     private System.Windows.Controls.RadioButton FarmSendListPerListRadioButton => FarmingPanelControl.SendListPerListOption;
     private System.Windows.Controls.RadioButton FarmSendAllAtOnceRadioButton => FarmingPanelControl.SendAllAtOnceOption;
     private System.Windows.Controls.TextBox FarmDispatchDelayMinTextBox => FarmingPanelControl.DispatchDelayMin;
@@ -26,7 +25,6 @@ public partial class MainWindow
     internal void OnCreateFarmListClicked(object sender, RoutedEventArgs e) => CreateFarmListButton_Click(sender, e);
     internal void OnFarmListSendAllNowClicked(object sender, RoutedEventArgs e) => FarmListSendAllNowButton_Click(sender, e);
     internal void OnFarmListSendNowClicked(object sender, RoutedEventArgs e) => FarmListSendNowButton_Click(sender, e);
-    internal void OnCancelFarmingOperationClicked(object sender, RoutedEventArgs e) => CancelFarmingOperationButton_Click(sender, e);
     internal void OnFarmingSettingsChanged(object sender, RoutedEventArgs e) => FarmingSettings_Changed(sender, e);
     internal void OnMoveFarmLossesChecked(object sender, RoutedEventArgs e) => MoveFarmLossesCheckBox_Checked(sender, e);
     internal void OnTravcoInactiveSearchClicked(object sender, RoutedEventArgs e) => TravcoInactiveSearchButton_Click(sender, e);

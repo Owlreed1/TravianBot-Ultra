@@ -243,25 +243,6 @@
                                                 </ItemsControl>
                                         </ScrollViewer>
 
-                                        <!-- Floats in the bottom-right corner of the Farm List
-                                             Management box while any farming operation (Analyze,
-                                             Add Farms, Send Now) is running, so the
-                                             user can always cancel from a fixed location. -->
-                                        <Button x:Name="CancelFarmingOperationButton"
-                                                Grid.Row="2"
-                                                Content="Cancel"
-                                                Background="{DynamicResource DangerStrongBrush}"
-                                                Foreground="White"
-                                                BorderBrush="{DynamicResource DangerStrongBrush}"
-                                                MinWidth="110"
-                                                Height="36"
-                                                Padding="14,0"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Bottom"
-                                                Margin="0,12,0,0"
-                                                Panel.ZIndex="1000"
-                                                Visibility="Collapsed"
-                                                Click="CancelFarmingOperationButton_Click" />
                                     </Grid>
                                 </Border>
 

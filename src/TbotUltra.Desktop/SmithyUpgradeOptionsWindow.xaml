@@ -97,9 +97,9 @@
                     Height="28"
                     Content="Save &amp; close"
                     Click="SaveButton_Click"
-                    Background="{DynamicResource PrimaryButtonBrush}"
-                    BorderBrush="{DynamicResource AccentBrush}"
-                    Foreground="{DynamicResource OnAccentBrush}" />
+                    Background="{DynamicResource SuccessBgBrush}"
+                    BorderBrush="{DynamicResource SuccessBorderBrush}"
+                    Foreground="{DynamicResource SuccessTextBrush}" />
         </StackPanel>
     </Grid>
 </Window>

@@ -58,11 +58,10 @@ public sealed class ConstructionQueueSelectorTests
     }
 
     [Fact]
-    public void SelectNext_InProgressFillsFreeSlotWithNextItem()
+    public void SelectNext_InProgressUpgradeAllResourcesHoldsLaterBuildingSlot()
     {
-        // The head's build is already queued (in progress) and a slot is free (Travian Plus reports
-        // Available), so the immediate next item in order fills the second slot instead of idling.
         var inProgress = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
+        inProgress.TaskName = "upgrade_all_resources_to_level";
         var next = CreateReadyItem();
 
         var result = ConstructionQueueSelector.SelectNext(
@@ -70,12 +69,13 @@ public sealed class ConstructionQueueSelectorTests
             Now,
             ConstructionQueueAvailability.Available);
 
-        Assert.Same(next, result.Item);
+        Assert.Null(result.Item);
         Assert.Null(result.QueueFullBlocker);
+        Assert.Contains("holding queue order", result.SkipReason);
     }
 
     [Fact]
-    public void SelectNext_InProgressResourceSlotFull_FillsAvailableBuildingSlot()
+    public void SelectNext_InProgressResourceSlotFull_HoldsAvailableBuildingSlot()
     {
         var activeResource = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
         var building = CreateReadyItem();
@@ -88,11 +88,12 @@ public sealed class ConstructionQueueSelectorTests
                 ? ConstructionQueueAvailability.Full
                 : ConstructionQueueAvailability.Available);
 
-        Assert.Same(building, result.Item);
+        Assert.Null(result.Item);
+        Assert.Contains("holding queue order", result.SkipReason);
     }
 
     [Fact]
-    public void SelectNext_StartedRomanPrefix_FillsFirstUnstartedBuildingSlot()
+    public void SelectNext_StartedRomanPrefix_HoldsFirstUnstartedBuildingSlot()
     {
         var resource = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
         var firstBuilding = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
@@ -106,7 +107,8 @@ public sealed class ConstructionQueueSelectorTests
                 ? ConstructionQueueAvailability.Available
                 : ConstructionQueueAvailability.Full);
 
-        Assert.Same(secondBuilding, result.Item);
+        Assert.Null(result.Item);
+        Assert.Contains("holding queue order", result.SkipReason);
     }
 
     [Fact]
