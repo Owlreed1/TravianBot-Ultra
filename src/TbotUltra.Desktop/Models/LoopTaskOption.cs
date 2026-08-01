@@ -16,6 +16,8 @@ public sealed class LoopTaskOption : INotifyPropertyChanged
     private string _stateText = "Idle";
     private string _detailText = string.Empty;
     private int? _remainingSeconds;
+    private string? _cardPrefix;
+    private string _cardTone = "Default";
 
     public string TaskName { get; init; } = string.Empty;
     public string Title { get; init; } = string.Empty;
@@ -36,6 +38,7 @@ public sealed class LoopTaskOption : INotifyPropertyChanged
             OnPropertyChanged(nameof(HasTimer));
             OnPropertyChanged(nameof(IsReady));
             OnPropertyChanged(nameof(BadgeText));
+            OnPropertyChanged(nameof(CardText));
         }
     }
 
@@ -99,6 +102,7 @@ public sealed class LoopTaskOption : INotifyPropertyChanged
             OnPropertyChanged(nameof(HasTimer));
             OnPropertyChanged(nameof(IsReady));
             OnPropertyChanged(nameof(BadgeText));
+            OnPropertyChanged(nameof(CardText));
         }
     }
 
@@ -116,6 +120,7 @@ public sealed class LoopTaskOption : INotifyPropertyChanged
             _blockedText = normalized;
             OnPropertyChanged();
             OnPropertyChanged(nameof(BadgeText));
+            OnPropertyChanged(nameof(CardText));
         }
     }
 
@@ -197,6 +202,46 @@ public sealed class LoopTaskOption : INotifyPropertyChanged
             OnPropertyChanged(nameof(IsReady));
             OnPropertyChanged(nameof(TimerText));
             OnPropertyChanged(nameof(ReadyText));
+            OnPropertyChanged(nameof(CardText));
+        }
+    }
+
+    /// <summary>
+    /// Optional compact status prefix for a specific dashboard card. Construction uses this to keep the
+    /// cause next to its countdown (for example, "Res: 00:12"). Other automation cards retain their
+    /// existing generic Ready/timer presentation.
+    /// </summary>
+    public string? CardPrefix
+    {
+        get => _cardPrefix;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            if (string.Equals(_cardPrefix, normalized, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _cardPrefix = normalized;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CardText));
+        }
+    }
+
+    /// <summary>Dashboard color intent: Default, Success, Warning, Info, or Muted.</summary>
+    public string CardTone
+    {
+        get => _cardTone;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value) ? "Default" : value.Trim();
+            if (string.Equals(_cardTone, normalized, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _cardTone = normalized;
+            OnPropertyChanged();
         }
     }
 
@@ -210,6 +255,29 @@ public sealed class LoopTaskOption : INotifyPropertyChanged
     public string ReadyText => "Ready";
 
     public string BadgeText => IsBlocked ? BlockedText : IsEnabled ? ReadyText : "Disabled";
+
+    public string CardText
+    {
+        get
+        {
+            if (IsBlocked)
+            {
+                return BlockedText;
+            }
+
+            if (!IsEnabled)
+            {
+                return "Disabled";
+            }
+
+            if (!string.IsNullOrWhiteSpace(CardPrefix))
+            {
+                return HasCountdown ? $"{CardPrefix}: {TimerText}" : CardPrefix;
+            }
+
+            return HasTimer ? TimerText : BadgeText;
+        }
+    }
 
     public string TimerText
     {

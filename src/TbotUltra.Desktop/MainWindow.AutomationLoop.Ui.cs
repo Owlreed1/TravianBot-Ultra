@@ -406,6 +406,8 @@ public partial class MainWindow
             item.IsRunning = runningGroup.HasValue && runningGroup.Value == group;
             item.IsBlocked = false;
             item.BlockedText = "Blocked";
+            item.CardPrefix = null;
+            item.CardTone = "Default";
             if (isBreweryGroupOutsideCapital)
             {
                 item.StateText = "Capital only";
@@ -632,14 +634,25 @@ public partial class MainWindow
 
         var snapshot = ConstructionQueueState.ResolveSnapshot(status, now);
         var availability = ConstructionQueueState.ResolveAvailability(status, _travianPlusActive, now);
-        var readyItem = SelectNextConstructionQueueItem(groupItems, now, out _, preview: true);
-        if (readyItem is not null)
+        if (snapshot.ActiveCount > 0)
         {
-            item.StateText = "Ready";
-            item.DetailText = snapshot.ActiveCount > 0
-                ? $"Travian queue: {snapshot.ActiveCount} active; build slot available."
-                : pendingCount == 1 ? "1 queued." : $"{pendingCount} queued.";
-            item.RemainingSeconds = null;
+            item.StateText = "Running";
+            item.DetailText = snapshot.ActiveCount == 1
+                ? "Travian construction active."
+                : $"{snapshot.ActiveCount} Travian constructions active.";
+            item.CardPrefix = snapshot.ActiveCount == 1 ? "Building" : $"Building ({snapshot.ActiveCount})";
+            item.CardTone = "Success";
+            item.RemainingSeconds = snapshot.RemainingSeconds;
+            return;
+        }
+
+        if (TryGetSelectedVillageConstructionHumanizeWaitSeconds(out var humanizeWaitSeconds))
+        {
+            item.StateText = "Waiting";
+            item.DetailText = "Waiting for the configured construction delay.";
+            item.CardPrefix = "Waiting";
+            item.CardTone = "Warning";
+            item.RemainingSeconds = humanizeWaitSeconds;
             return;
         }
 
@@ -647,8 +660,9 @@ public partial class MainWindow
         if (wait.Kind == ConstructionLoopWaitKind.DeferredTask && wait.DeferredItem is { } deferred)
         {
             var retryLabel = FormatQueueServerTime(deferred.NextAttemptAt);
+            var deferReason = ConstructionQueueState.ResolveDeferReason(deferred);
             item.StateText = "Waiting";
-            item.DetailText = ConstructionQueueState.ResolveDeferReason(deferred) switch
+            item.DetailText = deferReason switch
             {
                 ConstructionDeferReason.QueueFull =>
                     $"Travian build queue status not confirmed. Next check {retryLabel}",
@@ -660,31 +674,63 @@ public partial class MainWindow
                     $"Waiting for building requirements. Next try {retryLabel}",
                 _ => $"Waiting to retry. Next try {retryLabel}",
             };
-            item.RemainingSeconds = wait.RemainingSeconds;
+            item.CardPrefix = deferReason switch
+            {
+                ConstructionDeferReason.Resources => "Res",
+                ConstructionDeferReason.Requirements => "Req",
+                ConstructionDeferReason.StorageCapacity => ResolveStorageCapacityCardMessage(deferred),
+                ConstructionDeferReason.Humanize => "Waiting",
+                _ => "Retry",
+            };
+            item.CardTone = "Warning";
+            item.RemainingSeconds = deferReason == ConstructionDeferReason.StorageCapacity
+                ? null
+                : wait.RemainingSeconds;
             return;
         }
 
-        if (wait.Kind == ConstructionLoopWaitKind.QueueFull)
+        if (snapshot.Knowledge == ConstructionQueueKnowledge.Unknown)
         {
-            item.StateText = "Waiting";
-            item.DetailText = "Travian build queue full.";
-            item.RemainingSeconds = wait.RemainingSeconds;
+            item.StateText = "Unknown";
+            item.DetailText = "Construction status has not been verified yet.";
+            item.CardPrefix = "Unknown";
+            item.CardTone = "Muted";
+            item.RemainingSeconds = null;
             return;
         }
 
-        if (wait.Kind == ConstructionLoopWaitKind.ActiveQueue)
+        var readyItem = SelectNextConstructionQueueItem(groupItems, now, out _, preview: true);
+        if (readyItem is not null)
         {
-            item.StateText = "Waiting";
-            item.DetailText = "Travian build queue active.";
-            item.RemainingSeconds = wait.RemainingSeconds;
+            item.StateText = "Ready";
+            item.DetailText = pendingCount == 1 ? "1 queued." : $"{pendingCount} queued.";
+            item.CardTone = "Success";
+            item.RemainingSeconds = null;
             return;
         }
 
-        item.StateText = pendingCount > 0 ? "Ready" : "Idle";
-        item.DetailText = pendingCount > 0
-            ? pendingCount == 1 ? "1 queued." : $"{pendingCount} queued."
-            : "No queued task.";
+        if (pendingCount == 0 && snapshot.Knowledge == ConstructionQueueKnowledge.ConfirmedEmpty)
+        {
+            item.StateText = "Empty queue";
+            item.DetailText = "No queued construction task.";
+            item.CardPrefix = "Empty queue";
+            item.CardTone = "Info";
+            item.RemainingSeconds = null;
+            return;
+        }
+
+        item.StateText = "Ready";
+        item.DetailText = pendingCount == 1 ? "1 queued." : $"{pendingCount} queued.";
+        item.CardTone = "Success";
         item.RemainingSeconds = null;
+    }
+
+    private static string ResolveStorageCapacityCardMessage(QueueItem item)
+    {
+        var kind = item.Payload.GetValueOrDefault(BotOptionPayloadKeys.UpgradeStorageCapacityKind);
+        return kind?.Contains("granary", StringComparison.OrdinalIgnoreCase) == true
+            ? "Granary needed"
+            : "Warehouse needed";
     }
 
     private void SetAutomationLoopRunState(Color dotColor, string stateText, Color textColor)

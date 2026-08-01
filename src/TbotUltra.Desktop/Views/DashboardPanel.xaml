@@ -171,6 +171,18 @@
                                                 <Setter Property="Background" Value="{DynamicResource SuccessBgBrush}" />
                                                 <Setter Property="BorderBrush" Value="{DynamicResource SuccessBorderBrush}" />
                                                 <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding CardTone}" Value="Warning">
+                                                        <Setter Property="Background" Value="{DynamicResource WarningBgBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding CardTone}" Value="Info">
+                                                        <Setter Property="Background" Value="{DynamicResource InfoBgBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource InfoBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding CardTone}" Value="Muted">
+                                                        <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderMutedBrush}" />
+                                                    </DataTrigger>
                                                     <DataTrigger Binding="{Binding IsBlocked}" Value="True">
                                                         <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
                                                         <Setter Property="BorderBrush" Value="{DynamicResource BorderMutedBrush}" />
@@ -179,31 +191,45 @@
                                                         <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
                                                         <Setter Property="BorderBrush" Value="{DynamicResource BorderMutedBrush}" />
                                                     </DataTrigger>
-                                                    <DataTrigger Binding="{Binding HasTimer}" Value="True">
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding HasTimer}" Value="True" />
+                                                            <Condition Binding="{Binding CardTone}" Value="Default" />
+                                                        </MultiDataTrigger.Conditions>
                                                         <Setter Property="Background" Value="{DynamicResource WarningBgBrush}" />
                                                         <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
-                                                    </DataTrigger>
+                                                    </MultiDataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </Border.Style>
                                         <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
-                                                    <Setter Property="Text" Value="{Binding BadgeText}" />
+                                                    <Setter Property="Text" Value="{Binding CardText}" />
                                                     <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}" />
                                                     <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding CardTone}" Value="Warning">
+                                                            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding CardTone}" Value="Info">
+                                                            <Setter Property="Foreground" Value="{DynamicResource InfoTextBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding CardTone}" Value="Muted">
+                                                            <Setter Property="Foreground" Value="{DynamicResource TextSubtleBrush}" />
+                                                        </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsBlocked}" Value="True">
-                                                            <Setter Property="Text" Value="{Binding BlockedText}" />
                                                             <Setter Property="Foreground" Value="{DynamicResource TextSubtleBrush}" />
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsEnabled}" Value="False">
-                                                            <Setter Property="Text" Value="Disabled" />
                                                             <Setter Property="Foreground" Value="{DynamicResource TextSubtleBrush}" />
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding HasTimer}" Value="True">
-                                                            <Setter Property="Text" Value="{Binding TimerText}" />
+                                                        <MultiDataTrigger>
+                                                            <MultiDataTrigger.Conditions>
+                                                                <Condition Binding="{Binding HasTimer}" Value="True" />
+                                                                <Condition Binding="{Binding CardTone}" Value="Default" />
+                                                            </MultiDataTrigger.Conditions>
                                                             <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
-                                                        </DataTrigger>
+                                                        </MultiDataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>
