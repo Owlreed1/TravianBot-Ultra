@@ -37,6 +37,12 @@ public static class FarmListLossStateClassifier
         return FarmListLossState.Unknown;
     }
 
+    public static bool IsYellowLoss(string? classNames)
+    {
+        return !string.IsNullOrWhiteSpace(classNames)
+            && classNames.Contains("attack_won_withLosses", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static bool IsUnoccupiedOasis(string? targetName)
     {
         return string.Equals(CleanTargetName(targetName), "Unoccupied oasis", StringComparison.OrdinalIgnoreCase);

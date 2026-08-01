@@ -343,7 +343,9 @@ public sealed record FarmListLossHandlingRequest(
     string DestinationListId,
     string DestinationListName,
     string DestinationBaseName,
-    FarmListCreateRequest? CreateTemplate = null);
+    FarmListCreateRequest? CreateTemplate = null,
+    int? MaxTargets = null,
+    bool YellowLossesOnly = false);
 
 public sealed record FarmLossDestinationChange(
     string AccountName,

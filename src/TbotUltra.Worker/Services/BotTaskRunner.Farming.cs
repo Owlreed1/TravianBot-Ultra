@@ -7,11 +7,102 @@ using TbotUltra.Worker.Infrastructure;
 using TbotUltra.Worker.Services.Automation;
 using Microsoft.Playwright;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace TbotUltra.Worker.Services;
 
 public sealed partial class BotTaskRunner
 {
+    private static FarmListLossHandlingRequest CreateFarmListLossHandlingRequest(
+        BotOptions options,
+        int? maxTargets = null,
+        bool yellowLossesOnly = false)
+    {
+        var moveEnabled = options.ContinuousFarmDeactivateLosses
+            && options.ContinuousFarmMoveLosses
+            && !string.IsNullOrWhiteSpace(options.ContinuousFarmLossDestinationListName);
+        var villageIdMatch = Regex.Match(
+            options.TargetVillageUrl ?? string.Empty,
+            @"[?&]newdid=(\d+)",
+            RegexOptions.IgnoreCase);
+        var createTemplate = string.IsNullOrWhiteSpace(options.TargetVillageName)
+            ? null
+            : new FarmListCreateRequest(
+                [options.ContinuousFarmLossDestinationListName],
+                options.TargetVillageName,
+                villageIdMatch.Success ? villageIdMatch.Groups[1].Value : null,
+                "First available troop",
+                1,
+                TroopIndexOverride: 1);
+
+        return new FarmListLossHandlingRequest(
+            options.ContinuousFarmDeactivateOasisLosses,
+            moveEnabled,
+            options.ContinuousFarmLossDestinationListId,
+            options.ContinuousFarmLossDestinationListName,
+            string.IsNullOrWhiteSpace(options.ContinuousFarmLossDestinationBaseName)
+                ? options.ContinuousFarmLossDestinationListName
+                : options.ContinuousFarmLossDestinationBaseName,
+            createTemplate,
+            maxTargets,
+            yellowLossesOnly);
+    }
+
+    private void PublishFarmLossDestinationChange(BotOptions options, FarmListLossDeactivationResult result)
+    {
+        if (!result.DestinationChanged
+            || string.IsNullOrWhiteSpace(result.DestinationListId)
+            || string.IsNullOrWhiteSpace(result.DestinationListName))
+        {
+            return;
+        }
+
+        RaiseFarmLossDestinationChanged(new FarmLossDestinationChange(
+            _accountProvider.LoadAccount().Name,
+            result.DestinationListId,
+            result.DestinationListName,
+            string.IsNullOrWhiteSpace(options.ContinuousFarmLossDestinationBaseName)
+                ? options.ContinuousFarmLossDestinationListName
+                : options.ContinuousFarmLossDestinationBaseName,
+            options.TargetVillageName));
+    }
+
+    public async Task<FarmListLossDeactivationResult> RunFarmLossMoveTestAsync(
+        BotOptions options,
+        Action<string> log,
+        string? accountName = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!options.ContinuousFarmDeactivateLosses
+            || !options.ContinuousFarmMoveLosses
+            || string.IsNullOrWhiteSpace(options.ContinuousFarmLossDestinationListName))
+        {
+            throw new InvalidOperationException(
+                "Enable 'Deactivate red/yellow attacks' and 'Move red/yellow farms to list', then select a destination list first.");
+        }
+
+        FarmListLossDeactivationResult? result = null;
+        await ExecuteWithClientAsync(
+            options,
+            log,
+            accountName,
+            interactive: true,
+            cancellationToken,
+            async client =>
+            {
+                await client.LoginAsync(cancellationToken);
+                await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken);
+                var request = CreateFarmListLossHandlingRequest(options, maxTargets: 1, yellowLossesOnly: true)
+                    with { IncludeUnoccupiedOasis = false };
+                log($"[farm-list:debug] running one yellow-farm move/deactivate to '{request.DestinationListName}'.");
+                result = await client.HandleFarmListLossTargetsAsync(request, cancellationToken);
+            });
+
+        var completed = result ?? throw new InvalidOperationException("The yellow-farm test returned no result.");
+        PublishFarmLossDestinationChange(options, completed);
+        return completed;
+    }
+
     public async Task<IReadOnlyList<FarmListOverview>> ReadFarmListsOverviewAsync(
         BotOptions options,
         Action<string> log,

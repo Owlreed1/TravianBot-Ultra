@@ -133,6 +133,30 @@ public sealed class WindowSmokeTests
     }
 
     [Fact]
+    public void DebugWindow_ProvidesOneYellowFarmMoveAction()
+    {
+        _wpf.Run(() =>
+        {
+            var window = new FunctionTestWindow();
+            try
+            {
+                var requested = false;
+                window.MoveYellowFarmTestRequested += (_, _) => requested = true;
+                var button = Assert.IsType<Button>(window.FindName("TestMoveYellowFarmButton"));
+
+                button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+                Assert.True(requested);
+                Assert.Equal("Move one yellow farm", button.Content);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void BuildingSlotsWindow_LoadsWithTheImageAndACloseButton()
     {
         _wpf.Run(() =>

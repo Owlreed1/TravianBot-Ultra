@@ -78,6 +78,7 @@ public partial class MainWindow
         _resourceTestFunctionsWindow.NpcTradeBuildingTestRequested += TestNpcTradeBuildingButton_Click;
         _resourceTestFunctionsWindow.ReadSmithyQueueTestRequested += TestReadSmithyQueueButton_Click;
         _resourceTestFunctionsWindow.ReinforcementsTestRequested += TestReinforcementsButton_Click;
+        _resourceTestFunctionsWindow.MoveYellowFarmTestRequested += TestMoveYellowFarmButton_Click;
         _resourceTestFunctionsWindow.IncreaseAdventuresToHardRequested += TestIncreaseAdventuresToHardButton_Click;
         _resourceTestFunctionsWindow.ReduceAdventuresTimeRequested += TestReduceAdventuresTimeButton_Click;
         _resourceTestFunctionsWindow.StartAdventureRequested += StartAdventureDebugButton_Click;
@@ -95,6 +96,7 @@ public partial class MainWindow
             _resourceTestFunctionsWindow.NpcTradeBuildingTestRequested -= TestNpcTradeBuildingButton_Click;
             _resourceTestFunctionsWindow.ReadSmithyQueueTestRequested -= TestReadSmithyQueueButton_Click;
             _resourceTestFunctionsWindow.ReinforcementsTestRequested -= TestReinforcementsButton_Click;
+            _resourceTestFunctionsWindow.MoveYellowFarmTestRequested -= TestMoveYellowFarmButton_Click;
             _resourceTestFunctionsWindow.IncreaseAdventuresToHardRequested -= TestIncreaseAdventuresToHardButton_Click;
             _resourceTestFunctionsWindow.ReduceAdventuresTimeRequested -= TestReduceAdventuresTimeButton_Click;
             _resourceTestFunctionsWindow.StartAdventureRequested -= StartAdventureDebugButton_Click;
@@ -789,6 +791,46 @@ public partial class MainWindow
                     operationToken);
                 AppendLog($"[{operationId}] reinforcements test result: {result}");
                 return result;
+            });
+    }
+
+    private async void TestMoveYellowFarmButton_Click(object sender, RoutedEventArgs e)
+        => await GuardUiAsync(TestMoveYellowFarmButtonClickAsync);
+
+    private async Task TestMoveYellowFarmButtonClickAsync()
+    {
+        if (BlockIfSessionSleeping("Test yellow farm move"))
+        {
+            return;
+        }
+
+        var options = ApplySelectedVillageToOptions(LoadBotOptions());
+        if (!options.ContinuousFarmDeactivateLosses
+            || !options.ContinuousFarmMoveLosses
+            || string.IsNullOrWhiteSpace(options.ContinuousFarmLossDestinationListName))
+        {
+            const string message = "Enable both loss checkboxes and select a destination list on the Farming page first.";
+            AppendLog($"[farm-list:debug] canceled: {message}");
+            AppDialog.Show(this, message, "Move one yellow farm", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        await RunGuardedOperationAsync(
+            "TestMoveYellowFarm",
+            "Yellow farm move test paused.",
+            ToggleResourceTabActionsBusy,
+            async (operationId, operationToken) =>
+            {
+                await EnsureChromiumInstalledAsync();
+                AppendLog($"[{operationId}] moving and deactivating one yellow farm to '{options.ContinuousFarmLossDestinationListName}'.");
+                var result = await _botService.RunFarmLossMoveTestAsync(options, AppendLog, operationToken);
+                var summary = result.RowsMoved > 0
+                    ? $"Moved and deactivated {result.RowsMoved} yellow farm."
+                    : result.RowsFound == 0
+                        ? "No active yellow non-oasis farm was found."
+                        : $"No farm moved; deactivated={result.RowsDeactivated}, failures={result.MoveFailures}.";
+                AppendLog($"[{operationId}] {summary}");
+                return summary;
             });
     }
 

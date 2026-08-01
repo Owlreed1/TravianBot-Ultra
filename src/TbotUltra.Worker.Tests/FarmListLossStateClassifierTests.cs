@@ -21,4 +21,13 @@ public sealed class FarmListLossStateClassifierTests
         Assert.True(FarmListLossStateClassifier.IsUnoccupiedOasis("Unoccupied oasis \u202d(12|-34)\u202c"));
         Assert.False(FarmListLossStateClassifier.IsUnoccupiedOasis("Occupied oasis (12|-34)"));
     }
+
+    [Theory]
+    [InlineData("lastRaidState attack_won_withLosses_small", true)]
+    [InlineData("lastRaidState attack_lost_small", false)]
+    [InlineData("lastRaidState attack_won_withoutLosses_small", false)]
+    public void IsYellowLoss_OnlyMatchesWonWithLosses(string classNames, bool expected)
+    {
+        Assert.Equal(expected, FarmListLossStateClassifier.IsYellowLoss(classNames));
+    }
 }

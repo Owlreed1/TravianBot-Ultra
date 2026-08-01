@@ -11,6 +11,7 @@ public partial class FunctionTestWindow : Window
     public event RoutedEventHandler? NpcTradeBuildingTestRequested;
     public event RoutedEventHandler? ReadSmithyQueueTestRequested;
     public event RoutedEventHandler? ReinforcementsTestRequested;
+    public event RoutedEventHandler? MoveYellowFarmTestRequested;
     public event RoutedEventHandler? IncreaseAdventuresToHardRequested;
     public event RoutedEventHandler? ReduceAdventuresTimeRequested;
     public event RoutedEventHandler? StartAdventureRequested;
@@ -59,6 +60,11 @@ public partial class FunctionTestWindow : Window
     private void TestReinforcementsButton_Click(object sender, RoutedEventArgs e)
     {
         ReinforcementsTestRequested?.Invoke(sender, e);
+    }
+
+    private void TestMoveYellowFarmButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveYellowFarmTestRequested?.Invoke(sender, e);
     }
 
     private void TestIncreaseAdventuresToHardButton_Click(object sender, RoutedEventArgs e)

@@ -478,12 +478,26 @@ public sealed partial class TravianClient : IFarmingClient
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Notify($"ALARM: [farm-list] loss destination could not be prepared: {ex.Message}. Falling back to deactivation only.");
+            if (request.YellowLossesOnly || request.MaxTargets is > 0)
+            {
+                var constrainedRows = await ReadFarmListLossRowsFromCurrentPageAsync(cancellationToken);
+                var constrainedFound = constrainedRows.Count(row =>
+                    IsRequestedFarmListLossRow(row, request)
+                    && !FarmListLossStateClassifier.IsUnoccupiedOasis(row.TargetName));
+                Notify("ALARM: [farm-list:debug] destination preparation failed; constrained test will not run broad deactivation fallback.");
+                return new FarmListLossDeactivationResult(
+                    constrainedFound,
+                    0,
+                    0,
+                    MoveFailures: constrainedFound > 0 ? 1 : 0);
+            }
+
             var fallback = await DeactivateFarmListLossTargetsAsync(request.IncludeUnoccupiedOasis, cancellationToken);
             return fallback with { MoveFailures = fallback.RowsDeactivated };
         }
 
         var initialRows = await ReadFarmListLossRowsFromCurrentPageAsync(cancellationToken);
-        var lossRows = initialRows.Where(IsFarmListLossRow).ToList();
+        var lossRows = initialRows.Where(row => IsRequestedFarmListLossRow(row, request)).ToList();
         var skippedOasisRows = lossRows.Count(row =>
             !request.IncludeUnoccupiedOasis && FarmListLossStateClassifier.IsUnoccupiedOasis(row.TargetName));
         var deactivated = 0;
@@ -491,6 +505,8 @@ public sealed partial class TravianClient : IFarmingClient
         var moveFailures = 0;
         var ignoredRows = new HashSet<string>(StringComparer.Ordinal);
         string? unavailableDestinationReason = null;
+        var handledTargets = 0;
+        var maxTargets = request.MaxTargets is > 0 ? request.MaxTargets.Value : int.MaxValue;
         Notify($"[farm-list] combined loss handling started: found={lossRows.Count}; destination='{destination.Name}' ({destination.Id}).");
 
         for (var attempt = 1; attempt <= MaxFarmsPerFarmList * 2; attempt++)
@@ -500,7 +516,7 @@ public sealed partial class TravianClient : IFarmingClient
                 ? initialRows
                 : await ReadFarmListLossRowsFromCurrentPageAsync(cancellationToken);
             var candidate = rows.FirstOrDefault(row =>
-                IsFarmListLossRow(row)
+                IsRequestedFarmListLossRow(row, request)
                 && !ignoredRows.Contains(FarmListLossRowKey(row)));
             if (candidate is null)
             {
@@ -528,6 +544,12 @@ public sealed partial class TravianClient : IFarmingClient
                 }
                 continue;
             }
+
+            if (handledTargets >= maxTargets)
+            {
+                break;
+            }
+            handledTargets++;
 
             if (string.Equals(candidate.ListId, destination.Id, StringComparison.OrdinalIgnoreCase))
             {
@@ -1477,6 +1499,12 @@ public sealed partial class TravianClient : IFarmingClient
     {
         return row is { Disabled: false }
             && FarmListLossStateClassifier.Classify(row.RaidClass) == FarmListLossState.Loss;
+    }
+
+    private static bool IsRequestedFarmListLossRow(FarmListLossRowJs row, FarmListLossHandlingRequest request)
+    {
+        return IsFarmListLossRow(row)
+            && (!request.YellowLossesOnly || FarmListLossStateClassifier.IsYellowLoss(row.RaidClass));
     }
 
     private static string FarmListLossRowKey(FarmListLossRowJs row)
