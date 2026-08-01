@@ -1486,6 +1486,51 @@ public partial class MainWindow
             return;
         }
 
+        // The holding-list picker must expose every existing farmlist, including lists owned by other
+        // villages. A restored snapshot is intentionally not considered fresh, so analyze the Official
+        // farm page once before offering to create a new holding list.
+        if (!CanReuseRecentFarmListAnalysis(_lastFarmListsAnalysisAt, DateTimeOffset.UtcNow))
+        {
+            if (BlockIfSessionSleeping("Analyze farmlists"))
+            {
+                MoveFarmLossesCheckBox.IsChecked = false;
+                return;
+            }
+
+            BeginManualFunctionPacingPause();
+            try
+            {
+                ShowBusyOverlay("Analyze farmlists", "Reading all existing farmlists...");
+                var analysisOptions = ApplySelectedVillageToOptions(LoadBotOptions());
+                await EnsureChromiumInstalledAsync();
+                if (!await RefreshFarmListsFromServerAsync(analysisOptions, _loopController.AcquireSessionScopeToken()))
+                {
+                    MoveFarmLossesCheckBox.IsChecked = false;
+                    return;
+                }
+
+                AppendLog("[farm-list] analyzed all existing farmlists before choosing a loss destination.");
+            }
+            catch (OperationCanceledException)
+            {
+                MoveFarmLossesCheckBox.IsChecked = false;
+                AppendLog("[farm-list] loss destination analysis canceled.");
+                return;
+            }
+            catch (Exception ex)
+            {
+                MoveFarmLossesCheckBox.IsChecked = false;
+                AppendLog($"ALARM: Could not analyze farmlists for the loss destination picker: {ex.Message}");
+                AppDialog.Show(this, "Could not load existing farmlists. Try again before creating a new destination list.", "Analyze farmlists", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            finally
+            {
+                HideBusyOverlay();
+                EndManualFunctionPacingPause();
+            }
+        }
+
         if (FarmLossDestinationComboBox?.SelectedItem is FarmLossDestinationOption)
         {
             FarmingSettings_Changed(MoveFarmLossesCheckBox, new RoutedEventArgs());
