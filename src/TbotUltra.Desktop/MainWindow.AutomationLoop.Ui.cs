@@ -650,7 +650,7 @@ public partial class MainWindow
             item.DetailText = snapshot.ActiveCount == 1
                 ? "Travian construction active."
                 : $"{snapshot.ActiveCount} Travian constructions active.";
-            item.CardPrefix = snapshot.ActiveCount == 1 ? "Building" : $"Building ({snapshot.ActiveCount})";
+            item.CardPrefix = null;
             item.CardTone = "Success";
             item.RemainingSeconds = snapshot.RemainingSeconds;
             return;
