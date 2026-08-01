@@ -694,7 +694,7 @@ public partial class MainWindow
             item.StateText = "Unknown";
             item.DetailText = "Construction status has not been verified yet.";
             item.CardPrefix = "Unknown";
-            item.CardTone = "Muted";
+            item.CardTone = "Info";
             item.RemainingSeconds = null;
             return;
         }
