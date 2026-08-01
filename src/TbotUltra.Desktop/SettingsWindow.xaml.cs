@@ -1151,7 +1151,6 @@ public partial class SettingsWindow : Window
 
         SelectHoursVariationPercent(ReadInt(BotOptionPayloadKeys.SessionPacingHoursVariationPercent, PacingDefaults.SessionPacingHoursVariationPercent));
 
-        ActionPacingEnabledCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ActionPacingEnabled, PacingDefaults.ActionPacingEnabled);
         ActionTaskMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingTaskMinSeconds, PacingDefaults.ActionPacingTaskMinSeconds));
         ActionTaskMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingTaskMaxSeconds, PacingDefaults.ActionPacingTaskMaxSeconds));
         ActionPageLoadMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingPageLoadMinSeconds, PacingDefaults.ActionPacingPageLoadMinSeconds));
@@ -1219,7 +1218,7 @@ public partial class SettingsWindow : Window
                 .ToArray());
         _config[BotOptionPayloadKeys.SessionPacingHoursVariationPercent] = GetSelectedHoursVariationPercent();
 
-        _config[BotOptionPayloadKeys.ActionPacingEnabled] = ActionPacingEnabledCheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.ActionPacingEnabled] = true;
         WriteDelayRange(BotOptionPayloadKeys.ActionPacingTaskMinSeconds, BotOptionPayloadKeys.ActionPacingTaskMaxSeconds, ActionTaskMinTextBox, ActionTaskMaxTextBox, PacingDefaults.ActionPacingTaskMinSeconds, PacingDefaults.ActionPacingTaskMaxSeconds);
         WriteDelayRange(BotOptionPayloadKeys.ActionPacingPageLoadMinSeconds, BotOptionPayloadKeys.ActionPacingPageLoadMaxSeconds, ActionPageLoadMinTextBox, ActionPageLoadMaxTextBox, PacingDefaults.ActionPacingPageLoadMinSeconds, PacingDefaults.ActionPacingPageLoadMaxSeconds);
         WriteDelayRange(BotOptionPayloadKeys.ActionPacingClickMinSeconds, BotOptionPayloadKeys.ActionPacingClickMaxSeconds, ActionClickMinTextBox, ActionClickMaxTextBox, PacingDefaults.ActionPacingClickMinSeconds, PacingDefaults.ActionPacingClickMaxSeconds);
@@ -1333,7 +1332,6 @@ public partial class SettingsWindow : Window
             checkBox.IsChecked = true;
         }
         SelectHoursVariationPercent(PacingDefaults.SessionPacingHoursVariationPercent);
-        ActionPacingEnabledCheckBox.IsChecked = PacingDefaults.ActionPacingEnabled;
         ActionTaskMinTextBox.Text = FormatDelay(PacingDefaults.ActionPacingTaskMinSeconds);
         ActionTaskMaxTextBox.Text = FormatDelay(PacingDefaults.ActionPacingTaskMaxSeconds);
         ActionPageLoadMinTextBox.Text = FormatDelay(PacingDefaults.ActionPacingPageLoadMinSeconds);

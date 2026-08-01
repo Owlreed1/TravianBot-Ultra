@@ -75,6 +75,61 @@ public sealed class ConstructionQueueSelectorTests
     }
 
     [Fact]
+    public void SelectNext_InProgressResourceSlotFull_FillsAvailableBuildingSlot()
+    {
+        var activeResource = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
+        var building = CreateReadyItem();
+
+        var result = ConstructionQueueSelector.SelectNext(
+            [activeResource, building],
+            Now,
+            ConstructionQueueAvailability.Full,
+            availabilityForIndex: index => index == 0
+                ? ConstructionQueueAvailability.Full
+                : ConstructionQueueAvailability.Available);
+
+        Assert.Same(building, result.Item);
+    }
+
+    [Fact]
+    public void SelectNext_StartedRomanPrefix_FillsFirstUnstartedBuildingSlot()
+    {
+        var resource = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
+        var firstBuilding = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
+        var secondBuilding = CreateReadyItem();
+
+        var result = ConstructionQueueSelector.SelectNext(
+            [resource, firstBuilding, secondBuilding],
+            Now,
+            ConstructionQueueAvailability.Full,
+            availabilityForIndex: index => index == 2
+                ? ConstructionQueueAvailability.Available
+                : ConstructionQueueAvailability.Full);
+
+        Assert.Same(secondBuilding, result.Item);
+    }
+
+    [Fact]
+    public void SelectNext_UnstartedCategoryFullRowHoldsLaterBuildingSlot()
+    {
+        var activeResource = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
+        var waitingResource = CreateReadyItem();
+        var building = CreateReadyItem();
+
+        var result = ConstructionQueueSelector.SelectNext(
+            [activeResource, waitingResource, building],
+            Now,
+            ConstructionQueueAvailability.Full,
+            availabilityForIndex: index => index < 2
+                ? ConstructionQueueAvailability.Full
+                : ConstructionQueueAvailability.Available);
+
+        Assert.Null(result.Item);
+        Assert.Null(result.QueueFullBlocker);
+        Assert.Contains("holding queue order", result.SkipReason);
+    }
+
+    [Fact]
     public void SelectNext_InProgressHoldsQueueOrderWhenQueueFull()
     {
         var inProgress = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);

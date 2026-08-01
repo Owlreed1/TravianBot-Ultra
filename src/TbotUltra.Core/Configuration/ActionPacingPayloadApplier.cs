@@ -23,7 +23,7 @@ internal static class ActionPacingPayloadApplier
         IReadOnlyDictionary<string, string>? payload)
     {
         var result = new ActionPacingPayloadValues(
-            source.ActionPacingEnabled,
+            PacingDefaults.ActionPacingEnabled,
             source.ActionPacingTaskMinSeconds,
             source.ActionPacingTaskMaxSeconds,
             source.ActionPacingPageLoadMinSeconds,
@@ -49,10 +49,9 @@ internal static class ActionPacingPayloadApplier
                 continue;
             }
 
-            if (key.Equals(BotOptionPayloadKeys.ActionPacingEnabled, StringComparison.OrdinalIgnoreCase)
-                && bool.TryParse(value, out var enabled))
+            if (key.Equals(BotOptionPayloadKeys.ActionPacingEnabled, StringComparison.OrdinalIgnoreCase))
             {
-                result = result with { Enabled = enabled };
+                continue;
             }
             else if (TryReadDelay(key, value, BotOptionPayloadKeys.ActionPacingTaskMinSeconds, out var taskMin))
             {

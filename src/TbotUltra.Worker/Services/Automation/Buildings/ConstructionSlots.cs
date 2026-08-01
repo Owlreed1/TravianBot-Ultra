@@ -34,10 +34,14 @@ internal static class ConstructionSlots
 
         if (isRomans)
         {
-            resourceMax = 1;
+            // Romans always have one resource and one building slot. Travian Plus adds one flexible
+            // third slot, which may hold either another resource or another building.
+            resourceMax = travianPlusActive ? 2 : 1;
             buildingMax = travianPlusActive ? 2 : 1;
-            canResource = resourceUsed < resourceMax;
-            canBuilding = buildingUsed < buildingMax;
+            var totalMax = travianPlusActive ? 3 : 2;
+            var totalUsed = active.Count;
+            canResource = resourceUsed < resourceMax && totalUsed < totalMax;
+            canBuilding = buildingUsed < buildingMax && totalUsed < totalMax;
         }
         else
         {

@@ -7,13 +7,14 @@ public sealed class ActionPacer
 
     public ActionPacer(bool enabled, Action<string>? logger = null)
     {
-        _enabled = enabled;
+        // Kept for source compatibility; action pacing is always enabled.
+        _enabled = PacingDefaults.ActionPacingEnabled;
         _logger = logger;
     }
 
     public static ActionPacer FromOptions(BotOptions options, Action<string>? logger = null)
     {
-        return new ActionPacer(options.ActionPacingEnabled, logger);
+        return new ActionPacer(enabled: true, logger);
     }
 
     public Task DelayAsync(double minSeconds, double maxSeconds, CancellationToken cancellationToken, string? reason = null)

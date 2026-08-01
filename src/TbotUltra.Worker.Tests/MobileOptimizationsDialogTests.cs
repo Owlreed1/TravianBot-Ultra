@@ -28,4 +28,35 @@ public sealed class MobileOptimizationsDialogTests
             "#mobileOptimizationsDialog .action button.framed.green.withText",
             TravianClient.MobileOptimizationsPlayNowButtonSelector);
     }
+
+    [Fact]
+    public void ConfirmingMobileDialog_WaitsForLateGameNavigationBeforeWorldSelection()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "TbotUltra.Worker",
+            "Services",
+            "Automation",
+            "Core",
+            "TravianClient.LobbyLogin.cs"));
+        var methodStart = source.IndexOf("private async Task<bool> TryEnterLobbyWorldAsync", StringComparison.Ordinal);
+        var methodEnd = source.IndexOf("private async Task<bool> TryHandleMobileOptimizationsDialogAsync", methodStart, StringComparison.Ordinal);
+        var method = source[methodStart..methodEnd];
+
+        Assert.Contains("WaitForGameOriginAfterMobileConfirmationAsync", method, StringComparison.Ordinal);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "TbotUltra.sln")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new DirectoryNotFoundException("Could not locate TbotUltra.sln from the test output directory.");
+    }
 }

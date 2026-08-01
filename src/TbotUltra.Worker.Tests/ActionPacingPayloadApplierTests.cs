@@ -26,7 +26,7 @@ public sealed class ActionPacingPayloadApplierTests
 
         var result = BotOptionsPayloadApplier.Apply(source, payload);
 
-        Assert.False(result.ActionPacingEnabled);
+        Assert.True(result.ActionPacingEnabled);
         Assert.Equal(1, result.ActionPacingTaskMinSeconds);
         Assert.Equal(2, result.ActionPacingTaskMaxSeconds);
         Assert.Equal(3, result.ActionPacingPageLoadMinSeconds);

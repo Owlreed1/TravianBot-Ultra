@@ -751,7 +751,7 @@ public sealed class BotOptionsPayloadApplierTests
     }
 
     [Fact]
-    public void FromConfiguration_NewPacingKeysWinOverLegacyCompatibility()
+    public void FromConfiguration_ActionPacingCannotBeDisabledByConfiguration()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -768,7 +768,7 @@ public sealed class BotOptionsPayloadApplierTests
         var options = BotOptionsFactory.FromConfiguration(configuration);
 
         Assert.True(options.HumanLikeEnabled);
-        Assert.False(options.ActionPacingEnabled);
+        Assert.True(options.ActionPacingEnabled);
         Assert.Equal(0.9, options.ActionPacingTaskMinSeconds);
         Assert.Equal(5.0, options.ActionPacingTaskMaxSeconds);
     }

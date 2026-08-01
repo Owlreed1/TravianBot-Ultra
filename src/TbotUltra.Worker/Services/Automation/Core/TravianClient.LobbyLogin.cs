@@ -207,7 +207,10 @@ public sealed partial class TravianClient
         await DelayBeforeClickAsync(cancellationToken, "lobby Play now");
         await SuppressConsentUiDuringSsoLandingAsync();
         await ClickPlayNowAndWaitForGameOriginAsync(playNow, allowServerCorrection, cancellationToken);
-        await WaitForMobileOptimizationsDialogAfterWorldSelectionAsync(cancellationToken);
+        if (await WaitForMobileOptimizationsDialogAfterWorldSelectionAsync(cancellationToken))
+        {
+            await WaitForGameOriginAfterMobileConfirmationAsync(allowServerCorrection, cancellationToken);
+        }
 
         var configuredOriginReached = IsConfiguredGameOrigin(_page.Url);
         if (!configuredOriginReached
@@ -342,12 +345,33 @@ public sealed partial class TravianClient
         throw new InvalidOperationException("Mobile version dialog showed an enabled option that could not be turned off.");
     }
 
-    private async Task WaitForMobileOptimizationsDialogAfterWorldSelectionAsync(CancellationToken cancellationToken)
+    private async Task<bool> WaitForMobileOptimizationsDialogAfterWorldSelectionAsync(CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 10; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (await TryHandleMobileOptimizationsDialogAsync(cancellationToken))
+            {
+                return true;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        }
+
+        return false;
+    }
+
+    private async Task WaitForGameOriginAfterMobileConfirmationAsync(
+        bool allowServerCorrection,
+        CancellationToken cancellationToken)
+    {
+        Notify("[lobby-login] mobile version dialog closed; waiting for the game navigation to commit.");
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (IsConfiguredGameOrigin(_page.Url)
+                || (allowServerCorrection && TryResolveOfficialGameOrigin(_page.Url, out _)))
             {
                 return;
             }

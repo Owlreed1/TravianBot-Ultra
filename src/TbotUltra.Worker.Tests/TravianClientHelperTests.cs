@@ -740,7 +740,7 @@ public sealed class TravianClientHelperTests
 
     [Theory]
     [InlineData("Romans", false, 1, 1)]
-    [InlineData("Romans", true, 1, 2)]
+    [InlineData("Romans", true, 2, 2)]
     [InlineData("Gauls", false, 1, 1)]
     [InlineData("Teutons", true, 1, 2)]
     public void ComputeConstructionSlotStatus_MaxSlotsByTribeAndPlus(string tribe, bool plus, int resMax, int bldMax)
@@ -773,6 +773,32 @@ public sealed class TravianClientHelperTests
         var status = ConstructionSlots.Compute(active, "Gauls", travianPlusActive: false);
         Assert.False(status.CanStartResource);
         Assert.False(status.CanStartBuilding);
+    }
+
+    [Fact]
+    public void ComputeConstructionSlotStatus_RomanPlusUsesOneFlexibleThirdSlot()
+    {
+        IReadOnlyList<ActiveConstruction> active =
+        [
+            new ActiveConstruction(ConstructionKind.Resource, "Cropland", 4, 300, "0:05:00"),
+            new ActiveConstruction(ConstructionKind.Building, "Warehouse", 2, 300, "0:05:00"),
+        ];
+
+        var status = ConstructionSlots.Compute(active, "Romans", travianPlusActive: true);
+
+        Assert.True(status.CanStartResource);
+        Assert.True(status.CanStartBuilding);
+
+        var full = ConstructionSlots.Compute(
+            [
+                .. active,
+                new ActiveConstruction(ConstructionKind.Resource, "Woodcutter", 4, 300, "0:05:00"),
+            ],
+            "Romans",
+            travianPlusActive: true);
+
+        Assert.False(full.CanStartResource);
+        Assert.False(full.CanStartBuilding);
     }
 
     [Fact]

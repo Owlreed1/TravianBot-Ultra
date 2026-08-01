@@ -14,7 +14,8 @@ public static class ConstructionQueueSelector
         IReadOnlyList<QueueItem> orderedItems,
         DateTimeOffset now,
         ConstructionQueueAvailability availability,
-        Func<int, bool>? isBlockedByEarlierDependency = null)
+        Func<int, bool>? isBlockedByEarlierDependency = null,
+        Func<int, ConstructionQueueAvailability>? availabilityForIndex = null)
     {
         if (orderedItems.Count == 0)
         {
@@ -25,9 +26,9 @@ public static class ConstructionQueueSelector
                 false);
         }
 
-        // Construction is strictly ordered per village: only the visible head item may run.
-        // Requirement repair is the sole mechanism allowed to promote or insert a prerequisite
-        // ahead of it, after which that repaired item becomes the new head.
+        // Construction remains strictly ordered per village. A contiguous prefix of already-started
+        // rows has no remaining queue priority to protect, so the first unstarted row may use its own
+        // free slot. Never skip an unstarted row, even when its category is full.
         var item = orderedItems[0];
         if (item.Status != QueueStatus.Pending)
         {
@@ -62,20 +63,34 @@ public static class ConstructionQueueSelector
                     false);
             }
 
-            // In-progress head: its build is already queued and progressing (the item's target level was
-            // reached), so it is not waiting to build — it HAS built. When a build slot is still free
-            // (Travian Plus reports Available), fill it with the immediate next item in queue order instead
-            // of idling until the head's build finishes. Strict order is preserved: we only look past a
-            // build that has already been actioned, and only at the very next item (no reordering). Other
-            // defers (resources/requirements/storage/humanize) genuinely couldn't build, so they still hold.
             if (ConstructionQueueState.IsConstructionInProgressDeferred(item)
-                && availability == ConstructionQueueAvailability.Available
                 && orderedItems.Count > 1)
             {
-                var next = orderedItems[1];
+                var nextIndex = 1;
+                while (nextIndex < orderedItems.Count
+                    && orderedItems[nextIndex].Status == QueueStatus.Pending
+                    && orderedItems[nextIndex].NextAttemptAt > now
+                    && ConstructionQueueState.IsConstructionInProgressDeferred(orderedItems[nextIndex]))
+                {
+                    nextIndex++;
+                }
+
+                if (nextIndex >= orderedItems.Count)
+                {
+                    var inProgressWaitSeconds = Math.Max(0, (item.NextAttemptAt - now).TotalSeconds);
+                    return new ConstructionQueueSelection(
+                        null,
+                        $"group=Construction task='{item.TaskName}' waiting {inProgressWaitSeconds:F0}s; holding queue order",
+                        null,
+                        false);
+                }
+
+                var next = orderedItems[nextIndex];
+                var nextAvailability = availabilityForIndex?.Invoke(nextIndex) ?? availability;
                 if (next.Status == QueueStatus.Pending
                     && next.NextAttemptAt <= now
-                    && isBlockedByEarlierDependency?.Invoke(1) != true)
+                    && nextAvailability != ConstructionQueueAvailability.Full
+                    && isBlockedByEarlierDependency?.Invoke(nextIndex) != true)
                 {
                     return new ConstructionQueueSelection(next, null, null, false);
                 }

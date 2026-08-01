@@ -54,7 +54,9 @@ public partial class MainWindow
         // resets that village's deferred group retries (manual escape hatch for a stuck wait). It does not
         // start the bot from stopped, but it wakes an already-running loop so the groups retry promptly.
         ClearSelectedVillageRuntimeTimerCache(selectedVillageName, selectedVillageKey);
+        ClearAutomationLoopCardBlocks();
         var resetCount = ResetDeferredQueueTimersForVillage(selectedVillageName, selectedVillageKey);
+        PrepareConstructionLoginFill("manual-clear-timers", selectedVillageName, selectedVillageKey);
         _continuousConstructionRotationVillageKey = selectedVillageKey;
         SetContinuousGroupRotationVillageKey(QueueGroup.TroopTraining, selectedVillageKey);
         SetContinuousGroupRotationVillageKey(QueueGroup.Troops, selectedVillageKey);
@@ -67,7 +69,7 @@ public partial class MainWindow
         RequestQueueUiRefresh(immediate: true);
         RefreshVillageActivityIndicatorsOnDashboard();
         UpdateAutomationLoopRunningIndicators();
-        AppendLog($"Cleared cached timers and reset {resetCount} deferred group timer(s) for village '{selectedVillageName}'. Queue items were kept.");
+        AppendLog($"Cleared cached timers and reset {resetCount} deferred group timer(s) for village '{selectedVillageName}'. Construction was prepared for immediate queue fill. Queue items were kept.");
     }
 
     private void ClearAccountTimers()
@@ -76,6 +78,7 @@ public partial class MainWindow
         _smithyUpgradeRemainingSeconds.Clear();
         _troopTrainingViewModel.ClearRuntimeTimers();
         _heroViewModel.AdventureStatusText = "Status refresh requested.";
+        ClearAutomationLoopCardBlocks();
 
         var clearedStatuses = _villageStatusCache.Snapshot
             .ToDictionary(pair => pair.Key, pair => ClearCachedActivityTimers(pair.Value), StringComparer.OrdinalIgnoreCase);
@@ -87,6 +90,7 @@ public partial class MainWindow
         }
 
         var resetCount = ResetAllDeferredQueueTimers();
+        PrepareConstructionLoginFill("manual-clear-timers");
         _continuousConstructionRotationVillageKey = null;
         SetContinuousGroupRotationVillageKey(QueueGroup.TroopTraining, null);
         SetContinuousGroupRotationVillageKey(QueueGroup.Troops, null);
@@ -103,7 +107,7 @@ public partial class MainWindow
         RequestQueueUiRefresh(immediate: true);
         RefreshVillageActivityIndicatorsOnDashboard();
         UpdateAutomationLoopRunningIndicators();
-        AppendLog($"Cleared cached timers and reset {resetCount} deferred group timer(s) for the active account. Queue items were kept.");
+        AppendLog($"Cleared cached timers and reset {resetCount} deferred group timer(s) for the active account. Construction was prepared for immediate queue fill. Queue items were kept.");
     }
 
     private void ClearSelectedVillageRuntimeTimerCache(string selectedVillageName, string? selectedVillageKey)
@@ -132,6 +136,16 @@ public partial class MainWindow
         _buildQueueRemainingSeconds = constructionTimer.RemainingSeconds ?? -1;
         _buildQueueReachedZeroPendingCompletion = false;
         UpdateBuildQueueStatusText();
+    }
+
+    // Manual timer reset is also a manual retry of every automation card. Clear only automatic
+    // blocked states; a group that the user disabled manually remains disabled.
+    private void ClearAutomationLoopCardBlocks()
+    {
+        ClearTroopsBlockedState();
+        ClearFarmingBlockedState();
+        ClearHeroBlockedState();
+        ClearBreweryBlockedState();
     }
 
     // Manual "Clear timers" reset: wipes the cached construction snapshot too so a stale/stuck build
@@ -163,7 +177,8 @@ public partial class MainWindow
         var deferred = _botService.GetQueueItemsForDisplay()
             .Where(item => item.Status == QueueStatus.Pending
                 && item.NextAttemptAt > now
-                && IsQueueItemForVillage(item, villageName, villageKey))
+                && (item.Group == QueueGroup.Hero
+                    || IsQueueItemForVillage(item, villageName, villageKey)))
             .ToList();
 
         var reset = 0;

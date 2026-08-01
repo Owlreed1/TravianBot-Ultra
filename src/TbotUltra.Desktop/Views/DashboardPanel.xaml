@@ -76,6 +76,9 @@
                             Height="30"
                             Content="Clear timers"
                             MinWidth="70"
+                            Background="{DynamicResource AmberBg200Brush}"
+                            BorderBrush="{DynamicResource WarningBorderBrush}"
+                            Foreground="{DynamicResource WarningText2Brush}"
                             Click="DashboardClearTimersButton_Click" />
                     <StackPanel DockPanel.Dock="Right" Visibility="Collapsed">
                         <Ellipse x:Name="AutomationLoopRunStateDot" Width="8" Height="8" Fill="{DynamicResource BorderMutedBrush}" />
@@ -334,7 +337,7 @@
                                 <ContentControl.ToolTip>
                                     <ToolTip MaxWidth="320">
                                         <TextBlock TextWrapping="Wrap"
-                                                   Text="Makes one randomized pass through all villages, updating enabled live status before moving to the next village. Detailed scan choices and timing are in Settings &gt; Pacing." />
+                                                   Text="Scan all villages to update the current actual state to the program. Choose what you want the scan to do." />
                                     </ToolTip>
                                 </ContentControl.ToolTip>
                             </ContentControl>

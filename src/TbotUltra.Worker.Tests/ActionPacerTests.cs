@@ -7,15 +7,15 @@ namespace TbotUltra.Worker.Tests;
 public sealed class ActionPacerTests
 {
     [Fact]
-    public async Task DelayAsync_WhenDisabled_ReturnsWithoutWaiting()
+    public async Task DelayAsync_AlwaysWaits_EvenWhenDisabledIsRequested()
     {
         var pacer = new ActionPacer(enabled: false);
         var stopwatch = Stopwatch.StartNew();
 
-        await pacer.DelayAsync(10, 20, CancellationToken.None);
+        await pacer.DelayAsync(0.05, 0.05, CancellationToken.None);
 
         stopwatch.Stop();
-        Assert.True(stopwatch.ElapsedMilliseconds < 500, $"disabled pacer waited {stopwatch.ElapsedMilliseconds}ms");
+        Assert.True(stopwatch.ElapsedMilliseconds >= 25, $"pacer only waited {stopwatch.ElapsedMilliseconds}ms");
     }
 
     [Fact]
@@ -40,15 +40,15 @@ public sealed class ActionPacerTests
     }
 
     [Fact]
-    public async Task FromOptions_Disabled_IsNoOp_EvenForLargeDelay()
+    public async Task FromOptions_AlwaysWaits_EvenWhenDisabledIsConfigured()
     {
         var pacer = ActionPacer.FromOptions(new BotOptions { ActionPacingEnabled = false });
         var stopwatch = Stopwatch.StartNew();
 
-        await pacer.DelayMillisecondsAsync(5000, 5000, CancellationToken.None);
+        await pacer.DelayMillisecondsAsync(50, 50, CancellationToken.None);
 
         stopwatch.Stop();
-        Assert.True(stopwatch.ElapsedMilliseconds < 500, $"disabled pacer waited {stopwatch.ElapsedMilliseconds}ms");
+        Assert.True(stopwatch.ElapsedMilliseconds >= 25, $"pacer only waited {stopwatch.ElapsedMilliseconds}ms");
     }
 
     [Fact]

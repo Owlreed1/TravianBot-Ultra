@@ -553,6 +553,9 @@ public sealed partial class TravianClient
         [JsonPropertyName("slotId")]
         public string? SlotId { get; init; }
 
+        [JsonPropertyName("listId")]
+        public string? ListId { get; init; }
+
         [JsonPropertyName("listName")]
         public string? ListName { get; init; }
 

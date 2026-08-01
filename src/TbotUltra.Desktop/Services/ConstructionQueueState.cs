@@ -74,7 +74,8 @@ public static class ConstructionQueueState
         return !string.IsNullOrWhiteSpace(message)
             && (message.Contains("already queued and still in progress", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("queued and still in progress", StringComparison.OrdinalIgnoreCase)
-                || message.Contains("queued upgrade toward", StringComparison.OrdinalIgnoreCase));
+                || message.Contains("queued upgrade toward", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("queued upgrade(s) already reaching target", StringComparison.OrdinalIgnoreCase));
     }
 
     public static bool IsConstructionRequirementDeferMessage(string? message)
@@ -425,8 +426,9 @@ public static class ConstructionQueueState
         var relevantCount = isResourceTask
             ? active.Count(construction => construction.Kind == ConstructionKind.Resource)
             : active.Count(construction => construction.Kind != ConstructionKind.Resource);
-        var capacity = isResourceTask ? 1 : travianPlusActive == true ? 2 : 1;
-        return relevantCount < capacity
+        var categoryCapacity = travianPlusActive == true ? 2 : 1;
+        var totalCapacity = travianPlusActive == true ? 3 : 2;
+        return relevantCount < categoryCapacity && active.Count < totalCapacity
             ? ConstructionQueueAvailability.Available
             : ConstructionQueueAvailability.Full;
     }

@@ -582,12 +582,6 @@ public sealed partial class TravianClient
         string reason,
         CancellationToken cancellationToken)
     {
-        if (!_config.ActionPacingEnabled)
-        {
-            _browserTrace.Event("DECISION", action, "skipped", "reason=action pacing disabled");
-            return;
-        }
-
         using var trace = _browserTrace.BeginOperation(
             "WAIT",
             action,

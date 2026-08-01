@@ -217,7 +217,7 @@
                                 <CheckBox x:Name="QuickReloginCheckBox"
                                           Content="Quick re-login within 2 hours" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                ToolTip="When logging in less than 10 minutes after the last full login, skip the post-login analyzes (villages, hero, farm lists, brewery) and only confirm the session. Saved per account." />
+                                                ToolTip="When logging in less than 2hrs after the last full login, skip the post-login analyzes and only confirm the session. &#10;Recommended to keep ON" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="AutomaticallyCheckLanguageCheckBox"
@@ -321,8 +321,8 @@
                             <Border Style="{StaticResource SettingsGroupBox}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                        <CheckBox x:Name="ActionPacingEnabledCheckBox"
-                                                  Content="Action pacing" />
+                                        <TextBlock Text="Action pacing"
+                                                   VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="Adds small randomized pauses around central bot actions such as tasks, page loads, farm sends, and loop passes." />
                                     </StackPanel>
@@ -568,7 +568,7 @@
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <CheckBox x:Name="VillageStatusSweepEnabledCheckBox" Content="Village scan" />
-                                        <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Makes one randomized pass through all villages, updating cached status before moving on." />
+                                        <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Scan all villages to update the current actual state to the program. Choose what you want the scan to do." />
                                         <StackPanel Orientation="Horizontal" Margin="22,0,0,0" VerticalAlignment="Center">
                                             <Border x:Name="VillageStatusSweepNextScanBadge"
                                                     MinWidth="112"
@@ -782,14 +782,14 @@
                                 <CheckBox x:Name="PostLoginAnalyzeNewVillagesCheckBox"
                                           Content="Analyze new village startup" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                ToolTip="After login, detects villages without cached status and reads their resource fields and buildings from dorf1 and dorf2. Enabled by default." />
+                                                ToolTip="If there is a new villages after login without cached status a analysis will be made to scan dorf1 and dorf2. &#10;Recommended to keep ON." />
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="PostLoginAnalyzeNewAccountCheckBox"
                                           Content="New account analysis" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                ToolTip="On the first full login for a new account, analyzes hero inventory, hero attributes, and new village startup regardless of their individual settings. Enabled by default." />
+                                                ToolTip="On the first full login for a new account, analyzes hero inventory, hero attributes, and new village startup regardless of their individual settings." />
                                 <Border x:Name="NewAccountAnalysisStatusCard"
                                         Background="{DynamicResource WarningBrush}"
                                         BorderBrush="{DynamicResource WarningBorderBrush}"

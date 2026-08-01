@@ -153,6 +153,19 @@ public sealed class SessionPacer
             _sleepStartRaised = false;
         }
 
+        if (!_settings.Enabled)
+        {
+            var wakeRequested = Phase == SessionPacerPhase.Sleeping;
+            SetDisabled();
+            if (wakeRequested)
+            {
+                Logger?.Invoke("[pacing] session pacing disabled - resuming automation.");
+                WakeRequested?.Invoke(this, EventArgs.Empty);
+            }
+
+            return;
+        }
+
         if (Phase == SessionPacerPhase.Sleeping)
         {
             if (SleepReason is SessionSleepReason.Schedule or SessionSleepReason.DailyLimit)
@@ -165,9 +178,18 @@ public sealed class SessionPacer
             return;
         }
 
-        if (!_settings.Enabled)
+        if (Phase == SessionPacerPhase.Disabled && _automationActive)
         {
-            SetDisabled();
+            var restriction = GetActiveRestriction(now);
+            if (restriction != SessionSleepReason.None)
+            {
+                Phase = SessionPacerPhase.Running;
+                _lastRuntimeUpdate = now;
+                RequestSleep(restriction);
+                return;
+            }
+
+            StartNewRun(now);
             return;
         }
 

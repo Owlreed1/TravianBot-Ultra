@@ -1841,7 +1841,7 @@ public partial class MainWindow
         out string? skipReason,
         bool preview = false)
     {
-        var availability = ResolveConstructionQueueAvailability(orderedGroupItems, now);
+        var availability = ResolveConstructionQueueAvailability(orderedGroupItems.FirstOrDefault(), now);
         var selection = ConstructionQueueSelector.SelectNext(
             orderedGroupItems,
             now,
@@ -1852,7 +1852,8 @@ public partial class MainWindow
                 return (IsBuildingUpgradeForSlot(item, out var upgradeSlotId)
                         && HasEarlierPendingConstructForSlot(orderedGroupItems, index, item, upgradeSlotId))
                     || HasEarlierStoragePreflightDependency(orderedGroupItems, index);
-            });
+            },
+            index => ResolveConstructionQueueAvailability(orderedGroupItems[index], now));
         skipReason = selection.SkipReason;
 
         if (selection.QueueFullBlocker is not null && !preview)
@@ -1968,10 +1969,9 @@ public partial class MainWindow
     }
 
     private ConstructionQueueAvailability ResolveConstructionQueueAvailability(
-        IReadOnlyList<QueueItem> villageItems,
+        QueueItem? item,
         DateTimeOffset now)
     {
-        var item = villageItems.FirstOrDefault();
         var status = item is null
             ? ResolveSelectedVillageBuildingStatus()
             : ResolveBuildingStatusForQueueItem(item);
@@ -2587,7 +2587,7 @@ public partial class MainWindow
         var totalSeconds = waitDelay is null
             ? Math.Max(1, options.LoopIntervalSeconds)
             : Math.Max(1, (int)Math.Ceiling(waitDelay.Value.TotalSeconds));
-        if (!options.ActionPacingEnabled || networkBackoff)
+        if (networkBackoff)
         {
             return totalSeconds;
         }
@@ -3005,11 +3005,6 @@ public partial class MainWindow
     private void LogConservativeAutomationWarnings(BotOptions options)
     {
         var warnings = new List<string>();
-        if (!options.ActionPacingEnabled)
-        {
-            warnings.Add("[conservative] action pacing is disabled; automation can run faster than the conservative defaults.");
-        }
-
         try
         {
             var config = _botConfigStore.Load();

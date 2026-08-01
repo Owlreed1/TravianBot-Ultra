@@ -1,6 +1,6 @@
 # Engineering Notes
 
-Last updated: 2026-07-18
+Last updated: 2026-07-31
 
 Read this file before changing architecture, selectors, paths, browser behavior, persisted state, queueing,
 or server logic. Keep it short and current: durable rules belong here; detailed decisions belong in ADRs;
@@ -104,7 +104,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Sleeping/paused state must preserve work and must not start a competing loop.
 - Continuous-loop wake requests from saved settings or newly enabled automation must also end an active idle break;
   humanized idle pacing must not delay newly requested work.
+- Applying Session pacing settings while automation is active must take effect immediately: enabling starts its run
+  timer, while disabling a scheduled sleep resumes the captured automation state.
 - Known queue deadlines are authoritative and may not be shortened by pacing.
+- Action pacing is mandatory. Persisted configuration and incoming payloads may change its delay ranges but may
+  not disable it.
 - Proxy settings are account-scoped. Browser, HTTP client, tests, and bonus video use the same effective route.
   Never log credentials or place them in user-visible URLs.
 - Retry only transient failures with bounded attempts. Apply configured pacing; do not add unbounded sleeps.
@@ -134,6 +138,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - After Play now commits navigation to an Official game origin, rotate immediately to the clean in-app context that
   blocks the consent/ad stack. State filtering and the replacement context must use the resolved runtime game origin,
   not a stale configured base URL, so the selected world's SSO cookies survive the rotation.
+- The Official mobile-version dialog can appear after Play now's first navigation wait expires. After confirming it
+  with both mobile options off, wait again for the game origin before treating the current lobby URL as a failed SSO.
 - Preserve the intentional headed/maximized anti-detection setup and `ViewportSize.NoViewport`.
 - Login automation requires English UI and fails clearly when required markers are missing.
 - The one-time Gold Shop offer is a blocking announcement, not an automation action. Dismiss it after game-page
@@ -239,6 +245,12 @@ Published artifacts belong under `artifacts/`, never beside source files.
   not a user-toggleable automation group; do not show it on the Dashboard or in per-village group settings.
 - `ActiveConstructions` is the source of truth for occupied construction slots. A full queue is a normal blocked
   state, not an exception.
+- A confirmed empty dorf1/dorf2 construction overview arms a short per-village immediate-fill burst: start all
+  available official resource/building slots without the construction start delay, then resume normal humanized
+  timing. Romans have one resource plus one building slot without Plus; Plus adds one flexible third slot (up to
+  two resources or two buildings, three total). Only the first unstarted row after a contiguous prefix of already
+  started rows may use a free slot; every other unstarted resource, storage, requirement, retry, or humanize defer
+  preserves visible queue order and ends the burst.
 - A confirmed empty overview gives the first stale resource `page_timer` head one immediate live validation so a
   free slot cannot idle behind an obsolete timer. Hero inventory is never polled for this: only an observed inventory
   increase wakes the first resource-deferred construction head per village; identical reads and transfer deductions do not.

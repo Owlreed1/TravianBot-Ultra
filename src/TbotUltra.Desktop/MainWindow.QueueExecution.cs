@@ -1191,10 +1191,23 @@ public partial class MainWindow
                     // The pre-sleep fill flag is valid for exactly one execution attempt — this attempt
                     // just ran, so drop it. The sweep re-flags the item if it defers into the window again.
                     updatedPayload.Remove(BotOptionPayloadKeys.ConstructionPreSleepFill);
-                    // Login fill lasts only while starts can make progress. Any defer ends the burst;
-                    // later retries use the normal online-completion humanize rules.
+                    // The immediate-fill override stays meaningful only while a construction was started
+                    // or its own Travian category is full. Resource/requirement/storage/retry waits are
+                    // a real unstarted head and end the burst for later rows too.
+                    var fillCanContinue = string.Equals(
+                            updatedPayload[BotOptionPayloadKeys.UpgradeDeferReason],
+                            BotOptionPayloadKeys.UpgradeDeferReasonInProgress,
+                            StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(
+                            updatedPayload[BotOptionPayloadKeys.UpgradeDeferReason],
+                            BotOptionPayloadKeys.UpgradeDeferReasonQueueFull,
+                            StringComparison.OrdinalIgnoreCase);
                     updatedPayload.Remove(BotOptionPayloadKeys.ConstructionLoginFill);
                     updatedPayload.Remove(BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds);
+                    if (!fillCanContinue)
+                    {
+                        ClearConstructionLoginFillForBlockedHead(item, "empty-queue");
+                    }
 
                     // Safety net for an unsatisfiable requirement. Requirement defers don't consume Retries
                     // (the prerequisite could still arrive), so without a bound a construct whose prerequisite

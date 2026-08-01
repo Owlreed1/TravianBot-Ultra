@@ -159,15 +159,31 @@ public sealed class SessionPacerTests
     }
 
     [Fact]
-    public void Configure_WhileSleepingDoesNotEndSleep()
+    public void Configure_DisablingWhileSleeping_WakesAutomation()
     {
         var pacer = new SessionPacer();
         pacer.Configure(new SessionPacerSettings(true, 120, 120, 30, 30));
         pacer.BeginSleep();
+        var wakeRequested = false;
+        pacer.WakeRequested += (_, _) => wakeRequested = true;
 
         pacer.Configure(new SessionPacerSettings(false, 120, 120, 30, 30));
 
-        Assert.Equal(SessionPacerPhase.Sleeping, pacer.Phase);
+        Assert.Equal(SessionPacerPhase.Disabled, pacer.Phase);
+        Assert.True(wakeRequested);
+    }
+
+    [Fact]
+    public void Configure_EnablingWhileAutomationIsActive_StartsRunImmediately()
+    {
+        var pacer = new SessionPacer();
+        pacer.Configure(new SessionPacerSettings(false, 120, 120, 30, 30));
+        pacer.NotifyAutomationStarted();
+
+        pacer.Configure(new SessionPacerSettings(true, 120, 120, 30, 30));
+
+        Assert.Equal(SessionPacerPhase.Running, pacer.Phase);
+        Assert.NotNull(pacer.TimeUntilSleep);
     }
 
     [Fact]

@@ -59,6 +59,7 @@ public sealed class ConstructionQueueStateTests
     [InlineData("Slot 20: upgrade to level 5 already queued and still in progress. queue_wait_seconds=3600")]
     [InlineData("Slot 20: upgrade toward max already queued and still in progress. queue_wait_seconds=3600")]
     [InlineData("Slot 20: upgrade to level 5 queued and still in progress. queue_wait_seconds=3600")]
+    [InlineData("Resource fields: queued upgrade(s) already reaching target level 6. Upgrades made: 0. queue_wait_seconds=228")]
     public void IsConstructionInProgressDeferMessage_RecognizesItemSpecificWaits(string message)
     {
         Assert.True(ConstructionQueueState.IsConstructionInProgressDeferMessage(message));
@@ -418,7 +419,7 @@ public sealed class ConstructionQueueStateTests
     }
 
     [Fact]
-    public void ResolveAvailabilityForItem_RomansKeepsFullResourceQueueBlockedWhenBuildingSlotIsFree()
+    public void ResolveAvailabilityForItem_RomansPlusAllowsFlexibleSecondResourceSlot()
     {
         var status = CreateStatus([], [], 1, 600) with
         {
@@ -433,7 +434,7 @@ public sealed class ConstructionQueueStateTests
 
         var result = ConstructionQueueState.ResolveAvailabilityForItem(status, true, resourceItem);
 
-        Assert.Equal(ConstructionQueueAvailability.Full, result);
+        Assert.Equal(ConstructionQueueAvailability.Available, result);
     }
 
     [Fact]
