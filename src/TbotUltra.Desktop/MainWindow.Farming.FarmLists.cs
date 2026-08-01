@@ -303,6 +303,16 @@ public partial class MainWindow
                 SetFarmingBlockedState(FarmingBlockedReasonNoFarmLists, "No farmlists available");
             }
 
+            _suppressFarmingSettingsConfigWrite = true;
+            try
+            {
+                RefreshFarmLossDestinationOptions();
+            }
+            finally
+            {
+                _suppressFarmingSettingsConfigWrite = false;
+            }
+
             UpdateFarmingUiState();
             SyncFarmListSelectionHandlers();
             RefreshFarmListsItemsControl();
