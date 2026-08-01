@@ -6,6 +6,30 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class AccountSwitchSessionPacingSourceTests
 {
     [Fact]
+    public void RefreshAfterActiveAccountChanged_ForceClearsThePreviousAccountsVillageSelection()
+    {
+        var projectRoot = ProjectRootLocator.FindProjectRoot();
+        var source = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "src",
+            "TbotUltra.Desktop",
+            "MainWindow.Session.cs"));
+        var methodStart = source.IndexOf(
+            "private void RefreshAfterActiveAccountChanged",
+            StringComparison.Ordinal);
+        var methodEnd = source.IndexOf(
+            "    // ResetVillageSelectionUi()",
+            methodStart,
+            StringComparison.Ordinal);
+
+        Assert.True(methodStart >= 0 && methodEnd > methodStart);
+        var methodBody = source[methodStart..methodEnd];
+
+        Assert.Contains("ForceClearVillageSelectionUi();", methodBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("ResetVillageSelectionUi();", methodBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ResetForAccountSwitch_ClearsThePreviousAccountsSleepState()
     {
         var projectRoot = ProjectRootLocator.FindProjectRoot();

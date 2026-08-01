@@ -837,7 +837,7 @@ public partial class MainWindow
         RefreshBrowserStatisticsUi();
         RecoverAndRefreshActiveAccountQueue();
         AppendLog($"Active account changed to '{accountName}'. Previous session closed and state reset.");
-        ResetVillageSelectionUi();
+        ForceClearVillageSelectionUi();
         SyncServerFromActiveAccount();
         LoadConfigToUi();
         ConfigureSessionPacerFromConfig(reloadRuntime: true);
