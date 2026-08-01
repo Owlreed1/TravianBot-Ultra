@@ -736,7 +736,8 @@ public sealed partial class TravianClient : IFarmingClient
             return false;
         }
 
-        var editEntry = _page.Locator(".entry.edit:visible, button.entry.edit:visible, [class~='edit']:visible").First;
+        Notify($"[farm-list] combined move: menu opened for slot '{row.SlotId}'; selecting Edit target.");
+        var editEntry = _page.Locator("button.entry.edit[title='Edit target']:visible").First;
         try
         {
             await editEntry.WaitForAsync(new LocatorWaitForOptions
@@ -745,8 +746,9 @@ public sealed partial class TravianClient : IFarmingClient
                 Timeout = _config.TimeoutMs,
             }).WaitAsync(cancellationToken);
         }
-        catch (PlaywrightException)
+        catch (PlaywrightException ex)
         {
+            Notify($"[farm-list] Edit target was not visible for slot '{row.SlotId}': {ex.Message}");
             return false;
         }
 
@@ -833,7 +835,7 @@ public sealed partial class TravianClient : IFarmingClient
             """
             () => {
               const clean = value => (value || '').replace(/\s+/g, ' ').trim().toLowerCase();
-              const entries = Array.from(document.querySelectorAll('.entry.edit, button.entry.edit, [class~="edit"]'));
+              const entries = Array.from(document.querySelectorAll('button.entry.edit[title="Edit target"]'));
               const entry = entries.find(node => node.getClientRects().length > 0 && clean(node.textContent).includes('edit'));
               if (!entry) return false;
               entry.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
