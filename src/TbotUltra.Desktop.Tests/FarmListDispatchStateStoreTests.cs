@@ -29,4 +29,12 @@ public sealed class FarmListDispatchStateStoreTests
     {
         Assert.Equal("name:Raiders", FarmListDispatchStateStore.CreateKey(null, "Raiders"));
     }
+
+    [Fact]
+    public void IsSuccessfulDispatch_CompletedSendWithoutCooldown_IsSuccessful()
+    {
+        Assert.True(FarmListDispatchStateStore.IsSuccessfulDispatch(
+            sendActionCompleted: true,
+            remainingSeconds: 0));
+    }
 }

@@ -10,6 +10,14 @@ public static class FarmListDispatchStateStore
 {
     private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
+    internal static bool IsSuccessfulDispatch(bool sendActionCompleted, int? remainingSeconds)
+    {
+        // A list can dispatch successfully without exposing a positive cooldown (for example when
+        // Travian immediately reports it ready again). Cooldown describes list availability, not whether
+        // its send action succeeded.
+        return sendActionCompleted;
+    }
+
     public static string CreateKey(string? listId, string? listName)
     {
         if (!string.IsNullOrWhiteSpace(listId))

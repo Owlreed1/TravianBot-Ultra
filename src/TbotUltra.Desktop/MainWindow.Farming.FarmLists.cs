@@ -1430,7 +1430,9 @@ public partial class MainWindow
         {
             if (attemptedKeys.Contains(FarmListDispatchKey(row)))
             {
-                RecordFarmListDispatch(row, row.RemainingSeconds is > 0);
+                RecordFarmListDispatch(row, FarmListDispatchStateStore.IsSuccessfulDispatch(
+                    sendActionCompleted: true,
+                    row.RemainingSeconds));
             }
         }
     }

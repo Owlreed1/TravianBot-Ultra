@@ -120,18 +120,16 @@
                                                                         </Border.Style>
                                                                         <Grid>
                                                                             <Grid.ColumnDefinitions>
-                                                                                <ColumnDefinition Width="50" />
                                                                                 <ColumnDefinition Width="*" />
                                                                                 <ColumnDefinition Width="Auto" />
                                                                                 <ColumnDefinition Width="80" />
                                                                                 <ColumnDefinition Width="90" />
                                                                             </Grid.ColumnDefinitions>
-                                                                            <TextBlock Grid.Column="1"
-                                                                                       Text="{Binding Items[0].VillageHeaderText}"
+                                                                            <TextBlock Text="{Binding Items[0].VillageHeaderText}"
                                                                                        FontWeight="SemiBold"
                                                                                        FontSize="13"
                                                                                        Foreground="{DynamicResource TextSecondaryBrush}" />
-                                                                            <Border Grid.Column="2"
+                                                                            <Border Grid.Column="1"
                                                                                     Tag="FarmListNextSendBadge"
                                                                                     Margin="0,0,8,0"
                                                                                     Padding="8,3"
@@ -146,22 +144,6 @@
                                                                                            FontWeight="SemiBold"
                                                                                            Foreground="{DynamicResource WarningTextBrush}" />
                                                                             </Border>
-                                                                            <TextBlock Grid.Column="3"
-                                                                                       Text="Last sent"
-                                                                                       HorizontalAlignment="Center"
-                                                                                       FontWeight="SemiBold"
-                                                                                       FontSize="12"
-                                                                                       Foreground="{DynamicResource TextMutedBrush}">
-                                                                                <TextBlock.Style>
-                                                                                    <Style TargetType="TextBlock">
-                                                                                        <Style.Triggers>
-                                                                                            <DataTrigger Binding="{Binding Items[0].ShowLastSentTimer}" Value="False">
-                                                                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                                                            </DataTrigger>
-                                                                                        </Style.Triggers>
-                                                                                    </Style>
-                                                                                </TextBlock.Style>
-                                                                            </TextBlock>
                                                                         </Grid>
                                                                     </Border>
                                                                 </DataTemplate>
