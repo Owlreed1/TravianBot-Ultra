@@ -125,7 +125,15 @@ public static class QueueDisplayNameFormatter
         if (string.Equals(item.TaskName, "demolish_building_to_level", StringComparison.OrdinalIgnoreCase)
             && targetLevel.HasValue)
         {
-            var targetBuilding = GetPayloadValue(payload, BotOptionPayloadKeys.TargetBuildingSlotOrName);
+            var targetBuilding = GetPayloadValue(payload, BotOptionPayloadKeys.DemolishTargetName);
+            if (string.IsNullOrWhiteSpace(targetBuilding))
+            {
+                var targetSlotOrName = GetPayloadValue(payload, BotOptionPayloadKeys.TargetBuildingSlotOrName);
+                targetBuilding = int.TryParse(targetSlotOrName, out var demolishSlotId)
+                    ? resolveBuildingName(demolishSlotId) ?? targetSlotOrName
+                    : targetSlotOrName;
+            }
+
             return !string.IsNullOrWhiteSpace(targetBuilding)
                 ? $"Demolish {targetBuilding} to level {targetLevel.Value}"
                 : $"Demolish building to level {targetLevel.Value}";

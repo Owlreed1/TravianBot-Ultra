@@ -316,17 +316,17 @@
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                                                     <CheckBox x:Name="MoveFarmLossesCheckBox"
                                                               Content="Move red/yellow farms to list"
-                                                              Margin="0,0,8,0"
+                                                              Margin="0,0,6,0"
                                                               Checked="MoveFarmLossesCheckBox_Checked"
                                                               Unchecked="FarmingSettings_Changed" />
+                                                    <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                                    Margin="0,0,8,0"
+                                                                    VerticalAlignment="Center"
+                                                                    ToolTip="Moves red/yellow non-oasis targets to the selected list and deactivates them in the same Edit action." />
                                                     <ComboBox x:Name="FarmLossDestinationComboBox"
                                                               Width="260"
                                                               DisplayMemberPath="DisplayText"
                                                               SelectionChanged="FarmingSettings_Changed" />
-                                                    <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                                    Margin="8,0,0,0"
-                                                                    VerticalAlignment="Center"
-                                                                    ToolTip="Moves red/yellow non-oasis targets to the selected list and deactivates them in the same Edit action." />
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal">
                                                     <CheckBox x:Name="DeactivateFarmOasisLossesCheckBox"

@@ -245,10 +245,16 @@
                                           Width="80"
                                           Margin="10,0,0,0"
                                           VerticalAlignment="Center" />
-                                <TextBlock x:Name="DailyServerResetDetectedTextBlock"
-                                           VerticalAlignment="Center"
-                                           Margin="10,0,0,0"
-                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <Border Background="{DynamicResource SuccessBgBrush}"
+                                        BorderBrush="{DynamicResource SuccessBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="9,2"
+                                        Margin="10,0,0,0"
+                                        VerticalAlignment="Center">
+                                    <TextBlock x:Name="DailyServerResetDetectedTextBlock"
+                                               Foreground="{DynamicResource SuccessTextBrush}" />
+                                </Border>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -599,6 +605,18 @@
                                                     Click="VillageStatusSweepScanNowButton_Click" />
                                         </StackPanel>
                                     </StackPanel>
+                                    <Grid Margin="18,0,0,0">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="70" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Min" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Row="0" Grid.Column="2" Text="Max" FontWeight="SemiBold" />
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="Function delay (min)" /><ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Random delay after a completed round before the next round starts." /></StackPanel>
+                                        <TextBox x:Name="VillageStatusSweepRoundMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" />
+                                        <TextBox x:Name="VillageStatusSweepRoundMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="Village delay (s)" /><ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Random delay before switching to the next village. Normal click pacing also applies to the navigation." /></StackPanel>
+                                        <TextBox x:Name="VillageStatusSweepVillageMinTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" />
+                                        <TextBox x:Name="VillageStatusSweepVillageMaxTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                    </Grid>
                                     <StackPanel Margin="18,0,0,8">
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                             <CheckBox x:Name="VillageStatusSweepDorf1CheckBox" Content="Dorf1" IsChecked="True" Margin="0,2,8,2" />
@@ -615,35 +633,9 @@
                                             <CheckBox x:Name="VillageStatusSweepBreweryCheckBox" Content="Brewery" ToolTip="Teutons only" Margin="0,2" />
                                         </StackPanel>
                                     </StackPanel>
-                                    <Grid Margin="18,0,0,0">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="70" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Min" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Row="0" Grid.Column="2" Text="Max" FontWeight="SemiBold" />
-                                        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="Function delay (min)" /><ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Random delay after a completed round before the next round starts." /></StackPanel>
-                                        <TextBox x:Name="VillageStatusSweepRoundMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="VillageStatusSweepRoundMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" />
-                                        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="Village delay (s)" /><ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Random delay before switching to the next village. Normal click pacing also applies to the navigation." /></StackPanel>
-                                        <TextBox x:Name="VillageStatusSweepVillageMinTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="VillageStatusSweepVillageMaxTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" />
-                                    </Grid>
                                 </StackPanel>
                             </Border>
 
-                            <Border Style="{StaticResource SettingsGroupBox}" Margin="0,10,0,0">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Demolish delay (min)" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                        <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                        ToolTip="After Travian finishes one demolition, wait a random time before starting the next one. The chosen delay is stored with the queue timer." />
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                        <TextBox x:Name="DemolishDelayMinTextBox" Width="64" Height="24" />
-                                        <TextBlock Text="to" Margin="8,0" VerticalAlignment="Center" />
-                                        <TextBox x:Name="DemolishDelayMaxTextBox" Width="64" Height="24" />
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
                         </StackPanel>
                     </Border>
 
@@ -670,10 +662,25 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Style="{StaticResource SettingsGroupBox}"
-                                    BorderThickness="0"
-                                    Padding="0"
-                                    Margin="0">
+                            <Border Style="{StaticResource SettingsGroupBox}" Margin="0,10,0,0">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Demolish delay (min)" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                        ToolTip="After Travian finishes one demolition, wait a random time before starting the next one. The chosen delay is stored with the queue timer." />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <TextBox x:Name="DemolishDelayMinTextBox" Width="64" Height="24" />
+                                        <TextBlock Text="to" Margin="8,0" VerticalAlignment="Center" />
+                                        <TextBox x:Name="DemolishDelayMaxTextBox" Width="64" Height="24" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                                <Border Style="{StaticResource SettingsGroupBox}"
+                                        BorderThickness="0"
+                                        Padding="0"
+                                        Margin="0,10,0,0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10" VerticalAlignment="Center">
                                         <CheckBox x:Name="ConstructionHumanizeCheckBox"

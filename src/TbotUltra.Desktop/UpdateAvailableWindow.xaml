@@ -14,7 +14,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
@@ -28,19 +28,19 @@
                        Foreground="{DynamicResource TextMutedBrush}" />
         </StackPanel>
 
-        <Border Grid.Row="1"
+        <Border Grid.Row="2"
                 Background="{DynamicResource InfoBgBrush}"
                 BorderBrush="{DynamicResource InfoBrush}"
                 BorderThickness="1"
                 CornerRadius="8"
                 Padding="10,8"
-                Margin="0,8,0,16">
+                Margin="0,14,0,0">
             <TextBlock Text="Open update options to download or install the latest release."
                        Foreground="{DynamicResource InfoTextBrush}"
                        TextWrapping="Wrap" />
         </Border>
 
-        <Grid Grid.Row="2" VerticalAlignment="Top">
+        <Grid Grid.Row="1" VerticalAlignment="Top">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="38" />

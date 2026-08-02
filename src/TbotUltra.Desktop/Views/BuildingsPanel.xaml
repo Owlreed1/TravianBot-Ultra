@@ -244,10 +244,39 @@
                                         Margin="7,1,0,0"
                                         ToolTip="Queue demolitions from a building slot. The bot starts one level at a time, stores the server timer plus the configured random delay, and continues without waiting in the browser." />
                     </StackPanel>
-                    <TextBlock Text="{Binding BuildingsVm.DemolishStatusText, RelativeSource={RelativeSource AncestorType=Window}}"
-                               Foreground="{DynamicResource TextSubtleBrush}"
-                               TextWrapping="Wrap"
-                               Margin="0,6,0,10" />
+                    <Border Margin="0,6,0,10"
+                            CornerRadius="8">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="Padding" Value="0" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding BuildingsVm.DemolishStatusHasTimer, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource WarningBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
+                                        <Setter Property="BorderThickness" Value="1" />
+                                        <Setter Property="Padding" Value="8,4" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding BuildingsVm.DemolishStatusText, RelativeSource={RelativeSource AncestorType=Window}}"
+                                   TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextSubtleBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding BuildingsVm.DemolishStatusHasTimer, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Border>
                     <Button Content="Demolish overview" Height="30" Margin="0"
                             HorizontalAlignment="Stretch"
                             Click="DemolishOverviewButton_Click" />

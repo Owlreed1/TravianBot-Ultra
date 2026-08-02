@@ -54,22 +54,15 @@ public sealed partial class TravianClient
     }
 
     // Like ReadVillagesAsync but never navigates to spieler.php just to refresh the list.
-    // Order: fresh cache -> stale cache -> sidebar of current page -> server (last resort).
+    // The current sidebar is checked first because it is the earliest reliable signal for a
+    // newly founded village. The cache is only a fallback when the current page has no readable
+    // village list (for example during a navigation transition).
     // Used by lightweight refresh paths (e.g. post-upgrade) where the page navigation would
     // appear to the user as an unnecessary refresh.
     private async Task<IReadOnlyList<Village>> ReadVillagesPreferCacheAsync(CancellationToken cancellationToken)
     {
         using var trace = _browserTrace.BeginOperation("READ", "villages-prefer-cache", "scope=account source=cache-or-sidebar");
-        if (_cachedVillages is { Count: > 0 } cached
-            && DateTimeOffset.UtcNow - _cachedVillagesAt < VillagesCacheTtl)
-        {
-            var ageMs = (long)(DateTimeOffset.UtcNow - _cachedVillagesAt).TotalMilliseconds;
-            _browserTrace.Event("CACHE", "villages-hit", "hit", $"ageMs={ageMs} count={cached.Count}");
-            trace.Complete("success", $"source=fresh-cache count={cached.Count} ageMs={ageMs}");
-            return cached;
-        }
-
-        _browserTrace.Event("CACHE", "villages-miss", "miss", "reason=missing-or-expired checking=sidebar");
+        _browserTrace.Event("CACHE", "villages-check", "observed", "source=current-page-sidebar reason=discover-new-villages");
 
         try
         {
@@ -100,12 +93,12 @@ public sealed partial class TravianClient
             Notify($"[scan:verbose] ReadVillagesPreferCache sidebar read failed, falling back: {ex.Message}");
         }
 
-        if (_cachedVillages is { Count: > 0 } stale)
+        if (_cachedVillages is { Count: > 0 } cached)
         {
             var ageMs = (long)(DateTimeOffset.UtcNow - _cachedVillagesAt).TotalMilliseconds;
-            _browserTrace.Event("CACHE", "villages-hit", "hit", $"ageMs={ageMs} count={stale.Count} stale=true reason=sidebar-empty-or-failed");
-            trace.Complete("success", $"source=stale-cache count={stale.Count} ageMs={ageMs}");
-            return stale;
+            _browserTrace.Event("CACHE", "villages-hit", "hit", $"ageMs={ageMs} count={cached.Count} reason=sidebar-empty-or-failed");
+            trace.Complete("success", $"source=cache-fallback count={cached.Count} ageMs={ageMs}");
+            return cached;
         }
 
         var profile = await ReadVillagesAsync(cancellationToken);

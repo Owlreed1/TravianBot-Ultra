@@ -34,14 +34,16 @@ public partial class MainWindow
             .OrderBy(candidate => candidate.CreatedAt)
             .FirstOrDefault();
 
-        _buildingsViewModel.DemolishStatusText = GetDemolishStatusText(item, DateTimeOffset.UtcNow, false);
+        var status = GetDemolishStatus(item, DateTimeOffset.UtcNow, false);
+        _buildingsViewModel.DemolishStatusText = status.Text;
+        _buildingsViewModel.DemolishStatusHasTimer = status.HasTimer;
     }
 
-    private static string GetDemolishStatusText(QueueItem? item, DateTimeOffset now, bool overview)
+    private static (string Text, bool HasTimer) GetDemolishStatus(QueueItem? item, DateTimeOffset now, bool overview)
     {
         if (item is null)
         {
-            return overview ? "No active demolition" : "No demolition queued for this village.";
+            return (overview ? "No active demolition" : "No demolition queued for this village.", false);
         }
 
         var target = item.Payload.GetValueOrDefault(BotOptionPayloadKeys.DemolishTargetName)
@@ -53,20 +55,20 @@ public partial class MainWindow
 
         if (item.Status == QueueStatus.Running)
         {
-            return $"Starting demolition of {target}…";
+            return ($"Starting demolition of {target}…", false);
         }
 
         if (TryGetDemolishServerFinishAt(item, out var serverFinishAt) && serverFinishAt > now)
         {
-            return $"Demolishing {target} — {FormatCountdown((int)Math.Ceiling((serverFinishAt - now).TotalSeconds))} remaining.";
+            return ($"Demolishing {target} — {FormatCountdown((int)Math.Ceiling((serverFinishAt - now).TotalSeconds))} remaining.", true);
         }
 
         if (item.NextAttemptAt > now)
         {
-            return $"Next demolition for {target} after delay — {FormatCountdown((int)Math.Ceiling((item.NextAttemptAt - now).TotalSeconds))}.";
+            return ($"Next demolish start: {FormatCountdown((int)Math.Ceiling((item.NextAttemptAt - now).TotalSeconds))}", true);
         }
 
-        return $"Demolition of {target} is ready to start.";
+        return ($"Demolition of {target} is ready to start.", false);
     }
 
     private static bool TryGetDemolishServerFinishAt(QueueItem item, out DateTimeOffset finishAt)
@@ -108,13 +110,14 @@ public partial class MainWindow
             .Select(village =>
             {
                 activeItemsByVillage.TryGetValue(village.Key, out var items);
-                var status = GetDemolishStatusText(items?.FirstOrDefault(), now, true);
+                var status = GetDemolishStatus(items?.FirstOrDefault(), now, true);
+                var statusText = status.Text;
                 if (items?.Count > 1)
                 {
-                    status += $" (+{items.Count - 1} queued)";
+                    statusText += $" (+{items.Count - 1} queued)";
                 }
 
-                return new DemolishOverviewRow(village.Name, status);
+                return new DemolishOverviewRow(village.Name, statusText, status.HasTimer);
             })
             .ToList();
 

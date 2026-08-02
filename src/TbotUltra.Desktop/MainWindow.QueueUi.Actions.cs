@@ -285,6 +285,7 @@ public partial class MainWindow
 
             ClearPendingResourceLevelsFromUi();
             RefreshQueueUi();
+            RefreshSelectedBuildingsAfterQueueClear();
             AppendLog($"Cleared {removed} queued task(s) for village '{villageName}'.");
         }
         catch (Exception ex)
@@ -334,9 +335,19 @@ public partial class MainWindow
         _buildingLastQueuedConstructBySlot.Clear();
         ClearPendingResourceLevelsFromUi();
         RefreshQueueUi();
+        RefreshSelectedBuildingsAfterQueueClear();
         AppendLog(removed > 0
             ? "Active queue cleared and running actions stopped."
             : "Could not clear active queue.");
+    }
+
+    private void RefreshSelectedBuildingsAfterQueueClear()
+    {
+        var status = ResolveSelectedVillageBuildingStatus();
+        if (status is not null && IsStatusForSelectedVillage(status))
+        {
+            PopulateBuildingsTab(status);
+        }
     }
 
     private static bool IsActiveQueueItem(QueueItem item)

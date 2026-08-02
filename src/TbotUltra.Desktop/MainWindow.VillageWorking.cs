@@ -655,21 +655,6 @@ public partial class MainWindow
             .ToList();
     }
 
-    // The Queue tab just shows which village's queue is displayed; the village is chosen with the
-    // existing dropdown on the Dashboard. Keep the label in sync with that selection.
-    private void SyncQueueVillagePicker(VillageSelectionItem? selected)
-    {
-        if (QueueSelectedVillageTextBlock is null)
-        {
-            return;
-        }
-
-        var name = selected?.Name;
-        QueueSelectedVillageTextBlock.Text = string.IsNullOrWhiteSpace(name) || string.Equals(name, "-", StringComparison.Ordinal)
-            ? "Selected village: -"
-            : $"Selected village: {name}";
-    }
-
     private void SwitchVillageButton_Click(object sender, System.Windows.RoutedEventArgs e)
     {
         _ = sender;
@@ -1354,8 +1339,6 @@ public partial class MainWindow
             ClearVillageDetailUiForUncachedSelection(selected.Name);
         }
 
-        // Keep the queue view in sync with the selected village.
-        SyncQueueVillagePicker(selected);
         RefreshQueueUi();
         // Show this village's auto-loop group toggles + construction timer.
         ApplyAutomationLoopGroupsForSelectedVillage();

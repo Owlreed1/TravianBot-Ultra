@@ -225,13 +225,8 @@ public sealed partial class TravianClient
 
     // Session-level cache for the villages list. Spieler.php is expensive to load, but the
     // prefer-cache path only re-reads the lightweight current-page sidebar (no navigation), so a
-    // one-minute TTL keeps rare village additions reasonably fresh without re-reading the unchanged
-    // sidebar on every ~20s dashboard tick. Active-village renames use coordinate reconciliation on
-    // every tick and therefore do not depend on this TTL.
-    // Village identity changes rarely. Keep the account list long enough that periodic resource/UI
-    // reads do not scrape the same sidebar every minute. A failed switch invalidates it immediately;
-    // the five-minute observation refresh still detects founded/renamed villages during a session.
-    private static readonly TimeSpan VillagesCacheTtl = TimeSpan.FromMinutes(5);
+    // The sidebar is checked by lightweight refresh paths so newly founded villages and active-village
+    // renames are discovered without navigating to the profile page.
     private static readonly TimeSpan EnsureLoggedInMinInterval = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan UiSyncMinInterval = TimeSpan.FromSeconds(20);
     private static readonly object ResourceStatusCacheSync = new();

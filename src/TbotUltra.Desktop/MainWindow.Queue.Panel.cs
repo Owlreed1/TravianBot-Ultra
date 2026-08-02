@@ -8,8 +8,6 @@ public partial class MainWindow
     private DataGrid TravianBuildQueueDataGrid => QueuePanelControl.TravianBuildQueue;
     private DataGrid TravianSmithyQueueDataGrid => QueuePanelControl.TravianSmithyQueue;
     private TabControl QueueSectionTabControl => QueuePanelControl.QueueSections;
-    private TextBlock QueueInfoTextBlock => QueuePanelControl.QueueInfo;
-    private TextBlock QueueSelectedVillageTextBlock => QueuePanelControl.SelectedVillage;
     private Button QueueRemoveButton => QueuePanelControl.RemoveButton;
     private Button QueueMoveUpButton => QueuePanelControl.MoveUpButton;
     private Button QueueMoveDownButton => QueuePanelControl.MoveDownButton;

@@ -153,26 +153,6 @@
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center" />
-                    <Rectangle Width="1" Fill="{DynamicResource BorderSubtleBrush}" Margin="12,3,12,3" />
-                    <TextBlock x:Name="QueueInfoTextBlock"
-                               Text="Queue loaded."
-                               Width="118"
-                               TextTrimming="CharacterEllipsis"
-                               Foreground="{DynamicResource TextSubtleBrush}"
-                               FontSize="11"
-                               VerticalAlignment="Center" />
-                    <TextBlock Text=" | "
-                               Foreground="{DynamicResource TextSubtleBrush}"
-                               FontSize="11"
-                               VerticalAlignment="Center" />
-                    <TextBlock x:Name="QueueSelectedVillageTextBlock"
-                               Text="Selected village: -"
-                               Width="150"
-                               TextTrimming="CharacterEllipsis"
-                               Foreground="{DynamicResource TextSubtleBrush}"
-                               FontSize="11"
-                               VerticalAlignment="Center"
-                               ToolTip="The queue below is shown for this village. Choose a village with the dropdown on the Dashboard." />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button x:Name="QueueRemoveButton" Content="Remove" Width="76" Click="QueueRemoveButton_Click" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" />
@@ -276,7 +256,6 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Created" Width="1.5*" Binding="{Binding CreatedAtServer}" />
                     <DataGridTextColumn Header="Time" Width="1.1*" Binding="{Binding BuildTimeText}" />
                     <DataGridTemplateColumn Header="Cost (W | C | I | Cr)" Width="1.7*">
                         <DataGridTemplateColumn.CellTemplate>

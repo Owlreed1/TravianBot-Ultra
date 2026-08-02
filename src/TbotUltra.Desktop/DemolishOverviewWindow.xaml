@@ -21,7 +21,43 @@
                   CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Village" Binding="{Binding VillageName}" Width="1.1*" />
-                <DataGridTextColumn Header="Demolish" Binding="{Binding DemolishStatus}" Width="2*" />
+                <DataGridTemplateColumn Header="Demolish" Width="2*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="8">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="BorderBrush" Value="Transparent" />
+                                        <Setter Property="BorderThickness" Value="0" />
+                                        <Setter Property="Padding" Value="0" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DemolishStatusHasTimer}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource WarningBgBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
+                                                <Setter Property="BorderThickness" Value="1" />
+                                                <Setter Property="Padding" Value="8,3" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding DemolishStatus}" TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DemolishStatusHasTimer}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
         <Button Grid.Row="2" Content="Close" Width="90" Height="30" HorizontalAlignment="Right"

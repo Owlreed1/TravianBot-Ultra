@@ -40,6 +40,23 @@ public sealed class QueueDisplayServicesTests
     }
 
     [Fact]
+    public void Format_Demolish_UsesPayloadBuildingNameInsteadOfSlot()
+    {
+        var item = Item(
+            "demolish_building_to_level",
+            new Dictionary<string, string>
+            {
+                [BotOptionPayloadKeys.TargetBuildingSlotOrName] = "35",
+                [BotOptionPayloadKeys.TargetLevel] = "0",
+                [BotOptionPayloadKeys.DemolishTargetName] = "Sawmill",
+            });
+
+        var displayName = QueueDisplayNameFormatter.Format(item, _ => null, _ => null, 18);
+
+        Assert.Equal("Demolish Sawmill to level 0", displayName);
+    }
+
+    [Fact]
     public void Format_SendFarmlists_UsesSelectedListNames()
     {
         var item = Item(

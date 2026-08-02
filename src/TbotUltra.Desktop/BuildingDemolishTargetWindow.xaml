@@ -14,7 +14,6 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <TextBlock x:Name="TitleTextBlock"
@@ -30,16 +29,7 @@
                    TextWrapping="Wrap"
                    Margin="0,0,0,12" />
 
-        <Button Grid.Row="2"
-                Content="Demolish whole building"
-                Height="30"
-                Margin="0,0,0,14"
-                Background="{DynamicResource DangerTextBrush}"
-                Foreground="White"
-                BorderBrush="{DynamicResource DangerDarkBrush}"
-                Click="DemolishWholeButton_Click" />
-
-        <StackPanel Grid.Row="3">
+        <StackPanel Grid.Row="2">
             <TextBlock Text="Demolish to level"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        FontSize="12"
@@ -56,10 +46,18 @@
             </DockPanel>
         </StackPanel>
 
-        <StackPanel Grid.Row="4"
+        <StackPanel Grid.Row="3"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,14,0,0">
+            <Button Height="28"
+                    Padding="12,0"
+                    Margin="0,0,8,0"
+                    Content="Demolish whole building"
+                    Background="{DynamicResource DangerBgBrush}"
+                    Foreground="{DynamicResource DangerTextBrush}"
+                    BorderBrush="{DynamicResource DangerBorderBrush}"
+                    Click="DemolishWholeButton_Click" />
             <Button Width="88"
                     Height="28"
                     Content="Cancel"

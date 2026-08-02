@@ -15,8 +15,6 @@ public partial class QueuePanel : UserControl
     internal DataGrid TravianBuildQueue => TravianBuildQueueDataGrid;
     internal DataGrid TravianSmithyQueue => TravianSmithyQueueDataGrid;
     internal TabControl QueueSections => QueueSectionTabControl;
-    internal TextBlock QueueInfo => QueueInfoTextBlock;
-    internal TextBlock SelectedVillage => QueueSelectedVillageTextBlock;
     internal Button RemoveButton => QueueRemoveButton;
     internal Button MoveUpButton => QueueMoveUpButton;
     internal Button MoveDownButton => QueueMoveDownButton;

@@ -123,7 +123,6 @@ public partial class MainWindow
                 }
             }
 
-            QueueInfoTextBlock.Text = $"Queue active: {displayedActiveRows.Count} | done: {displayedHistoryRows.Count}";
             UpdateQueueClearButtonContent();
             if (_queuePopupWindow?.Content is Grid queuePopupRoot && queuePopupRoot.Children.Count >= 2)
             {
@@ -141,7 +140,6 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            QueueInfoTextBlock.Text = $"Queue load failed: {ex.Message}";
             AppendLog($"Queue load failed: {ex.Message}");
             UpdateExecutionStateIndicator();
         }

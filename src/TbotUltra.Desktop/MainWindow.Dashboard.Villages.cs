@@ -162,8 +162,6 @@ public partial class MainWindow
             ApplySelectedVillageTribeFromCache(selectedVillage);
         }
 
-        // Mirror the picker into the Queue tab's village dropdown so both stay in sync.
-        SyncQueueVillagePicker(VillageComboBox.SelectedItem as VillageSelectionItem);
     }
 
     private static string? ResolveUniqueVillageKeyByName(IReadOnlyList<Village> villages, string? name)

@@ -18,11 +18,18 @@ namespace TbotUltra.Desktop.ViewModels;
 public sealed class BuildingsViewModel : BaseViewModel
 {
     private string _demolishStatusText = "No demolition queued for this village.";
+    private bool _demolishStatusHasTimer;
 
     public string DemolishStatusText
     {
         get => _demolishStatusText;
         set => SetProperty(ref _demolishStatusText, value);
+    }
+
+    public bool DemolishStatusHasTimer
+    {
+        get => _demolishStatusHasTimer;
+        set => SetProperty(ref _demolishStatusHasTimer, value);
     }
 
     /// <summary>

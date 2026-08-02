@@ -14,4 +14,4 @@ public partial class DemolishOverviewWindow : Window
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
 }
 
-internal sealed record DemolishOverviewRow(string VillageName, string DemolishStatus);
+internal sealed record DemolishOverviewRow(string VillageName, string DemolishStatus, bool DemolishStatusHasTimer);
