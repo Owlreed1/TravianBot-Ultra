@@ -285,6 +285,8 @@ public partial class MainWindow
         {
             UpdateAutomationLoopRunningIndicators();
         }
+
+        UpdateNextFarmListSendDisplay();
     }
 
     private static bool AutomationLoopTaskFilter(object item)
@@ -332,6 +334,7 @@ public partial class MainWindow
                 item.RemainingSeconds = null;
             }
 
+            UpdateNextFarmListSendDisplay();
             return;
         }
 
@@ -599,6 +602,8 @@ public partial class MainWindow
             UpdateAutomationLoopSummaryText();
             PersistAutomationLoopTasksToConfig();
         }
+
+        UpdateNextFarmListSendDisplay();
 
         if (isRunning)
         {

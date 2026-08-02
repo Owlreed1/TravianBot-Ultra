@@ -8,6 +8,13 @@ public static class FarmingDefaults
     // Delay between farm sends is a random pick in [min, max] minutes.
     public const int DefaultDispatchDelayMinMinutes = 30;
     public const int DefaultDispatchDelayMaxMinutes = 90;
+    public const bool ShowLastSentTimer = true;
+    public const bool LastSentLimitEnabled = true;
+    public const int DefaultLastSentLimitHours = 24;
+    public const int MaxLastSentLimitHours = 120;
+
+    public static int NormalizeLastSentLimitHours(int value)
+        => value <= 0 ? DefaultLastSentLimitHours : Math.Min(value, MaxLastSentLimitHours);
 
     public static int NormalizeDispatchDelayMinMinutes(int value)
     {

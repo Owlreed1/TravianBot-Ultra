@@ -257,6 +257,11 @@ public partial class SettingsWindow : Window
             _config[BotOptionPayloadKeys.ConstructionStorageUpgradeLevelsAhead]?.GetValue<int>()
             ?? ConstructionDefaults.StorageUpgradeLevelsAhead);
         LoadConstructionHumanizeConfigToUi();
+        ShowFarmListLastSentTimerCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ShowFarmListLastSentTimer, FarmingDefaults.ShowLastSentTimer);
+        FarmListLastSentLimitEnabledCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.FarmListLastSentLimitEnabled, FarmingDefaults.LastSentLimitEnabled);
+        FarmListLastSentLimitHoursTextBox.Text = FarmingDefaults.NormalizeLastSentLimitHours(ReadInt(
+            BotOptionPayloadKeys.FarmListLastSentLimitHours,
+            FarmingDefaults.DefaultLastSentLimitHours)).ToString(CultureInfo.InvariantCulture);
         PostLoginAnalyzeFarmlistsCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeFarmlists]?.GetValue<bool>() ?? false;
         PostLoginAnalyzeHeroCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeHero]?.GetValue<bool>() ?? false;
         PostLoginReadTroopTrainingQueueCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginReadTroopTrainingQueue]?.GetValue<bool>() ?? false;
@@ -541,6 +546,13 @@ public partial class SettingsWindow : Window
                         ? selectedLevels
                         : ConstructionDefaults.StorageUpgradeLevelsAhead);
             SaveConstructionHumanizeConfigFromUi();
+            _config[BotOptionPayloadKeys.ShowFarmListLastSentTimer] = ShowFarmListLastSentTimerCheckBox.IsChecked == true;
+            _config[BotOptionPayloadKeys.FarmListLastSentLimitEnabled] = FarmListLastSentLimitEnabledCheckBox.IsChecked == true;
+            _config[BotOptionPayloadKeys.FarmListLastSentLimitHours] = ReadIntText(
+                FarmListLastSentLimitHoursTextBox,
+                FarmingDefaults.DefaultLastSentLimitHours,
+                1,
+                FarmingDefaults.MaxLastSentLimitHours);
             // Queue-wait handling is always "smart" (defer); drop the removed threshold key.
             _config.Remove("queue_wait_threshold_mode");
             _config[BotOptionPayloadKeys.PostLoginAnalyzeFarmlists] = PostLoginAnalyzeFarmlistsCheckBox.IsChecked == true;
@@ -619,6 +631,7 @@ public partial class SettingsWindow : Window
             (DailyGoldSpendingLimitTextBox, "Daily gold spending limit", true, 0, int.MaxValue),
             (SilverLimitTextBox, "Minimum silver balance", true, 0, int.MaxValue),
             (DailySilverSpendingLimitTextBox, "Daily silver spending limit", true, 0, int.MaxValue),
+            (FarmListLastSentLimitHoursTextBox, "Farm-list last sent limit", true, 1, FarmingDefaults.MaxLastSentLimitHours),
         };
 
         foreach (var field in fields)
@@ -1458,6 +1471,32 @@ public partial class SettingsWindow : Window
             && int.TryParse(item.Tag?.ToString(), out var hours)
                 ? Math.Clamp(hours, 0, 24)
                 : PacingDefaults.SessionPacingDailyMaxHours;
+    }
+
+    private void SessionDailyMaxHoursComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        var dailyMaxHours = GetSelectedDailyMaxHours();
+        if (dailyMaxHours is > 0 and <= PacingDefaults.SessionPacingDailyMaxHours)
+        {
+            return;
+        }
+
+        AppDialog.ShowCustom(
+            this,
+            "Using the bot for more than 12 hours per day increases the risk of being banned.",
+            "Daily runtime warning",
+            [("OK", MessageBoxResult.OK)],
+            MessageBoxImage.Warning,
+            MessageBoxResult.OK,
+            MessageBoxResult.OK,
+            successResult: MessageBoxResult.OK);
     }
 
     private void SelectDailyMaxVariationPercent(int percent)

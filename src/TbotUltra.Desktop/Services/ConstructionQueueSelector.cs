@@ -26,10 +26,26 @@ public static class ConstructionQueueSelector
                 false);
         }
 
-        // Construction remains strictly ordered per village. A parent task such as Upgrade all resources
-        // stays pending while it starts its individual fields, so an in-progress row must still hold every
-        // later row until that parent task finishes.
-        var item = orderedItems[0];
+        // A one-level construction task is marked InProgress after its click is registered. It must not
+        // hold later rows when Travian still has a free slot (for example MB6 may be followed by MB7 on a
+        // Plus queue). Parent tasks stay at the head because they orchestrate several starts themselves.
+        var itemIndex = 0;
+        while (itemIndex < orderedItems.Count
+            && CanYieldQueueOrderAfterInProgress(orderedItems[itemIndex]))
+        {
+            itemIndex++;
+        }
+
+        if (itemIndex >= orderedItems.Count)
+        {
+            return new ConstructionQueueSelection(
+                null,
+                "group=Construction has only in-progress single-level tasks; waiting for the next queue refresh",
+                null,
+                false);
+        }
+
+        var item = orderedItems[itemIndex];
         if (item.Status != QueueStatus.Pending)
         {
             return new ConstructionQueueSelection(
@@ -71,7 +87,8 @@ public static class ConstructionQueueSelector
                 false);
         }
 
-        if (availability == ConstructionQueueAvailability.Full)
+        var itemAvailability = availabilityForIndex?.Invoke(itemIndex) ?? availability;
+        if (itemAvailability == ConstructionQueueAvailability.Full)
         {
             return new ConstructionQueueSelection(
                 null,
@@ -80,7 +97,7 @@ public static class ConstructionQueueSelector
                 false);
         }
 
-        if (isBlockedByEarlierDependency?.Invoke(0) == true)
+        if (isBlockedByEarlierDependency?.Invoke(itemIndex) == true)
         {
             return new ConstructionQueueSelection(
                 null,
@@ -90,5 +107,16 @@ public static class ConstructionQueueSelector
         }
 
         return new ConstructionQueueSelection(item, null, null, false);
+    }
+
+    private static bool CanYieldQueueOrderAfterInProgress(QueueItem item)
+    {
+        if (!ConstructionQueueState.IsConstructionInProgressDeferred(item))
+        {
+            return false;
+        }
+
+        return string.Equals(item.TaskName, "upgrade_resource_to_level", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.TaskName, "upgrade_building_to_level", StringComparison.OrdinalIgnoreCase);
     }
 }

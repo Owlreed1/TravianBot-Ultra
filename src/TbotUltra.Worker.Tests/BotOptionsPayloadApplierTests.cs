@@ -96,6 +96,38 @@ public sealed class BotOptionsPayloadApplierTests
     }
 
     [Fact]
+    public void FromConfiguration_DeactivateRedYellowAttacks_DefaultsEnabled()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+
+        Assert.True(BotOptionsFactory.FromConfiguration(configuration).ContinuousFarmDeactivateLosses);
+    }
+
+    [Fact]
+    public void FromConfiguration_FarmListLastSentDisplay_DefaultsAndClamps()
+    {
+        var defaults = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        var configured = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [BotOptionPayloadKeys.ShowFarmListLastSentTimer] = "false",
+                [BotOptionPayloadKeys.FarmListLastSentLimitEnabled] = "false",
+                [BotOptionPayloadKeys.FarmListLastSentLimitHours] = "121",
+            })
+            .Build();
+
+        var defaultOptions = BotOptionsFactory.FromConfiguration(defaults);
+        var configuredOptions = BotOptionsFactory.FromConfiguration(configured);
+
+        Assert.True(defaultOptions.ShowFarmListLastSentTimer);
+        Assert.True(defaultOptions.FarmListLastSentLimitEnabled);
+        Assert.Equal(24, defaultOptions.FarmListLastSentLimitHours);
+        Assert.False(configuredOptions.ShowFarmListLastSentTimer);
+        Assert.False(configuredOptions.FarmListLastSentLimitEnabled);
+        Assert.Equal(120, configuredOptions.FarmListLastSentLimitHours);
+    }
+
+    [Fact]
     public void FromConfiguration_StorageUpgradeLevelsAheadDefaultsAndClamps()
     {
         var defaults = new ConfigurationBuilder().AddInMemoryCollection().Build();

@@ -224,6 +224,11 @@ public partial class MainWindow
             AppendLog($"[pacing] pre-sleep state: loggedIn={_sleepSnapshot.WasLoggedIn}, "
                 + $"continuousLoop={_sleepSnapshot.WasContinuousLoopRunning}, queueAutoRun={_sleepSnapshot.WasQueueAutoRunning}.");
 
+            if (!manual)
+            {
+                await WaitBrieflyForPreSleepFillItemsAsync();
+            }
+
             var stoppedGracefully = await RequestGracefulAutomationStopForSleepAsync();
             if (!stoppedGracefully)
             {

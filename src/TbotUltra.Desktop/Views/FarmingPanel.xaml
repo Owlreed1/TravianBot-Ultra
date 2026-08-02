@@ -76,10 +76,26 @@
                                                 </Button>
                                             </Grid>
                                             <WrapPanel>
-                                                <Button x:Name="CreateFarmListButton"
-                                                        Content="Create Farmlist"
-                                                        MinWidth="150"
-                                                        Click="CreateFarmListButton_Click" />
+                                                <StackPanel>
+                                                    <Button x:Name="CreateFarmListButton"
+                                                            Content="Create Farmlist"
+                                                            MinWidth="150"
+                                                            Click="CreateFarmListButton_Click" />
+                                                    <Border x:Name="FarmListNextSendBadge"
+                                                            Margin="0,6,0,0"
+                                                            Padding="8,3"
+                                                            CornerRadius="8"
+                                                            HorizontalAlignment="Left"
+                                                            Background="{DynamicResource ControlBackgroundBrush}"
+                                                            BorderBrush="{DynamicResource BorderMutedBrush}"
+                                                            BorderThickness="1">
+                                                        <TextBlock x:Name="FarmListNextSendTextBlock"
+                                                                   Text="Next send: --"
+                                                                   FontSize="12"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource TextSubtleBrush}" />
+                                                    </Border>
+                                                </StackPanel>
                                                 <Button x:Name="AddFarmsToListButton"
                                                         Content="Add Farms to List"
                                                         MinWidth="140"
@@ -116,10 +132,32 @@
                                                                                 </Style.Triggers>
                                                                             </Style>
                                                                         </Border.Style>
-                                                                        <TextBlock Text="{Binding Items[0].VillageHeaderText}"
-                                                                                   FontWeight="SemiBold"
-                                                                                   FontSize="13"
-                                                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                                        <Grid>
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="*" />
+                                                                                <ColumnDefinition Width="104" />
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <TextBlock Text="{Binding Items[0].VillageHeaderText}"
+                                                                                       FontWeight="SemiBold"
+                                                                                       FontSize="13"
+                                                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                                            <TextBlock Grid.Column="1"
+                                                                                       Text="Last sent"
+                                                                                       HorizontalAlignment="Center"
+                                                                                       FontWeight="SemiBold"
+                                                                                       FontSize="12"
+                                                                                       Foreground="{DynamicResource TextMutedBrush}">
+                                                                                <TextBlock.Style>
+                                                                                    <Style TargetType="TextBlock">
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding Items[0].ShowLastSentTimer}" Value="False">
+                                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                            </DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </TextBlock.Style>
+                                                                            </TextBlock>
+                                                                        </Grid>
                                                                     </Border>
                                                                 </DataTemplate>
                                                             </GroupStyle.HeaderTemplate>
@@ -183,13 +221,20 @@
                                                                                 <Setter Property="Background" Value="{DynamicResource SuccessBgBrush}" />
                                                                                 <Setter Property="BorderBrush" Value="{DynamicResource SuccessBorderBrush}" />
                                                                                 <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                                                                    <DataTrigger Binding="{Binding ShowLastSentTimer}" Value="False">
+                                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding HasLastSent}" Value="False">
                                                                                         <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
                                                                                         <Setter Property="BorderBrush" Value="{DynamicResource BorderMutedBrush}" />
                                                                                     </DataTrigger>
-                                                                                    <DataTrigger Binding="{Binding HasTimer}" Value="True">
-                                                                                        <Setter Property="Background" Value="{DynamicResource WarningBgBrush}" />
-                                                                                        <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
+                                                                                    <DataTrigger Binding="{Binding LastSendFailed}" Value="True">
+                                                                                        <Setter Property="Background" Value="{DynamicResource DangerBgBrush}" />
+                                                                                        <Setter Property="BorderBrush" Value="{DynamicResource DangerBorderBrush}" />
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                                                        <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
+                                                                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderMutedBrush}" />
                                                                                     </DataTrigger>
                                                                                 </Style.Triggers>
                                                                             </Style>
@@ -197,15 +242,19 @@
                                                                         <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold">
                                                                             <TextBlock.Style>
                                                                                 <Style TargetType="TextBlock">
-                                                                                    <Setter Property="Text" Value="{Binding ReadyText}" />
+                                                                                    <Setter Property="Text" Value="{Binding LastSentText}" />
                                                                                     <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}" />
                                                                                     <Style.Triggers>
-                                                                                        <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                                                                        <DataTrigger Binding="{Binding HasLastSent}" Value="False">
                                                                                             <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}" />
                                                                                         </DataTrigger>
-                                                                                        <DataTrigger Binding="{Binding HasTimer}" Value="True">
-                                                                                            <Setter Property="Text" Value="{Binding TimerText}" />
-                                                                                            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+                                                                                        <DataTrigger Binding="{Binding LastSendFailed}" Value="True">
+                                                                                            <Setter Property="Text" Value="Failed" />
+                                                                                            <Setter Property="Foreground" Value="{DynamicResource DangerTextBrush}" />
+                                                                                        </DataTrigger>
+                                                                                        <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                                                            <Setter Property="Text" Value="{Binding LastSentText}" />
+                                                                                            <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}" />
                                                                                         </DataTrigger>
                                                                                     </Style.Triggers>
                                                                                 </Style>

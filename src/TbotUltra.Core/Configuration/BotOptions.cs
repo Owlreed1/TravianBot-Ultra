@@ -46,6 +46,15 @@ public sealed record BotOptions
     [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmSendMode)]
     public string ContinuousFarmSendMode { get; init; } = FarmingDefaults.SendModeListPerList;
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.ShowFarmListLastSentTimer)]
+    public bool ShowFarmListLastSentTimer { get; init; } = FarmingDefaults.ShowLastSentTimer;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.FarmListLastSentLimitEnabled)]
+    public bool FarmListLastSentLimitEnabled { get; init; } = FarmingDefaults.LastSentLimitEnabled;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.FarmListLastSentLimitHours)]
+    public int FarmListLastSentLimitHours { get; init; } = FarmingDefaults.DefaultLastSentLimitHours;
+
     [ConfigurationKeyName(BotOptionPayloadKeys.TownHallCelebrationMode)]
     public string TownHallCelebrationMode { get; init; } = TownHallCelebrationDefaults.Small;
 
@@ -89,7 +98,7 @@ public sealed record BotOptions
     public double SmithyUpgradeRestartDelayMaxMinutes { get; init; } = SmithyUpgradeRestartDelayDefaults.MaxMinutes;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmDeactivateLosses)]
-    public bool ContinuousFarmDeactivateLosses { get; init; }
+    public bool ContinuousFarmDeactivateLosses { get; init; } = true;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses)]
     public bool ContinuousFarmDeactivateOasisLosses { get; init; }

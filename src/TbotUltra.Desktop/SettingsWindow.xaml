@@ -303,7 +303,8 @@
                                         <TextBox x:Name="SessionSleepMinMinutesTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2" />
                                         <TextBox x:Name="SessionSleepMaxMinutesTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="6,2,0,2" />
                                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Daily max" VerticalAlignment="Center" Margin="0,2" />
-                                        <ComboBox x:Name="SessionDailyMaxHoursComboBox" Grid.Row="3" Grid.Column="1" Height="24" Margin="0,2" />
+                                        <ComboBox x:Name="SessionDailyMaxHoursComboBox" Grid.Row="3" Grid.Column="1" Height="24" Margin="0,2"
+                                                  SelectionChanged="SessionDailyMaxHoursComboBox_SelectionChanged" />
                                         <ComboBox x:Name="SessionDailyMaxVariationComboBox" Grid.Row="3" Grid.Column="2" Height="24" Margin="6,2,0,2"
                                                   ToolTip="Daily max variation: randomizes the daily limit by this much each day (applies only to Daily max)." />
                                     </Grid>
@@ -852,30 +853,36 @@
                     </Border>
 
                     <Border Style="{StaticResource FarmingSettingsCategoryStyle}">
-                        <Grid MinHeight="300">
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <Border Width="44" Height="44" CornerRadius="22"
-                                        HorizontalAlignment="Center"
-                                        Background="{DynamicResource SuccessBgBrush}"
-                                        BorderBrush="{DynamicResource SuccessBorderBrush}"
-                                        BorderThickness="1">
-                                    <TextBlock Text="F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontSize="16"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource SuccessTextBrush}" />
-                                </Border>
-                                <TextBlock Text="Farming settings"
-                                           HorizontalAlignment="Center"
-                                           Margin="0,12,0,4"
-                                           FontSize="16"
-                                           FontWeight="SemiBold" />
-                                <TextBlock Text="No settings in this category yet."
-                                           HorizontalAlignment="Center"
-                                           Foreground="{DynamicResource TextMutedBrush}" />
-                            </StackPanel>
-                        </Grid>
+                        <StackPanel>
+                            <TextBlock Text="Farming settings"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <Border Style="{StaticResource SettingsGroupBox}" Margin="0,10,0,0">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <CheckBox x:Name="ShowFarmListLastSentTimerCheckBox"
+                                                  Content="Show last sent timer"
+                                                  Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                        ToolTip="Shows the Last sent column for farm lists on the Farming page." />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0" VerticalAlignment="Center">
+                                        <CheckBox x:Name="FarmListLastSentLimitEnabledCheckBox"
+                                                  Content="Last sent limit"
+                                                  Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                        ToolTip="After this many hours the timer shows e.g. 24h+. Turn it off to show elapsed time up to the hard 5-day display limit." />
+                                        <StackPanel Orientation="Horizontal"
+                                                    Margin="8,0,0,0"
+                                                    IsEnabled="{Binding IsChecked, ElementName=FarmListLastSentLimitEnabledCheckBox}">
+                                            <TextBox x:Name="FarmListLastSentLimitHoursTextBox" Width="56" />
+                                            <TextBlock Text="hours" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
                     </Border>
 
                     <Border Style="{StaticResource TroopsSettingsCategoryStyle}">

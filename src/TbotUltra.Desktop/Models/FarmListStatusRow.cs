@@ -15,6 +15,11 @@ public sealed class FarmListStatusRow : INotifyPropertyChanged
     private int _totalFarmCount;
     private int? _capacity;
     private int? _remainingSeconds;
+    private DateTimeOffset? _lastSentAtUtc;
+    private bool _lastSendFailed;
+    private bool _showLastSentTimer = true;
+    private bool _lastSentLimitEnabled = true;
+    private int _lastSentLimitHours = 24;
     private bool _isProcessing;
     private bool _isPlaceholder;
 
@@ -173,6 +178,89 @@ public sealed class FarmListStatusRow : INotifyPropertyChanged
             _isEnabled = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(CanSendNow));
+            OnPropertyChanged(nameof(LastSentText));
+        }
+    }
+
+    public DateTimeOffset? LastSentAtUtc
+    {
+        get => _lastSentAtUtc;
+        set
+        {
+            if (_lastSentAtUtc == value)
+            {
+                return;
+            }
+
+            _lastSentAtUtc = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasLastSent));
+            OnPropertyChanged(nameof(LastSentText));
+        }
+    }
+
+    public bool LastSendFailed
+    {
+        get => _lastSendFailed;
+        set
+        {
+            if (_lastSendFailed == value)
+            {
+                return;
+            }
+
+            _lastSendFailed = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool HasLastSent => LastSentAtUtc is not null;
+
+    public bool ShowLastSentTimer
+    {
+        get => _showLastSentTimer;
+        set
+        {
+            if (_showLastSentTimer == value)
+            {
+                return;
+            }
+
+            _showLastSentTimer = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool LastSentLimitEnabled
+    {
+        get => _lastSentLimitEnabled;
+        set
+        {
+            if (_lastSentLimitEnabled == value)
+            {
+                return;
+            }
+
+            _lastSentLimitEnabled = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(LastSentText));
+        }
+    }
+
+    public int LastSentLimitHours
+    {
+        get => _lastSentLimitHours;
+        set
+        {
+            var normalized = Math.Clamp(value, 1, 120);
+            if (_lastSentLimitHours == normalized)
+            {
+                return;
+            }
+
+            _lastSentLimitHours = normalized;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(LastSentText));
         }
     }
 
@@ -260,6 +348,26 @@ public sealed class FarmListStatusRow : INotifyPropertyChanged
 
     public string ReadyText => !HasFarmList ? string.Empty : IsEmpty ? "Empty" : "Ready";
 
+    public string LastSentText
+    {
+        get
+        {
+            if (!IsEnabled || LastSentAtUtc is null)
+            {
+                return "00:00:00";
+            }
+
+            var elapsed = DateTimeOffset.UtcNow - LastSentAtUtc.Value;
+            var displayLimitHours = LastSentLimitEnabled ? LastSentLimitHours : 120;
+            if (elapsed > TimeSpan.FromHours(displayLimitHours))
+            {
+                return $"{displayLimitHours}h+";
+            }
+
+            return $"{Math.Max(0, (int)elapsed.TotalHours):00}:{elapsed.Minutes:00}:{elapsed.Seconds:00}";
+        }
+    }
+
     public string ActionText => IsEmpty ? "Empty" : "Send Now";
 
     public string TimerText
@@ -282,9 +390,16 @@ public sealed class FarmListStatusRow : INotifyPropertyChanged
 
     public bool TickOneSecond()
     {
+        var changed = false;
+        if (LastSentAtUtc is not null)
+        {
+            OnPropertyChanged(nameof(LastSentText));
+            changed = true;
+        }
+
         if (!HasTimer || RemainingSeconds is null)
         {
-            return false;
+            return changed;
         }
 
         RemainingSeconds = RemainingSeconds.Value - 1;

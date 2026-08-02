@@ -115,7 +115,7 @@ public sealed class SessionPacerTests
         Assert.Equal(50, PacingDefaults.SessionPacingRunMaxMinutes);
         Assert.Equal(10, PacingDefaults.SessionPacingSleepMinMinutes);
         Assert.Equal(40, PacingDefaults.SessionPacingSleepMaxMinutes);
-        Assert.Equal(16, PacingDefaults.SessionPacingDailyMaxHours);
+        Assert.Equal(12, PacingDefaults.SessionPacingDailyMaxHours);
         Assert.Equal(10, PacingDefaults.SessionPacingDailyMaxVariationPercent);
     }
 

@@ -75,7 +75,7 @@ public sealed class ConstructionQueueSelectorTests
     }
 
     [Fact]
-    public void SelectNext_InProgressResourceSlotFull_HoldsAvailableBuildingSlot()
+    public void SelectNext_InProgressResourceSlotFull_AllowsAvailableBuildingSlot()
     {
         var activeResource = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
         var building = CreateReadyItem();
@@ -88,12 +88,11 @@ public sealed class ConstructionQueueSelectorTests
                 ? ConstructionQueueAvailability.Full
                 : ConstructionQueueAvailability.Available);
 
-        Assert.Null(result.Item);
-        Assert.Contains("holding queue order", result.SkipReason);
+        Assert.Same(building, result.Item);
     }
 
     [Fact]
-    public void SelectNext_StartedRomanPrefix_HoldsFirstUnstartedBuildingSlot()
+    public void SelectNext_StartedRomanPrefix_AllowsNextAvailableBuildingSlot()
     {
         var resource = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
         var firstBuilding = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
@@ -107,8 +106,7 @@ public sealed class ConstructionQueueSelectorTests
                 ? ConstructionQueueAvailability.Available
                 : ConstructionQueueAvailability.Full);
 
-        Assert.Null(result.Item);
-        Assert.Contains("holding queue order", result.SkipReason);
+        Assert.Same(secondBuilding, result.Item);
     }
 
     [Fact]
@@ -127,7 +125,7 @@ public sealed class ConstructionQueueSelectorTests
                 : ConstructionQueueAvailability.Available);
 
         Assert.Null(result.Item);
-        Assert.Null(result.QueueFullBlocker);
+        Assert.Same(waitingResource, result.QueueFullBlocker);
         Assert.Contains("holding queue order", result.SkipReason);
     }
 
@@ -147,18 +145,17 @@ public sealed class ConstructionQueueSelectorTests
     }
 
     [Fact]
-    public void SelectNext_InProgressHoldsWhenNextItemNotDue()
+    public void SelectNext_InProgressSingleLevelUpgradeAllowsNextReadyItemWhenSlotIsAvailable()
     {
         var inProgress = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
-        var deferredNext = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonResources);
+        var next = CreateReadyItem();
 
         var result = ConstructionQueueSelector.SelectNext(
-            [inProgress, deferredNext],
+            [inProgress, next],
             Now,
             ConstructionQueueAvailability.Available);
 
-        Assert.Null(result.Item);
-        Assert.Contains("holding queue order", result.SkipReason);
+        Assert.Same(next, result.Item);
     }
 
     [Fact]

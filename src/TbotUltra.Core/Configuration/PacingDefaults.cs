@@ -8,7 +8,7 @@ public static class PacingDefaults
     public const int SessionPacingRunMaxMinutes = 50;
     public const int SessionPacingSleepMinMinutes = 10;
     public const int SessionPacingSleepMaxMinutes = 40;
-    public const int SessionPacingDailyMaxHours = 16;
+    public const int SessionPacingDailyMaxHours = 12;
     // Daily-max has its own variation, independent of the run/sleep/schedule "Variation" above.
     public const int SessionPacingDailyMaxVariationPercent = 10;
     // Allowed-hours ("Daily hours") boundary jitter: shifts each on/off hour boundary by ±this% of an

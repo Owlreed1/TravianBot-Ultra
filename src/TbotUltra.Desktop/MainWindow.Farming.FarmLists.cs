@@ -21,6 +21,7 @@ using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Desktop.ViewModels;
 using TbotUltra.Worker.Domain;
+using TbotUltra.Worker.Services;
 
 namespace TbotUltra.Desktop;
 
@@ -29,6 +30,9 @@ public partial class MainWindow
     private static readonly TimeSpan RecentFarmListAnalysisWindow = TimeSpan.FromMinutes(5);
     private readonly HashSet<string> _analyzedFarmCoordinates = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int?> _farmListCapacitiesByName = new(StringComparer.OrdinalIgnoreCase);
+    private bool _showFarmListLastSentTimer = FarmingDefaults.ShowLastSentTimer;
+    private bool _farmListLastSentLimitEnabled = FarmingDefaults.LastSentLimitEnabled;
+    private int _farmListLastSentLimitHours = FarmingDefaults.DefaultLastSentLimitHours;
 
     // Farm lists whose last analysis read fewer target coordinates than the list claims to hold (e.g. an
     // expansion that did not finish). Their farms can be missed by the "don't add duplicates" check, so the
@@ -169,6 +173,16 @@ public partial class MainWindow
     {
         var selectedFarmLists = LoadConfiguredContinuousFarmListNames();
         var selectedFarmListIds = LoadConfiguredContinuousFarmListIds();
+        IReadOnlyDictionary<string, FarmListDispatchState> dispatchStates;
+        try
+        {
+            dispatchStates = FarmListDispatchStateStore.Load(_projectRoot, _accountStore.ActiveAccountName());
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Could not load farm list dispatch status: {ex.Message}");
+            dispatchStates = new Dictionary<string, FarmListDispatchState>(StringComparer.OrdinalIgnoreCase);
+        }
         // Keyed by the stable lid (falling back to name for layouts without one) so two same-named lists
         // in different villages stay separate — a name-only key would merge them into one row/group.
         var mergedByKey = new Dictionary<string, (string Name, string? VillageName, int? VillageIndex, int Active, int Total, int? RemainingSeconds, string? ListId, int? Capacity, IReadOnlyList<string> Coordinates)>(StringComparer.OrdinalIgnoreCase);
@@ -253,6 +267,7 @@ public partial class MainWindow
                     }
 
                     var value = mergedByKey[key];
+                    dispatchStates.TryGetValue(FarmListDispatchStateStore.CreateKey(value.ListId, value.Name), out var dispatchState);
                     var hasSelection = selectedFarmLists.Count > 0 || selectedFarmListIds.Count > 0;
                     var isSelected = !hasSelection
                         || (value.ListId is not null && selectedFarmListIds.Contains(value.ListId))
@@ -277,6 +292,11 @@ public partial class MainWindow
                         Capacity = value.Capacity,
                         IsEnabled = isSelected,
                         RemainingSeconds = value.RemainingSeconds,
+                        LastSentAtUtc = dispatchState?.LastSentAtUtc,
+                        LastSendFailed = dispatchState?.Failed == true,
+                        ShowLastSentTimer = _showFarmListLastSentTimer,
+                        LastSentLimitEnabled = _farmListLastSentLimitEnabled,
+                        LastSentLimitHours = _farmListLastSentLimitHours,
                     });
                     _farmListCapacitiesByName[value.Name] = value.Capacity;
                     displayedRows++;
@@ -357,6 +377,11 @@ public partial class MainWindow
             return;
         }
 
+        var attemptedKeys = _farmLists
+            .Where(row => IsRealFarmListRow(row) && row.CanSendNow)
+            .Select(FarmListDispatchKey)
+            .ToList();
+
         try
         {
             // On a real send the worker just read the farm page and wrote a fresh snapshot — apply
@@ -364,6 +389,7 @@ public partial class MainWindow
             // rename ("not found") there is no fresh snapshot, so fall back to a full re-analyze.
             if (sendHappened && await TryApplyFarmListsSnapshotAsync())
             {
+                ReconcileFarmListDispatches(attemptedKeys);
                 return;
             }
 
@@ -1001,6 +1027,7 @@ public partial class MainWindow
             await EnsureChromiumInstalledAsync();
             var timerSeconds = await _botService.SendFarmListNowAsync(options, list.Name, AppendLog, operationToken);
             list.RemainingSeconds = timerSeconds is > 0 ? timerSeconds : null;
+            RecordFarmListDispatch(list, succeeded: true);
             UpdateFarmingUiState();
             CompleteOperation(operationId, operationSw, $"Sent '{list.Name}'.");
         }
@@ -1010,6 +1037,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
+            RecordFarmListDispatch(list, succeeded: false);
             FailOperation(operationId, operationSw, ex);
         }
         finally
@@ -1069,6 +1097,11 @@ public partial class MainWindow
             }
         }
 
+        var attemptedKeys = _farmLists
+            .Where(row => IsRealFarmListRow(row) && !row.IsEmpty && row.IsReady && (!sendToggled || row.IsEnabled))
+            .Select(FarmListDispatchKey)
+            .ToList();
+
         var operationId = BeginOperation("Farm Send All Now");
         var operationSw = Stopwatch.StartNew();
         var operationToken = _loopController.StartOperation("operation");
@@ -1083,6 +1116,7 @@ public partial class MainWindow
                 ? await _botService.SendSelectedFarmListsNowAsync(options, toggledNames, toggledIds, AppendLog, operationToken)
                 : await _botService.SendAllFarmListsViaStartAllButtonAsync(options, AppendLog, operationToken);
             await RefreshFarmListsFromServerAsync(options, operationToken);
+            ReconcileFarmListDispatches(attemptedKeys);
             CompleteOperation(operationId, operationSw, $"Sent {(sendToggled ? "toggled" : "all")} farmlists ({sentCount} list(s)).");
         }
         catch (OperationCanceledException)
@@ -1091,6 +1125,10 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
+            foreach (var row in _farmLists.Where(row => attemptedKeys.Contains(FarmListDispatchKey(row))))
+            {
+                RecordFarmListDispatch(row, succeeded: false);
+            }
             FailOperation(operationId, operationSw, ex);
         }
         finally
@@ -1248,6 +1286,16 @@ public partial class MainWindow
 
     private void ApplyFarmingSettingsToUi(BotOptions options)
     {
+        _showFarmListLastSentTimer = options.ShowFarmListLastSentTimer;
+        _farmListLastSentLimitEnabled = options.FarmListLastSentLimitEnabled;
+        _farmListLastSentLimitHours = FarmingDefaults.NormalizeLastSentLimitHours(options.FarmListLastSentLimitHours);
+        foreach (var row in _farmLists.Where(IsRealFarmListRow))
+        {
+            row.ShowLastSentTimer = _showFarmListLastSentTimer;
+            row.LastSentLimitEnabled = _farmListLastSentLimitEnabled;
+            row.LastSentLimitHours = _farmListLastSentLimitHours;
+        }
+
         _suppressFarmingSettingsConfigWrite = true;
         try
         {
@@ -1339,6 +1387,60 @@ public partial class MainWindow
         catch (Exception ex)
         {
             AppendLog($"Could not save farm settings: {ex.Message}");
+        }
+    }
+
+    private void UpdateNextFarmListSendDisplay()
+    {
+        var farmingCard = _automationLoopTasks.FirstOrDefault(item =>
+            string.Equals(item.TaskName, QueueGroupCatalog.GetKey(QueueGroup.Farming), StringComparison.OrdinalIgnoreCase));
+        var hasScheduledSend = farmingCard?.HasTimer == true;
+        FarmListNextSendTextBlock.Text = hasScheduledSend
+            ? $"Next send: {farmingCard!.TimerText}"
+            : "Next send: --";
+        FarmListNextSendBadge.SetResourceReference(
+            System.Windows.Controls.Border.BackgroundProperty,
+            hasScheduledSend ? "SuccessBgBrush" : "ControlBackgroundBrush");
+        FarmListNextSendBadge.SetResourceReference(
+            System.Windows.Controls.Border.BorderBrushProperty,
+            hasScheduledSend ? "SuccessBorderBrush" : "BorderMutedBrush");
+        FarmListNextSendTextBlock.SetResourceReference(
+            System.Windows.Controls.TextBlock.ForegroundProperty,
+            hasScheduledSend ? "SuccessTextBrush" : "TextSubtleBrush");
+    }
+
+    private static string FarmListDispatchKey(FarmListStatusRow row)
+        => FarmListDispatchStateStore.CreateKey(row.ListId, row.Name);
+
+    private void RecordFarmListDispatch(FarmListStatusRow row, bool succeeded)
+    {
+        try
+        {
+            var states = FarmListDispatchStateStore.Load(_projectRoot, _accountStore.ActiveAccountName())
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+            var key = FarmListDispatchKey(row);
+            var state = new FarmListDispatchState(
+                succeeded ? DateTimeOffset.UtcNow : states.GetValueOrDefault(key)?.LastSentAtUtc,
+                Failed: !succeeded);
+            states[key] = state;
+            FarmListDispatchStateStore.Save(_projectRoot, _accountStore.ActiveAccountName(), states);
+            row.LastSentAtUtc = state.LastSentAtUtc;
+            row.LastSendFailed = state.Failed;
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Could not save farm list dispatch status: {ex.Message}");
+        }
+    }
+
+    private void ReconcileFarmListDispatches(IReadOnlyCollection<string> attemptedKeys)
+    {
+        foreach (var row in _farmLists.Where(IsRealFarmListRow))
+        {
+            if (attemptedKeys.Contains(FarmListDispatchKey(row)))
+            {
+                RecordFarmListDispatch(row, row.RemainingSeconds is > 0);
+            }
         }
     }
 
@@ -1549,10 +1651,21 @@ public partial class MainWindow
 
         var existingNames = _farmLists.Where(IsRealFarmListRow).Select(row => row.Name).ToList();
         var suggestedName = FarmLossListNaming.NextAvailable("Yellow farms", existingNames);
-        var dialog = new CreateLossFarmListWindow(suggestedName) { Owner = this };
+        var existingDestinations = (FarmLossDestinationComboBox?.ItemsSource as IEnumerable<FarmLossDestinationOption> ?? [])
+            .ToList();
+        var dialog = new CreateLossFarmListWindow(suggestedName, existingDestinations) { Owner = this };
         if (dialog.ShowDialog() != true)
         {
             MoveFarmLossesCheckBox.IsChecked = false;
+            return;
+        }
+
+        if (dialog.SelectedExistingDestination is { } selectedDestination)
+        {
+            FarmLossDestinationComboBox!.SelectedItem = existingDestinations.FirstOrDefault(option =>
+                string.Equals(option.ListId, selectedDestination.ListId, StringComparison.OrdinalIgnoreCase))
+                ?? selectedDestination;
+            FarmingSettings_Changed(MoveFarmLossesCheckBox, new RoutedEventArgs());
             return;
         }
 

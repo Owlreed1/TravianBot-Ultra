@@ -7,6 +7,8 @@ public partial class MainWindow
     private System.Windows.Controls.Button AnalyzeFarmListsButton => FarmingPanelControl.AnalyzeButton;
     private System.Windows.Controls.Button AddFarmsToListButton => FarmingPanelControl.AddFarmsButton;
     private System.Windows.Controls.Button CreateFarmListButton => FarmingPanelControl.CreateListButton;
+    private System.Windows.Controls.Border FarmListNextSendBadge => FarmingPanelControl.NextSendBadge;
+    private System.Windows.Controls.TextBlock FarmListNextSendTextBlock => FarmingPanelControl.NextSendText;
     private System.Windows.Controls.TextBlock FarmingStatusTextBlock => FarmingPanelControl.StatusText;
     private System.Windows.Controls.Button FarmListSendAllNowButton => FarmingPanelControl.SendAllButton;
     private System.Windows.Controls.ItemsControl FarmListsItemsControl => FarmingPanelControl.FarmLists;

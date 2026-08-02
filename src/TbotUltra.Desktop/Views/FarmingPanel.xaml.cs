@@ -14,6 +14,8 @@ public partial class FarmingPanel : UserControl
     internal Button AnalyzeButton => AnalyzeFarmListsButton;
     internal Button AddFarmsButton => AddFarmsToListButton;
     internal Button CreateListButton => CreateFarmListButton;
+    internal Border NextSendBadge => FarmListNextSendBadge;
+    internal TextBlock NextSendText => FarmListNextSendTextBlock;
     internal TextBlock StatusText => FarmingStatusTextBlock;
     internal Button SendAllButton => FarmListSendAllNowButton;
     internal ItemsControl FarmLists => FarmListsItemsControl;

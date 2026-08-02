@@ -25,7 +25,11 @@ public static class BotOptionsFactory
         var continuousFarmDispatchDelayVariationPercent = FarmingDefaults.NormalizeDispatchDelayMaxMinutes(
             configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmDispatchDelayMaxMinutes, FarmingDefaults.DefaultDispatchDelayMaxMinutes));
         var continuousFarmSendMode = FarmingDefaults.NormalizeSendMode(configuration[BotOptionPayloadKeys.ContinuousFarmSendMode]);
-        var continuousFarmDeactivateLosses = configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmDeactivateLosses, false);
+        var showFarmListLastSentTimer = configuration.GetValue(BotOptionPayloadKeys.ShowFarmListLastSentTimer, FarmingDefaults.ShowLastSentTimer);
+        var farmListLastSentLimitEnabled = configuration.GetValue(BotOptionPayloadKeys.FarmListLastSentLimitEnabled, FarmingDefaults.LastSentLimitEnabled);
+        var farmListLastSentLimitHours = FarmingDefaults.NormalizeLastSentLimitHours(
+            configuration.GetValue(BotOptionPayloadKeys.FarmListLastSentLimitHours, FarmingDefaults.DefaultLastSentLimitHours));
+        var continuousFarmDeactivateLosses = configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmDeactivateLosses, true);
         var configuredContinuousFarmMoveLosses = configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmMoveLosses, false);
         var continuousFarmMoveLosses = continuousFarmDeactivateLosses && configuredContinuousFarmMoveLosses;
         var townHallCelebrationMode = TownHallCelebrationDefaults.NormalizeMode(configuration[BotOptionPayloadKeys.TownHallCelebrationMode]);
@@ -65,6 +69,9 @@ public static class BotOptionsFactory
             ContinuousFarmDispatchDelayMinMinutes = continuousFarmDispatchDelayMinutes,
             ContinuousFarmDispatchDelayMaxMinutes = continuousFarmDispatchDelayVariationPercent,
             ContinuousFarmSendMode = continuousFarmSendMode,
+            ShowFarmListLastSentTimer = showFarmListLastSentTimer,
+            FarmListLastSentLimitEnabled = farmListLastSentLimitEnabled,
+            FarmListLastSentLimitHours = farmListLastSentLimitHours,
             TownHallCelebrationMode = townHallCelebrationMode,
             TownHallCelebrationCount = townHallCelebrationCount,
             TownHallCelebrationRestartDelayMinMinutes = townHallCelebrationRestartDelayMinMinutes,

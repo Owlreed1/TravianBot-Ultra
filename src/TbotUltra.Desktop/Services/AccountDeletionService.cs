@@ -78,6 +78,7 @@ public sealed class AccountDeletionService
         DeleteFileIfExists(AccountStoragePaths.LegacyBrowserStatePath(_projectRoot, accountName));
         DeleteFileIfExists(AccountStoragePaths.BuildingsSnapshotPath(_projectRoot, accountName));
         DeleteFileIfExists(AccountStoragePaths.FarmListsSnapshotPath(_projectRoot, accountName));
+        DeleteFileIfExists(AccountStoragePaths.FarmListDispatchStatePath(_projectRoot, accountName));
 
         DeleteLegacyAnalysisFiles(accountKey);
         RemoveAccountFromLegacyCapitalState(accountKey);

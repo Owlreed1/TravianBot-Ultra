@@ -204,7 +204,8 @@ public partial class MainWindow
             var now = DateTimeOffset.UtcNow;
             var hasActiveFillItem = _botService.GetQueueItemsForDisplay()
                 .Where(item => item.Group == QueueGroup.Construction)
-                .Where(item => item.Payload.ContainsKey(BotOptionPayloadKeys.ConstructionPreSleepFill))
+                .Where(item => item.Payload.ContainsKey(BotOptionPayloadKeys.ConstructionPreSleepFill)
+                    || item.Payload.ContainsKey(BotOptionPayloadKeys.ConstructionLoginFill))
                 .Any(item => item.Status == QueueStatus.Running
                     || (item.Status == QueueStatus.Pending && item.NextAttemptAt <= now + TimeSpan.FromSeconds(30)));
             if (!hasActiveFillItem)

@@ -72,6 +72,44 @@ public sealed class FarmListsViewModelTests
     }
 
     [Fact]
+    public void LastSentText_UsesElapsedTimeAndKeepsDisabledListsNeutral()
+    {
+        var row = new FarmListStatusRow
+        {
+            Name = "Raiders",
+            IsEnabled = true,
+            LastSentAtUtc = DateTimeOffset.UtcNow.AddHours(-1).AddMinutes(-2),
+        };
+
+        Assert.Matches(@"^01:02:\d{2}$", row.LastSentText);
+
+        row.IsEnabled = false;
+
+        Assert.Equal("00:00:00", row.LastSentText);
+    }
+
+    [Fact]
+    public void LastSentText_AppliesConfiguredLimitOrHardFiveDayCap()
+    {
+        var row = new FarmListStatusRow
+        {
+            Name = "Raiders",
+            IsEnabled = true,
+            LastSentAtUtc = DateTimeOffset.UtcNow.AddHours(-25),
+            LastSentLimitEnabled = true,
+            LastSentLimitHours = 24,
+        };
+
+        Assert.Equal("24h+", row.LastSentText);
+
+        row.LastSentLimitEnabled = false;
+
+        Assert.Matches(@"^25:00:\d{2}$", row.LastSentText);
+        row.LastSentAtUtc = DateTimeOffset.UtcNow.AddHours(-121);
+        Assert.Equal("120h+", row.LastSentText);
+    }
+
+    [Fact]
     public void IsRealRow_PlaceholderIsNotReal()
     {
         Assert.False(FarmListsViewModel.IsRealRow(new FarmListStatusRow { IsPlaceholder = true }));
