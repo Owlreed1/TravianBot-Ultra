@@ -67,7 +67,7 @@ public sealed partial class BotTaskRunner
             options.TargetVillageName));
     }
 
-    public async Task<FarmListLossDeactivationResult> RunFarmLossMoveTestAsync(
+    public async Task<FarmListLossDeactivationResult> RunFarmLossMoveDebugAsync(
         BotOptions options,
         Action<string> log,
         string? accountName = null,
@@ -92,13 +92,13 @@ public sealed partial class BotTaskRunner
             {
                 await client.LoginAsync(cancellationToken);
                 await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken);
-                var request = CreateFarmListLossHandlingRequest(options, maxTargets: 1, yellowLossesOnly: true)
+                var request = CreateFarmListLossHandlingRequest(options)
                     with { IncludeUnoccupiedOasis = false };
-                log($"[farm-list:debug] running one yellow-farm move/deactivate to '{request.DestinationListName}'.");
+                log($"[farm-list:debug] running red/yellow farm move/deactivate to '{request.DestinationListName}'.");
                 result = await client.HandleFarmListLossTargetsAsync(request, cancellationToken);
             });
 
-        var completed = result ?? throw new InvalidOperationException("The yellow-farm test returned no result.");
+        var completed = result ?? throw new InvalidOperationException("The red/yellow farm move returned no result.");
         PublishFarmLossDestinationChange(options, completed);
         return completed;
     }

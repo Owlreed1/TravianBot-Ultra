@@ -141,13 +141,13 @@ public sealed class WindowSmokeTests
             try
             {
                 var requested = false;
-                window.MoveYellowFarmTestRequested += (_, _) => requested = true;
-                var button = Assert.IsType<Button>(window.FindName("TestMoveYellowFarmButton"));
+                window.MoveLossFarmsTestRequested += (_, _) => requested = true;
+                var button = Assert.IsType<Button>(window.FindName("TestMoveLossFarmsButton"));
 
                 button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
                 Assert.True(requested);
-                Assert.Equal("Move one yellow farm", button.Content);
+                Assert.Equal("Move red/yellow farms", button.Content);
             }
             finally
             {

@@ -134,12 +134,12 @@
                                     ToolTip="Runs the reinforcement function with the saved Reinforcements settings. If only one village exists, the test still starts and reports the function result."
                                     ToolTipService.InitialShowDelay="500"
                                     Click="TestReinforcementsButton_Click" />
-                            <Button x:Name="TestMoveYellowFarmButton"
+                            <Button x:Name="TestMoveLossFarmsButton"
                                     Style="{DynamicResource DebugActionButtonStyle}"
-                                    Content="Move one yellow farm"
-                                    ToolTip="Runs the complete combined flow once: finds the first active yellow non-oasis farm, opens Edit, moves it to the configured loss destination, checks Deactivate target, and saves. Requires both loss checkboxes and a selected destination list on the Farming page."
+                                    Content="Move red/yellow farms"
+                                    ToolTip="Runs the complete combined flow for every active red or yellow non-oasis farm: opens Edit, moves it to the configured loss destination, checks Deactivate target, and saves. Requires both loss checkboxes and a selected destination list on the Farming page."
                                     ToolTipService.InitialShowDelay="500"
-                                    Click="TestMoveYellowFarmButton_Click" />
+                                    Click="TestMoveLossFarmsButton_Click" />
                             <Button x:Name="TestIncreaseAdventuresToHardButton"
                                     Style="{DynamicResource DebugActionButtonStyle}"
                                     Content="Adventure: hard"

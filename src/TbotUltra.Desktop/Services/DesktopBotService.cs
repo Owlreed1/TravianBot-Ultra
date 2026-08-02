@@ -166,9 +166,9 @@ public sealed class DesktopBotService : IDesktopBotService
         return _taskRunner.CreateFarmListsAsync(options, request, log, null, progress, cancellationToken);
     }
 
-    public Task<FarmListLossDeactivationResult> RunFarmLossMoveTestAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken)
+    public Task<FarmListLossDeactivationResult> RunFarmLossMoveDebugAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken)
     {
-        return _taskRunner.RunFarmLossMoveTestAsync(options, log, null, cancellationToken);
+        return _taskRunner.RunFarmLossMoveDebugAsync(options, log, null, cancellationToken);
     }
 
     public Task<IReadOnlyDictionary<string, long>> ReadAvailableTroopsForCatapultWavesAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken)
