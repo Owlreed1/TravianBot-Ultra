@@ -67,7 +67,7 @@ public sealed partial class TravianClient
         // If the active village was renamed in-game, refresh its cached name now (matched by
         // coordinates) so the villages list below agrees with ActiveVillage in the same payload.
         ReconcileActiveVillageNameInCache(activeVillage, activeCoordinates);
-        var villages = await ReadVillagesPreferCacheAsync(cancellationToken);
+        var villages = await ReadVillagesForUiSyncAsync(cancellationToken);
         return new UiSyncSnapshot(
             Gold: currency.Gold,
             Silver: currency.Silver,

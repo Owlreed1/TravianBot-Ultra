@@ -12,7 +12,9 @@ internal static class LegacyActionPacingCompatibility
     {
         var legacyEnabled = configuration.GetValue("human_like_enabled", false);
         var legacySpeed = configuration["human_like_speed"] ?? "medium";
-        var actionPacingEnabled = PacingDefaults.ActionPacingEnabled;
+        var actionPacingEnabled = configuration.GetValue(
+            BotOptionPayloadKeys.ActionPacingEnabled,
+            PacingDefaults.ActionPacingEnabled);
 
         return new LegacyActionPacingSettings(
             legacyEnabled,

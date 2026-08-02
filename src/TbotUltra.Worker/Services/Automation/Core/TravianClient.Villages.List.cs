@@ -106,6 +106,69 @@ public sealed partial class TravianClient
         return profile;
     }
 
+    private async Task<IReadOnlyList<Village>> ReadVillagesForUiSyncAsync(CancellationToken cancellationToken)
+    {
+        using var trace = _browserTrace.BeginOperation(
+            "READ",
+            "villages-ui-sync",
+            "scope=account source=live-sidebar-or-profile");
+
+        for (var attempt = 1; attempt <= 2; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await WaitForPageReadyAsync(cancellationToken);
+                var sidebarVillages = await ReadVillagesFromCurrentPageAsync(cancellationToken);
+                if (sidebarVillages.Count > 0)
+                {
+                    var merged = _cachedVillages is { Count: > 0 } prior
+                        ? sidebarVillages
+                            .Select(village => VillageIdentityReconciler.MergeFreshWithCached(village, prior))
+                            .ToList()
+                        : sidebarVillages.ToList();
+                    _cachedVillages = ApplyKnownVillageTribes(merged);
+                    _cachedVillagesAt = DateTimeOffset.UtcNow;
+                    trace.Complete("success", $"source=live-sidebar count={_cachedVillages.Count} attempt={attempt}");
+                    return _cachedVillages;
+                }
+
+                _browserTrace.Event(
+                    "CACHE",
+                    "villages-ui-sync-sidebar-empty",
+                    "miss",
+                    $"attempt={attempt} url={_page.Url}");
+            }
+            catch (Exception ex) when (BrowserFailureClassifier.IsTransientNavigation(ex))
+            {
+                Notify($"[ui-sync] live village sidebar read transiently failed; "
+                    + (attempt < 2 ? "retrying" : "using profile fallback")
+                    + $": {ex.Message}");
+            }
+
+            if (attempt == 1)
+            {
+                await Task.Delay(200, cancellationToken);
+            }
+        }
+
+        var profileVillages = await ReadVillagesFromServerAsync(cancellationToken);
+        if (profileVillages.Count == 0)
+        {
+            throw new InvalidOperationException("Live village list was empty on both sidebar and profile reads.");
+        }
+
+        _cachedVillages = profileVillages.ToList();
+        _cachedVillagesAt = DateTimeOffset.UtcNow;
+        if (profileVillages.Any(village => village.Population.HasValue))
+        {
+            _cachedVillagesPopulationAt = DateTimeOffset.UtcNow;
+        }
+
+        trace.Complete("success", $"source=profile count={profileVillages.Count}");
+        return profileVillages;
+    }
+
     private async Task<IReadOnlyList<Village>> ReadVillagesFromCurrentPageAsync(CancellationToken cancellationToken)
     {
 
