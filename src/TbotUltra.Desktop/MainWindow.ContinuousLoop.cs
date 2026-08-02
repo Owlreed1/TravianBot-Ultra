@@ -2405,7 +2405,7 @@ public partial class MainWindow
                 }
                 else
                 {
-                    var waitDelay = ResolveContinuousLoopWaitDelay();
+                    var waitDelay = ResolveContinuousLoopWaitDelay(options);
                     await WaitForNextContinuousLoopPassAsync(tickId, waitDelay, options, token, routineIdleWait: true);
                 }
             }
@@ -2446,37 +2446,55 @@ public partial class MainWindow
         }
     }
 
-    private TimeSpan? ResolveContinuousLoopWaitDelay()
+    private TimeSpan? ResolveContinuousLoopWaitDelay(BotOptions options)
     {
         try
         {
-            if (GetContinuousLoopConsideredGroupsInOrder().Count <= 0)
-            {
-                return null;
-            }
-
             var now = DateTimeOffset.UtcNow;
-            var nextDeferred = GetContinuousLoopRelevantQueueItems()
-                .Where(item => item.Status == QueueStatus.Pending && item.NextAttemptAt > now)
-                .OrderBy(item => item.NextAttemptAt)
-                .FirstOrDefault();
-            if (nextDeferred is null)
-            {
-                return null;
-            }
-
-            var delay = nextDeferred.NextAttemptAt - now;
-            if (delay < TimeSpan.FromSeconds(1))
-            {
-                return TimeSpan.FromSeconds(1);
-            }
-
-            return delay;
+            var nextQueueDeadline = GetContinuousLoopConsideredGroupsInOrder().Count <= 0
+                ? null
+                : GetContinuousLoopRelevantQueueItems()
+                    .Where(item => item.Status == QueueStatus.Pending && item.NextAttemptAt > now)
+                    .Select(item => (DateTimeOffset?)item.NextAttemptAt)
+                    .Min();
+            DateTimeOffset? nextVillageScanUtc = options.VillageStatusSweepEnabled
+                ? GetVillageStatusSweepNextScanUtc()
+                : null;
+            return ResolveContinuousLoopWaitDelay(now, nextQueueDeadline, nextVillageScanUtc);
         }
         catch
         {
             return null;
         }
+    }
+
+    internal static TimeSpan? ResolveContinuousLoopWaitDelay(
+        DateTimeOffset now,
+        DateTimeOffset? nextQueueDeadline,
+        DateTimeOffset? nextVillageScanUtc)
+    {
+        var nextDeadline = nextQueueDeadline;
+        if (nextVillageScanUtc is DateTimeOffset villageScanDeadline
+            && (villageScanDeadline == DateTimeOffset.MinValue || villageScanDeadline <= now))
+        {
+            return TimeSpan.FromSeconds(1);
+        }
+
+        if (nextVillageScanUtc is DateTimeOffset scheduledVillageScan
+            && (nextDeadline is null || scheduledVillageScan < nextDeadline.Value))
+        {
+            nextDeadline = scheduledVillageScan;
+        }
+
+        if (nextDeadline is null)
+        {
+            return null;
+        }
+
+        var delay = nextDeadline.Value - now;
+        return delay < TimeSpan.FromSeconds(1)
+            ? TimeSpan.FromSeconds(1)
+            : delay;
     }
 
     private async Task WaitForNextContinuousLoopPassAsync(
