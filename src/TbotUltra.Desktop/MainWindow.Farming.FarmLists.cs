@@ -1395,18 +1395,9 @@ public partial class MainWindow
         var farmingCard = _automationLoopTasks.FirstOrDefault(item =>
             string.Equals(item.TaskName, QueueGroupCatalog.GetKey(QueueGroup.Farming), StringComparison.OrdinalIgnoreCase));
         var hasScheduledSend = farmingCard?.HasTimer == true;
-        FarmListNextSendTextBlock.Text = hasScheduledSend
+        FarmingPanelControl.SetNextSendDisplay(hasScheduledSend
             ? $"Next send: {farmingCard!.TimerText}"
-            : "Next send: --";
-        FarmListNextSendBadge.SetResourceReference(
-            System.Windows.Controls.Border.BackgroundProperty,
-            hasScheduledSend ? "SuccessBgBrush" : "ControlBackgroundBrush");
-        FarmListNextSendBadge.SetResourceReference(
-            System.Windows.Controls.Border.BorderBrushProperty,
-            hasScheduledSend ? "SuccessBorderBrush" : "BorderMutedBrush");
-        FarmListNextSendTextBlock.SetResourceReference(
-            System.Windows.Controls.TextBlock.ForegroundProperty,
-            hasScheduledSend ? "SuccessTextBrush" : "TextSubtleBrush");
+            : "Next send: --");
     }
 
     private static string FarmListDispatchKey(FarmListStatusRow row)

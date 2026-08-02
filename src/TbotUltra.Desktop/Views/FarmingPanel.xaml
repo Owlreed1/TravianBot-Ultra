@@ -81,20 +81,6 @@
                                                             Content="Create Farmlist"
                                                             MinWidth="150"
                                                             Click="CreateFarmListButton_Click" />
-                                                    <Border x:Name="FarmListNextSendBadge"
-                                                            Margin="0,6,0,0"
-                                                            Padding="8,3"
-                                                            CornerRadius="8"
-                                                            HorizontalAlignment="Left"
-                                                            Background="{DynamicResource ControlBackgroundBrush}"
-                                                            BorderBrush="{DynamicResource BorderMutedBrush}"
-                                                            BorderThickness="1">
-                                                        <TextBlock x:Name="FarmListNextSendTextBlock"
-                                                                   Text="Next send: --"
-                                                                   FontSize="12"
-                                                                   FontWeight="SemiBold"
-                                                                   Foreground="{DynamicResource TextSubtleBrush}" />
-                                                    </Border>
                                                 </StackPanel>
                                                 <Button x:Name="AddFarmsToListButton"
                                                         Content="Add Farms to List"
@@ -117,7 +103,7 @@
                                                                     <!-- Grouped by village ordinal; the heading text (name + coordinates)
                                                                          is taken from the group's first row. Empty for the placeholder
                                                                          group, whose header is then hidden. -->
-                                                                    <Border Margin="0,6,0,6" Padding="0,0,0,4">
+                                                                    <Border Margin="0,6,0,6" Padding="10,0,10,4">
                                                                         <Border.Style>
                                                                             <Style TargetType="Border">
                                                                                 <Setter Property="BorderBrush" Value="{DynamicResource BorderMutedBrush}" />
@@ -134,14 +120,33 @@
                                                                         </Border.Style>
                                                                         <Grid>
                                                                             <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="50" />
                                                                                 <ColumnDefinition Width="*" />
-                                                                                <ColumnDefinition Width="104" />
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                                <ColumnDefinition Width="80" />
+                                                                                <ColumnDefinition Width="90" />
                                                                             </Grid.ColumnDefinitions>
-                                                                            <TextBlock Text="{Binding Items[0].VillageHeaderText}"
+                                                                            <TextBlock Grid.Column="1"
+                                                                                       Text="{Binding Items[0].VillageHeaderText}"
                                                                                        FontWeight="SemiBold"
                                                                                        FontSize="13"
                                                                                        Foreground="{DynamicResource TextSecondaryBrush}" />
-                                                                            <TextBlock Grid.Column="1"
+                                                                            <Border Grid.Column="2"
+                                                                                    Tag="FarmListNextSendBadge"
+                                                                                    Margin="0,0,8,0"
+                                                                                    Padding="8,3"
+                                                                                    CornerRadius="8"
+                                                                                    VerticalAlignment="Center"
+                                                                                    Background="{DynamicResource WarningBgBrush}"
+                                                                                    BorderBrush="{DynamicResource WarningBorderBrush}"
+                                                                                    BorderThickness="1">
+                                                                                <TextBlock Tag="FarmListNextSendText"
+                                                                                           Text="Next send: --"
+                                                                                           FontSize="12"
+                                                                                           FontWeight="SemiBold"
+                                                                                           Foreground="{DynamicResource WarningTextBrush}" />
+                                                                            </Border>
+                                                                            <TextBlock Grid.Column="3"
                                                                                        Text="Last sent"
                                                                                        HorizontalAlignment="Center"
                                                                                        FontWeight="SemiBold"
