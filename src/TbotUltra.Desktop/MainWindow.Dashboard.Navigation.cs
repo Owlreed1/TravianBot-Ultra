@@ -39,6 +39,7 @@ public partial class MainWindow
                 {
                     RefreshFarmListsItemsControl();
                     SyncFarmingControlsEnabledState();
+                    UpdateNextFarmListSendDisplay();
                 }
                 else if (ReferenceEquals(targetTab, DashboardTabItem))
                 {

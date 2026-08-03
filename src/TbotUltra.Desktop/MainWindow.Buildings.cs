@@ -213,61 +213,42 @@ public partial class MainWindow
             return (Action: action, Request: new QueueItemCreateRequest(action.TaskName, payload, 0, 3));
         }).ToList();
 
-        IReadOnlyList<QueueItemCreateRequest> stagedResourceRequests = [];
         IReadOnlyList<StoragePreflightUpgrade> storageUpgrades = [];
-        var bulkResourceActions = prepared
-            .Where(item => string.Equals(
-                item.Action.TaskName,
-                "upgrade_all_resources_to_level",
-                StringComparison.OrdinalIgnoreCase))
-            .Where(item => item.Request.Payload is not null
-                && item.Request.Payload.TryGetValue(BotOptionPayloadKeys.ResourceUpgradeTargetLevel, out var rawTarget)
-                && int.TryParse(rawTarget, out _))
-            .ToList();
-        if (bulkResourceActions.Count > 0)
-        {
-            var targetLevel = bulkResourceActions.Max(item =>
-                int.Parse(item.Request.Payload![BotOptionPayloadKeys.ResourceUpgradeTargetLevel]));
-            var parentPayload = bulkResourceActions
-                .OrderByDescending(item => int.Parse(item.Request.Payload![BotOptionPayloadKeys.ResourceUpgradeTargetLevel]))
-                .First()
-                .Request.Payload!;
-            var firstBulkResourceIndex = prepared.FindIndex(item => string.Equals(
-                item.Action.TaskName,
-                "upgrade_all_resources_to_level",
-                StringComparison.OrdinalIgnoreCase));
-            var precedingTemplateRequests = prepared
-                .Take(firstBulkResourceIndex)
-                .Select(item => item.Request)
-                .ToList();
-            if (!TryPrepareUpgradeAllStoragePreflight(
-                    targetLevel,
-                    parentPayload,
-                    out stagedResourceRequests,
-                    out storageUpgrades,
-                    precedingTemplateRequests))
-            {
-                BuildingsInfoTextBlock.Text = "Building template cancelled by storage capacity preflight.";
-                return;
-            }
-
-        }
-
         var finalRequests = new List<QueueItemCreateRequest>();
-        var stagedResourcesInserted = false;
+        var priorTemplateRequests = new List<QueueItemCreateRequest>();
         foreach (var item in prepared)
         {
+            if (string.Equals(item.Action.TaskName, "upgrade_all_resources_to_level", StringComparison.OrdinalIgnoreCase)
+                && item.Request.Payload is not null
+                && item.Request.Payload.TryGetValue(BotOptionPayloadKeys.ResourceUpgradeTargetLevel, out var rawTarget)
+                && int.TryParse(rawTarget, out var targetLevel))
+            {
+                if (!TryPrepareUpgradeAllStoragePreflight(
+                        targetLevel,
+                        item.Request.Payload,
+                        out var stagedRequests,
+                        out var stagedStorageUpgrades,
+                        priorTemplateRequests))
+                {
+                    BuildingsInfoTextBlock.Text = "Building template cancelled by storage capacity preflight.";
+                    return;
+                }
+
+                finalRequests.AddRange(stagedRequests);
+                priorTemplateRequests.AddRange(stagedRequests);
+                storageUpgrades = storageUpgrades.Concat(stagedStorageUpgrades).ToList();
+                continue;
+            }
+
             if (string.Equals(item.Action.TaskName, "upgrade_all_resources_to_level", StringComparison.OrdinalIgnoreCase))
             {
-                if (!stagedResourcesInserted)
-                {
-                    finalRequests.AddRange(stagedResourceRequests);
-                    stagedResourcesInserted = true;
-                }
+                finalRequests.Add(item.Request);
+                priorTemplateRequests.Add(item.Request);
                 continue;
             }
 
             finalRequests.Add(item.Request);
+            priorTemplateRequests.Add(item.Request);
         }
 
         if (!TryPrepareConstructionStoragePreflight(
