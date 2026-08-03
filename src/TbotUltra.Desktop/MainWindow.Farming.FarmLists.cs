@@ -49,6 +49,16 @@ public partial class MainWindow
         => lastAnalysisAt != DateTimeOffset.MinValue
             && lastAnalysisAt >= now - RecentFarmListAnalysisWindow;
 
+    internal static string BuildFarmListVillageHeader(
+        string villageName,
+        IReadOnlyDictionary<string, string> villageCoordsByName)
+    {
+        return !string.IsNullOrWhiteSpace(villageName)
+            && villageCoordsByName.TryGetValue(villageName, out var coords)
+            ? $"{villageName} {coords}"
+            : villageName;
+    }
+
     private void EnsureFarmListPlaceholderRow()
         => _farmListsViewModel.EnsurePlaceholderRow();
 
@@ -273,12 +283,7 @@ public partial class MainWindow
                         || (value.ListId is not null && selectedFarmListIds.Contains(value.ListId))
                         || selectedFarmLists.Contains(value.Name);
                     var villageName = value.VillageName ?? string.Empty;
-                    var headerText = villageName;
-                    if (!string.IsNullOrEmpty(villageName)
-                        && villageCoordsByName.TryGetValue(villageName, out var coords))
-                    {
-                        headerText = $"{villageName} {coords}";
-                    }
+                    var headerText = BuildFarmListVillageHeader(villageName, villageCoordsByName);
 
                     _farmLists.Add(new FarmListStatusRow
                     {
@@ -992,6 +997,22 @@ public partial class MainWindow
         return coordsByName
             .Where(pair => pair.Value is not null)
             .ToDictionary(pair => pair.Key, pair => pair.Value!, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void RefreshFarmListVillageHeaders()
+    {
+        if (!_farmLists.Any(IsRealFarmListRow))
+        {
+            return;
+        }
+
+        var villageCoordsByName = BuildUniqueVillageCoordsByName();
+        foreach (var row in _farmLists.Where(IsRealFarmListRow))
+        {
+            row.VillageHeaderText = BuildFarmListVillageHeader(row.VillageName, villageCoordsByName);
+        }
+
+        CollectionViewSource.GetDefaultView(_farmLists).Refresh();
     }
 
     private async void FarmListSendNowButton_Click(object sender, RoutedEventArgs e)

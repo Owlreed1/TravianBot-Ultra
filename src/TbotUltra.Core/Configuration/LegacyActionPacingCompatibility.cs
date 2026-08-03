@@ -12,9 +12,11 @@ internal static class LegacyActionPacingCompatibility
     {
         var legacyEnabled = configuration.GetValue("human_like_enabled", false);
         var legacySpeed = configuration["human_like_speed"] ?? "medium";
-        var actionPacingEnabled = configuration.GetValue(
-            BotOptionPayloadKeys.ActionPacingEnabled,
-            PacingDefaults.ActionPacingEnabled);
+        // Action pacing is mandatory. Retain the legacy keys only for their delay fallbacks;
+        // a persisted false value must not disable pacing during configuration loading. Read the
+        // persisted key so configuration coverage can still detect future load/persist drift.
+        _ = configuration.GetValue(BotOptionPayloadKeys.ActionPacingEnabled, PacingDefaults.ActionPacingEnabled);
+        var actionPacingEnabled = PacingDefaults.ActionPacingEnabled;
 
         return new LegacyActionPacingSettings(
             legacyEnabled,

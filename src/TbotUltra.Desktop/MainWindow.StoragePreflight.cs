@@ -109,7 +109,8 @@ public partial class MainWindow
         int targetLevel,
         Dictionary<string, string> parentPayload,
         out IReadOnlyList<QueueItemCreateRequest> plannedRequests,
-        out IReadOnlyList<StoragePreflightUpgrade> upgrades)
+        out IReadOnlyList<StoragePreflightUpgrade> upgrades,
+        IReadOnlyList<QueueItemCreateRequest>? precedingTemplateRequests = null)
     {
         plannedRequests = [];
         upgrades = [];
@@ -134,6 +135,17 @@ public partial class MainWindow
         var precedingItems = _botService.GetQueueItemsForDisplay()
             .Where(item => IsQueueItemForVillage(item, villageName, villageKey))
             .ToList();
+        if (precedingTemplateRequests is not null)
+        {
+            precedingItems.AddRange(precedingTemplateRequests.Select(request => new QueueItem
+            {
+                TaskName = request.TaskName,
+                Payload = request.Payload is null
+                    ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    : new Dictionary<string, string>(request.Payload, StringComparer.OrdinalIgnoreCase),
+                Status = QueueStatus.Pending,
+            }));
+        }
         var storageUpgradeLevelsAhead = LoadBotOptions().ConstructionStorageUpgradeLevelsAhead;
         var result = StorageCapacityQueuePreflightPlanner.PlanUpgradeAllResourcesStepwise(
             status,

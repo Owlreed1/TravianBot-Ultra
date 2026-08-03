@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
+using TbotUltra.Core.Configuration;
 using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Worker.Services;
@@ -62,33 +63,41 @@ public sealed partial class TravianClient
                 return false;
             }
 
-            var analysisStore = new AccountAnalysisStore(_projectRoot);
-            analysisStore.TryLoad(_account.Name, out var analysis, ServerUrl);
-            var cachedWorldUid = Guid.TryParse(analysis?.WorldUid, out _)
-                ? analysis!.WorldUid
-                : null;
-
             IReadOnlyList<LobbyWorldCard> candidates = [];
-            if (cachedWorldUid is not null)
+            string? cachedWorldUid = null;
+            if (ShouldAlwaysRequestLobbyWorldSelection(_config.ServerName))
             {
-                candidates = cards
-                    .Where(card => card.WorldUid.Equals(cachedWorldUid, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                if (candidates.Count == 0)
-                {
-                    Notify($"[lobby-login] cached world UID '{cachedWorldUid}' is not present in the lobby.");
-                    cachedWorldUid = null;
-                }
+                Notify("[lobby-login] account is set to 'Choose in lobby'; requesting a world selection.");
             }
-
-            if (cachedWorldUid is null)
+            else
             {
-                candidates = cards
-                    .Where(card => IsLobbyWorldNameMatch(card.Name, new Uri(ServerUrl).Host, _config.ServerName))
-                    .ToList();
-                if (candidates.Count == 0)
+                var analysisStore = new AccountAnalysisStore(_projectRoot);
+                analysisStore.TryLoad(_account.Name, out var analysis, ServerUrl);
+                cachedWorldUid = Guid.TryParse(analysis?.WorldUid, out _)
+                    ? analysis!.WorldUid
+                    : null;
+
+                if (cachedWorldUid is not null)
                 {
-                    Notify($"[lobby-login] no lobby world name matched server '{_config.ServerName}' ({ServerUrl}).");
+                    candidates = cards
+                        .Where(card => card.WorldUid.Equals(cachedWorldUid, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                    if (candidates.Count == 0)
+                    {
+                        Notify($"[lobby-login] cached world UID '{cachedWorldUid}' is not present in the lobby.");
+                        cachedWorldUid = null;
+                    }
+                }
+
+                if (cachedWorldUid is null)
+                {
+                    candidates = cards
+                        .Where(card => IsLobbyWorldNameMatch(card.Name, new Uri(ServerUrl).Host, _config.ServerName))
+                        .ToList();
+                    if (candidates.Count == 0)
+                    {
+                        Notify($"[lobby-login] no lobby world name matched server '{_config.ServerName}' ({ServerUrl}).");
+                    }
                 }
             }
 
@@ -177,6 +186,9 @@ public sealed partial class TravianClient
         }
         return selected;
     }
+
+    internal static bool ShouldAlwaysRequestLobbyWorldSelection(string? serverName)
+        => LobbyWorldSelectionDefaults.IsChooseInLobby(serverName);
 
     private async Task<bool> TryEnterLobbyWorldAsync(
         LobbyWorldCard candidate,

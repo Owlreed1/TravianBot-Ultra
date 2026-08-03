@@ -197,6 +197,38 @@ public sealed class StorageCapacityQueuePreflightPlannerTests
     }
 
     [Fact]
+    public void PlanUpgradeAllResourcesStepwise_TemplateStorageBeforeResourcesIsProjected()
+    {
+        var fields = Enumerable.Range(1, 18)
+            .Select(slot => new ResourceField(
+                slot,
+                slot % 4 == 0 ? "Cropland" : "Iron Mine",
+                "Resource field",
+                5,
+                null))
+            .ToList();
+        var status = CreateStatusWithoutStorage(
+            fields,
+            warehouseCapacity: 800,
+            granaryCapacity: 800,
+            buildings: [new Building(21, "Main Building", 1, null, 15)]);
+        var templateStorage = new QueueItem[]
+        {
+            Pending("construct_building", new BuildingConstructPayload(19, 10, "Warehouse").ToDictionary()),
+            Pending("upgrade_building_to_level", new BuildingUpgradePayload(19, 2, "Warehouse").ToDictionary()),
+            Pending("construct_building", new BuildingConstructPayload(20, 11, "Granary").ToDictionary()),
+            Pending("upgrade_building_to_level", new BuildingUpgradePayload(20, 2, "Granary").ToDictionary()),
+        };
+
+        var result = StorageCapacityQueuePreflightPlanner.PlanUpgradeAllResourcesStepwise(
+            status,
+            templateStorage,
+            6);
+
+        Assert.Empty(result.Upgrades);
+    }
+
+    [Fact]
     public void PlanUpgradeAllResourcesStepwise_StorageLevelsAheadAddsExtraCapacityLevels()
     {
         var status = CreateStatus(
@@ -438,4 +470,12 @@ public sealed class StorageCapacityQueuePreflightPlannerTests
             BuildQueue: [],
             WarehouseCapacity: warehouseCapacity,
             GranaryCapacity: granaryCapacity);
+
+    private static QueueItem Pending(string taskName, Dictionary<string, string> payload)
+        => new()
+        {
+            TaskName = taskName,
+            Payload = payload,
+            Status = QueueStatus.Pending,
+        };
 }

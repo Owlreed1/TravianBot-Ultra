@@ -6,6 +6,15 @@ namespace TbotUltra.Worker.Tests;
 
 public sealed class LobbyWorldMatcherTests
 {
+    [Theory]
+    [InlineData("Choose in lobby", true)]
+    [InlineData(" choose in lobby ", true)]
+    [InlineData("Europe 3", false)]
+    public void ShouldAlwaysRequestLobbyWorldSelection_RecognizesLobbyChoice(string serverName, bool expected)
+    {
+        Assert.Equal(expected, TravianClient.ShouldAlwaysRequestLobbyWorldSelection(serverName));
+    }
+
     [Fact]
     public void LobbyWorldOption_DisplayTextIncludesCardDetailsAndStableUidPrefix()
     {

@@ -6,6 +6,7 @@ dotnetExe = ResolveDotnetExe(shell, fso)
 projectPath = projectDir & "\src\TbotUltra.Desktop\TbotUltra.Desktop.csproj"
 devOutputDir = projectDir & "\temp_build_out\dev-app"
 exePath = devOutputDir & "\TbotUltra.Desktop.exe"
+sourceStampPath = devOutputDir & "\.source-stamp"
 srcDesktop = projectDir & "\src\TbotUltra.Desktop"
 srcWorker = projectDir & "\src\TbotUltra.Worker"
 srcCore = projectDir & "\src\TbotUltra.Core"
@@ -25,18 +26,15 @@ Else
         WScript.Quit 0
     End If
 
+    latestSource = #1/1/2000#
+    UpdateLatestModified srcDesktop, latestSource
+    UpdateLatestModified srcWorker, latestSource
+    UpdateLatestModified srcCore, latestSource
+
     If Not fso.FileExists(exePath) Then
         needsBuild = True
-    Else
-        exeModified = fso.GetFile(exePath).DateLastModified
-        latestSource = #1/1/2000#
-        UpdateLatestModified srcDesktop, latestSource
-        UpdateLatestModified srcWorker, latestSource
-        UpdateLatestModified srcCore, latestSource
-
-        If latestSource > exeModified Then
-            needsBuild = True
-        End If
+    ElseIf latestSource > ReadBuildStamp(fso, sourceStampPath) Then
+        needsBuild = True
     End If
 
     If needsBuild Then
@@ -46,6 +44,7 @@ Else
         ElseIf Not fso.FileExists(exePath) Then
             MsgBox "Built exe not found: " & exePath, vbExclamation, "Tbot Ultra"
         Else
+            WriteBuildStamp fso, sourceStampPath, latestSource
             LaunchAndActivate shell, exePath
         End If
     Else
@@ -72,18 +71,37 @@ Sub UpdateLatestModified(folderPath, ByRef latest)
         Exit Sub
     End If
 
-    For Each file In folder.Files
-        ext = LCase(fso.GetExtensionName(file.Name))
-        If ext = "cs" Or ext = "xaml" Or ext = "csproj" Or ext = "json" Or ext = "resx" Then
-            If file.DateLastModified > latest Then
-                latest = file.DateLastModified
-            End If
-        End If
-    Next
+    ' A source file edit updates its direct parent directory. Walking directories instead of
+    ' every source file makes unchanged launches much faster while still rebuilding on edits.
+    If folder.DateLastModified > latest Then
+        latest = folder.DateLastModified
+    End If
 
     For Each subFolder In folder.SubFolders
         UpdateLatestModified subFolder.Path, latest
     Next
+End Sub
+
+Function ReadBuildStamp(fileSystemObject, stampPath)
+    On Error Resume Next
+    ReadBuildStamp = #1/1/2000#
+    If Not fileSystemObject.FileExists(stampPath) Then
+        Exit Function
+    End If
+
+    Set stream = fileSystemObject.OpenTextFile(stampPath, 1)
+    value = Trim(stream.ReadLine)
+    stream.Close
+    If IsDate(value) Then
+        ReadBuildStamp = CDate(value)
+    End If
+End Function
+
+Sub WriteBuildStamp(fileSystemObject, stampPath, sourceModified)
+    On Error Resume Next
+    Set stream = fileSystemObject.OpenTextFile(stampPath, 2, True)
+    stream.Write CStr(sourceModified)
+    stream.Close
 End Sub
 
 Function ResolveDotnetExe(shellObject, fileSystemObject)

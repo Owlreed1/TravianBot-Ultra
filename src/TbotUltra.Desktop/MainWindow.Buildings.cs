@@ -232,11 +232,20 @@ public partial class MainWindow
                 .OrderByDescending(item => int.Parse(item.Request.Payload![BotOptionPayloadKeys.ResourceUpgradeTargetLevel]))
                 .First()
                 .Request.Payload!;
+            var firstBulkResourceIndex = prepared.FindIndex(item => string.Equals(
+                item.Action.TaskName,
+                "upgrade_all_resources_to_level",
+                StringComparison.OrdinalIgnoreCase));
+            var precedingTemplateRequests = prepared
+                .Take(firstBulkResourceIndex)
+                .Select(item => item.Request)
+                .ToList();
             if (!TryPrepareUpgradeAllStoragePreflight(
                     targetLevel,
                     parentPayload,
                     out stagedResourceRequests,
-                    out storageUpgrades))
+                    out storageUpgrades,
+                    precedingTemplateRequests))
             {
                 BuildingsInfoTextBlock.Text = "Building template cancelled by storage capacity preflight.";
                 return;

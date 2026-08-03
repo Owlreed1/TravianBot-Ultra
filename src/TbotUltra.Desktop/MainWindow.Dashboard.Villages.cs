@@ -211,6 +211,8 @@ public partial class MainWindow
             .OrderByDescending(item => item.IsCapital)
             .ToList();
 
+        RefreshFarmListVillageHeaders();
+
         // The list was rebuilt with fresh items; re-apply the active-village border.
         ApplyActiveVillageHighlight();
     }

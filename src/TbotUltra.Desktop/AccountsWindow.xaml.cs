@@ -1211,7 +1211,7 @@ public partial class AccountsWindow : Window
             // Follow the checkbox rather than assuming "off", so the controls can never disagree with it.
             SetProxyFieldsEnabled(UseProxyCheckBox.IsChecked == true);
         }, "clear proxy fields");
-        SelectServer(_defaultServerName, _defaultServerUrl);
+        SelectServer(LobbyWorldSelectionDefaults.ServerName, LobbyWorldSelectionDefaults.ServerUrl);
         ServerComboBox.IsEnabled = true;
         CaptureBaseline();
         UpdateActionButtons();
@@ -1240,6 +1240,12 @@ public partial class AccountsWindow : Window
     private void RebuildServerComboItems(List<ServerOption> officialServers)
     {
         _comboServers = OfficialServerCatalog.BuildPickerServers(_serverOptions, _specialServerOptions, officialServers);
+        _comboServers.Insert(0, new ServerOption
+        {
+            Name = LobbyWorldSelectionDefaults.ServerName,
+            BaseUrl = LobbyWorldSelectionDefaults.ServerUrl,
+            Group = "Lobby",
+        });
         var view = new ListCollectionView(_comboServers);
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ServerOption.Group)));
         ServerComboBox.ItemsSource = view;

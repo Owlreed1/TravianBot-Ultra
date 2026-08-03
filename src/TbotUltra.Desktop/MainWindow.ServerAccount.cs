@@ -416,6 +416,13 @@ public partial class MainWindow
             return 1.0;
         }
 
+        // A new account can intentionally remain on the lobby until its first verified world choice.
+        // The real server speed is unavailable at that point, so use the temporary estimate silently.
+        if (LobbyWorldSelectionDefaults.IsChooseInLobby(serverName))
+        {
+            return 1.0;
+        }
+
         if (!_serverSpeedAlarmRaised)
         {
             _serverSpeedAlarmRaised = true;

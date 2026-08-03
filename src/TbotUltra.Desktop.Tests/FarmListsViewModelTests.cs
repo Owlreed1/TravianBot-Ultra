@@ -115,4 +115,17 @@ public sealed class FarmListsViewModelTests
         Assert.False(FarmListsViewModel.IsRealRow(new FarmListStatusRow { IsPlaceholder = true }));
         Assert.True(FarmListsViewModel.IsRealRow(Real("List A")));
     }
+
+    [Fact]
+    public void BuildFarmListVillageHeader_UsesKnownCoordinatesImmediately()
+    {
+        var header = MainWindow.BuildFarmListVillageHeader(
+            "Swollster",
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Swollster"] = "(120 | 14)",
+            });
+
+        Assert.Equal("Swollster (120 | 14)", header);
+    }
 }
