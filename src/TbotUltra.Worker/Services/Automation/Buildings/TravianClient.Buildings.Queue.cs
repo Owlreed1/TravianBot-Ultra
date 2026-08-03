@@ -610,12 +610,10 @@ public sealed partial class TravianClient
             }
             else if (previousOngoingCount > 0)
             {
-                // Single-slot category that just freed (a build finished). No percentage reference.
-                var minutes = RandomInRange(
-                    _config.ConstructionHumanizeNoPlusMinMinutes,
-                    _config.ConstructionHumanizeNoPlusMaxMinutes);
-                delaySeconds = minutes * 60.0;
-                reason = $"no-plus {minutes:F1}m after slot freed";
+                // This is a fresh confirmed-empty overview after the category's active build finished.
+                // Start the next queued item now so the free slot does not become an avoidable gap.
+                Notify($"[construction-humanize] slot {slotId}: confirmed empty queue after slot freed — starting immediately.");
+                return null;
             }
             else
             {
