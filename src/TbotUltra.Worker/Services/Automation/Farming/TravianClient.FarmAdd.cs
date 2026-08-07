@@ -48,15 +48,30 @@ public sealed partial class TravianClient
             throw new InvalidOperationException("Gold Club is not enabled for this account.");
         }
 
-        return await AddFarmsFromCoordinatesCoreAsync(
-            farmListName,
-            troopType,
-            troopCount,
-            requestedCount,
-            coordinates,
-            progress,
-            useDefaultTroops,
-            cancellationToken);
+        try
+        {
+            return await AddFarmsFromCoordinatesCoreAsync(
+                farmListName,
+                troopType,
+                troopCount,
+                requestedCount,
+                coordinates,
+                progress,
+                useDefaultTroops,
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            _session.FarmListReloadRequiredBeforeAdd = true;
+            Notify("[farm-list] Add farms was cancelled; the next add run will reload Farm Lists before reading targets.");
+            throw;
+        }
+        catch
+        {
+            _session.FarmListReloadRequiredBeforeAdd = true;
+            Notify("[farm-list] Add farms failed; the next add run will reload Farm Lists before reading targets.");
+            throw;
+        }
     }
 
     private async Task<FarmAddBatchResult> AddFarmsFromCoordinatesCoreAsync(
@@ -69,7 +84,19 @@ public sealed partial class TravianClient
         bool useDefaultTroops,
         CancellationToken cancellationToken)
     {
-        await EnsureRallyPointAndOpenFarmListPageAsync(cancellationToken);
+        if (_session.FarmListReloadRequiredBeforeAdd)
+        {
+            Notify("[farm-list] Reloading Farm Lists after an interrupted Add farms run to discard stale page state.");
+            await ReloadOrGotoAsync(Paths.RallyPointFarmLists, cancellationToken);
+            await EnsureLoggedInAsync(cancellationToken: cancellationToken);
+            await WaitForOfficialFarmListRenderAsync(cancellationToken);
+            _session.FarmListReloadRequiredBeforeAdd = false;
+        }
+        else
+        {
+            await EnsureRallyPointAndOpenFarmListPageAsync(cancellationToken);
+        }
+
         var lid = await TryResolveFarmListSlotIdByNameAsync(farmListName, cancellationToken);
         if (string.IsNullOrWhiteSpace(lid))
         {

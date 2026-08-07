@@ -31,11 +31,10 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     private string _totalTimeText = "Time -";
     private string _totalConstructFasterTimeText = "Time (25%) -";
     private string _validationSummaryText = string.Empty;
-    private string _windowTitle = "Building templates";
     private bool _isRefreshingPlanPreview;
     private string? _templateLoadWarning;
-    private bool _isTemplatesLoaded;
     private bool _isLoadingTemplateRows;
+    private CancellationTokenSource? _templateLoadCts;
 
     public ObservableCollection<BuildingTemplate> Templates { get; } = [];
     public ObservableCollection<BuildingTemplateRowView> Rows { get; } = [];
@@ -46,18 +45,6 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         Enumerable.Range(1, 20).Select(item => item.ToString()).ToList();
 
     public BuildingTemplatePlanResult? QueuePlan { get; private set; }
-
-    public bool IsTemplatesLoaded
-    {
-        get => _isTemplatesLoaded;
-        private set => SetProperty(ref _isTemplatesLoaded, value);
-    }
-
-    public string WindowTitle
-    {
-        get => _windowTitle;
-        private set => SetProperty(ref _windowTitle, value);
-    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -154,9 +141,8 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
 
         Rows.CollectionChanged += Rows_CollectionChanged;
         LoadBuildingOptions(status.Tribe);
-        StatusText = "Loading templates...";
-        WindowTitle = "Building templates — Loading...";
         Loaded += BuildingTemplatesWindow_Loaded;
+        Closed += BuildingTemplatesWindow_Closed;
     }
 
     private void ShowBuildingSlotsButton_Click(object sender, RoutedEventArgs e)
@@ -191,39 +177,65 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     private async void BuildingTemplatesWindow_Loaded(object sender, RoutedEventArgs e)
     {
         Loaded -= BuildingTemplatesWindow_Loaded;
-        IReadOnlyList<BuildingTemplate> loadedTemplates;
-        string? loadWarning = null;
+        var loadCts = new CancellationTokenSource();
+        _templateLoadCts = loadCts;
         try
         {
-            loadedTemplates = await _store.LoadAsync();
-        }
-        catch (Exception ex)
-        {
-            loadWarning = $"Could not load templates: {ex.Message}";
-            loadedTemplates = [];
-        }
+            IReadOnlyList<BuildingTemplate> loadedTemplates;
+            string? loadWarning = null;
+            try
+            {
+                loadedTemplates = await _store.LoadAsync(loadCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                loadWarning = $"Could not load templates: {ex.Message}";
+                loadedTemplates = [];
+            }
 
-        if (!IsLoaded)
-        {
-            return;
-        }
+            if (!IsLoaded || loadCts.IsCancellationRequested)
+            {
+                return;
+            }
 
-        Templates.Clear();
-        _templateLoadWarning = loadWarning ?? _store.LastLoadWarning;
-        foreach (var template in loadedTemplates)
-        {
-            Templates.Add(template);
-        }
+            Templates.Clear();
+            _templateLoadWarning = loadWarning ?? _store.LastLoadWarning;
+            foreach (var template in loadedTemplates)
+            {
+                Templates.Add(template);
+            }
 
-        if (Templates.Count == 0)
-        {
-            Templates.Add(CreateNewTemplate("New template"));
-        }
+            if (Templates.Count == 0)
+            {
+                Templates.Add(CreateNewTemplate("New template"));
+            }
 
-        SelectedTemplate = Templates[0];
-        IsTemplatesLoaded = true;
-        WindowTitle = "Building templates";
+            SelectedTemplate = Templates[0];
+            LoadingOverlay.Hide();
+        }
+        finally
+        {
+            if (ReferenceEquals(_templateLoadCts, loadCts))
+            {
+                _templateLoadCts = null;
+            }
+
+            loadCts.Dispose();
+        }
     }
+
+    private void LoadingOverlay_Cancelled(object sender, EventArgs e)
+    {
+        _templateLoadCts?.Cancel();
+        Close();
+    }
+
+    private void BuildingTemplatesWindow_Closed(object? sender, EventArgs e)
+        => _templateLoadCts?.Cancel();
 
     private BuildingTemplate CreateNewTemplate(string name)
     {

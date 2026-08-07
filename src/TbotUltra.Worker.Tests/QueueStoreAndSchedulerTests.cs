@@ -768,6 +768,7 @@ public sealed class QueueStoreAndSchedulerTests : IDisposable
     [InlineData("Building cannot be built yet. Missing requirements.", true)]
     [InlineData("Slot 20 reports max level reached.", true)]
     [InlineData("Production bonus: video cooldown active. queue_wait_seconds=125", true)]
+    [InlineData("Village 'SWOLL' (12|-4): Slot 31: could not find 'Upgrade to level 20' button. blocked (upgrade control unavailable) queue_wait_seconds=120", true)]
     [InlineData("Slot 20: already at level 3.", false)]
     [InlineData("", false)]
     public void BotTaskRunner_IsBlockedTaskResult_MatchesKnownFormats(string result, bool expected)
@@ -780,6 +781,7 @@ public sealed class QueueStoreAndSchedulerTests : IDisposable
     [InlineData("Constructed Warehouse in slot 20 (confirmed level 1 on dorf2).", ConstructionTaskOutcome.ConfirmedComplete)]
     [InlineData("Slot 20: already at level 3.", ConstructionTaskOutcome.AlreadySatisfied)]
     [InlineData("Queued Marketplace in slot 21. Evidence: ...", ConstructionTaskOutcome.QueuedOrInProgress)]
+    [InlineData("Village 'SWOLL' (12|-4): Slot 31: could not find 'Upgrade to level 20' button. blocked (upgrade control unavailable) queue_wait_seconds=120", ConstructionTaskOutcome.WaitingOrBlocked)]
     public void BotTaskRunner_ClassifyConstructionTaskResult_MapsKnownResults(string result, ConstructionTaskOutcome expected)
     {
         Assert.Equal(expected, BotTaskRunner.ClassifyConstructionTaskResult("construct_building", result));

@@ -164,9 +164,13 @@ public sealed partial class TravianClient : IBuildingClient
 
                 // The current build page already has the exact resource block and hero-transfer control.
                 // Use it before any dorf2 queue probe so a normal top-up does not navigate away and back.
-                if (actionability.Outcome == UpgradeAttemptOutcome.BlockedByResources
-                    && pageAnalysis.LooksBlockedByResources)
+                if (pageAnalysis.LooksBlockedByResources)
                 {
+                    if (actionability.Outcome != UpgradeAttemptOutcome.BlockedByResources)
+                    {
+                        Notify($"[build] slot {slotId}: the upgrade control was unavailable, but the live page reports a resource block; checking Hero inventory before deferring.");
+                    }
+
                     var offerLevel = actionability.DetectedTargetLevel ?? nextLevel;
                     var offerCost = await TryReadLiveResourceUpgradeCostOnCurrentPageAsync(cancellationToken);
                     var offerKey = BuildConstructionHeroTransferOfferKey(slotId, offerLevel, offerCost);
@@ -266,10 +270,11 @@ public sealed partial class TravianClient : IBuildingClient
                         continue;
                     }
                     var candidateSummary = string.IsNullOrWhiteSpace(actionability.DebugSummary) ? "none" : actionability.DebugSummary;
-                    return $"Slot {slotId}: could not find 'Upgrade to level {nextLevel}' button. "
+                    var village = await ReadActiveVillageBuildLogLabelAsync(cancellationToken);
+                    return $"Village {village}: Slot {slotId}: could not find 'Upgrade to level {nextLevel}' button. "
                         + $"Reason: {actionability.Outcome} ({actionability.Reason}). "
                         + $"url='{_page.Url}' candidates=[{candidateSummary}]. "
-                        + $"Upgrades performed: {upgrades}.";
+                        + $"Upgrades performed: {upgrades}. blocked (upgrade control unavailable) queue_wait_seconds=120";
                 }
             }
 
@@ -506,6 +511,30 @@ public sealed partial class TravianClient : IBuildingClient
         int? PopulationDelta,
         bool LooksBlockedByResources,
         string? ConstructRequirementError);
+
+    private async Task<string> ReadActiveVillageBuildLogLabelAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            return await _page.EvaluateAsync<string>(
+                """
+                () => {
+                  const clean = (value) => (value || '').replace(/\s+/g, ' ').trim();
+                  const village = document.querySelector('#villageName');
+                  const name = clean(village?.textContent) || 'unknown';
+                  const x = village?.getAttribute('data-x');
+                  const y = village?.getAttribute('data-y');
+                  return x !== null && y !== null ? `'${name}' (${x}|${y})` : `'${name}'`;
+                }
+                """).WaitAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
+        {
+            Notify($"[build:verbose] could not read active village identity for slot log: {ex.Message}");
+            return "'unknown'";
+        }
+    }
 
     private async Task<ConstructionPageAnalysis> ReadConstructionPageAnalysisAsync(
         int slotId,
@@ -807,10 +836,14 @@ public sealed partial class TravianClient : IBuildingClient
             ".upgradeButtonsContainer .section1 button.green.build",
             ".upgradeButtonsContainer .section1 button.green",
             ".upgradeButtonsContainer .section1 button",
+            ".upgradeButtonsContainer .section1 input[type='submit']",
+            ".upgradeButtonsContainer .section1 input[type='button']",
             "div.addHoverClick",
             "div.button-container",
             "button.green",
             "button",
+            "input[type='submit']",
+            "input[type='button']",
             "a.green",
             "a",
         };
@@ -1012,9 +1045,13 @@ public sealed partial class TravianClient : IBuildingClient
 
                 // The current build page already has the exact resource block and hero-transfer control.
                 // Use it before any dorf2 queue probe so a normal top-up does not navigate away and back.
-                if (actionability.Outcome == UpgradeAttemptOutcome.BlockedByResources
-                    && pageAnalysis.LooksBlockedByResources)
+                if (pageAnalysis.LooksBlockedByResources)
                 {
+                    if (actionability.Outcome != UpgradeAttemptOutcome.BlockedByResources)
+                    {
+                        Notify($"[build] slot {slotId}: the upgrade control was unavailable, but the live page reports a resource block; checking Hero inventory before deferring.");
+                    }
+
                     var offerLevel = actionability.DetectedTargetLevel ?? nextLevel;
                     var offerCost = await TryReadLiveResourceUpgradeCostOnCurrentPageAsync(cancellationToken);
                     var offerKey = BuildConstructionHeroTransferOfferKey(slotId, offerLevel, offerCost);
@@ -1115,10 +1152,11 @@ public sealed partial class TravianClient : IBuildingClient
                         continue;
                     }
                     var candidateSummary = string.IsNullOrWhiteSpace(actionability.DebugSummary) ? "none" : actionability.DebugSummary;
-                    return $"Slot {slotId}: could not find 'Upgrade to level {nextLevel}' button. "
+                    var village = await ReadActiveVillageBuildLogLabelAsync(cancellationToken);
+                    return $"Village {village}: Slot {slotId}: could not find 'Upgrade to level {nextLevel}' button. "
                         + $"Reason: {actionability.Outcome} ({actionability.Reason}). "
                         + $"url='{_page.Url}' candidates=[{candidateSummary}]. "
-                        + $"Upgrades performed: {upgrades}.";
+                        + $"Upgrades performed: {upgrades}. blocked (upgrade control unavailable) queue_wait_seconds=120";
                 }
             }
 

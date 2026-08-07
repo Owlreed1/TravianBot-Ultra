@@ -382,8 +382,17 @@ public partial class MainWindow
             return;
         }
 
+        var sendAllLists = string.Equals(
+            FarmingDefaults.NormalizeSendMode(LoadBotOptions().ContinuousFarmSendMode),
+            FarmingDefaults.SendModeAllAtOnce,
+            StringComparison.Ordinal);
         var attemptedKeys = _farmLists
-            .Where(row => IsRealFarmListRow(row) && row.CanSendNow)
+            .Where(row => IsRealFarmListRow(row)
+                && FarmListDispatchStateStore.ShouldTrackDispatch(
+                    sendAllLists,
+                    row.IsEnabled,
+                    row.IsReady,
+                    row.IsEmpty))
             .Select(FarmListDispatchKey)
             .ToList();
 

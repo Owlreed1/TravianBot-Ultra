@@ -796,19 +796,7 @@ public sealed partial class TravianClient : IFarmingClient
                 return false;
             }
 
-            await _page.WaitForFunctionAsync(
-                """
-                (candidate) => {
-                  const wrapper = Array.from(document.querySelectorAll('#rallyPointFarmList .farmListWrapper'))
-                    .find(item => item.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') === candidate.destinationId);
-                  const input = wrapper?.querySelector(`tr.slot input[data-slot-id="${CSS.escape(candidate.slotId)}"]`);
-                  const movedRow = input?.closest('tr.slot');
-                  return !!movedRow && movedRow.classList.contains('disabled');
-                }
-                """,
-                new { slotId = row.SlotId ?? string.Empty, destinationId = destination.Id },
-                new PageWaitForFunctionOptions { Timeout = _config.TimeoutMs }).WaitAsync(cancellationToken);
-            return true;
+            return await WaitForFarmListMoveWithDuplicateOverrideAsync(row, destination, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -819,6 +807,80 @@ public sealed partial class TravianClient : IFarmingClient
             Notify($"[farm-list] combined move/deactivate did not confirm target='{row.TargetName}' slot='{row.SlotId}': {ex.Message}");
             return false;
         }
+    }
+
+    // Wait for the ordinary completed move OR Travian's duplicate-target confirmation. Both are
+    // observed in the same bounded loop, so a normal move is not delayed while a late dialog can
+    // still appear and be confirmed before the overall move-verification deadline expires.
+    private async Task<bool> WaitForFarmListMoveWithDuplicateOverrideAsync(
+        FarmListLossRowJs row,
+        LossDestinationResolution destination,
+        CancellationToken cancellationToken)
+    {
+        const string duplicateMessage = "The target is already on the farm list. Override existing farm list target?";
+        var confirmation = _page
+            .Locator(".dialogContainer:visible .confirmationDialogContent")
+            .Filter(new LocatorFilterOptions { HasTextString = duplicateMessage })
+            .First;
+
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await _page.WaitForFunctionAsync(
+                    """
+                    (candidate) => {
+                      const duplicateShown = Array.from(document.querySelectorAll('.dialogContainer .confirmationDialogContent'))
+                        .some(dialog => (dialog.textContent || '').includes(candidate.duplicateMessage));
+                      if (duplicateShown) return true;
+                      const wrapper = Array.from(document.querySelectorAll('#rallyPointFarmList .farmListWrapper'))
+                        .find(item => item.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') === candidate.destinationId);
+                      const input = wrapper?.querySelector(`tr.slot input[data-slot-id="${CSS.escape(candidate.slotId)}"]`);
+                      const movedRow = input?.closest('tr.slot');
+                      return !!movedRow && movedRow.classList.contains('disabled');
+                    }
+                    """,
+                    new
+                    {
+                        slotId = row.SlotId ?? string.Empty,
+                        destinationId = destination.Id,
+                        duplicateMessage,
+                    },
+                    new PageWaitForFunctionOptions { Timeout = 5000 }).WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (TimeoutException)
+            {
+                continue;
+            }
+
+            if (await confirmation.CountAsync() > 0)
+            {
+                var confirmButton = confirmation
+                    .Locator("button.textButtonV2.buttonFramed.rectangle.withText.green")
+                    .First;
+                if (!await TryRealClickFarmButtonAsync(
+                        confirmButton,
+                        () => Task.FromResult(false),
+                        $"confirm duplicate farm-list target override for slot '{row.SlotId}'",
+                        cancellationToken))
+                {
+                    Notify($"[farm-list] duplicate target override could not be confirmed target='{row.TargetName}' slot='{row.SlotId}'.");
+                    return false;
+                }
+                Notify($"[farm-list] confirmed duplicate target override target='{row.TargetName}' slot='{row.SlotId}'.");
+                continue;
+            }
+
+            return true;
+        }
+
+        Notify($"[farm-list] move did not confirm target='{row.TargetName}' slot='{row.SlotId}' within {4 * 5}s.");
+        return false;
     }
 
     private ILocator ResolveFarmListLossRowLocator(FarmListLossRowJs row)
@@ -1551,9 +1613,15 @@ public sealed partial class TravianClient : IFarmingClient
         {
             throw;
         }
+        catch (TimeoutException ex)
+        {
+            Notify($"[farm-list] loss-row deactivate action timed out target='{row.TargetName}' slot='{row.SlotId}': {ex.Message}");
+            return false;
+        }
         catch (PlaywrightException ex)
         {
             Notify($"[farm-list] loss-row deactivate action did not become visible target='{row.TargetName}' slot='{row.SlotId}': {ex.Message}");
+            return false;
         }
 
         var deactivateClicked = await TryRealClickFarmButtonAsync(
@@ -1591,6 +1659,11 @@ public sealed partial class TravianClient : IFarmingClient
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (TimeoutException ex)
+        {
+            Notify($"[farm-list] loss-row deactivate confirmation timed out target='{row.TargetName}' slot='{row.SlotId}': {ex.Message}");
+            return false;
         }
         catch (PlaywrightException ex)
         {

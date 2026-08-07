@@ -18,6 +18,9 @@ public static class FarmListDispatchStateStore
         return sendActionCompleted;
     }
 
+    internal static bool ShouldTrackDispatch(bool sendAllLists, bool isEnabled, bool isReady, bool isEmpty)
+        => !isEmpty && isReady && (sendAllLists || isEnabled);
+
     public static string CreateKey(string? listId, string? listName)
     {
         if (!string.IsNullOrWhiteSpace(listId))

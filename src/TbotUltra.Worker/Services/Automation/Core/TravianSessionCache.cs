@@ -27,6 +27,10 @@ public sealed class TravianSessionCache
     public int ConsecutiveUnknownAccessStates { get; set; }
     public System.DateTimeOffset LastResourceReadLogAt { get; set; } = System.DateTimeOffset.MinValue;
 
+    // An interrupted Add farms run can leave the visible farm-list DOM behind the server state.
+    // The next add run consumes this flag by reloading the Farm Lists page before reading list data.
+    public bool FarmListReloadRequiredBeforeAdd { get; set; }
+
     // Next time hero_manage may dispatch an adventure. Set when an adventure is first observed while
     // the hero is home, so repeated worker attempts reuse one deadline instead of drawing a new random
     // delay forever. No deadline is created while the hero is away or no adventure exists.

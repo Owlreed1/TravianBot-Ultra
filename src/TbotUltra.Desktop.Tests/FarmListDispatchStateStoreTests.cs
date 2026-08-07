@@ -37,4 +37,19 @@ public sealed class FarmListDispatchStateStoreTests
             sendActionCompleted: true,
             remainingSeconds: 0));
     }
+
+    [Fact]
+    public void ShouldTrackDispatch_SendAllIncludesDisabledReadyLists()
+    {
+        Assert.True(FarmListDispatchStateStore.ShouldTrackDispatch(
+            sendAllLists: true,
+            isEnabled: false,
+            isReady: true,
+            isEmpty: false));
+        Assert.False(FarmListDispatchStateStore.ShouldTrackDispatch(
+            sendAllLists: false,
+            isEnabled: false,
+            isReady: true,
+            isEmpty: false));
+    }
 }
