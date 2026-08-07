@@ -10,7 +10,9 @@
     "isWorking": null,
     "lastFailureUtc": null,
     "assignedAccount": null,
-    "usedByAccounts": [],
+    "usedByAccounts": [
+      "jesperr_svensson_gmail_com_ts100_x10_europe_travian_com_6004f322c34af538"
+    ],
     "createdAtUtc": "2026-08-03T18:28:07.8996897Z"
   },
   {
@@ -194,7 +196,9 @@
     "isWorking": null,
     "lastFailureUtc": null,
     "assignedAccount": "jesperr_svensson_gmail_com_ts100_x10_europe_travian_com_6004f322c34af538",
-    "usedByAccounts": [],
+    "usedByAccounts": [
+      "jesperr_svensson_gmail_com_ts100_x10_europe_travian_com_6004f322c34af538"
+    ],
     "createdAtUtc": "2026-08-03T18:28:07.9068778Z"
   },
   {

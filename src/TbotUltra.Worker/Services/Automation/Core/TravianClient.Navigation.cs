@@ -366,6 +366,54 @@ public sealed partial class TravianClient
         }
     }
 
+    // The disposable video browser can occasionally reach the right URL before Travian finishes
+    // rendering its page contract. Recover before any video action, so a malformed first load does
+    // not immediately discard a browser that a safe reload can repair.
+    private async Task<bool> LoadIsolatedBonusVideoPageAsync(
+        string path,
+        string label,
+        Func<CancellationToken, Task<bool>> isPageReady,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; attempt <= BonusVideoPlaybackPolicy.IsolatedPageLoadAttempts; attempt++)
+        {
+            try
+            {
+                if (attempt == 1)
+                {
+                    await GotoAsync(path, cancellationToken);
+                }
+                else
+                {
+                    await ReloadOrGotoAsync(path, cancellationToken);
+                }
+
+                await WaitForPageReadyAsync(cancellationToken);
+                if (await isPageReady(cancellationToken))
+                {
+                    return true;
+                }
+
+                Notify($"[bonus-video] {label}: Travian page did not finish rendering (load {attempt}/{BonusVideoPlaybackPolicy.IsolatedPageLoadAttempts}).");
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (IsTimeoutError(ex) || IsTransientExecutionContextException(ex))
+            {
+                Notify($"[bonus-video] {label}: transient page-load failure (load {attempt}/{BonusVideoPlaybackPolicy.IsolatedPageLoadAttempts}): {ex.Message}");
+            }
+
+            if (BonusVideoPlaybackPolicy.ShouldRetryIsolatedPageLoad(attempt))
+            {
+                Notify($"[bonus-video] {label}: reloading the isolated browser page before giving up.");
+            }
+        }
+
+        return false;
+    }
+
     private async Task ReloadCurrentPageWithSlowNetworkRecoveryAsync(
         string expectedPath,
         CancellationToken cancellationToken)

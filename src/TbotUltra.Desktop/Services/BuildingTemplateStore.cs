@@ -76,6 +76,9 @@ public sealed class BuildingTemplateStore
         }
     }
 
+    public Task<IReadOnlyList<BuildingTemplate>> LoadAsync(CancellationToken cancellationToken = default)
+        => Task.Run(Load, cancellationToken);
+
     public void Save(IReadOnlyList<BuildingTemplate> templates)
     {
         if (_saveBlockedByLoadFailure)

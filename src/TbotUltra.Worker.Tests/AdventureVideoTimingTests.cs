@@ -54,4 +54,21 @@ public sealed class AdventureVideoTimingTests
             BonusVideoPlaybackPolicy.IsolatedActionTimeoutSeconds
             >= BonusVideoPlaybackPolicy.PostPlayTimeoutSeconds + 60);
     }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    [InlineData(3, false)]
+    public void IsolatedPageLoad_ReloadsTwiceBeforeGivingUp(int completedAttempt, bool shouldReload)
+    {
+        Assert.Equal(shouldReload, BonusVideoPlaybackPolicy.ShouldRetryIsolatedPageLoad(completedAttempt));
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    public void MainPageRecovery_RetriesOnceAfterAboutBlank(int completedAttempt, bool shouldRetry)
+    {
+        Assert.Equal(shouldRetry, BonusVideoPlaybackPolicy.ShouldRetryMainPageRecovery(completedAttempt));
+    }
 }

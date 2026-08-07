@@ -1,11 +1,16 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 
 namespace TbotUltra.Desktop.Views;
 
 public partial class FarmingPanel : UserControl
 {
+    public static readonly DependencyProperty NextSendDisplayProperty = DependencyProperty.Register(
+        nameof(NextSendDisplay),
+        typeof(string),
+        typeof(FarmingPanel),
+        new PropertyMetadata("Next send: --"));
+
     private MainWindow? _host;
 
     public FarmingPanel() => InitializeComponent();
@@ -28,33 +33,13 @@ public partial class FarmingPanel : UserControl
     internal ComboBox LossDestinationOption => FarmLossDestinationComboBox;
     internal Button TravcoSearchButton => TravcoInactiveSearchButton;
 
-    internal void SetNextSendDisplay(string text)
+    public string NextSendDisplay
     {
-        foreach (var element in FindVisualChildren<FrameworkElement>(this))
-        {
-            if (Equals(element.Tag, "FarmListNextSendText") && element is TextBlock textBlock)
-            {
-                textBlock.Text = text;
-            }
-        }
+        get => (string)GetValue(NextSendDisplayProperty);
+        set => SetValue(NextSendDisplayProperty, value);
     }
 
-    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject parent) where T : DependencyObject
-    {
-        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
-        {
-            var child = VisualTreeHelper.GetChild(parent, index);
-            if (child is T typedChild)
-            {
-                yield return typedChild;
-            }
-
-            foreach (var descendant in FindVisualChildren<T>(child))
-            {
-                yield return descendant;
-            }
-        }
-    }
+    internal void SetNextSendDisplay(string text) => NextSendDisplay = text;
 
     private void AnalyzeFarmListsButton_Click(object sender, RoutedEventArgs e) => Host?.OnAnalyzeFarmListsClicked(sender, e);
     private void AddFarmsToListButton_Click(object sender, RoutedEventArgs e) => Host?.OnAddFarmsToListClicked(sender, e);

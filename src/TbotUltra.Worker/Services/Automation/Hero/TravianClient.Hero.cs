@@ -439,10 +439,21 @@ public sealed partial class TravianClient : IHeroClient
         // timer; Rally Point can contain thousands of unrelated troop returns across several pages.
         if (!inVillage && !status.IsDead && heroReturnWaitSeconds is not > 0)
         {
-            heroReturnWaitSeconds = await ReadHeroReturnFromAttributesAsync(cancellationToken);
-            Notify(heroReturnWaitSeconds is > 0
-                ? $"[hero] away — return ETA read from Hero Attributes: {TravianParsing.FormatDuration(heroReturnWaitSeconds.Value)}"
-                : "[hero] away — no return ETA was exposed; using the 5m safety re-check.");
+            var isReinforcing = string.Equals(status.MovementState, "Reinforcing", StringComparison.OrdinalIgnoreCase);
+            var returnEtaSeconds = await ReadHeroReturnFromAttributesAsync(cancellationToken);
+            heroReturnWaitSeconds = HeroStatusDecision.ResolveAwayRetrySeconds(returnEtaSeconds, isReinforcing);
+            if (returnEtaSeconds is > 0)
+            {
+                Notify($"[hero] away — return ETA read from Hero Attributes: {TravianParsing.FormatDuration(heroReturnWaitSeconds.Value)}");
+            }
+            else if (isReinforcing)
+            {
+                Notify("[hero] reinforcing another village — no return ETA was exposed; using the 30m re-check.");
+            }
+            else
+            {
+                Notify("[hero] away — no return ETA was exposed; using the 15m safety re-check.");
+            }
         }
 
         if (hpPercent is >= 0 && hpPercent >= minHpThreshold)
@@ -712,6 +723,7 @@ public sealed partial class TravianClient : IHeroClient
             """
             () => {
               // 1) Most reliable: explicit hero home/running icons in the top bar/sidebar.
+              if (document.querySelector('i.heroReinforcing, .heroState i.statusSupport_medium')) return false;
               if (document.querySelector('i.heroHome, [class*="heroHome"]')) return true;
               if (document.querySelector('i.heroRunning, [class*="heroRunning"]')) return false;
 

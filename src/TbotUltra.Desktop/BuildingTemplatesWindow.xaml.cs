@@ -31,8 +31,11 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     private string _totalTimeText = "Time -";
     private string _totalConstructFasterTimeText = "Time (25%) -";
     private string _validationSummaryText = string.Empty;
+    private string _windowTitle = "Building templates";
     private bool _isRefreshingPlanPreview;
     private string? _templateLoadWarning;
+    private bool _isTemplatesLoaded;
+    private bool _isLoadingTemplateRows;
 
     public ObservableCollection<BuildingTemplate> Templates { get; } = [];
     public ObservableCollection<BuildingTemplateRowView> Rows { get; } = [];
@@ -43,6 +46,18 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         Enumerable.Range(1, 20).Select(item => item.ToString()).ToList();
 
     public BuildingTemplatePlanResult? QueuePlan { get; private set; }
+
+    public bool IsTemplatesLoaded
+    {
+        get => _isTemplatesLoaded;
+        private set => SetProperty(ref _isTemplatesLoaded, value);
+    }
+
+    public string WindowTitle
+    {
+        get => _windowTitle;
+        private set => SetProperty(ref _windowTitle, value);
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -139,8 +154,9 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
 
         Rows.CollectionChanged += Rows_CollectionChanged;
         LoadBuildingOptions(status.Tribe);
-        LoadTemplates();
-        RefreshPlanPreview();
+        StatusText = "Loading templates...";
+        WindowTitle = "Building templates — Loading...";
+        Loaded += BuildingTemplatesWindow_Loaded;
     }
 
     private void ShowBuildingSlotsButton_Click(object sender, RoutedEventArgs e)
@@ -172,11 +188,28 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         ResourceOptions.Add(new BuildingTemplateTargetOption(null, "All Croplands", "Resources", "crop", null));
     }
 
-    private void LoadTemplates()
+    private async void BuildingTemplatesWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        Loaded -= BuildingTemplatesWindow_Loaded;
+        IReadOnlyList<BuildingTemplate> loadedTemplates;
+        string? loadWarning = null;
+        try
+        {
+            loadedTemplates = await _store.LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            loadWarning = $"Could not load templates: {ex.Message}";
+            loadedTemplates = [];
+        }
+
+        if (!IsLoaded)
+        {
+            return;
+        }
+
         Templates.Clear();
-        var loadedTemplates = _store.Load();
-        _templateLoadWarning = _store.LastLoadWarning;
+        _templateLoadWarning = loadWarning ?? _store.LastLoadWarning;
         foreach (var template in loadedTemplates)
         {
             Templates.Add(template);
@@ -188,6 +221,8 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         }
 
         SelectedTemplate = Templates[0];
+        IsTemplatesLoaded = true;
+        WindowTitle = "Building templates";
     }
 
     private BuildingTemplate CreateNewTemplate(string name)
@@ -209,13 +244,31 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             row.PropertyChanged -= Row_PropertyChanged;
         }
 
-        Rows.Clear();
-        if (SelectedTemplate is not null)
+        _isLoadingTemplateRows = true;
+        Rows.CollectionChanged -= Rows_CollectionChanged;
+        try
         {
-            foreach (var row in SelectedTemplate.Rows)
+            Rows.Clear();
+            if (SelectedTemplate is not null)
             {
-                AddRowView(BuildingTemplateRowView.From(row, BuildingOptions, ResourceOptions));
+                foreach (var row in SelectedTemplate.Rows)
+                {
+                    var rowView = BuildingTemplateRowView.From(row, BuildingOptions, ResourceOptions);
+                    rowView.SetOptionSources(BuildingOptions, ResourceOptions);
+                    Rows.Add(rowView);
+                }
             }
+        }
+        finally
+        {
+            Rows.CollectionChanged += Rows_CollectionChanged;
+            _isLoadingTemplateRows = false;
+        }
+
+        foreach (var row in Rows)
+        {
+            row.PropertyChanged -= Row_PropertyChanged;
+            row.PropertyChanged += Row_PropertyChanged;
         }
 
         RefreshIndexes();
@@ -224,6 +277,11 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
 
     private void Rows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        if (_isLoadingTemplateRows)
+        {
+            return;
+        }
+
         if (e.OldItems is not null)
         {
             foreach (BuildingTemplateRowView row in e.OldItems)

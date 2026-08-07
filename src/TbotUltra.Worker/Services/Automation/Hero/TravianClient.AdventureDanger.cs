@@ -126,11 +126,16 @@ public sealed partial class TravianClient
             // valid we must NOT enter credentials here: a second login would invalidate the main browser's
             // session (Travian allows a single active session) and log the bot out. Navigate, then verify
             // read-only; skip the video instead of logging in so the main session is never disturbed.
-            await OpenHeroAdventuresPageAsync(cancellationToken);
-            if (!await IsLoggedInAsync())
+            var pageReady = await LoadIsolatedBonusVideoPageAsync(
+                Paths.HeroAdventures,
+                label,
+                async pageLoadCancellationToken =>
+                    await IsLoggedInAsync() && await IsAdventureVideoPageRenderedAsync(pageLoadCancellationToken),
+                cancellationToken);
+            if (!pageReady)
             {
-                Notify($"[adventure-video:verbose] {label}: isolated video browser is not logged in (stale cookies); skipping so the main session is not disturbed.");
-                return $"{label}: skipped — the bonus-video browser was not logged in.";
+                Notify($"[adventure-video:verbose] {label}: isolated video browser did not load a ready adventures page after two reloads; skipping so the main session is not disturbed.");
+                return $"{label}: skipped — the bonus-video browser could not load Travian.";
             }
 
             return await RunAdventureVideoBonusCoreAsync(boxClass, label, cancellationToken);
@@ -153,20 +158,25 @@ public sealed partial class TravianClient
             callbacks: new TravianClientCallbacks { StatusCallback = _statusCallback });
     }
 
+    private async Task<bool> IsAdventureVideoPageRenderedAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            return await _page.EvaluateAsync<bool>(
+                "() => !!document.querySelector('.videoFeatureBonusBox, #adventureListForm, table.adventureList, .heroState')");
+        }
+        catch (PlaywrightException ex) when (IsTransientExecutionContextError(ex))
+        {
+            return false;
+        }
+    }
+
     // Shared by production-bonus video cleanup. Adventure videos intentionally keep the main page
     // in place because their following action is another adventures-page interaction.
     private async Task ReturnMainPageAfterIsolatedBonusVideoAsync()
     {
-        using var navigateCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        try
-        {
-            await GotoAsync(Paths.Resources, navigateCts.Token);
-            Notify("[bonus-video] main browser returned to dorf1 after isolated video browser.");
-        }
-        catch (Exception ex)
-        {
-            Notify($"[bonus-video] main browser could not return to dorf1 after isolated video browser: {ex.Message}");
-        }
+        await RestoreMainPageAfterBonusVideoAsync("[bonus-video]");
     }
 
     /// <summary>
@@ -199,15 +209,29 @@ public sealed partial class TravianClient
             }
         }
 
-        using var navigateCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        try
+        await RestoreMainPageAfterBonusVideoAsync("[adventure-video]");
+    }
+
+    private async Task RestoreMainPageAfterBonusVideoAsync(string logPrefix)
+    {
+        for (var attempt = 1; attempt <= BonusVideoPlaybackPolicy.MainPageRecoveryAttempts; attempt++)
         {
-            await GotoAsync(Paths.Resources, navigateCts.Token);
-            Notify("[adventure-video] navigated to dorf1 to unload resident ad/consent providers.");
-        }
-        catch (Exception ex)
-        {
-            Notify($"[adventure-video] could not navigate to flush ad providers: {ex.Message}");
+            using var navigateCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            try
+            {
+                await GotoAsync(Paths.Resources, navigateCts.Token);
+                Notify($"{logPrefix} main browser is on dorf1 after bonus video.");
+                return;
+            }
+            catch (Exception ex)
+            {
+                Notify($"{logPrefix} could not restore dorf1 after bonus video (attempt {attempt}/{BonusVideoPlaybackPolicy.MainPageRecoveryAttempts}): {ex.Message}");
+            }
+
+            if (BonusVideoPlaybackPolicy.ShouldRetryMainPageRecovery(attempt))
+            {
+                Notify($"{logPrefix} main browser may be on about:blank; retrying dorf1 navigation.");
+            }
         }
     }
 

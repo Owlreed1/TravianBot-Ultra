@@ -321,13 +321,17 @@ public sealed partial class TravianClient
     // Isolated browser: activate exactly one resource's +15% video.
     private async Task<string> RunSingleProductionBonusVideoIsolatedAsync(string resource, CancellationToken cancellationToken)
     {
-        await GotoAsync(Paths.Resources, cancellationToken);
-        if (!await IsLoggedInAsync())
+        var pageReady = await LoadIsolatedBonusVideoPageAsync(
+            Paths.Resources,
+            $"{resource} production bonus",
+            _ => IsLoggedInAsync(),
+            cancellationToken);
+        if (!pageReady)
         {
             // Do not log in here: Travian allows a single active session, so a second login would log the
             // main browser out. Skip instead (same reasoning as the adventure bonus video).
-            Notify($"[production-bonus:verbose] {resource}: isolated browser is not logged in (stale cookies); skipping so the main session is not disturbed.");
-            return $"{resource}: skipped — the bonus-video browser was not logged in.";
+            Notify($"[production-bonus:verbose] {resource}: isolated browser did not load a ready Travian page after two reloads; skipping so the main session is not disturbed.");
+            return $"{resource}: skipped — the bonus-video browser could not load Travian.";
         }
 
         await AcceptConsentManagerIfPresentAsync(cancellationToken, "[production-bonus:verbose]");

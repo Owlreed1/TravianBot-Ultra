@@ -6,6 +6,8 @@ internal static class BonusVideoPlaybackPolicy
     internal const int PostPlayTimeoutSeconds = 120;
     internal const int ProviderFailureConfirmations = 2;
     internal const int IsolatedActionTimeoutSeconds = 240;
+    internal const int IsolatedPageLoadAttempts = 3;
+    internal const int MainPageRecoveryAttempts = 2;
 
     internal static bool MayComplete(double elapsedPostPlaySeconds)
         => elapsedPostPlaySeconds >= MinimumPostPlaySeconds;
@@ -25,4 +27,10 @@ internal static class BonusVideoPlaybackPolicy
 
     internal static int RemainingGraceSeconds(double elapsedPostPlaySeconds)
         => Math.Max(0, (int)Math.Ceiling(MinimumPostPlaySeconds - elapsedPostPlaySeconds));
+
+    internal static bool ShouldRetryIsolatedPageLoad(int completedAttempt)
+        => completedAttempt < IsolatedPageLoadAttempts;
+
+    internal static bool ShouldRetryMainPageRecovery(int completedAttempt)
+        => completedAttempt < MainPageRecoveryAttempts;
 }

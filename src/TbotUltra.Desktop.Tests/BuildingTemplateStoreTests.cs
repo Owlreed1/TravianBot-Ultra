@@ -57,6 +57,19 @@ public sealed class BuildingTemplateStoreTests
     }
 
     [Fact]
+    public async Task LoadAsync_PreservesTemplates()
+    {
+        var root = TempRoot();
+        var store = new BuildingTemplateStore(root);
+        store.Save([new BuildingTemplate { Name = "Starter", CreatedByTribe = "Teutons" }]);
+
+        var loaded = await store.LoadAsync();
+
+        var template = Assert.Single(loaded);
+        Assert.Equal("Starter", template.Name);
+    }
+
+    [Fact]
     public void Load_CorruptJson_QuarantinesFileBeforeReturningEmpty()
     {
         var root = TempRoot();

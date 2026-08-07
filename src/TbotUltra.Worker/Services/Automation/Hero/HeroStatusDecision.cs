@@ -44,6 +44,16 @@ internal static class HeroStatusDecision
             || text.Contains("returning", StringComparison.Ordinal);
     }
 
+    internal static int ResolveAwayRetrySeconds(int? returnSeconds, bool isReinforcing)
+    {
+        if (returnSeconds is > 0)
+        {
+            return returnSeconds.Value;
+        }
+
+        return isReinforcing ? 30 * 60 : 15 * 60;
+    }
+
     internal static int ComputeHpWaitSeconds(
         int? hpPercent,
         int thresholdPercent,

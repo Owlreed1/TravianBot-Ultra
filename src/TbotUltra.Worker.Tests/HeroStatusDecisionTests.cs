@@ -52,6 +52,18 @@ public sealed class HeroStatusDecisionTests
     }
 
     [Theory]
+    [InlineData(420, true, 420)]
+    [InlineData(null, true, 1800)]
+    [InlineData(null, false, 900)]
+    public void ResolveAwayRetrySeconds_PreservesEtaAndUsesReinforcementFallback(
+        int? returnSeconds,
+        bool isReinforcing,
+        int expectedSeconds)
+    {
+        Assert.Equal(expectedSeconds, HeroStatusDecision.ResolveAwayRetrySeconds(returnSeconds, isReinforcing));
+    }
+
+    [Theory]
     [InlineData(40, 60, 40, 43200)]
     [InlineData(59, 60, 40, 2160)]
     [InlineData(0, 100, 20, 432000)]

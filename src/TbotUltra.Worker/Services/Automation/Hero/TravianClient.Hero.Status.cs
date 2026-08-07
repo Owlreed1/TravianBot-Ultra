@@ -770,6 +770,11 @@ public sealed partial class TravianClient
               const statusText = (statusMessage?.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
               const heroStateText = (document.querySelector('.heroState')?.textContent || '').replace(/\s+/g, ' ').trim();
               const awayText = heroStateText || bodyInnerText;
+              // A hero reinforcing another village is stationary: Official shows heroReinforcing in the
+              // global status and statusSupport_medium with "Hero is defending" on Hero Attributes.
+              const isReinforcing = !!document.querySelector('i.heroReinforcing, .heroStatus i.heroReinforcing')
+                || (!!document.querySelector('.heroState i.statusSupport_medium')
+                  && /hero\s+is\s+defending\s+in\s+village/i.test(heroStateText));
               const isReturningHome = /on\s+(?:its|the)\s+way\s+back\s+to\s+(?:the\s+)?(?:home\s+)?village|returning\s+to\s+(?:the\s+)?(?:home\s+)?village/i.test(awayText);
               const isOutboundMovement = !isReturningHome
                 && /on\s+(?:its|the)\s+way\s+to\b/i.test(awayText);
@@ -848,7 +853,9 @@ public sealed partial class TravianClient
                 secondsUntilAdventureReady: adventureTimer,
                 secondsUntilReturn: returnTimer,
                 reviveRemainingSeconds: Number.isFinite(reviveTimer) ? Math.max(0, Math.trunc(reviveTimer)) : null,
-                movementState: isReturningHome
+                movementState: isReinforcing
+                  ? 'Reinforcing'
+                  : isReturningHome
                   ? 'Returning home'
                   : isOutboundMovement && /adventure/i.test(awayText)
                     ? 'On the way to adventure'

@@ -479,7 +479,7 @@ public partial class MainWindow
 
     // Login should respect planned off-hours / daily-limit windows, but manual in-session actions
     // must not start the normal run/sleep timer.
-    private bool TryEnterPlannedSleepInsteadOfLogin()
+    private async Task<bool> TryEnterPlannedSleepInsteadOfLoginAsync()
     {
         if (_loginInProgress || _accountSwitchInProgress || _sessionPacingSleepInProgress)
         {
@@ -501,6 +501,16 @@ public partial class MainWindow
 
         AppendLog("[login] planned sleep window is active — entering sleep instead of logging in. "
             + "Press the session pacing Run-now button to log in anyway.");
+        try
+        {
+            // A planned sleep can be entered while a prior page remains open (for example after a
+            // bonus-video cleanup left it on about:blank). Sleep owns no browser process.
+            await CloseBrowserForSleepAsync("Planned sleep");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[pacing] planned sleep browser close failed: {ex.Message}");
+        }
         UpdateSessionPacingUi();
         return true;
     }

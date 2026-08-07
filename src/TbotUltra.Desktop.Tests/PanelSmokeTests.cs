@@ -1,5 +1,10 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Media;
+using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Views;
 using Xunit;
 
@@ -71,5 +76,47 @@ public sealed class PanelSmokeTests
             Assert.Equal("Move red/yellow farms to list", panel.MoveLossesOption.Content);
             Assert.Equal("DisplayText", panel.LossDestinationOption.DisplayMemberPath);
         });
+    }
+
+    [Fact]
+    public void FarmingPanel_NextSendDisplay_BindsToHeadersCreatedAfterTheTimerUpdate()
+    {
+        _wpf.Run(() =>
+        {
+            var panel = new FarmingPanel();
+
+            panel.SetNextSendDisplay("Next send: 01:00");
+            var lists = new ObservableCollection<FarmListStatusRow>
+            {
+                new() { Name = "Test", TotalFarmCount = 1, VillageOrdinal = 0, VillageHeaderText = "Village" },
+            };
+            panel.FarmLists.ItemsSource = lists;
+            var view = CollectionViewSource.GetDefaultView(lists);
+            view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(FarmListStatusRow.VillageOrdinal)));
+            panel.Measure(new Size(1280, 900));
+            panel.Arrange(new Rect(0, 0, 1280, 900));
+            panel.UpdateLayout();
+
+            var nextSend = FindVisualChildren<TextBlock>(panel)
+                .Single(element => Equals(element.Tag, "FarmListNextSendText"));
+            Assert.Equal("Next send: 01:00", nextSend.Text);
+        });
+    }
+
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, index);
+            if (child is T typedChild)
+            {
+                yield return typedChild;
+            }
+
+            foreach (var descendant in FindVisualChildren<T>(child))
+            {
+                yield return descendant;
+            }
+        }
     }
 }

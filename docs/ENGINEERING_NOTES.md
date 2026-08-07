@@ -102,6 +102,7 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Pass the active cancellation token through every cancellable operation. Never replace it with
   `CancellationToken.None`; cancellation is expected control flow, not an alarm.
 - Sleeping/paused state must preserve work and must not start a competing loop.
+- Entering sleep closes the active browser session, including planned sleep entered before login.
 - Continuous-loop wake requests from saved settings or newly enabled automation must also end an active idle break;
   humanized idle pacing must not delay newly requested work.
 - Applying Session pacing settings while automation is active must take effect immediately: enabling starts its run
