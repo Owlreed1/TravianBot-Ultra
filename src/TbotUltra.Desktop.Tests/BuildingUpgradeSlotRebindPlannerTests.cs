@@ -67,16 +67,37 @@ public sealed class BuildingUpgradeSlotRebindPlannerTests
     }
 
     [Fact]
-    public void Plan_DoesNotRebindDuplicateAllowedBuildingFamily()
+    public void ConstructionQueueReconciliation_RemovesWarehouseConstructBeforeLevel20AndRebindsDependentUpgrade()
     {
-        var source = Item(
+        var construct = Item(
             "construct_building",
             new BuildingConstructPayload(38, 10, "Warehouse").ToDictionary());
         var upgrade = Item(
             "upgrade_building_to_level",
             new BuildingUpgradePayload(38, 5, "Warehouse").ToDictionary());
 
-        Assert.Empty(BuildingUpgradeSlotRebindPlanner.Plan(source, 37, [upgrade]));
+        var plan = ConstructionQueueReconciliation.Plan(
+            Status(new Building(37, "Warehouse", 12, "/build.php?id=37", 10)),
+            [construct, upgrade]);
+
+        Assert.Contains(construct.Id, plan.Removals);
+        var update = Assert.Single(plan.Updates);
+        Assert.Equal(upgrade.Id, update.QueueItemId);
+        Assert.Equal("37", update.Payload[BotOptionPayloadKeys.BuildingUpgradeSlotId]);
+    }
+
+    [Fact]
+    public void ConstructionQueueReconciliation_PreservesWarehouseConstructAfterLevel20()
+    {
+        var construct = Item(
+            "construct_building",
+            new BuildingConstructPayload(38, 10, "Warehouse").ToDictionary());
+
+        var plan = ConstructionQueueReconciliation.Plan(
+            Status(new Building(37, "Warehouse", 20, "/build.php?id=37", 10)),
+            [construct]);
+
+        Assert.False(plan.HasChanges);
     }
 
     [Fact]

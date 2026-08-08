@@ -80,33 +80,19 @@ public partial class MainWindow
     // Villages with no estimatable construction are absent from the result.
     private Dictionary<string, double> BuildConstructionQueueSecondsByVillage(IReadOnlyList<PipelineTaskSource> tasks)
     {
-        var serverSpeed = ResolveServerSpeed();
-        var mainBuildingLevel = ResolveMainBuildingLevel();
-        var queuedCoverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var secondsByVillage = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-
+        var rowsById = BuildQueueEstimateRows(tasks.Select(source => source.Item).ToList())
+            .ToDictionary(row => row.Id);
         foreach (var source in tasks)
         {
-            var item = source.Item;
-
-            // Estimate every item in queue order (even ones that do not count below) so the shared coverage
-            // builds up identically to the Queue tab — otherwise a later upgrade of the same slot would
-            // re-count levels an earlier queued step already covers.
-            var estimate = EstimateForQueueItem(item, serverSpeed, mainBuildingLevel, queuedCoverage);
-            if (!estimate.HasData || string.IsNullOrWhiteSpace(source.VillageKey))
+            if (!rowsById.TryGetValue(source.Item.Id, out var row)
+                || !QueueEstimateAggregation.CountsTowardTotal(row)
+                || string.IsNullOrWhiteSpace(source.VillageKey))
             {
                 continue;
             }
-
-            var countsTowardTotal = item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused
-                || (item.Status == QueueStatus.Failed && !item.IsRuntimeOnly);
-            if (!countsTowardTotal)
-            {
-                continue;
-            }
-
             secondsByVillage[source.VillageKey] =
-                secondsByVillage.GetValueOrDefault(source.VillageKey) + estimate.Seconds;
+                secondsByVillage.GetValueOrDefault(source.VillageKey) + row.EstimateSeconds;
         }
 
         return secondsByVillage;
@@ -506,7 +492,7 @@ public partial class MainWindow
         var counted = 0;
         foreach (var row in rows)
         {
-            if (!row.HasEstimate)
+            if (!QueueEstimateAggregation.CountsTowardTotal(row))
             {
                 continue;
             }

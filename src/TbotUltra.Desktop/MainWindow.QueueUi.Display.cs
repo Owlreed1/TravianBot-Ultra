@@ -62,26 +62,7 @@ public partial class MainWindow
             }
 
             _queueServerTimeOffset = ResolveQueueServerTimeOffset();
-            var displayRunningId = ResolveDisplayRunningQueueItemId(ordered);
-            var serverSpeed = ResolveServerSpeed();
-            var mainBuildingLevel = ResolveMainBuildingLevel();
-            // Tracks the highest level already covered by earlier queued upgrades of the same building/
-            // field (in queue order) so each row only counts its own step, not the shared lower levels.
-            var queuedCoverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            var rows = ordered
-                .Select(item =>
-                {
-                    var estimate = EstimateForQueueItem(item, serverSpeed, mainBuildingLevel, queuedCoverage);
-                    return QueueItemRowFactory.Create(
-                        item,
-                        estimate,
-                        displayRunningId,
-                        GetQueueItemCurrentVillageName,
-                        GetQueueItemVillageKey,
-                        BuildQueueDisplayName,
-                        FormatQueueServerTime);
-                })
-                .ToList();
+            var rows = BuildQueueEstimateRows(ordered);
             var activeRows = rows
                 .Where(row =>
                     row.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused
@@ -147,6 +128,25 @@ public partial class MainWindow
         {
             _isRefreshingQueueUi = false;
         }
+    }
+
+    // Produces the one estimate projection consumed by both the Queue tab and Village Settings overview.
+    private List<QueueItemRow> BuildQueueEstimateRows(IReadOnlyList<QueueItem> ordered)
+    {
+        var displayRunningId = ResolveDisplayRunningQueueItemId(ordered);
+        var serverSpeed = ResolveServerSpeed();
+        var mainBuildingLevel = ResolveMainBuildingLevel();
+        var queuedCoverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        return ordered
+            .Select(item => QueueItemRowFactory.Create(
+                item,
+                EstimateForQueueItem(item, serverSpeed, mainBuildingLevel, queuedCoverage),
+                displayRunningId,
+                GetQueueItemCurrentVillageName,
+                GetQueueItemVillageKey,
+                BuildQueueDisplayName,
+                FormatQueueServerTime))
+            .ToList();
     }
 
     private void UpdateDashboardQueueDurationTooltips(IReadOnlyList<QueueItemRow> rows)

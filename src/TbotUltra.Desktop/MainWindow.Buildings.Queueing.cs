@@ -132,7 +132,7 @@ public partial class MainWindow
         }
     }
 
-    private void RebindPendingSingleInstanceBuildingUpgrades(QueueItem source, int effectiveSlotId)
+    private void RebindPendingBuildingUpgrades(QueueItem source, int effectiveSlotId)
     {
         var sameVillage = BuildSameVillageQueueFilter(source);
         var candidates = _botService.GetQueueItemsForDisplay()
@@ -143,7 +143,7 @@ public partial class MainWindow
             if (_botService.UpdatePendingQueueItem(rebind.QueueItemId, rebind.Payload, priority: null))
             {
                 AppendLog(
-                    $"[building-rebind] moved pending single-instance upgrade to confirmed slot {effectiveSlotId} " +
+                    $"[building-rebind] moved pending building upgrade to confirmed slot {effectiveSlotId} " +
                     $"after live dorf2 duplicate detection (id={rebind.QueueItemId}).");
             }
             else
@@ -791,7 +791,7 @@ public partial class MainWindow
                 activeConstructSlots.Add(constructSlotId);
             }
 
-            if (string.Equals(item.TaskName, "demolish_building_to_level", StringComparison.OrdinalIgnoreCase)
+            if (IsDemolishQueueItemForSelectedVillage(item)
                 && item.Payload.TryGetValue(BotOptionPayloadKeys.TargetBuildingSlotOrName, out var demolishSlotText)
                 && int.TryParse(demolishSlotText, out var demolishSlotId))
             {
@@ -815,6 +815,13 @@ public partial class MainWindow
         foreach (var slotId in _buildingDemolishingSlots.Except(activeDemolishSlots).ToList())
         {
             SetDemolishingFlag(slotId, false);
+        }
+
+        // A building slot number exists in every village. Reapply the selected village's active
+        // demolitions so switching villages cannot carry a red demolition marker across slots.
+        foreach (var slotId in activeDemolishSlots.Except(_buildingDemolishingSlots).ToList())
+        {
+            SetDemolishingFlag(slotId, true);
         }
     }
 

@@ -276,8 +276,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   by another slot, never apply an unknown-slot same-name row to the target; use exact slot identity.
 - Existing buildings and level-zero sites are distinct. Select exact building types and verify active village,
   target slot, and result before considering an action successful.
-- Immediately before constructing a non-duplicate building, read the complete live dorf2 overview and remove a
-  stale queue item when that building already exists anywhere in the village, not only in the queued slot.
+- Immediately before constructing any building, read the complete live dorf2 overview. Remove a stale construct
+  when its exact target slot already has the intended building, when a single-instance building exists anywhere,
+  or when a level-gated duplicate has not reached its required level; rebind dependent upgrades to the confirmed
+  live slot. Keep the construct when an additional copy is legal.
 - After a successful hero resource transfer reloads the same verified build.php slot, retry its exact construct or
   upgrade action directly; do not restart through queue and dorf2 probes unless the direct action remains unavailable.
 - An upgrade that confirms its planned slot is empty is not a successful no-op. Reconstruct the expected building in

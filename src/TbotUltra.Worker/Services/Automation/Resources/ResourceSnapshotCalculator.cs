@@ -54,6 +54,17 @@ internal static class ResourceSnapshotCalculator
                 .ToList();
     }
 
+    /// <summary>
+    /// Identifies resource fields that have the same Official upgrade offer in one bulk-upgrade pass.
+    /// </summary>
+    internal static string BuildUpgradeOfferIdentity(string? fieldType, int level)
+    {
+        var normalizedFieldType = string.IsNullOrWhiteSpace(fieldType)
+            ? "unknown"
+            : fieldType.Trim().ToLowerInvariant();
+        return $"{normalizedFieldType}|level:{level}";
+    }
+
     internal static IReadOnlyList<ResourceStorageForecast> BuildStorageForecasts(
         IReadOnlyDictionary<string, string> resources,
         long? warehouseCapacity,

@@ -872,7 +872,7 @@ public sealed class TravianClientHelperTests
     }
 
     [Fact]
-    public void FindExistingNonDuplicateBuilding_FindsTownHallInDifferentSlot()
+    public void FindExistingBuildingThatMakesConstructRedundant_FindsTownHallInDifferentSlot()
     {
         var buildings = new List<Building>
         {
@@ -880,7 +880,7 @@ public sealed class TravianClientHelperTests
             new(27, "Town Hall", 1, null, 24),
         };
 
-        var existing = InvokeFindExistingNonDuplicateBuilding(buildings, 24, "Town Hall");
+        var existing = InvokeFindExistingBuildingThatMakesConstructRedundant(buildings, 38, 24, "Town Hall");
 
         Assert.NotNull(existing);
         Assert.Equal(27, existing!.SlotId);
@@ -889,11 +889,36 @@ public sealed class TravianClientHelperTests
     [Theory]
     [InlineData(10, "Warehouse")]
     [InlineData(23, "Cranny")]
-    public void FindExistingNonDuplicateBuilding_AllowsSupportedDuplicates(int gid, string name)
+    public void FindExistingBuildingThatMakesConstructRedundant_AllowsSupportedDuplicatesAtRequiredLevel(int gid, string name)
     {
         var buildings = new List<Building> { new(27, name, 20, null, gid) };
 
-        Assert.Null(InvokeFindExistingNonDuplicateBuilding(buildings, gid, name));
+        Assert.Null(InvokeFindExistingBuildingThatMakesConstructRedundant(buildings, 38, gid, name));
+    }
+
+    [Theory]
+    [InlineData(10, "Warehouse")]
+    [InlineData(11, "Granary")]
+    [InlineData(23, "Cranny")]
+    public void FindExistingBuildingThatMakesConstructRedundant_BlocksConditionalDuplicateBeforeRequiredLevel(int gid, string name)
+    {
+        var buildings = new List<Building> { new(27, name, 9, null, gid) };
+
+        var existing = InvokeFindExistingBuildingThatMakesConstructRedundant(buildings, 38, gid, name);
+
+        Assert.NotNull(existing);
+        Assert.Equal(27, existing!.SlotId);
+    }
+
+    [Fact]
+    public void FindExistingBuildingThatMakesConstructRedundant_RemovesExactConditionalDuplicateAfterRequiredLevel()
+    {
+        var buildings = new List<Building> { new(38, "Warehouse", 20, null, 10) };
+
+        var existing = InvokeFindExistingBuildingThatMakesConstructRedundant(buildings, 38, 10, "Warehouse");
+
+        Assert.NotNull(existing);
+        Assert.Equal(38, existing!.SlotId);
     }
 
     [Theory]
@@ -925,14 +950,15 @@ public sealed class TravianClientHelperTests
         method!.Invoke(null, [status, gid, name]);
     }
 
-    private static Building? InvokeFindExistingNonDuplicateBuilding(
+    private static Building? InvokeFindExistingBuildingThatMakesConstructRedundant(
         IReadOnlyList<Building> buildings,
+        int targetSlotId,
         int gid,
         string name)
     {
-        var method = typeof(TravianClient).GetMethod("FindExistingNonDuplicateBuilding", BindingFlags.NonPublic | BindingFlags.Static);
+        var method = typeof(TravianClient).GetMethod("FindExistingBuildingThatMakesConstructRedundant", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
-        return (Building?)method!.Invoke(null, [buildings, gid, name]);
+        return (Building?)method!.Invoke(null, [buildings, targetSlotId, gid, name]);
     }
 
     [Theory]

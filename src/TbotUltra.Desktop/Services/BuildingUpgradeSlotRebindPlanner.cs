@@ -97,16 +97,30 @@ internal static class BuildingUpgradeSlotRebindPlanner
     {
         if (!string.Equals(candidate.TaskName, "construct_building", StringComparison.OrdinalIgnoreCase)
             || !BuildingConstructPayload.TryFromDictionary(candidate.Payload, out var construct)
-            || construct is null
-            || !BuildingCatalogService.IsSingleInstance(construct.Gid))
+            || construct is null)
         {
             return null;
         }
 
         var liveMatches = FindLiveMatches(status, construct.Gid);
-        if (liveMatches.Count != 1
-            || liveMatches[0].SlotId is not int liveSlotId
-            || liveMatches[0].Level is not int liveLevel)
+        var exactSlotMatch = liveMatches.FirstOrDefault(building => building.SlotId == construct.SlotId);
+        var existing = exactSlotMatch;
+        if (existing is null && BuildingCatalogService.IsSingleInstance(construct.Gid))
+        {
+            existing = liveMatches.FirstOrDefault();
+        }
+        else if (existing is null
+                 && BuildingCatalogService.DuplicateRequiredExistingLevelFor(construct.Gid) is int requiredLevel
+                 && liveMatches.Count > 0
+                 && liveMatches.Max(building => building.Level ?? 0) < requiredLevel)
+        {
+            existing = liveMatches
+                .OrderByDescending(building => building.Level ?? 0)
+                .First();
+        }
+
+        if (existing?.SlotId is not int liveSlotId
+            || existing.Level is not int liveLevel)
         {
             return null;
         }
@@ -138,8 +152,7 @@ internal static class BuildingUpgradeSlotRebindPlanner
         if (effectiveSlotId is < 19 or > 38
             || !BuildingConstructPayload.TryFromDictionary(sourceConstruct.Payload, out var construct)
             || construct is null
-            || construct.SlotId == effectiveSlotId
-            || !BuildingCatalogService.IsSingleInstance(construct.Gid))
+            || construct.SlotId == effectiveSlotId)
         {
             return [];
         }

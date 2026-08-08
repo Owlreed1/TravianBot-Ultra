@@ -54,6 +54,16 @@ public sealed class ResourceSnapshotCalculatorTests
     }
 
     [Fact]
+    public void BuildUpgradeOfferIdentity_GroupsOnlySameResourceTypeAndLevel()
+    {
+        var cropLevelEight = ResourceSnapshotCalculator.BuildUpgradeOfferIdentity("crop", 8);
+
+        Assert.Equal(cropLevelEight, ResourceSnapshotCalculator.BuildUpgradeOfferIdentity(" Crop ", 8));
+        Assert.NotEqual(cropLevelEight, ResourceSnapshotCalculator.BuildUpgradeOfferIdentity("crop", 9));
+        Assert.NotEqual(cropLevelEight, ResourceSnapshotCalculator.BuildUpgradeOfferIdentity("wood", 8));
+    }
+
+    [Fact]
     public void BuildStorageForecasts_UsesGranaryForCropAndWarehouseForOtherResources()
     {
         var resources = new Dictionary<string, string>

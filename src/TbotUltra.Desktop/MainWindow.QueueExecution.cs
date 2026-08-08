@@ -512,7 +512,7 @@ public partial class MainWindow
             return false;
         }
 
-        RebindPendingSingleInstanceBuildingUpgrades(item, match.LiveSlotId);
+        RebindPendingBuildingUpgrades(item, match.LiveSlotId);
         ReconcilePendingBuildingQueueWithLiveStatus(freshStatus);
         _botService.MarkQueueItemSucceeded(item.Id);
         _botService.RemoveQueueItem(item.Id);
@@ -846,7 +846,7 @@ public partial class MainWindow
                 BotOptionPayloadKeys.BuildingConstructSlotId,
                 out var effectiveConstructSlot))
         {
-            RebindPendingSingleInstanceBuildingUpgrades(item, effectiveConstructSlot);
+            RebindPendingBuildingUpgrades(item, effectiveConstructSlot);
             RebindPendingBuildingTemplateStep(item, effectiveConstructSlot);
         }
 

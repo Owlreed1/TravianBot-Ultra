@@ -328,6 +328,7 @@ public sealed partial class TravianClient
                 var attemptedAny = false;
                 var anyQueuedTowardTarget = false;
                 var blockReasons = new List<string>();
+                var blockedOfferIdentities = new HashSet<string>(StringComparer.Ordinal);
                 UpgradeResourceWaitSnapshot? earliestResourceWait = null;
                 foreach (var candidate in candidateRows)
                 {
@@ -343,6 +344,14 @@ public sealed partial class TravianClient
                     {
                         // Already at target — the per-slot skip line was pure per-tick noise; the final
                         // "All resource fields are at or above target" return already summarizes this.
+                        continue;
+                    }
+
+                    var offerIdentity = ResourceSnapshotCalculator.BuildUpgradeOfferIdentity(candidate.FieldType, level);
+                    if (blockedOfferIdentities.Contains(offerIdentity))
+                    {
+                        blockReasons.Add($"slot {slot}: equivalent offer {offerIdentity} already blocked by resources");
+                        Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} skipping equivalent blocked offer {offerIdentity}; the representative field already exhausted hero/NPC resource recovery.");
                         continue;
                     }
 
@@ -518,6 +527,7 @@ public sealed partial class TravianClient
 
                     if (actionability.Outcome == UpgradeAttemptOutcome.BlockedByResources)
                     {
+                        blockedOfferIdentities.Add(offerIdentity);
                         var snapshot = await ReadUpgradeResourceWaitSnapshotAsync(
                             label,
                             UpgradeMath.ClampResourceWaitSeconds(actionability.QueueWaitSeconds),

@@ -100,6 +100,10 @@ _Avoid_: First blocked field, bulk stop
 When no affordable bulk-resource candidate can start, the resource wait is the earliest live affordability deadline among eligible candidates, not the first candidate's deadline.
 _Avoid_: First wait, strategy wait
 
+**Representative Bulk Resource Offer**:
+The first resource field at one exact resource type and level that is checked during a bulk upgrade. If it remains resource-blocked after permitted recovery, equivalent fields do not require separate checks in that pass.
+_Avoid_: Every identical field, repeated resource check
+
 **Construction Card Waiting Color**:
 Amber/yellow is used for `Res:`, `Req:`, `Waiting:`, and `Retry:` Construction card messages. Blue is reserved for `Empty queue`.
 _Avoid_: Green waiting state, mixed status colors

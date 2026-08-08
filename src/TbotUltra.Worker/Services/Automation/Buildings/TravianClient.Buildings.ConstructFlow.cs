@@ -51,7 +51,11 @@ public sealed partial class TravianClient : IBuildingClient
             // possibly in a different slot. Run this village-wide identity check before queue and pacing
             // defers so an already-completed task is removed immediately instead of waiting another cycle.
             var liveBuildings = await ReadBuildingsAsync(cancellationToken);
-            var existingVillageBuilding = FindExistingNonDuplicateBuilding(liveBuildings, gid, buildingName);
+            var existingVillageBuilding = FindExistingBuildingThatMakesConstructRedundant(
+                liveBuildings,
+                slotId,
+                gid,
+                buildingName);
             if (existingVillageBuilding is not null)
             {
                 Notify($"[construct] {buildingName} already exists at slot {existingVillageBuilding.SlotId} level {existingVillageBuilding.Level} on fresh dorf2 — removing stale task from queue.");
@@ -630,22 +634,37 @@ public sealed partial class TravianClient : IBuildingClient
                 .Where(slot => slot is >= 19 and <= 38)
                 .ToHashSet();
 
-    private static Building? FindExistingNonDuplicateBuilding(
+    private static Building? FindExistingBuildingThatMakesConstructRedundant(
         IReadOnlyList<Building> buildings,
+        int targetSlotId,
         int gid,
         string buildingName)
     {
-        // These building families intentionally support multiple instances. Their normal prerequisite
-        // validation decides whether another instance is legal; mere presence must not discard the task.
-        if (gid is 23 or 31 or 32 or 33 or 38 or 39 or 42 or 43
-            || BuildingCatalogService.DuplicateRequiredExistingLevelFor(gid) is not null)
+        var matches = buildings
+            .Where(building => building.Level is >= 1
+                && (building.Gid == gid || BuildingNames.Same(building.Name, buildingName)))
+            .ToList();
+        var exactSlotMatch = matches.FirstOrDefault(building => building.SlotId == targetSlotId);
+        if (exactSlotMatch is not null)
         {
-            return null;
+            return exactSlotMatch;
         }
 
-        return buildings.FirstOrDefault(building =>
-            building.Level is >= 1
-            && (building.Gid == gid || BuildingNames.Same(building.Name, buildingName)));
+        if (BuildingCatalogService.IsSingleInstance(gid))
+        {
+            return matches.FirstOrDefault();
+        }
+
+        if (BuildingCatalogService.DuplicateRequiredExistingLevelFor(gid) is int requiredLevel
+            && matches.Count > 0
+            && matches.Max(building => building.Level ?? 0) < requiredLevel)
+        {
+            return matches
+                .OrderByDescending(building => building.Level ?? 0)
+                .First();
+        }
+
+        return null;
     }
 
     /// <summary>
