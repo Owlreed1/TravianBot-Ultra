@@ -24,7 +24,8 @@ public sealed partial class TravianClient
         // population updates keep it current without an expensive spieler navigation. This means
         // resource ticks / ui-sync no longer trigger a spieler read.
         var populationInvalidated = _cachedVillagesPopulationAt == DateTimeOffset.MinValue;
-        if (_cachedVillages is { Count: > 0 } cached && !populationInvalidated)
+        var capitalProfileVerificationDue = IsCapitalProfileVerificationDue();
+        if (_cachedVillages is { Count: > 0 } cached && !populationInvalidated && !capitalProfileVerificationDue)
         {
             var ageMs = (long)(DateTimeOffset.UtcNow - _cachedVillagesAt).TotalMilliseconds;
             _browserTrace.Event("CACHE", "villages-hit", "hit", $"ageMs={ageMs} count={cached.Count} populationInvalidated=false");
@@ -36,13 +37,17 @@ public sealed partial class TravianClient
             "CACHE",
             "villages-miss",
             "miss",
-            $"reason={(populationInvalidated ? "population-invalidated" : "missing")}");
+            $"reason={(capitalProfileVerificationDue ? "capital-profile-verification" : populationInvalidated ? "population-invalidated" : "missing")}");
+
+        if (capitalProfileVerificationDue)
+        {
+            Notify("[capital] cached capital state is uncertain; refreshing player profile.");
+        }
 
         var villages = await ReadVillagesFromServerAsync(cancellationToken);
         if (villages.Count > 0)
         {
-            _cachedVillages = villages.ToList();
-            _cachedVillagesAt = DateTimeOffset.UtcNow;
+            UpdateCachedVillages(villages);
             if (villages.Any(v => v.Population.HasValue))
             {
                 _cachedVillagesPopulationAt = DateTimeOffset.UtcNow;
@@ -76,16 +81,28 @@ public sealed partial class TravianClient
                         // then coordinates, and use a name only when that name is unambiguous.
                         .Select(v => VillageIdentityReconciler.MergeFreshWithCached(v, prior))
                         .ToList();
-                    _cachedVillages = ApplyKnownVillageTribes(merged);
-                    _cachedVillagesAt = DateTimeOffset.UtcNow;
+                    UpdateCachedVillages(merged);
+                    if (IsCapitalProfileVerificationDue())
+                    {
+                        Notify("[capital] sidebar capital state is uncertain; refreshing player profile.");
+                        var verifiedProfileVillages = await ReadVillagesFromServerAsync(cancellationToken);
+                        UpdateCachedVillages(verifiedProfileVillages);
+                        return verifiedProfileVillages;
+                    }
                     trace.Complete("success", $"source=sidebar-merged count={merged.Count}");
-                    return _cachedVillages;
+                    return _cachedVillages!;
                 }
 
-                _cachedVillages = ApplyKnownVillageTribes(sidebar);
-                _cachedVillagesAt = DateTimeOffset.UtcNow;
+                UpdateCachedVillages(sidebar);
+                if (IsCapitalProfileVerificationDue())
+                {
+                    Notify("[capital] sidebar capital state is uncertain; refreshing player profile.");
+                    var verifiedProfileVillages = await ReadVillagesFromServerAsync(cancellationToken);
+                    UpdateCachedVillages(verifiedProfileVillages);
+                    return verifiedProfileVillages;
+                }
                 trace.Complete("success", $"source=sidebar count={sidebar.Count}");
-                return _cachedVillages;
+                return _cachedVillages!;
             }
         }
         catch (Exception ex)
@@ -127,9 +144,15 @@ public sealed partial class TravianClient
                             .Select(village => VillageIdentityReconciler.MergeFreshWithCached(village, prior))
                             .ToList()
                         : sidebarVillages.ToList();
-                    _cachedVillages = ApplyKnownVillageTribes(merged);
-                    _cachedVillagesAt = DateTimeOffset.UtcNow;
-                    trace.Complete("success", $"source=live-sidebar count={_cachedVillages.Count} attempt={attempt}");
+                    UpdateCachedVillages(merged);
+                    if (IsCapitalProfileVerificationDue())
+                    {
+                        Notify("[capital] sidebar capital state is uncertain; refreshing player profile.");
+                        var verifiedProfileVillages = await ReadVillagesFromServerAsync(cancellationToken);
+                        UpdateCachedVillages(verifiedProfileVillages);
+                        return verifiedProfileVillages;
+                    }
+                    trace.Complete("success", $"source=live-sidebar count={_cachedVillages!.Count} attempt={attempt}");
                     return _cachedVillages;
                 }
 
@@ -158,8 +181,7 @@ public sealed partial class TravianClient
             throw new InvalidOperationException("Live village list was empty on both sidebar and profile reads.");
         }
 
-        _cachedVillages = profileVillages.ToList();
-        _cachedVillagesAt = DateTimeOffset.UtcNow;
+        UpdateCachedVillages(profileVillages);
         if (profileVillages.Any(village => village.Population.HasValue))
         {
             _cachedVillagesPopulationAt = DateTimeOffset.UtcNow;
@@ -311,7 +333,9 @@ public sealed partial class TravianClient
                 return new Village(
                     Name: item.Name!,
                     Url: item.Url,
-                    IsCapital: item.IsCapital ?? TryGetCachedCapitalState(item.Name!),
+                    IsCapital: item.IsCapital ?? (_session.CapitalProfileVerificationRequired
+                        ? null
+                        : TryGetCachedCapitalState(item.Name!)),
                     CoordX: item.X ?? cachedX,
                     CoordY: item.Y ?? cachedY,
                     Population: sidebarPopulation);
@@ -326,8 +350,24 @@ public sealed partial class TravianClient
             return;
         }
 
-        _cachedVillages = ApplyKnownVillageTribes(villages);
+        var withKnownTribes = ApplyKnownVillageTribes(villages);
+        var capitalCount = withKnownTribes.Count(village => village.IsCapital == true);
+        if (capitalCount > 1)
+        {
+            Notify($"[capital] conflicting cached capital flags ({capitalCount}); clearing them and requiring a live profile scan.");
+            RequireCapitalProfileVerification($"shared village cache contains {capitalCount} capital candidates", delayRetry: false);
+            _cachedVillages = CapitalStateResolver.ClearConflictingCapitalFlags(withKnownTribes).ToList();
+            _cachedVillagesAt = DateTimeOffset.MinValue;
+            return;
+        }
+
+        _cachedVillages = withKnownTribes;
         _cachedVillagesAt = DateTimeOffset.UtcNow;
+        if (CapitalStateResolver.RequiresProfileVerification(withKnownTribes)
+            && (!_session.CapitalProfileVerificationRequired || IsCapitalProfileVerificationDue()))
+        {
+            RequireCapitalProfileVerification("shared village cache has no confirmed capital", delayRetry: false);
+        }
     }
 
     private async Task<int?> ReadActiveVillagePopulationFromCurrentPageAsync(
@@ -578,23 +618,36 @@ public sealed partial class TravianClient
             // If the spieler scan identified at least one capital village, trust the per-row data
             // verbatim — there is exactly one capital, and an OR with stale cache could keep an
             // old village marked as capital after the capital is moved.
-            var trustScanCapital = rawList.Any(v => v.IsCapital);
+            var reportedCapitalCount = rawList.Count(v => v.IsCapital);
+            var trustScanCapital = reportedCapitalCount == 1;
+            if (trustScanCapital)
+            {
+                ConfirmCapitalProfileVerification();
+            }
+            else
+            {
+                var reason = reportedCapitalCount == 0
+                    ? "player profile contained no capital marker"
+                    : $"player profile contained {reportedCapitalCount} capital markers";
+                RequireCapitalProfileVerification(reason, delayRetry: true);
+                ClearCachedCapitalStatesForCurrentAccount();
+                Notify($"ALARM: [capital] profile verification failed: {reason}. Capital state remains unknown; retrying player profile in 20 minutes.");
+            }
 
             var profileVillages = rawList
                 .Select(v =>
                 {
                     var duplicateName = rawList.Count(candidate =>
                         string.Equals(candidate.Name, v.Name, StringComparison.OrdinalIgnoreCase)) > 1;
-                    var cachedCapital = duplicateName ? null : TryGetCachedCapitalState(v.Name!);
                     var (cachedX, cachedY) = duplicateName
                         ? (null, null)
                         : TryGetCachedVillageCoords(v.Name!);
-                    var resolvedCapital = trustScanCapital ? v.IsCapital : (v.IsCapital || cachedCapital == true);
+                    bool? resolvedCapital = trustScanCapital ? v.IsCapital : null;
                     var resolvedX = v.X ?? cachedX;
                     var resolvedY = v.Y ?? cachedY;
                     // The legacy capital cache is keyed by display name and therefore cannot safely
                     // represent two same-name villages. Do not let one twin overwrite the other.
-                    if (!duplicateName)
+                    if (!duplicateName && reportedCapitalCount <= 1)
                     {
                         SaveCachedVillageState(v.Name!, resolvedCapital, resolvedX, resolvedY);
                     }

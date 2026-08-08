@@ -74,6 +74,7 @@ public sealed partial class BotTaskRunner
     private readonly AccountAnalysisStore _accountAnalysisStore;
     private readonly BulkMessageSentCacheStore _bulkMessageSentCacheStore;
     private readonly SemaphoreSlim _sessionGate = new(1, 1);
+    private readonly PriorityBrowserWorkCoordinator _priorityBrowserWork = new();
     private readonly BrowserSessionGeneration _sessionGeneration = new();
     private BrowserSession? _sharedVisibleSession;
     private IPage? _sharedVisiblePage;
@@ -200,6 +201,13 @@ public sealed partial class BotTaskRunner
                 log($"[tick] tasks ({tasks.Count}): {string.Join(", ", tasks)}");
                 try
                 {
+                    if (_priorityBrowserWork.HasPendingRequest)
+                    {
+                        log("[tick] yielding to queued priority manual browser action before automatic work starts.");
+                        executionTrace.Complete("yielded", "priority-manual-browser-action");
+                        return;
+                    }
+
                     await client.LoginAsync(cancellationToken);
                     await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken);
                     var context = new TaskExecutionContext(this, options, client, log, cancellationToken, taskResults.Add);
@@ -207,6 +215,13 @@ public sealed partial class BotTaskRunner
                     foreach (var taskName in tasks)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
+                        if (_priorityBrowserWork.HasPendingRequest)
+                        {
+                            log($"[tick] yielding to queued priority manual browser action before task '{taskName}' ({taskIndex + 1}/{tasks.Count}).");
+                            executionTrace.Complete("yielded", $"priority-manual-browser-action nextTask={taskName}");
+                            return;
+                        }
+
                         taskIndex++;
                         if (!TaskCatalog.IsAllowed(taskName))
                         {

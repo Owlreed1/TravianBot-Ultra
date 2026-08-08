@@ -91,8 +91,8 @@ public sealed class ResourcesViewModel : BaseViewModel
         set => SetProperty(ref _actionsEnabled, value);
     }
 
-    private bool _isBuildLowestFirst;
-    private bool _isBuildSmart = true;
+    private bool _isBuildLowestFirst = true;
+    private bool _isBuildSmart;
 
     /// <summary>
     /// Upgrade-all strategy: build the lowest-level field first. Mutually

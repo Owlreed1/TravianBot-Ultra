@@ -55,6 +55,8 @@ public sealed class TravianSessionCache
     public System.DateTimeOffset CachedVillagesAt { get; set; } = System.DateTimeOffset.MinValue;
     public System.DateTimeOffset CachedVillagesPopulationAt { get; set; } = System.DateTimeOffset.MinValue;
     public bool PopulationBaselineRead { get; set; }
+    public bool CapitalProfileVerificationRequired { get; set; }
+    public System.DateTimeOffset CapitalProfileVerificationNotBeforeUtc { get; set; } = System.DateTimeOffset.MinValue;
 
     // Troop training queue statuses read while build_troops ran, keyed by building type, plus the
     // village they were read on. The post-build queue read reuses them (when fresh and still on the

@@ -82,7 +82,7 @@ public sealed partial class TravianClient
             ActiveBuildCount: activeBuildCount,
             BuildQueueRemainingSeconds: remaining,
             BuildQueueRemainingText: remaining is int left ? TravianParsing.FormatDuration(left) : string.Empty,
-            IsCapital: TryGetCachedCapitalState(activeVillage),
+            IsCapital: TryGetCachedCapitalState(activeVillage, activeCoords.X, activeCoords.Y),
             ServerTimeUtc: _serverTimeUtc,
             WarehouseCapacity: capacities.Warehouse,
             GranaryCapacity: capacities.Granary,
@@ -304,21 +304,10 @@ public sealed partial class TravianClient
             ? liveResourceFields
             : cachedSnapshot?.ResourceFields ?? liveResourceFields;
 
-        // Fast capital detection: non-capital villages are capped at level 10
-        var cachedIsCapital = TryGetCachedCapitalState(activeVillage);
+        var cachedIsCapital = TryGetCachedCapitalState(activeVillage, activeCoords.X, activeCoords.Y);
         if (cachedIsCapital != true && resourceFields.Any(f => f.Level > 10))
         {
-            Notify($"Fast capital detection: resource field above level 10 found — '{activeVillage}' is capital.");
-            SaveCachedVillageState(activeVillage, true, null, null);
-            cachedIsCapital = true;
-            // Update the in-memory list with the new capital flag instead of refetching
-            // from spieler.php — that re-fetch would cause a visible page navigation.
-            villages = villages
-                .Select(v => string.Equals(v.Name, activeVillage, StringComparison.Ordinal)
-                    ? v with { IsCapital = true }
-                    : v)
-                .ToList();
-            UpdateCachedVillages(villages);
+            Notify($"[capital:verbose] resource field above level 10 in '{activeVillage}' ({activeCoords.X}|{activeCoords.Y}); capital remains unconfirmed until a live player-profile scan.");
         }
 
         SaveCachedVillageResourceSnapshot(

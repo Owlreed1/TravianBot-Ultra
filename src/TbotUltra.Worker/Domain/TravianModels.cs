@@ -13,6 +13,8 @@ public sealed record Village(
     int? CropFields = null,
     string Tribe = "Unknown");
 
+public sealed record CapitalProfileCheckResult(string VillageName, int CoordX, int CoordY);
+
 public sealed record AccountSnapshot(
     string Tribe,
     string ActiveVillage,

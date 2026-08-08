@@ -242,7 +242,7 @@ public static class BotOptionsFactory
             ResourceUpgradeSlotId = configuration.GetValue<int?>(BotOptionPayloadKeys.ResourceUpgradeSlotId),
             ResourceUpgradeTargetLevel = configuration.GetValue<int?>(BotOptionPayloadKeys.ResourceUpgradeTargetLevel),
             ResourceUpgradeMaxAttempts = configuration.GetValue(BotOptionPayloadKeys.ResourceUpgradeMaxAttempts, 30),
-            ResourceBuildStrategy = configuration[BotOptionPayloadKeys.ResourceBuildStrategy] ?? "smart",
+            ResourceBuildStrategy = configuration[BotOptionPayloadKeys.ResourceBuildStrategy] ?? "lowest_first",
             SmithyUpgradeTargets = configuration[BotOptionPayloadKeys.SmithyUpgradeTargets],
             BuildingUpgradeSlotId = configuration.GetValue<int?>(BotOptionPayloadKeys.BuildingUpgradeSlotId),
             BuildingUpgradeTargetLevel = configuration.GetValue<int?>(BotOptionPayloadKeys.BuildingUpgradeTargetLevel),

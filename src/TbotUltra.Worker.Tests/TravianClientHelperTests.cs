@@ -1152,6 +1152,69 @@ public sealed class TravianClientHelperTests
     }
 
     [Fact]
+    public void CapitalStateResolver_ClearsConflictingCapitalFlagsUntilProfileVerification()
+    {
+        var villages = new[]
+        {
+            new Village("SWOLL", "dorf1.php?newdid=1", IsCapital: true, CoordX: 12, CoordY: -4),
+            new Village("A8", "dorf1.php?newdid=2", IsCapital: true, CoordX: 8, CoordY: 8),
+        };
+
+        var normalized = CapitalStateResolver.ClearConflictingCapitalFlags(villages);
+
+        Assert.DoesNotContain(normalized, village => village.IsCapital == true);
+        Assert.All(normalized, village => Assert.Null(village.IsCapital));
+    }
+
+    [Fact]
+    public void CapitalStateResolver_AppliesExactlyOneVerifiedCapitalByCoordinates()
+    {
+        var villages = new[]
+        {
+            new Village("SWOLL", "dorf1.php?newdid=1", IsCapital: true, CoordX: 12, CoordY: -4),
+            new Village("A8", "dorf1.php?newdid=2", IsCapital: false, CoordX: 8, CoordY: 8),
+        };
+
+        var updated = CapitalStateResolver.ApplyVerifiedCapital(villages, 8, 8);
+
+        Assert.False(updated.Single(village => village.Name == "SWOLL").IsCapital);
+        Assert.True(updated.Single(village => village.Name == "A8").IsCapital);
+    }
+
+    [Fact]
+    public void CapitalStateResolver_RequiresProfileVerificationWhenCapitalIsMissingOrConflicting()
+    {
+        var missing = new[]
+        {
+            new Village("SWOLL", "dorf1.php?newdid=1", IsCapital: null, CoordX: 12, CoordY: -4),
+        };
+        var conflicting = new[]
+        {
+            new Village("SWOLL", "dorf1.php?newdid=1", IsCapital: true, CoordX: 12, CoordY: -4),
+            new Village("A8", "dorf1.php?newdid=2", IsCapital: true, CoordX: 8, CoordY: 8),
+        };
+
+        Assert.True(CapitalStateResolver.RequiresProfileVerification(missing));
+        Assert.True(CapitalStateResolver.RequiresProfileVerification(conflicting));
+    }
+
+    [Fact]
+    public void CapitalStateResolver_NormalizesLegacyCacheWithMultipleCandidatesToUnknown()
+    {
+        IReadOnlyDictionary<string, bool?> candidates = new Dictionary<string, bool?>
+        {
+            ["xy:120|14"] = true,
+            ["xy:8|8"] = true,
+            ["xy:15|20"] = true,
+            ["xy:30|40"] = true,
+        };
+
+        var normalized = CapitalStateResolver.NormalizeCachedCapitalCandidates(candidates);
+
+        Assert.All(normalized.Values, Assert.Null);
+    }
+
+    [Fact]
     public void ReconcileRenamedActiveVillageByCoords_RefreshesNameByCoordinates()
     {
         var cached = new List<Village>

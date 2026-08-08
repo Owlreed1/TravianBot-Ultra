@@ -171,6 +171,16 @@ public sealed class DesktopBotService : IDesktopBotService
         return _taskRunner.RunFarmLossMoveDebugAsync(options, log, null, cancellationToken);
     }
 
+    public Task<CapitalProfileCheckResult> CheckCapitalFromProfileAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken)
+    {
+        return _taskRunner.CheckCapitalFromProfileAsync(options, log, null, cancellationToken);
+    }
+
+    public Task SetVerifiedCapitalStateAsync(BotOptions options, CapitalProfileCheckResult capital, Action<string> log, CancellationToken cancellationToken)
+    {
+        return _taskRunner.SetVerifiedCapitalStateAsync(options, capital, log, null, cancellationToken);
+    }
+
     public Task<IReadOnlyDictionary<string, long>> ReadAvailableTroopsForCatapultWavesAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken)
     {
         return _taskRunner.ReadAvailableTroopsForCatapultWavesAsync(options, log, null, cancellationToken);

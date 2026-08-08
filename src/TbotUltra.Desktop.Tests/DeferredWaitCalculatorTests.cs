@@ -22,6 +22,44 @@ public sealed class DeferredWaitCalculatorTests
     }
 
     [Fact]
+    public void TroopTraining_waits_when_any_checked_resource_is_below_the_percent_threshold()
+    {
+        var requests = new[] { Barracks(minPercent: 50, checkWood: true, checkClay: true, checkIron: true) };
+        var current = Res(wood: 600, clay: 600, iron: 400);
+        var production = Prod(iron: 100); // iron is 100 short of 50%, so wait one hour.
+
+        var result = DeferredWaitCalculator.EvaluateDeferredTroopTrainingWait(
+            requests, NoBuildingFilter, current, production, warehouseCapacity: 1000, granaryCapacity: 1000, fallbackCooldownSeconds: 30);
+
+        Assert.Equal(new DeferredTroopTrainingEvaluation(false, 3600, "estimated_from_status"), result);
+    }
+
+    [Fact]
+    public void TroopTraining_is_ready_when_all_checked_resources_meet_the_percent_threshold()
+    {
+        var requests = new[] { Barracks(minPercent: 50, checkWood: true, checkClay: true, checkIron: true, checkCrop: true) };
+        var current = Res(wood: 500, clay: 500, iron: 500, crop: 500);
+
+        var result = DeferredWaitCalculator.EvaluateDeferredTroopTrainingWait(
+            requests, NoBuildingFilter, current, NoProduction, warehouseCapacity: 1000, granaryCapacity: 1000, fallbackCooldownSeconds: 30);
+
+        Assert.Equal(new DeferredTroopTrainingEvaluation(true, 0, "ready"), result);
+    }
+
+    [Fact]
+    public void TroopTraining_checks_all_resources_when_no_resource_checkbox_is_selected()
+    {
+        var requests = new[] { Barracks(minPercent: 50, checkWood: false) };
+        var current = Res(wood: 600, clay: 600, iron: 600, crop: 400);
+        var production = Prod(crop: 100); // no selection falls back to all resources; crop is 100 short.
+
+        var result = DeferredWaitCalculator.EvaluateDeferredTroopTrainingWait(
+            requests, NoBuildingFilter, current, production, warehouseCapacity: 1000, granaryCapacity: 1000, fallbackCooldownSeconds: 30);
+
+        Assert.Equal(new DeferredTroopTrainingEvaluation(false, 3600, "estimated_from_status"), result);
+    }
+
+    [Fact]
     public void TroopTraining_estimates_wait_from_production_when_short()
     {
         var requests = new[] { Barracks(minPercent: 50, checkWood: true) };
@@ -227,9 +265,14 @@ public sealed class DeferredWaitCalculatorTests
     private static readonly IReadOnlyDictionary<string, double?> NoProduction = new Dictionary<string, double?>();
     private static readonly IReadOnlyDictionary<string, string> EmptyPayload = new Dictionary<string, string>();
 
-    private static DeferredTroopTrainingRequest Barracks(int minPercent, bool checkWood)
+    private static DeferredTroopTrainingRequest Barracks(
+        int minPercent,
+        bool checkWood,
+        bool checkClay = false,
+        bool checkIron = false,
+        bool checkCrop = false)
         => new("Barracks", Enabled: true, RunMode: "resource_percent", MinimumResourcesPercent: minPercent,
-            CheckWood: checkWood, CheckClay: false, CheckIron: false, CheckCrop: false);
+            CheckWood: checkWood, CheckClay: checkClay, CheckIron: checkIron, CheckCrop: checkCrop);
 
     private static Dictionary<string, long> Res(long wood = 0, long clay = 0, long iron = 0, long crop = 0)
         => new(StringComparer.OrdinalIgnoreCase) { ["wood"] = wood, ["clay"] = clay, ["iron"] = iron, ["crop"] = crop };

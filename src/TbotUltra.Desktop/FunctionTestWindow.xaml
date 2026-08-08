@@ -140,6 +140,12 @@
                                     ToolTip="Runs the complete combined flow for every active red or yellow non-oasis farm: opens Edit, moves it to the configured loss destination, checks Deactivate target, and saves. Requires both loss checkboxes and a selected destination list on the Farming page."
                                     ToolTipService.InitialShowDelay="500"
                                     Click="TestMoveLossFarmsButton_Click" />
+                            <Button x:Name="CheckCapitalButton"
+                                    Style="{DynamicResource DebugActionButtonStyle}"
+                                    Content="Check capital"
+                                    ToolTip="Reads the player profile and asks before applying the verified capital village to the UI state."
+                                    ToolTipService.InitialShowDelay="500"
+                                    Click="CheckCapitalButton_Click" />
                             <Button x:Name="TestIncreaseAdventuresToHardButton"
                                     Style="{DynamicResource DebugActionButtonStyle}"
                                     Content="Adventure: hard"

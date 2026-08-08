@@ -13,6 +13,46 @@ namespace TbotUltra.Worker.Services;
 
 public sealed partial class BotTaskRunner
 {
+    public async Task<CapitalProfileCheckResult> CheckCapitalFromProfileAsync(
+        BotOptions options,
+        Action<string> log,
+        string? accountName = null,
+        CancellationToken cancellationToken = default)
+    {
+        using var priorityRequest = _priorityBrowserWork.EnterPriorityRequest();
+        CapitalProfileCheckResult? result = null;
+        await ExecuteWithClientAsync(
+            options,
+            log,
+            accountName,
+            interactive: true,
+            cancellationToken,
+            async client =>
+            {
+                await client.LoginAsync(cancellationToken);
+                result = await client.CheckCapitalFromProfileAsync(cancellationToken);
+            });
+
+        return result ?? throw new InvalidOperationException("The player profile returned no capital village.");
+    }
+
+    public async Task SetVerifiedCapitalStateAsync(
+        BotOptions options,
+        CapitalProfileCheckResult capital,
+        Action<string> log,
+        string? accountName = null,
+        CancellationToken cancellationToken = default)
+    {
+        using var priorityRequest = _priorityBrowserWork.EnterPriorityRequest();
+        await ExecuteWithClientAsync(
+            options,
+            log,
+            accountName,
+            interactive: true,
+            cancellationToken,
+            client => client.SetVerifiedCapitalStateAsync(capital, cancellationToken));
+    }
+
     private static FarmListLossHandlingRequest CreateFarmListLossHandlingRequest(
         BotOptions options,
         int? maxTargets = null,

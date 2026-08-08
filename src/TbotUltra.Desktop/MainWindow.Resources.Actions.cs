@@ -79,6 +79,7 @@ public partial class MainWindow
         _resourceTestFunctionsWindow.ReadSmithyQueueTestRequested += TestReadSmithyQueueButton_Click;
         _resourceTestFunctionsWindow.ReinforcementsTestRequested += TestReinforcementsButton_Click;
         _resourceTestFunctionsWindow.MoveLossFarmsTestRequested += TestMoveLossFarmsButton_Click;
+        _resourceTestFunctionsWindow.CheckCapitalRequested += CheckCapitalButton_Click;
         _resourceTestFunctionsWindow.IncreaseAdventuresToHardRequested += TestIncreaseAdventuresToHardButton_Click;
         _resourceTestFunctionsWindow.ReduceAdventuresTimeRequested += TestReduceAdventuresTimeButton_Click;
         _resourceTestFunctionsWindow.StartAdventureRequested += StartAdventureDebugButton_Click;
@@ -97,6 +98,7 @@ public partial class MainWindow
             _resourceTestFunctionsWindow.ReadSmithyQueueTestRequested -= TestReadSmithyQueueButton_Click;
             _resourceTestFunctionsWindow.ReinforcementsTestRequested -= TestReinforcementsButton_Click;
             _resourceTestFunctionsWindow.MoveLossFarmsTestRequested -= TestMoveLossFarmsButton_Click;
+            _resourceTestFunctionsWindow.CheckCapitalRequested -= CheckCapitalButton_Click;
             _resourceTestFunctionsWindow.IncreaseAdventuresToHardRequested -= TestIncreaseAdventuresToHardButton_Click;
             _resourceTestFunctionsWindow.ReduceAdventuresTimeRequested -= TestReduceAdventuresTimeButton_Click;
             _resourceTestFunctionsWindow.StartAdventureRequested -= StartAdventureDebugButton_Click;
@@ -829,6 +831,49 @@ public partial class MainWindow
                     : result.RowsFound == 0
                         ? "No active red/yellow non-oasis farm was found."
                         : $"No farm moved; deactivated={result.RowsDeactivated}, failures={result.MoveFailures}.";
+                AppendLog($"[{operationId}] {summary}");
+                return summary;
+            });
+    }
+
+    private async void CheckCapitalButton_Click(object sender, RoutedEventArgs e)
+        => await GuardUiAsync(CheckCapitalButtonClickAsync);
+
+    private async Task CheckCapitalButtonClickAsync()
+    {
+        if (BlockIfSessionSleeping("Check capital"))
+        {
+            return;
+        }
+
+        await RunGuardedOperationAsync(
+            "CheckCapital",
+            "Capital check paused.",
+            ToggleResourceTabActionsBusy,
+            async (operationId, operationToken) =>
+            {
+                var options = LoadBotOptions();
+                await EnsureChromiumInstalledAsync();
+                AppendLog($"[{operationId}] reading the player profile for the capital village.");
+                var capital = await _botService.CheckCapitalFromProfileAsync(options, AppendLog, operationToken);
+                var choice = AppDialog.ShowCustom(
+                    (Window?)_resourceTestFunctionsWindow ?? this,
+                    $"Player profile identified '{capital.VillageName}' ({capital.CoordX}|{capital.CoordY}) as the capital.\n\nApply this capital state to the UI?",
+                    "Set capital state",
+                    [("Set capital state", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.No)],
+                    MessageBoxImage.Question,
+                    MessageBoxResult.No,
+                    MessageBoxResult.No,
+                    successResult: MessageBoxResult.Yes,
+                    dangerResult: MessageBoxResult.No);
+                if (choice != MessageBoxResult.Yes)
+                {
+                    AppendLog($"[{operationId}] capital state update canceled by user.");
+                    return "Capital state was not changed.";
+                }
+
+                await _botService.SetVerifiedCapitalStateAsync(options, capital, AppendLog, operationToken);
+                var summary = $"Capital state set to '{capital.VillageName}' ({capital.CoordX}|{capital.CoordY}).";
                 AppendLog($"[{operationId}] {summary}");
                 return summary;
             });

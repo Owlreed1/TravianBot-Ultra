@@ -550,7 +550,7 @@ public sealed record BotOptions
     public int ResourceUpgradeMaxAttempts { get; init; } = 30;
 
     [ConfigurationKeyName("resource_build_strategy")]
-    public string ResourceBuildStrategy { get; init; } = "smart"; // "lowest_first" or "smart"
+    public string ResourceBuildStrategy { get; init; } = "lowest_first"; // "lowest_first" or "smart"
 
     [ConfigurationKeyName("resource_upgrade_types")]
     public string ResourceUpgradeTypes { get; init; } = "wood,clay,iron,crop";

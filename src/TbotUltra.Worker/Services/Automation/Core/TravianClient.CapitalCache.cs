@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using TbotUltra.Core.Accounts;
+using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Worker.Services;
 
@@ -15,6 +16,126 @@ public sealed partial class TravianClient
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
+
+    private bool IsCapitalProfileVerificationDue()
+        => _session.CapitalProfileVerificationRequired
+            && DateTimeOffset.UtcNow >= _session.CapitalProfileVerificationNotBeforeUtc;
+
+    private void RequireCapitalProfileVerification(string reason, bool delayRetry)
+    {
+        _session.CapitalProfileVerificationRequired = true;
+        _session.CapitalProfileVerificationNotBeforeUtc = delayRetry
+            ? DateTimeOffset.UtcNow.AddMinutes(20)
+            : DateTimeOffset.MinValue;
+        if (_session.LogValueChanged("capital:profile-verification", reason))
+        {
+            Notify($"[capital] profile verification required: {reason}");
+        }
+    }
+
+    private void ConfirmCapitalProfileVerification()
+    {
+        _session.CapitalProfileVerificationRequired = false;
+        _session.CapitalProfileVerificationNotBeforeUtc = DateTimeOffset.MinValue;
+    }
+
+    public async Task<CapitalProfileCheckResult> CheckCapitalFromProfileAsync(
+        CancellationToken cancellationToken = default)
+    {
+        Notify("[capital] checking player profile for the verified capital.");
+        var previousUrl = _page.Url;
+        try
+        {
+            await GotoAsync(Paths.PlayerProfile, cancellationToken);
+            await EnsureLoggedInAsync(cancellationToken: cancellationToken);
+            var capitals = await _page.EvaluateAsync<PlayerProfileVillageRowJs[]>(
+                """
+                () => {
+                  const clean = (value) => (value || '').replace(/\s+/g, ' ').trim();
+                  const parseCoordinate = (value) => {
+                    const match = clean(value).replace(/[−–—]/g, '-').match(/-?\d+/);
+                    return match ? Number.parseInt(match[0], 10) : null;
+                  };
+                  const capitals = [];
+                  for (const row of document.querySelectorAll('table tr')) {
+                    const isCapital = Array.from(row.querySelectorAll('span.additionalInfo'))
+                      .some(node => /\bcapital\b/i.test(node.textContent || ''));
+                    if (!isCapital) continue;
+
+                    const name = clean(
+                      row.querySelector('td.name a, td.village a, td.name, td.village, td:first-child')?.textContent || '')
+                      .replace(/\s*\(capital\)\s*/i, '')
+                      .trim();
+                    const x = parseCoordinate(row.querySelector('td.coordinates .coordinateX, .coordinateX')?.textContent || '');
+                    const y = parseCoordinate(row.querySelector('td.coordinates .coordinateY, .coordinateY')?.textContent || '');
+                    if (!name || x === null || y === null) continue;
+                    capitals.push({ name, isCapital: true, x, y });
+                  }
+                  return capitals;
+                }
+                """);
+
+            if (capitals is not { Length: 1 })
+            {
+                var count = capitals?.Length ?? 0;
+                Notify($"[capital] profile check failed: expected exactly one capital row, found {count}.");
+                throw new InvalidOperationException(
+                    $"Player profile did not identify exactly one capital village (found {count}). No capital state was changed.");
+            }
+
+            var capitalRow = capitals[0];
+            if (string.IsNullOrWhiteSpace(capitalRow.Name) || !capitalRow.X.HasValue || !capitalRow.Y.HasValue)
+            {
+                throw new InvalidOperationException(
+                    "Player profile capital row was missing its village name or coordinates. No capital state was changed.");
+            }
+
+            var capital = new CapitalProfileCheckResult(capitalRow.Name, capitalRow.X.Value, capitalRow.Y.Value);
+            Notify($"[capital] profile check identified '{capital.VillageName}' at {capital.CoordX}|{capital.CoordY}; awaiting confirmation.");
+            return capital;
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(previousUrl)
+                && !string.Equals(previousUrl, _page.Url, StringComparison.OrdinalIgnoreCase))
+            {
+                await GotoAsync(previousUrl, cancellationToken);
+            }
+        }
+    }
+
+    public async Task SetVerifiedCapitalStateAsync(
+        CapitalProfileCheckResult capital,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(capital.VillageName);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var cachedVillages = _cachedVillages;
+        var matchingVillageCount = cachedVillages?.Count(village =>
+            village.CoordX == capital.CoordX && village.CoordY == capital.CoordY) ?? 0;
+        if (matchingVillageCount != 1)
+        {
+            Notify($"[capital] shared village cache did not contain verified capital '{capital.VillageName}'; refreshing the player profile before applying state.");
+            cachedVillages = (await ReadVillagesFromServerAsync(cancellationToken)).ToList();
+            matchingVillageCount = cachedVillages.Count(village =>
+                village.CoordX == capital.CoordX && village.CoordY == capital.CoordY);
+        }
+
+        if (matchingVillageCount != 1)
+        {
+            throw new InvalidOperationException(
+                $"Verified capital '{capital.VillageName}' ({capital.CoordX}|{capital.CoordY}) was not found exactly once in the live village list. No capital state was changed.");
+        }
+
+        SaveCachedVillageState(capital.VillageName, true, capital.CoordX, capital.CoordY);
+        UpdateCachedVillages(CapitalStateResolver.ApplyVerifiedCapital(
+            cachedVillages!,
+            capital.CoordX,
+            capital.CoordY));
+        Notify($"[capital] verified capital state set to '{capital.VillageName}' at {capital.CoordX}|{capital.CoordY}.");
+        await TryEmitUiSyncSnapshotAsync(cancellationToken, force: true);
+    }
 
     private async Task<bool?> ReadIsCapitalAsync(
         string villageName,
@@ -129,6 +250,16 @@ public sealed partial class TravianClient
         EnsureCapitalCacheLoaded();
         lock (_capitalCacheSync)
         {
+            var capitalCount = _capitalCacheByKey.Values.Count(entry =>
+                IsCurrentAccountServer(entry) && entry.IsCapital == true);
+            if (capitalCount > 1)
+            {
+                RequireCapitalProfileVerification(
+                    $"capital cache contains {capitalCount} candidates for this account/server",
+                    delayRetry: false);
+                return null;
+            }
+
             if (coordX.HasValue && coordY.HasValue)
             {
                 var coordinateKey = BuildCapitalCacheKey(villageName, coordX, coordY);
@@ -148,6 +279,24 @@ public sealed partial class TravianClient
     private void SaveCachedCapitalState(string villageName, bool? isCapital)
         => SaveCachedVillageState(villageName, isCapital, null, null);
 
+    private void ClearCachedCapitalStatesForCurrentAccount()
+    {
+        lock (_capitalCacheSync)
+        {
+            EnsureCapitalCacheLoadedUnderLock();
+            foreach (var key in _capitalCacheByKey.Keys.ToList())
+            {
+                var entry = _capitalCacheByKey[key];
+                if (IsCurrentAccountServer(entry) && entry.IsCapital is not null)
+                {
+                    _capitalCacheByKey[key] = CopyCapitalCacheEntry(entry, isCapital: null);
+                }
+            }
+
+            PersistCapitalCacheUnderLock();
+        }
+    }
+
     private void SaveCachedVillageState(string villageName, bool? isCapital, int? coordX, int? coordY)
     {
         if (string.IsNullOrWhiteSpace(villageName))
@@ -166,6 +315,20 @@ public sealed partial class TravianClient
             if (resolvedIsCapital is null && coordX is null && coordY is null)
             {
                 return;
+            }
+
+            if (resolvedIsCapital == true)
+            {
+                foreach (var existingKey in _capitalCacheByKey.Keys.ToList())
+                {
+                    var other = _capitalCacheByKey[existingKey];
+                    if (existingKey == key || !IsCurrentAccountServer(other) || other.IsCapital != true)
+                    {
+                        continue;
+                    }
+
+                    _capitalCacheByKey[existingKey] = CopyCapitalCacheEntry(other, isCapital: false);
+                }
             }
 
             _capitalCacheByKey[key] = new CapitalCacheEntry
@@ -247,6 +410,8 @@ public sealed partial class TravianClient
                 var key = BuildCapitalCacheEntryKey(entry);
                 _capitalCacheByKey[key] = entry;
             }
+
+            NormalizeConflictingCapitalCacheCandidatesUnderLock();
         }
         catch (Exception ex)
         {
@@ -289,6 +454,7 @@ public sealed partial class TravianClient
                 _capitalCacheByKey[key] = entry;
             }
 
+            NormalizeConflictingCapitalCacheCandidatesUnderLock();
             PersistCapitalCacheUnderLock();
             RemoveMigratedAccountEntriesFromLegacyCapitalCache(legacyPath);
         }
@@ -304,6 +470,26 @@ public sealed partial class TravianClient
         return string.IsNullOrWhiteSpace(raw)
             ? null
             : JsonSerializer.Deserialize<CapitalCacheDocument>(raw, CapitalCacheJsonOptions);
+    }
+
+    private void NormalizeConflictingCapitalCacheCandidatesUnderLock()
+    {
+        var candidates = _capitalCacheByKey
+            .Where(pair => IsCurrentAccountServer(pair.Value))
+            .ToDictionary(pair => pair.Key, pair => pair.Value.IsCapital, StringComparer.OrdinalIgnoreCase);
+        var normalized = CapitalStateResolver.NormalizeCachedCapitalCandidates(candidates);
+        if (normalized.Count == 0 || candidates.All(candidate => normalized[candidate.Key] == candidate.Value))
+        {
+            return;
+        }
+
+        foreach (var candidate in normalized)
+        {
+            var entry = _capitalCacheByKey[candidate.Key];
+            _capitalCacheByKey[candidate.Key] = CopyCapitalCacheEntry(entry, candidate.Value);
+        }
+
+        PersistCapitalCacheUnderLock();
     }
 
     private void PersistCapitalCacheUnderLock()
@@ -407,6 +593,17 @@ public sealed partial class TravianClient
             : $"name:{entry.VillageName}";
         return CapitalCacheKey.Build(entry.AccountName, entry.ServerUrl, identity);
     }
+
+    private static CapitalCacheEntry CopyCapitalCacheEntry(CapitalCacheEntry entry, bool? isCapital) => new()
+    {
+        AccountName = entry.AccountName,
+        ServerUrl = entry.ServerUrl,
+        VillageName = entry.VillageName,
+        IsCapital = isCapital,
+        CoordX = entry.CoordX,
+        CoordY = entry.CoordY,
+        UpdatedAtUtc = DateTimeOffset.UtcNow,
+    };
 
     private sealed class CapitalCacheDocument
     {

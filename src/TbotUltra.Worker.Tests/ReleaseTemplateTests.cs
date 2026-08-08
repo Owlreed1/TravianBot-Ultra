@@ -35,7 +35,7 @@ public sealed class ReleaseTemplateTests
         Assert.Equal(30, options.ContinuousFarmDispatchDelayMinMinutes);
         Assert.Equal(90, options.ContinuousFarmDispatchDelayMaxMinutes);
         Assert.Equal(FarmingDefaults.SendModeListPerList, options.ContinuousFarmSendMode);
-        Assert.Equal("smart", options.ResourceBuildStrategy);
+        Assert.Equal("lowest_first", options.ResourceBuildStrategy);
         Assert.Equal("resource_percent", options.TroopTrainingBarracksRunMode);
         Assert.Equal("resource_percent", options.TroopTrainingStableRunMode);
         Assert.Equal("resource_percent", options.TroopTrainingWorkshopRunMode);
