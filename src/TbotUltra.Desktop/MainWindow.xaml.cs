@@ -452,12 +452,12 @@ public partial class MainWindow : Window
         var queueScheduler = new PriorityFifoQueueScheduler();
         var queueExecutor = new QueueExecutor(taskRunner);
         _botService = new DesktopBotService(taskRunner, queueStore, queueScheduler, queueExecutor);
-        _heroPanelService = new HeroPanelService(_botService, _botConfigStore);
+        _heroPanelService = new HeroPanelService(new DesktopHeroPanelClient(_botService), _botConfigStore);
         _resourcesPanelService = new ResourcesPanelService(_botConfigStore, _villageSettingsStore);
-        _farmingPanelService = new FarmingPanelService(_botService, _botConfigStore);
-        _buildingsPanelService = new BuildingsPanelService(_botService);
-        _troopTrainingPanelService = new TroopTrainingPanelService(_botService, _botConfigStore, _projectRoot);
-        _queuePanelService = new QueuePanelService(_botService);
+        _farmingPanelService = new FarmingPanelService(new DesktopFarmingPanelClient(_botService), _botConfigStore);
+        _buildingsPanelService = new BuildingsPanelService(new DesktopBuildingsPanelClient(_botService));
+        _troopTrainingPanelService = new TroopTrainingPanelService(new DesktopTroopTrainingPanelClient(_botService), _botConfigStore, _projectRoot);
+        _queuePanelService = new QueuePanelService(new DesktopQueuePanelClient(_botService));
         _botService.FarmLossDestinationChanged += OnFarmLossDestinationChanged;
         _travianQueueViewModel.RemoveRequested += QueueRemoveSelected;
         _travianQueueViewModel.RestoreRequested += RestoreRemovedQueueItems;

@@ -7,22 +7,22 @@ using TbotUltra.Worker.Domain;
 namespace TbotUltra.Desktop.Services;
 
 /// <summary>Owns Troop Training panel persistence and Worker reads behind the Desktop facade.</summary>
-public sealed class TroopTrainingPanelService(IDesktopBotService botService, BotConfigStore configStore, string projectRoot)
+public sealed class TroopTrainingPanelService(ITroopTrainingPanelClient client, BotConfigStore configStore, string projectRoot)
 {
     public Task<VillageStatus> ReadBuildingsAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken)
-        => botService.ReadBuildingsStatusAsync(options, log, cancellationToken);
+        => client.ReadBuildingsAsync(options, log, cancellationToken);
 
     public Task<IReadOnlyList<TroopTrainingQueueStatus>> ReadQueuesAsync(
         BotOptions options, Action<string> log, IReadOnlyList<Building>? buildings, CancellationToken cancellationToken)
-        => botService.ReadTroopTrainingQueuesAsync(options, log, buildings, cancellationToken);
+        => client.ReadQueuesAsync(options, log, buildings, cancellationToken);
 
     public Task<SmithyUpgradeStatus> ReadSmithyStatusAsync(
         BotOptions options, Action<string> log, IReadOnlyList<Building>? buildings, CancellationToken cancellationToken)
-        => botService.ReadSmithyUpgradeStatusAsync(options, log, buildings, cancellationToken);
+        => client.ReadSmithyStatusAsync(options, log, buildings, cancellationToken);
 
     public Task<BreweryCelebrationStatus> ReadBreweryStatusAsync(
         BotOptions options, Action<string> log, IReadOnlyList<Building>? buildings, CancellationToken cancellationToken)
-        => botService.ReadBreweryCelebrationStatusAsync(options, log, buildings, cancellationToken);
+        => client.ReadBreweryStatusAsync(options, log, buildings, cancellationToken);
 
     public TroopTrainingPayload? LoadVillageSettings(string account, string villageKey)
         => TroopTrainingSettingsStore.Load(projectRoot, account, villageKey);

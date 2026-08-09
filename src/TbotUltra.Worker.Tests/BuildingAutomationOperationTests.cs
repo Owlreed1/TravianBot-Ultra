@@ -94,11 +94,64 @@ public sealed class BuildingAutomationOperationTests
         Assert.Equal("reduced", timeResult);
     }
 
+    [Fact]
+    public async Task BuildingOperation_ForwardsStatusAndCelebrationArgumentsWithoutChangingThem()
+    {
+        var client = new FakeBuildingClient();
+        var operation = new BuildingAutomationOperation(client);
+        IReadOnlyList<Building> buildings = [];
+        using var cancellation = new CancellationTokenSource();
+
+        await operation.ReadSmithyUpgradeStatusAsync(buildings, cancellation.Token);
+        await operation.ReadSmithyQueueFromCurrentPageAsync(cancellation.Token);
+        await operation.RunBreweryCelebrationAsync(true, 1.5, 2.5, cancellation.Token);
+        await operation.RunTownHallCelebrationAsync("great", 3, false, 4.5, 5.5, cancellation.Token);
+
+        Assert.Same(buildings, client.SmithyBuildings);
+        Assert.Equal((true, 1.5, 2.5), client.BreweryRequest);
+        Assert.Equal(("great", 3, false, 4.5, 5.5), client.TownHallRequest);
+        Assert.All(client.CancellationTokens, token => Assert.Equal(cancellation.Token, token));
+    }
+
+    [Fact]
+    public async Task ResourceAndHeroOperations_ForwardAllReadArgumentsAndCancellation()
+    {
+        var resourceClient = new FakeResourceUpgradeClient();
+        var resourceOperation = new ResourceAutomationOperation(resourceClient);
+        var heroClient = new FakeHeroClient();
+        var heroOperation = new HeroAutomationOperation(heroClient);
+        using var cancellation = new CancellationTokenSource();
+
+        Assert.Equal("resource upgraded", await resourceOperation.UpgradeSingleAsync(7, 12, cancellation.Token));
+        await heroOperation.DispatchAdventureAsync(cancellation.Token);
+        await heroOperation.ReviveIfNeededAsync(true, cancellation.Token);
+        await heroOperation.RefreshAdventureCountAsync(cancellation.Token);
+        await heroOperation.HasLevelUpIndicatorAsync(cancellation.Token);
+        await heroOperation.IsRevivingAsync(cancellation.Token);
+        await heroOperation.IsHomeAsync(cancellation.Token);
+        await heroOperation.ReadCurrentPageHpAsync(cancellation.Token);
+        await heroOperation.HasClaimableTasksAsync(cancellation.Token);
+        await heroOperation.HasClaimableDailyQuestsAsync(cancellation.Token);
+        await heroOperation.ReadAttributesAsync(cancellation.Token);
+        await heroOperation.ReadInventoryResourcesAsync(cancellation.Token);
+        await heroOperation.SpendAttributePointsAsync("resources", cancellation.Token);
+
+        Assert.Equal((7, 12), resourceClient.SingleRequest);
+        Assert.Equal(
+            ["dispatch", "revive", "count", "level-up", "reviving", "home", "hp", "tasks", "daily", "attributes", "inventory", "spend"],
+            heroClient.Calls);
+        Assert.All(heroClient.CancellationTokens, token => Assert.Equal(cancellation.Token, token));
+    }
+
     private sealed class FakeBuildingClient : IBuildingClient
     {
         public (int SlotId, int Gid, string Name, bool AllowFallback, string? ExcludedSlots) ConstructRequest { get; private set; }
         public (int SlotId, int MaxAttempts) UpgradeToMaxRequest { get; private set; }
         public bool ReadBreweryStatusRequested { get; private set; }
+        public IReadOnlyList<Building>? SmithyBuildings { get; private set; }
+        public (bool Enabled, double Min, double Max) BreweryRequest { get; private set; }
+        public (string Mode, int Count, bool Enabled, double Min, double Max) TownHallRequest { get; private set; }
+        public List<CancellationToken> CancellationTokens { get; } = [];
 
         public Task<VillageStatus> ReadBuildingsStatusAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<string> DemolishBuildingToLevelAsync(string targetBuildingSlotOrName, int targetLevel, CancellationToken cancellationToken = default) => Task.FromResult("demolished");
@@ -117,7 +170,11 @@ public sealed class BuildingAutomationOperationTests
         }
 
         public Task<string> RunBreweryCelebrationAsync(bool restartDelayEnabled, double restartDelayMinMinutes, double restartDelayMaxMinutes, CancellationToken cancellationToken = default)
-            => Task.FromResult("brewery celebration started");
+        {
+            BreweryRequest = (restartDelayEnabled, restartDelayMinMinutes, restartDelayMaxMinutes);
+            CancellationTokens.Add(cancellationToken);
+            return Task.FromResult("brewery celebration started");
+        }
 
         public Task<BreweryCelebrationStatus> ReadBreweryCelebrationStatusAsync(IReadOnlyList<Building>? knownBuildings = null, CancellationToken cancellationToken = default)
         {
@@ -126,11 +183,24 @@ public sealed class BuildingAutomationOperationTests
         }
 
         public Task<string> RunTownHallCelebrationAsync(string mode, int count, bool restartDelayEnabled, double restartDelayMinMinutes, double restartDelayMaxMinutes, CancellationToken cancellationToken = default)
-            => Task.FromResult("town hall celebration started");
+        {
+            TownHallRequest = (mode, count, restartDelayEnabled, restartDelayMinMinutes, restartDelayMaxMinutes);
+            CancellationTokens.Add(cancellationToken);
+            return Task.FromResult("town hall celebration started");
+        }
 
         public Task<string> UpgradeSelectedTroopsAtSmithyAsync(IReadOnlyList<SmithyTroopTarget> targets, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<SmithyUpgradeStatus> ReadSmithyUpgradeStatusAsync(IReadOnlyList<Building>? knownBuildings = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<string> ReadSmithyQueueFromCurrentPageTestAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<SmithyUpgradeStatus> ReadSmithyUpgradeStatusAsync(IReadOnlyList<Building>? knownBuildings = null, CancellationToken cancellationToken = default)
+        {
+            SmithyBuildings = knownBuildings;
+            CancellationTokens.Add(cancellationToken);
+            return Task.FromResult(new SmithyUpgradeStatus(false, null, 0, null, [], "", ""));
+        }
+        public Task<string> ReadSmithyQueueFromCurrentPageTestAsync(CancellationToken cancellationToken = default)
+        {
+            CancellationTokens.Add(cancellationToken);
+            return Task.FromResult("smithy queue");
+        }
         public Task<IReadOnlyList<ActiveConstruction>> ReadActiveConstructionsAsync(CancellationToken cancellationToken = default, bool allowNavigationToBuildings = true, ActiveConstructionReadMode readMode = ActiveConstructionReadMode.FreshForMutation) => throw new NotSupportedException();
         public Task<ConstructionSlotStatus> EvaluateConstructionSlotsAsync(string tribe, bool travianPlusActive, CancellationToken cancellationToken = default, bool allowNavigationToBuildings = true) => throw new NotSupportedException();
         public Task<int> WaitForConstructionSlotIfBusyAsync(ConstructionKind kind, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -139,9 +209,13 @@ public sealed class BuildingAutomationOperationTests
     private sealed class FakeResourceUpgradeClient : IResourceUpgradeClient
     {
         public (int TargetLevel, string Strategy, string? Types) BulkRequest { get; private set; }
+        public (int SlotId, int TargetLevel) SingleRequest { get; private set; }
 
         public Task<string> UpgradeResourceToLevelAsync(int slotId, int targetLevel, CancellationToken cancellationToken = default)
-            => Task.FromResult("resource upgraded");
+        {
+            SingleRequest = (slotId, targetLevel);
+            return Task.FromResult("resource upgraded");
+        }
 
         public Task<string> UpgradeAllResourcesToLevelAsync(int targetLevel, string buildStrategy = "lowest_first", string? resourceTypes = null, CancellationToken cancellationToken = default)
         {
@@ -155,16 +229,18 @@ public sealed class BuildingAutomationOperationTests
         public (int MinHp, bool AutoRevive, bool AutoAssign, bool AutoOintments, string StatPriority, string AdventureOrder, int RegenPercent) ManageRequest { get; private set; }
         public bool IncreaseAdventureDangerRequested { get; private set; }
         public bool ReduceAdventureTimeRequested { get; private set; }
+        public List<string> Calls { get; } = [];
+        public List<CancellationToken> CancellationTokens { get; } = [];
 
-        public Task<HeroAdventureDispatchResult> SendHeroOnAdventureAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<int?> RefreshAdventureCountAsync(bool forceReload = true, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<bool> HasHeroLevelUpIndicatorOnCurrentPageAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<bool> CheckAndReviveDeadHeroOnCurrentPageAsync(bool autoRevive, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<bool> IsHeroRevivingOnCurrentPageAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<bool> IsHeroHomeOnCurrentPageAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<int?> ReadHeroHpFromCurrentPageAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<bool> HasClaimableTasksOnCurrentPageAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<bool> HasClaimableDailyQuestsOnCurrentPageAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<HeroAdventureDispatchResult> SendHeroOnAdventureAsync(CancellationToken cancellationToken = default) => Record("dispatch", cancellationToken, new HeroAdventureDispatchResult(true, null, 0, false, null, "done"));
+        public Task<int?> RefreshAdventureCountAsync(bool forceReload = true, CancellationToken cancellationToken = default) => Record("count", cancellationToken, (int?)3);
+        public Task<bool> HasHeroLevelUpIndicatorOnCurrentPageAsync(CancellationToken cancellationToken = default) => Record("level-up", cancellationToken, true);
+        public Task<bool> CheckAndReviveDeadHeroOnCurrentPageAsync(bool autoRevive, CancellationToken cancellationToken = default) => Record("revive", cancellationToken, autoRevive);
+        public Task<bool> IsHeroRevivingOnCurrentPageAsync(CancellationToken cancellationToken = default) => Record("reviving", cancellationToken, false);
+        public Task<bool> IsHeroHomeOnCurrentPageAsync(CancellationToken cancellationToken = default) => Record("home", cancellationToken, true);
+        public Task<int?> ReadHeroHpFromCurrentPageAsync(CancellationToken cancellationToken = default) => Record("hp", cancellationToken, (int?)80);
+        public Task<bool> HasClaimableTasksOnCurrentPageAsync(CancellationToken cancellationToken = default) => Record("tasks", cancellationToken, true);
+        public Task<bool> HasClaimableDailyQuestsOnCurrentPageAsync(CancellationToken cancellationToken = default) => Record("daily", cancellationToken, false);
 
         public Task<string> ManageHeroAsync(int minHpForAdventure, bool autoRevive, bool autoAssignPoints, bool autoUseOintments, string statPriority, string adventurePickOrder = "shortest", int heroHpRegenPerDayPercent = 40, CancellationToken cancellationToken = default)
         {
@@ -172,20 +248,29 @@ public sealed class BuildingAutomationOperationTests
             return Task.FromResult("managed");
         }
 
-        public Task<string> SpendHeroAttributePointsAsync(string statPriority, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<HeroAttributeSnapshot> ReadHeroAttributeSnapshotAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<HeroInventoryResources> ReadHeroInventoryResourcesAsync(CancellationToken cancellationToken = default, bool suppressUiSync = false) => throw new NotSupportedException();
+        public Task<string> SpendHeroAttributePointsAsync(string statPriority, CancellationToken cancellationToken = default) => Record("spend", cancellationToken, "spent");
+        public Task<HeroAttributeSnapshot> ReadHeroAttributeSnapshotAsync(CancellationToken cancellationToken = default) => Record("attributes", cancellationToken, new HeroAttributeSnapshot());
+        public Task<HeroInventoryResources> ReadHeroInventoryResourcesAsync(CancellationToken cancellationToken = default, bool suppressUiSync = false) => Record("inventory", cancellationToken, new HeroInventoryResources());
         public HeroInventoryResources? TryGetCachedHeroInventory() => null;
         public Task<string> IncreaseAdventuresToHardAsync(CancellationToken cancellationToken = default)
         {
+            CancellationTokens.Add(cancellationToken);
             IncreaseAdventureDangerRequested = true;
             return Task.FromResult("hard");
         }
 
         public Task<string> ReduceAdventuresTimeAsync(CancellationToken cancellationToken = default)
         {
+            CancellationTokens.Add(cancellationToken);
             ReduceAdventureTimeRequested = true;
             return Task.FromResult("reduced");
+        }
+
+        private Task<T> Record<T>(string call, CancellationToken cancellationToken, T result)
+        {
+            Calls.Add(call);
+            CancellationTokens.Add(cancellationToken);
+            return Task.FromResult(result);
         }
     }
 }

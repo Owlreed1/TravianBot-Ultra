@@ -6,7 +6,7 @@ using TbotUltra.Worker.Domain;
 namespace TbotUltra.Worker.Services.Automation;
 
 /// <summary>Owns the post-login snapshot and stable-account-signal workflow.</summary>
-internal sealed class PostLoginSnapshotOperation(TravianClient client, AccountAnalysisStore accountAnalysisStore)
+internal sealed class PostLoginSnapshotOperation(IPostLoginSnapshotClient client, AccountAnalysisStore accountAnalysisStore)
 {
     public async Task<PostLoginSnapshot> LoadAsync(
         BotOptions options,

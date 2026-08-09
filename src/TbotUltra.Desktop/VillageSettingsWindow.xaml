@@ -34,6 +34,15 @@
                   CanUserResizeRows="False"
                   HeadersVisibility="Column"
                   SelectionMode="Single">
+            <DataGrid.Resources>
+                <Style x:Key="CheckAllButtonStyle" TargetType="Button">
+                    <Setter Property="Height" Value="20" />
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="MinWidth" Value="0" />
+                    <Setter Property="FontSize" Value="8" />
+                    <Setter Property="Padding" Value="3,0" />
+                </Style>
+            </DataGrid.Resources>
             <DataGrid.Columns>
                 <DataGridTemplateColumn Width="Auto">
                     <DataGridTemplateColumn.Header>
@@ -58,8 +67,7 @@
                                           Margin="2,0" />
                                 <Button x:Name="CheckAll"
                                         Content="Check all"
-                                        FontSize="9"
-                                        Padding="3,1"
+                                        Style="{DynamicResource CheckAllButtonStyle}"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center"
                                         Visibility="{Binding CheckAllVisibility}"
@@ -118,8 +126,7 @@
                                           Margin="2,0" />
                                 <Button x:Name="CheckAll"
                                         Content="Check all"
-                                        FontSize="9"
-                                        Padding="3,1"
+                                        Style="{DynamicResource CheckAllButtonStyle}"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center"
                                         Visibility="{Binding CheckAllVisibility}"

@@ -6,7 +6,7 @@ using TbotUltra.Worker.Domain;
 namespace TbotUltra.Worker.Services.Automation;
 
 /// <summary>Owns the Gold Club read and stable account-analysis update after login.</summary>
-internal sealed class GoldClubStatusOperation(TravianClient client, AccountAnalysisStore accountAnalysisStore)
+internal sealed class GoldClubStatusOperation(IGoldClubStatusClient client, AccountAnalysisStore accountAnalysisStore)
 {
     public async Task<bool> ReadAndPersistAsync(
         AccountOptions account,

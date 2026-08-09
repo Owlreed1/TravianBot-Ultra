@@ -3,22 +3,22 @@ using TbotUltra.Worker.Domain;
 namespace TbotUltra.Desktop.Services;
 
 /// <summary>Owns Queue panel reads and user-driven persisted queue transitions.</summary>
-public sealed class QueuePanelService(IDesktopBotService botService)
+public sealed class QueuePanelService(IQueuePanelClient client)
 {
-    public IReadOnlyList<QueueItem> GetItems() => botService.GetQueueItemsForDisplay();
+    public IReadOnlyList<QueueItem> GetItems() => client.GetItems();
 
-    public bool Remove(Guid id) => botService.RemoveQueueItem(id);
+    public bool Remove(Guid id) => client.Remove(id);
 
-    public bool MoveUp(Guid id) => botService.MoveQueueItemUp(id);
+    public bool MoveUp(Guid id) => client.MoveUp(id);
 
-    public bool MoveDown(Guid id) => botService.MoveQueueItemDown(id);
+    public bool MoveDown(Guid id) => client.MoveDown(id);
 
-    public bool Pause(Guid id) => botService.PauseQueueItem(id);
+    public bool Pause(Guid id) => client.Pause(id);
 
-    public bool Resume(Guid id) => botService.ResumeQueueItem(id);
+    public bool Resume(Guid id) => client.Resume(id);
 
-    public bool Retry(Guid id) => botService.RetryQueueItem(id);
+    public bool Retry(Guid id) => client.Retry(id);
 
     public QueueItem Enqueue(string taskName, Dictionary<string, string> payload, int priority, int maxRetries)
-        => botService.Enqueue(taskName, payload, priority, maxRetries);
+        => client.Enqueue(taskName, payload, priority, maxRetries);
 }

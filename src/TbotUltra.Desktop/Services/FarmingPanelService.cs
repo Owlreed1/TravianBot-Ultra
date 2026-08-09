@@ -5,36 +5,36 @@ using TbotUltra.Worker.Domain;
 namespace TbotUltra.Desktop.Services;
 
 /// <summary>Owns account-scoped Farming panel settings persistence.</summary>
-public sealed class FarmingPanelService(IDesktopBotService botService, BotConfigStore configStore)
+public sealed class FarmingPanelService(IFarmingPanelClient client, BotConfigStore configStore)
 {
     public Task<bool> ReadAndPersistGoldClubStatusAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken)
-        => botService.ReadAndPersistGoldClubStatusAsync(options, log, cancellationToken);
+        => client.ReadAndPersistGoldClubStatusAsync(options, log, cancellationToken);
 
     public Task<IReadOnlyList<FarmListOverview>> ReadOverviewAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken)
-        => botService.ReadFarmListsOverviewAsync(options, log, cancellationToken);
+        => client.ReadOverviewAsync(options, log, cancellationToken);
 
     public Task<FarmAddBatchResult> AddFarmsAsync(
         BotOptions options, string farmListName, string troopType, int troopCount, int requestedCount,
         IReadOnlyList<FarmCoordinate> coordinates, bool useDefaultTroops, Action<string> log,
         IProgress<FarmAddProgress>? progress, CancellationToken cancellationToken)
-        => botService.AddFarmsFromCoordinatesAsync(options, farmListName, troopType, troopCount, requestedCount,
+        => client.AddFarmsAsync(options, farmListName, troopType, troopCount, requestedCount,
             coordinates, useDefaultTroops, log, progress, cancellationToken);
 
     public Task<FarmListCreateBatchResult> CreateListsAsync(
         BotOptions options, FarmListCreateRequest request, Action<string> log,
         IProgress<FarmListCreateProgress>? progress, CancellationToken cancellationToken)
-        => botService.CreateFarmListsAsync(options, request, log, progress, cancellationToken);
+        => client.CreateListsAsync(options, request, log, progress, cancellationToken);
 
     public Task<int?> SendOneAsync(BotOptions options, string farmListName, Action<string> log, CancellationToken cancellationToken)
-        => botService.SendFarmListNowAsync(options, farmListName, log, cancellationToken);
+        => client.SendOneAsync(options, farmListName, log, cancellationToken);
 
     public Task<int> SendSelectedAsync(
         BotOptions options, IReadOnlyCollection<string> names, IReadOnlyCollection<string> ids,
         Action<string> log, CancellationToken cancellationToken)
-        => botService.SendSelectedFarmListsNowAsync(options, names, ids, log, cancellationToken);
+        => client.SendSelectedAsync(options, names, ids, log, cancellationToken);
 
     public Task<int> SendAllAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken)
-        => botService.SendAllFarmListsViaStartAllButtonAsync(options, log, cancellationToken);
+        => client.SendAllAsync(options, log, cancellationToken);
 
     public FarmingSettingsSaveResult SaveSettings(FarmingPanelSettings settings)
     {

@@ -475,8 +475,7 @@ public partial class VillageSettingsWindow : Window
     {
         var button = new FrameworkElementFactory(typeof(Button)) { Name = name };
         button.SetValue(ContentControl.ContentProperty, "Check all");
-        button.SetValue(Control.FontSizeProperty, 9d);
-        button.SetValue(Control.PaddingProperty, new Thickness(3, 1, 3, 1));
+        button.SetResourceReference(FrameworkElement.StyleProperty, "CheckAllButtonStyle");
         button.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
         button.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
         button.SetBinding(UIElement.VisibilityProperty, new System.Windows.Data.Binding(nameof(VillageSettingsRow.CheckAllVisibility)));

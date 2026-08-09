@@ -41,6 +41,7 @@ public sealed partial class BotTaskRunner
         bool keepBrowserOpenAfterLogin = false)
     {
         _ = keepBrowserOpenAfterLogin;
+        _browserSessionAdmission.Open();
         await ExecuteWithClientAsync(
             options,
             log,
@@ -124,6 +125,7 @@ public sealed partial class BotTaskRunner
         bool keepBrowserOpenAfterLogin = false)
     {
         _ = keepBrowserOpenAfterLogin;
+        _browserSessionAdmission.Open();
         PostLoginSnapshot? snapshot = null;
         await ExecuteWithClientAsync(
             options,

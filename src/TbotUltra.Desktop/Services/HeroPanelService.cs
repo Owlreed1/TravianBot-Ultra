@@ -6,7 +6,7 @@ using TbotUltra.Worker.Domain;
 namespace TbotUltra.Desktop.Services;
 
 /// <summary>Owns Hero-panel persistence, queue insertion, and Worker calls behind the Desktop facade.</summary>
-public sealed class HeroPanelService(IDesktopBotService botService, BotConfigStore configStore)
+public sealed class HeroPanelService(IHeroPanelClient client, BotConfigStore configStore)
 {
     public void PersistPriority(HeroViewModel viewModel)
     {
@@ -54,23 +54,23 @@ public sealed class HeroPanelService(IDesktopBotService botService, BotConfigSto
         BotOptions options,
         Action<string> log,
         CancellationToken cancellationToken)
-        => botService.ReadHeroAttributesAsync(options, log, cancellationToken);
+        => client.ReadAttributesAsync(options, log, cancellationToken);
 
     public Task<int?> ReadAdventureCountAsync(
         BotOptions options,
         Action<string> log,
         CancellationToken cancellationToken)
-        => botService.RefreshAdventureCountAsync(options, log, cancellationToken);
+        => client.ReadAdventureCountAsync(options, log, cancellationToken);
 
     public Task<int?> ReadHpAsync(
         BotOptions options,
         Action<string> log,
         CancellationToken cancellationToken)
-        => botService.ReadHeroHpFromCurrentPageAsync(options, log, cancellationToken);
+        => client.ReadHpAsync(options, log, cancellationToken);
 
     public Task<HeroInventoryResources> ReadInventoryAsync(
         BotOptions options,
         Action<string> log,
         CancellationToken cancellationToken)
-        => botService.RefreshHeroInventoryAsync(options, log, cancellationToken);
+        => client.ReadInventoryAsync(options, log, cancellationToken);
 }

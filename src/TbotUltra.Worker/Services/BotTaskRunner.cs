@@ -76,6 +76,7 @@ public sealed partial class BotTaskRunner
     private readonly SemaphoreSlim _sessionGate = new(1, 1);
     private readonly PriorityBrowserWorkCoordinator _priorityBrowserWork = new();
     private readonly BrowserSessionGeneration _sessionGeneration = new();
+    private readonly BrowserSessionAdmission _browserSessionAdmission = new();
     private BrowserSession? _sharedVisibleSession;
     private IPage? _sharedVisiblePage;
     private IPage? _travcoPage;
@@ -311,6 +312,7 @@ public sealed partial class BotTaskRunner
 
     public async Task ShutdownAsync(Action<string>? log = null)
     {
+        _browserSessionAdmission.Close();
         var hadActiveBrowserWork = _sharedVisibleSession is not null
             || _sharedVisiblePage is not null
             || _travcoPage is not null
@@ -444,6 +446,7 @@ public sealed partial class BotTaskRunner
         bool interactive,
         CancellationToken cancellationToken)
     {
+        _browserSessionAdmission.ThrowIfClosed();
         var leaseGeneration = _sessionGeneration.Capture();
         var desiredBaseUrl = options.BaseUrl.TrimEnd('/');
         var desiredProxyFingerprint = account.ProxyEnabled ? $"on|{account.ProxyServer.Trim()}" : "off";
@@ -507,6 +510,7 @@ public sealed partial class BotTaskRunner
 
         if (mustReplaceSession)
         {
+            _browserSessionAdmission.ThrowIfClosed();
             _travcoPage = null;
             if (_sharedVisibleSession is not null)
             {
