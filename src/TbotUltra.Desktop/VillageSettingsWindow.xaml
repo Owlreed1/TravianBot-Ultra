@@ -37,13 +37,22 @@
             <DataGrid.Columns>
                 <DataGridTemplateColumn Width="Auto">
                     <DataGridTemplateColumn.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Auto" FontSize="11" VerticalAlignment="Center"
-                                       ToolTipService.InitialShowDelay="100"
-                                       ToolTip="Turns the village on/off for the bot. Off = the village is skipped entirely." />
-                            <ContentControl Style="{DynamicResource InfoTooltipIconStyle}" Margin="4,0,0,0"
-                                            ToolTipService.InitialShowDelay="100"
-                                            ToolTip="Turns the village on/off for the bot. Off = the village is skipped entirely." />
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Auto" FontSize="11" VerticalAlignment="Center"
+                                           ToolTipService.InitialShowDelay="100"
+                                           ToolTip="Turns the village on/off for the bot. Off = the village is skipped entirely." />
+                                <ContentControl Style="{DynamicResource InfoTooltipIconStyle}" Margin="4,0,0,0"
+                                                ToolTipService.InitialShowDelay="100"
+                                                ToolTip="Turns the village on/off for the bot. Off = the village is skipped entirely." />
+                            </StackPanel>
+                            <Button Content="Check all"
+                                    FontSize="9"
+                                    Padding="3,1"
+                                    Margin="0,3,0,1"
+                                    HorizontalAlignment="Center"
+                                    ToolTip="Checks every village in this column. If all are checked, clears them."
+                                    Click="CheckAllAutomationButton_Click" />
                         </StackPanel>
                     </DataGridTemplateColumn.Header>
                     <DataGridTemplateColumn.CellTemplate>
@@ -68,7 +77,10 @@
                         </Style>
                     </DataGridTextColumn.ElementStyle>
                     <DataGridTextColumn.Header>
-                        <TextBlock Text="Village" FontSize="11" VerticalAlignment="Center" />
+                        <StackPanel>
+                            <TextBlock Text="Village" FontSize="11" VerticalAlignment="Center" />
+                            <Border Height="23" />
+                        </StackPanel>
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
                 <!-- Hidden by default: only special servers allow a different tribe per village, and the
@@ -79,19 +91,34 @@
                                     IsReadOnly="True"
                                     Visibility="Collapsed">
                     <DataGridTextColumn.Header>
-                        <TextBlock Text="Tribe" FontSize="11" VerticalAlignment="Center" />
+                        <StackPanel>
+                            <TextBlock Text="Tribe" FontSize="11" VerticalAlignment="Center" />
+                            <Border Height="23" />
+                        </StackPanel>
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
                 <DataGridTextColumn Binding="{Binding PopText}" Width="Auto" IsReadOnly="True">
                     <DataGridTextColumn.Header>
-                        <TextBlock Text="Pop" FontSize="11" VerticalAlignment="Center" />
+                        <StackPanel>
+                            <TextBlock Text="Pop" FontSize="11" VerticalAlignment="Center" />
+                            <Border Height="23" />
+                        </StackPanel>
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
                 <DataGridTemplateColumn x:Name="NpcTradeColumn" Width="Auto">
                     <DataGridTemplateColumn.Header>
-                        <TextBlock Text="NPC" FontSize="11" VerticalAlignment="Center"
-                                   ToolTipService.InitialShowDelay="100"
-                                   ToolTip="Selects which villages NPC trade may run in. The NPC trade master toggle in Auto settings must also be on for it to run." />
+                        <StackPanel>
+                            <TextBlock Text="NPC" FontSize="11" VerticalAlignment="Center"
+                                       ToolTipService.InitialShowDelay="100"
+                                       ToolTip="Selects which villages NPC trade may run in. The NPC trade master toggle in Auto settings must also be on for it to run." />
+                            <Button Content="Check all"
+                                    FontSize="9"
+                                    Padding="3,1"
+                                    Margin="0,3,0,1"
+                                    HorizontalAlignment="Center"
+                                    ToolTip="Checks every village in this column. If all are checked, clears them."
+                                    Click="CheckAllNpcTradeButton_Click" />
+                        </StackPanel>
                     </DataGridTemplateColumn.Header>
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>

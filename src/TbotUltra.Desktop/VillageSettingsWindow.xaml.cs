@@ -145,6 +145,7 @@ public partial class VillageSettingsWindow : Window
         var template = rows[0].GroupToggles;
         for (var i = 0; i < template.Count; i++)
         {
+            var groupIndex = i;
             var toggle = template[i];
             var tooltip = string.IsNullOrWhiteSpace(toggle.Description)
                 ? $"Uncheck to stop \"{toggle.Title}\" running in this village."
@@ -157,7 +158,7 @@ public partial class VillageSettingsWindow : Window
 
             VillageSettingsDataGrid.Columns.Add(new DataGridTemplateColumn
             {
-                Header = BuildColumnHeader(headerTitle, tooltip),
+                Header = BuildToggleColumnHeader(headerTitle, tooltip, (_, _) => ToggleAllGroup(groupIndex)),
                 Width = DataGridLength.Auto,
                 CellTemplate = BuildGroupCellTemplate(toggle.GroupKey, $"GroupToggles[{i}].IsEnabled"),
             });
@@ -166,9 +167,12 @@ public partial class VillageSettingsWindow : Window
             {
                 VillageSettingsDataGrid.Columns.Add(new DataGridTemplateColumn
                 {
-                    Header = BuildColumnHeader(
+                    Header = BuildToggleColumnHeader(
                         "25% construct.",
-                        "Construct 25% faster. Enables Official Travian construct-faster bonus videos for this village."),
+                        "Construct 25% faster. Enables Official Travian construct-faster bonus videos for this village.",
+                        (_, _) => ToggleAllRows(
+                            row => row.ConstructFasterEnabled,
+                            (row, isEnabled) => row.ConstructFasterEnabled = isEnabled)),
                     Width = DataGridLength.Auto,
                     CellTemplate = BuildToggleWithGearCellTemplate(
                         nameof(VillageSettingsRow.ConstructFasterEnabled),
@@ -182,9 +186,12 @@ public partial class VillageSettingsWindow : Window
             {
                 VillageSettingsDataGrid.Columns.Add(new DataGridTemplateColumn
                 {
-                    Header = BuildColumnHeader(
+                    Header = BuildToggleColumnHeader(
                         "Hero res.",
-                        "Selects which villages may use hero inventory resources."),
+                        "Selects which villages may use hero inventory resources.",
+                        (_, _) => ToggleAllRows(
+                            row => row.HeroResourcesEnabled,
+                            (row, isEnabled) => row.HeroResourcesEnabled = isEnabled)),
                     Width = DataGridLength.Auto,
                     CellTemplate = BuildToggleWithGearCellTemplate(
                         nameof(VillageSettingsRow.HeroResourcesEnabled),
@@ -275,19 +282,79 @@ public partial class VillageSettingsWindow : Window
         };
     }
 
-    // Builds a compact column header: small title text with the explanation as tooltip directly on the
-    // text (no separate "i" icon — with 10+ columns the icons alone cost ~200px of width).
-    private static FrameworkElement BuildColumnHeader(string title, string tooltip)
+    // The second header line controls the whole toggle column. This keeps mass edits visible without
+    // adding a separate control row whose widths could drift away from the DataGrid columns.
+    private FrameworkElement BuildToggleColumnHeader(string title, string tooltip, RoutedEventHandler checkAllClick)
     {
-        var header = new TextBlock
+        var header = new StackPanel();
+        var titleText = new TextBlock
         {
             Text = title,
             FontSize = 11,
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = tooltip,
         };
-        ToolTipService.SetInitialShowDelay(header, 100);
+        ToolTipService.SetInitialShowDelay(titleText, 100);
+        header.Children.Add(titleText);
+
+        var checkAll = new Button
+        {
+            Content = "Check all",
+            FontSize = 9,
+            Padding = new Thickness(3, 1, 3, 1),
+            Margin = new Thickness(0, 3, 0, 1),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            ToolTip = "Checks every available village in this column. If all are checked, clears them.",
+        };
+        checkAll.Click += checkAllClick;
+        header.Children.Add(checkAll);
         return header;
+    }
+
+    private void CheckAllAutomationButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleAllRows(
+            row => row.IsEnabledForAutomation,
+            (row, isEnabled) => row.IsEnabledForAutomation = isEnabled);
+    }
+
+    private void CheckAllNpcTradeButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleAllRows(
+            row => row.NpcTrade,
+            (row, isEnabled) => row.NpcTrade = isEnabled);
+    }
+
+    private void ToggleAllGroup(int groupIndex)
+    {
+        ToggleAllRows(
+            row => groupIndex < row.GroupToggles.Count && row.GroupToggles[groupIndex].IsEnabled,
+            (row, isEnabled) =>
+            {
+                if (groupIndex < row.GroupToggles.Count)
+                {
+                    row.GroupToggles[groupIndex].IsEnabled = isEnabled;
+                }
+            },
+            row => groupIndex < row.GroupToggles.Count && row.GroupToggles[groupIndex].CanToggle);
+    }
+
+    private void ToggleAllRows(
+        Func<VillageSettingsRow, bool> isChecked,
+        Action<VillageSettingsRow, bool> setChecked,
+        Func<VillageSettingsRow, bool>? canToggle = null)
+    {
+        var eligibleRows = (canToggle is null ? _rows : _rows.Where(canToggle)).ToList();
+        if (eligibleRows.Count == 0)
+        {
+            return;
+        }
+
+        var checkAll = eligibleRows.Any(row => !isChecked(row));
+        foreach (var row in eligibleRows)
+        {
+            setChecked(row, checkAll);
+        }
     }
 
     // Display-only short titles so every column fits without horizontal scrolling. The full name is

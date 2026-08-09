@@ -91,10 +91,17 @@
                                     <DataTrigger Binding="{Binding IsMaxLevel}" Value="True">
                                         <Setter Property="Foreground" Value="{DynamicResource CapitalBrush}" />
                                     </DataTrigger>
-                                    <DataTrigger Binding="{Binding IsDemolishing}" Value="True">
+                                    <!-- A completed demolition may still have a queued cleanup marker.
+                                         Only an occupied building is an active demolition; an empty
+                                         slot must retain the normal neutral empty-slot color. -->
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsDemolishing}" Value="True" />
+                                            <Condition Binding="{Binding IsOccupied}" Value="True" />
+                                        </MultiDataTrigger.Conditions>
                                         <Setter Property="Foreground" Value="{DynamicResource UnreadBrush}" />
                                         <Setter Property="FontWeight" Value="SemiBold" />
-                                    </DataTrigger>
+                                    </MultiDataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </TextBlock.Style>
