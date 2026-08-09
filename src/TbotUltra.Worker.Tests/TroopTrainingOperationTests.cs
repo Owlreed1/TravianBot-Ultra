@@ -1,5 +1,6 @@
 using TbotUltra.Core.Tasks;
 using TbotUltra.Core.Travian;
+using TbotUltra.Worker.Domain;
 using TbotUltra.Worker.Services;
 using TbotUltra.Worker.Services.Automation;
 using Xunit;
@@ -45,10 +46,28 @@ public sealed class TroopTrainingOperationTests
         Assert.Equal("troops queued", result);
     }
 
+    [Fact]
+    public async Task ReadQueuesAsync_RoutesToTrainingClient()
+    {
+        var client = new FakeTrainingClient();
+
+        var result = await new TroopTrainingOperation(client).ReadQueuesAsync(null, CancellationToken.None);
+
+        Assert.True(client.ReadQueuesRequested);
+        Assert.Empty(result);
+    }
+
     private sealed class FakeTrainingClient : ITrainingClient
     {
         public IReadOnlyList<SmithyTroopTarget> SmithyTargets { get; private set; } = [];
         public bool BuildRequested { get; private set; }
+        public bool ReadQueuesRequested { get; private set; }
+
+        public Task<IReadOnlyList<TroopTrainingQueueStatus>> ReadTroopTrainingQueuesAsync(IReadOnlyList<Building>? knownBuildings = null, CancellationToken cancellationToken = default)
+        {
+            ReadQueuesRequested = true;
+            return Task.FromResult<IReadOnlyList<TroopTrainingQueueStatus>>([]);
+        }
 
         public Task<string> UpgradeSelectedTroopsAtSmithyAsync(IReadOnlyList<SmithyTroopTarget> targets, CancellationToken cancellationToken = default)
         {

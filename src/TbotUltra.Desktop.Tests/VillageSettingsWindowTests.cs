@@ -41,23 +41,23 @@ public sealed class VillageSettingsWindowTests
             try
             {
                 var grid = Assert.IsType<DataGrid>(window.FindName("VillageSettingsDataGrid"));
+                var checkAllRow = Assert.IsType<VillageSettingsRow>(grid.Items[0]);
+                Assert.True(checkAllRow.IsCheckAllRow);
 
-                ClickCheckAll(grid.Columns[0]);
+                ClickCheckAll(grid.Columns[0], checkAllRow);
                 Assert.All(rows, row => Assert.False(row.IsEnabledForAutomation));
 
-                ClickCheckAll(grid.Columns[0]);
+                ClickCheckAll(grid.Columns[0], checkAllRow);
                 Assert.All(rows, row => Assert.True(row.IsEnabledForAutomation));
 
-                var farmingColumn = grid.Columns
+                var npcColumn = grid.Columns
                     .OfType<DataGridTemplateColumn>()
-                    .Single(column => HeaderTitle(column) == "Farming");
-                ClickCheckAll(farmingColumn);
-                Assert.True(rows[0].GroupToggles[0].IsEnabled);
-                Assert.True(rows[1].GroupToggles[0].IsEnabled);
+                    .Single(column => HeaderTitle(column) == "NPC");
+                ClickCheckAll(npcColumn, checkAllRow);
+                Assert.All(rows, row => Assert.True(row.NpcTrade));
 
-                ClickCheckAll(farmingColumn);
-                Assert.False(rows[0].GroupToggles[0].IsEnabled);
-                Assert.True(rows[1].GroupToggles[0].IsEnabled);
+                ClickCheckAll(npcColumn, checkAllRow);
+                Assert.All(rows, row => Assert.False(row.NpcTrade));
             }
             finally
             {
@@ -89,21 +89,17 @@ public sealed class VillageSettingsWindowTests
         ],
     };
 
-    private static void ClickCheckAll(DataGridColumn column)
+    private static void ClickCheckAll(DataGridColumn column, VillageSettingsRow checkAllRow)
     {
-        var header = Assert.IsType<StackPanel>(column.Header);
-        var button = Assert.Single(header.Children.OfType<Button>());
+        var templateColumn = Assert.IsType<DataGridTemplateColumn>(column);
+        var cell = Assert.IsType<Grid>(templateColumn.CellTemplate.LoadContent());
+        cell.DataContext = checkAllRow;
+        var button = Assert.Single(cell.Children.OfType<Button>());
         button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     }
 
     private static string HeaderTitle(DataGridColumn column)
     {
-        var header = Assert.IsType<StackPanel>(column.Header);
-        return header.Children
-            .OfType<TextBlock>()
-            .Concat(header.Children.OfType<StackPanel>().SelectMany(panel => panel.Children.OfType<TextBlock>()))
-            .FirstOrDefault()?
-            .Text
-            ?? string.Empty;
+        return (column.Header as TextBlock)?.Text ?? string.Empty;
     }
 }

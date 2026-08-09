@@ -26,7 +26,7 @@ public partial class MainWindow
             return;
         }
 
-        var existingItem = _botService.GetQueueItemsForDisplay().FirstOrDefault(item => item.Id == selected.Id);
+        var existingItem = _queuePanelService.GetItems().FirstOrDefault(item => item.Id == selected.Id);
 
         // Warn before removing an item that other queued buildings depend on: removing it would cascade-
         // remove those follow-on items too. Show exactly which ones so the user knows the full effect.
@@ -41,8 +41,8 @@ public partial class MainWindow
 
         // Snapshot the whole queue before removing so the Redo/Restore button can bring back the selected
         // item AND every dependent/higher-level item the cascades drop along with it.
-        var snapshotBefore = _botService.GetQueueItemsForDisplay().ToList();
-        if (_botService.RemoveQueueItem(selected.Id))
+        var snapshotBefore = _queuePanelService.GetItems().ToList();
+        if (_queuePanelService.Remove(selected.Id))
         {
             if (existingItem is not null)
             {
@@ -75,7 +75,7 @@ public partial class MainWindow
     // Records the items present before a Remove but gone after (selected + cascaded) as the restorable set.
     private void RememberRemovedQueueItemsForUndo(IReadOnlyList<QueueItem> snapshotBefore)
     {
-        var survivingIds = _botService.GetQueueItemsForDisplay().Select(item => item.Id).ToHashSet();
+        var survivingIds = _queuePanelService.GetItems().Select(item => item.Id).ToHashSet();
         _lastRemovedQueueItems = snapshotBefore
             .Where(item => !survivingIds.Contains(item.Id))
             .Select(item => new RemovedQueueSnapshot(
@@ -99,7 +99,7 @@ public partial class MainWindow
         {
             try
             {
-                _botService.Enqueue(
+                _queuePanelService.Enqueue(
                     snapshot.TaskName,
                     new Dictionary<string, string>(snapshot.Payload, StringComparer.OrdinalIgnoreCase),
                     snapshot.Priority,
@@ -132,7 +132,7 @@ public partial class MainWindow
             return;
         }
 
-        if (_botService.MoveQueueItemUp(selected.Id))
+        if (_queuePanelService.MoveUp(selected.Id))
         {
             RefreshQueueUi(selectId: selected.Id);
             return;
@@ -155,7 +155,7 @@ public partial class MainWindow
             return;
         }
 
-        if (_botService.MoveQueueItemDown(selected.Id))
+        if (_queuePanelService.MoveDown(selected.Id))
         {
             RefreshQueueUi(selectId: selected.Id);
             return;
@@ -166,7 +166,7 @@ public partial class MainWindow
 
     private bool WouldMoveBuildingUpgradeBeforeConstruct(Guid selectedId)
     {
-        var ordered = _botService.GetQueueItemsForDisplay().ToList();
+        var ordered = _queuePanelService.GetItems().ToList();
         var index = ordered.FindIndex(item => item.Id == selectedId);
         if (index <= 0)
         {
@@ -184,7 +184,7 @@ public partial class MainWindow
 
     private bool WouldMoveBuildingConstructAfterUpgrade(Guid selectedId)
     {
-        var ordered = _botService.GetQueueItemsForDisplay().ToList();
+        var ordered = _queuePanelService.GetItems().ToList();
         var index = ordered.FindIndex(item => item.Id == selectedId);
         if (index < 0 || index >= ordered.Count - 1)
         {
@@ -270,7 +270,7 @@ public partial class MainWindow
             var removed = 0;
             foreach (var item in villageItems)
             {
-                if (!_botService.RemoveQueueItem(item.Id))
+                if (!_queuePanelService.Remove(item.Id))
                 {
                     continue;
                 }
@@ -313,7 +313,7 @@ public partial class MainWindow
         var removed = 0;
         foreach (var item in activeItems)
         {
-            if (!_botService.RemoveQueueItem(item.Id))
+            if (!_queuePanelService.Remove(item.Id))
             {
                 continue;
             }
@@ -358,7 +358,7 @@ public partial class MainWindow
         var removed = 0;
         foreach (var row in historyRows)
         {
-            if (_botService.RemoveQueueItem(row.Id))
+            if (_queuePanelService.Remove(row.Id))
             {
                 removed += 1;
             }

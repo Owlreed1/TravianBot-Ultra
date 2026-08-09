@@ -154,7 +154,7 @@ public partial class MainWindow
             new("load_buildings_snapshot", refreshPayload, 0, 3),
         };
         finalRequests.AddRange(plannedRequests);
-        var created = _botService.EnqueueBatch(finalRequests);
+        var created = _buildingsPanelService.EnqueueBatch(finalRequests);
         ApplyStoragePreflightPendingState(storageUpgrades);
         foreach (var row in candidateRows)
         {
@@ -272,7 +272,7 @@ public partial class MainWindow
         IReadOnlyList<QueueItem> created;
         try
         {
-            created = _botService.EnqueueBatch(finalRequests);
+            created = _buildingsPanelService.EnqueueBatch(finalRequests);
         }
         catch (Exception ex)
         {
@@ -509,7 +509,7 @@ public partial class MainWindow
             return false;
         }
 
-        var created = _botService.EnqueueBatch(plannedRequests);
+        var created = _buildingsPanelService.EnqueueBatch(plannedRequests);
         _buildingsViewModel.RememberQueuedUpgrade(slotId, targetLevel, now);
         ApplyStoragePreflightPendingState(storageUpgrades);
         SetPendingBuildingUpgrade(slotId, targetLevel);
@@ -886,7 +886,7 @@ public partial class MainWindow
             return false;
         }
 
-        var created = _botService.EnqueueBatch(plannedRequests);
+        var created = _buildingsPanelService.EnqueueBatch(plannedRequests);
         _buildingsViewModel.RememberQueuedConstruct(slotId, selectedBuilding.Name, selectedBuilding.Gid, now);
         ApplyStoragePreflightPendingState(storageUpgrades);
         SetPendingBuildingConstruct(slotId, selectedBuilding.Name, selectedBuilding.Gid);
@@ -939,7 +939,7 @@ public partial class MainWindow
             return false;
         }
 
-        var created = _botService.EnqueueBatch(plannedRequests);
+        var created = _buildingsPanelService.EnqueueBatch(plannedRequests);
         ApplyStoragePreflightPendingState(storageUpgrades);
         SetPendingBuildingUpgrade(slotId, maxLevel);
         RequestQueueUiRefresh(selectId: created.LastOrDefault()?.Id);

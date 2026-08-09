@@ -42,6 +42,9 @@ public sealed class CombatOperationTests
             return Task.FromResult("Reinforcements sent.");
         }
 
+        public Task<string> SendResourcesBetweenOwnVillagesAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult("Resources sent.");
+
         public Task<string> TestSendReinforcementsBetweenOwnVillagesAsync(CancellationToken cancellationToken = default)
             => Task.FromResult("Reinforcements test passed.");
     }

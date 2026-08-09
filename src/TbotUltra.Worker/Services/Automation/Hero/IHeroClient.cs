@@ -25,6 +25,10 @@ public interface IHeroClient
 
     Task<int?> ReadHeroHpFromCurrentPageAsync(CancellationToken cancellationToken = default);
 
+    Task<bool> HasClaimableTasksOnCurrentPageAsync(CancellationToken cancellationToken = default);
+
+    Task<bool> HasClaimableDailyQuestsOnCurrentPageAsync(CancellationToken cancellationToken = default);
+
     Task<string> ManageHeroAsync(
         int minHpForAdventure,
         bool autoRevive,

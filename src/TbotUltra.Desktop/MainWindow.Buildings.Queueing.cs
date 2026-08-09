@@ -21,7 +21,7 @@ public partial class MainWindow
 
     private IReadOnlyList<QueueItem> GetActiveQueueItems()
     {
-        return _botService.GetQueueItemsForDisplay()
+        return _buildingsPanelService.GetQueueItems()
             .Where(item => IsActiveQueueStatus(item.Status))
             .ToList();
     }
@@ -91,7 +91,7 @@ public partial class MainWindow
             return;
         }
 
-        foreach (var dependent in _botService.GetQueueItemsForDisplay()
+        foreach (var dependent in _buildingsPanelService.GetQueueItems()
                      .Where(item => item.Id != source.Id && item.Status == QueueStatus.Pending)
                      .Where(item => item.Payload.TryGetValue(BotOptionPayloadKeys.BuildingTemplateStepId, out var candidate)
                          && string.Equals(candidate, stepId, StringComparison.OrdinalIgnoreCase)))
@@ -120,7 +120,7 @@ public partial class MainWindow
                 continue;
             }
 
-            if (_botService.UpdatePendingQueueItem(dependent.Id, payload, priority: null))
+            if (_buildingsPanelService.UpdatePending(dependent.Id, payload))
             {
                 dependent.Payload = payload;
                 AppendLog($"[building-template] rebound step {stepId} to runtime slot {effectiveSlotId}.");
@@ -135,12 +135,12 @@ public partial class MainWindow
     private void RebindPendingBuildingUpgrades(QueueItem source, int effectiveSlotId)
     {
         var sameVillage = BuildSameVillageQueueFilter(source);
-        var candidates = _botService.GetQueueItemsForDisplay()
+        var candidates = _buildingsPanelService.GetQueueItems()
             .Where(sameVillage)
             .ToList();
         foreach (var rebind in BuildingUpgradeSlotRebindPlanner.Plan(source, effectiveSlotId, candidates))
         {
-            if (_botService.UpdatePendingQueueItem(rebind.QueueItemId, rebind.Payload, priority: null))
+            if (_buildingsPanelService.UpdatePending(rebind.QueueItemId, rebind.Payload))
             {
                 AppendLog(
                     $"[building-rebind] moved pending building upgrade to confirmed slot {effectiveSlotId} " +
@@ -159,7 +159,7 @@ public partial class MainWindow
     {
         var villageName = status.ActiveVillage;
         var villageKey = ResolveStatusVillageKey(status);
-        var candidates = _botService.GetQueueItemsForDisplay()
+        var candidates = _buildingsPanelService.GetQueueItems()
             .Where(item => IsQueueItemForVillage(item, villageName, villageKey))
             .ToList();
         var plan = ConstructionQueueReconciliation.Plan(status, candidates);
@@ -168,7 +168,7 @@ public partial class MainWindow
             return;
         }
 
-        if (_botService.ApplyPendingQueueReconciliation(plan.Removals, plan.Updates))
+        if (_buildingsPanelService.ApplyPendingReconciliation(plan.Removals, plan.Updates))
         {
             foreach (var removal in plan.Removals)
             {
@@ -221,7 +221,7 @@ public partial class MainWindow
                     continue;
                 }
 
-                if (_botService.RemoveQueueItem(item.Id))
+                if (_buildingsPanelService.Remove(item.Id))
                 {
                     ForgetBuildingQueueCachesForItem(item);
                     AppendLog($"Removed queued {item.TaskName}: {reason}");
@@ -365,7 +365,7 @@ public partial class MainWindow
 
         foreach (var item in higherUpgrades)
         {
-            if (_botService.RemoveQueueItem(item.Id))
+            if (_buildingsPanelService.Remove(item.Id))
             {
                 ForgetBuildingQueueCachesForItem(item);
                 AppendLog($"Removed queued {item.TaskName}: slot {slotId} upgrade above the removed level {removedTargetLevel}.");
@@ -566,7 +566,7 @@ public partial class MainWindow
         out bool enqueued,
         out int removedCount)
     {
-        var relatedItems = _botService.GetQueueItemsForDisplay()
+        var relatedItems = _buildingsPanelService.GetQueueItems()
             .Where(item => IsActiveQueueStatus(item.Status))
             // Same-village only: otherwise constructing a slot here would both be blocked by, and even
             // remove (RemoveCoalescedQueueItems below), another village's queued work for the same slot.
@@ -605,7 +605,7 @@ public partial class MainWindow
         removedCount = RemoveCoalescedQueueItems(relatedItems, ForgetBuildingQueueCachesForItem);
 
         ApplySelectedVillageToPayload(payload);
-        var created = _botService.Enqueue("construct_building", payload, priority: 0, maxRetries: 3);
+        var created = _buildingsPanelService.Enqueue("construct_building", payload);
         enqueued = true;
         return created;
     }
@@ -629,7 +629,7 @@ public partial class MainWindow
 
         if (string.Equals(taskName, "upgrade_building_to_max", StringComparison.OrdinalIgnoreCase))
         {
-            var existingMax = _botService.GetQueueItemsForDisplay()
+            var existingMax = _buildingsPanelService.GetQueueItems()
                 .Where(item => string.Equals(item.TaskName, "upgrade_building_to_max", StringComparison.OrdinalIgnoreCase)
                     && IsActiveQueueStatus(item.Status)
                     && IsQueueItemForSelectedVillageOrGlobal(item))
@@ -648,7 +648,7 @@ public partial class MainWindow
         }
 
         ApplySelectedVillageToPayload(payload);
-        var created = _botService.Enqueue(taskName, payload, priority: 0, maxRetries: 3);
+        var created = _buildingsPanelService.Enqueue(taskName, payload);
         enqueued = true;
         return created;
     }

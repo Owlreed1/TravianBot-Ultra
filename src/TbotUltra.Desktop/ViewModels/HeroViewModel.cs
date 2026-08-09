@@ -12,8 +12,8 @@ using TbotUltra.Worker.Domain;
 namespace TbotUltra.Desktop.ViewModels;
 
 /// <summary>
-/// View model backing the Hero / Adventures panel. It owns the panel state
-/// that has moved out of MainWindow while service-bound work remains hosted there.
+/// View model backing the Hero / Adventures panel. It owns the panel state and
+/// command enablement; <see cref="HeroPanelService"/> owns its persistence and Worker calls.
 ///
 /// Owns:
 ///   - <see cref="AttributePriorityItems"/> — drag-orderable hero attributes.
@@ -22,11 +22,10 @@ namespace TbotUltra.Desktop.ViewModels;
 ///   - Pure helpers for parsing and serializing the priority list and for
 ///     applying a stats snapshot to the items collection.
 ///
-/// Hero state still on MainWindow (will migrate later):
+/// Host-only state remains on MainWindow:
 ///   - The drag-handler scratch state (anchor point, source item)
 ///   - The blocked-reason key + IsHeroGroupBlocked() helper
-///   - All async/service-bound work; command subscribers on MainWindow retain
-///     dialog, cancellation, lifecycle, and service access during migration.
+///   - Lifecycle, dialog, cancellation, and dashboard integration bridges.
 /// </summary>
 public sealed class HeroViewModel : BaseViewModel
 {

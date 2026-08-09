@@ -16,7 +16,7 @@ public partial class MainWindow
 
     // A short-lived, UI-thread-only snapshot of the queue. Every display reader (per-second countdowns,
     // execution-state indicator, automation-loop cards, next-task, village overview) used to call
-    // _botService.GetQueueItemsForDisplay() independently, and each call reads queue.json from disk under a
+    // QueuePanelService.GetItems() independently reads queue.json from disk under a
     // file lock. Firing many of those within the same UI tick caused disk churn and lock contention with the
     // worker loop that writes the file — the source of the stuttering/laggy timers. This caches the result
     // for ~120 ms so a tick's burst of display reads share one disk read. Background/loop threads and
@@ -27,13 +27,13 @@ public partial class MainWindow
     {
         if (!Dispatcher.CheckAccess())
         {
-            return _botService.GetQueueItemsForDisplay();
+            return _queuePanelService.GetItems();
         }
 
         var now = DateTimeOffset.UtcNow;
         if (_uiQueueSnapshot is null || (now - _uiQueueSnapshotAtUtc).TotalMilliseconds > 120)
         {
-            _uiQueueSnapshot = _botService.GetQueueItemsForDisplay();
+            _uiQueueSnapshot = _queuePanelService.GetItems();
             _uiQueueSnapshotAtUtc = now;
         }
 
@@ -45,7 +45,7 @@ public partial class MainWindow
         var removedCount = 0;
         foreach (var item in candidates.Where(item => item.Status is QueueStatus.Pending or QueueStatus.Paused))
         {
-            if (_botService.RemoveQueueItem(item.Id))
+            if (_queuePanelService.Remove(item.Id))
             {
                 onRemoved?.Invoke(item);
                 removedCount += 1;
@@ -59,7 +59,7 @@ public partial class MainWindow
     {
         var now = DateTimeOffset.UtcNow;
         var preservedCount = 0;
-        foreach (var item in _botService.GetQueueItemsForDisplay().ToList())
+        foreach (var item in _queuePanelService.GetItems().ToList())
         {
             if (IsDeferredHeroManageTimer(item, now))
             {
@@ -67,7 +67,7 @@ public partial class MainWindow
                 continue;
             }
 
-            _botService.RemoveQueueItem(item.Id);
+            _queuePanelService.Remove(item.Id);
         }
 
         RequestQueueUiRefresh();
@@ -77,11 +77,11 @@ public partial class MainWindow
     private int ClearHeroManageQueueItems()
     {
         var removedCount = 0;
-        foreach (var item in _botService.GetQueueItemsForDisplay()
+        foreach (var item in _queuePanelService.GetItems()
             .Where(IsHeroManageQueueItem)
             .ToList())
         {
-            if (_botService.RemoveQueueItem(item.Id))
+            if (_queuePanelService.Remove(item.Id))
             {
                 removedCount += 1;
             }
@@ -116,7 +116,7 @@ public partial class MainWindow
     {
         var targetName = NormalizeVillageName(villageName);
         var removedCount = 0;
-        foreach (var item in _botService.GetQueueItemsForDisplay()
+        foreach (var item in _queuePanelService.GetItems()
             .Where(item => string.Equals(item.TaskName, taskName, StringComparison.OrdinalIgnoreCase))
             .Where(item => item.Status is QueueStatus.Pending or QueueStatus.Paused)
             .ToList())
@@ -127,7 +127,7 @@ public partial class MainWindow
                 continue;
             }
 
-            if (_botService.RemoveQueueItem(item.Id))
+            if (_queuePanelService.Remove(item.Id))
             {
                 removedCount += 1;
             }

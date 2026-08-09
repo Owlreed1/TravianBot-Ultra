@@ -308,12 +308,12 @@
                                                                  Content="Send toggled lists"
                                                                  GroupName="FarmSendMode"
                                                                  Margin="0,0,16,0"
-                                                                 Checked="FarmingSettings_Changed" />
+                                                                 IsChecked="{Binding SendToggledLists, Mode=TwoWay}" />
                                                     <RadioButton x:Name="FarmSendAllAtOnceRadioButton"
                                                                  Content="Send all lists"
                                                                  GroupName="FarmSendMode"
                                                                  Margin="0,0,8,0"
-                                                                 Checked="FarmingSettings_Changed" />
+                                                                 IsChecked="{Binding SendAllLists, Mode=TwoWay}" />
                                                     <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                                     VerticalAlignment="Center"
                                                                     ToolTip="Send toggled lists: each round sends every farm list toggled on above, one at a time. Send all lists: sends every farm list on the account. Either way the lists go out one at a time (paced by 'Send farmlists'); 'Delay between farm sends' is the wait between whole rounds." />
@@ -329,7 +329,7 @@
                                                              Width="52"
                                                              Height="26"
                                                              VerticalContentAlignment="Center"
-                                                             LostFocus="FarmingSettings_Changed" />
+                                                             Text="{Binding DispatchDelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
                                                     <TextBlock Text="Max" VerticalAlignment="Center" Margin="8,0,4,0"
                                                                Foreground="{DynamicResource TextSubtleBrush}" />
                                                     <TextBox x:Name="FarmDispatchDelayMaxTextBox"
@@ -337,7 +337,7 @@
                                                              Height="26"
                                                              Margin="0,0,8,0"
                                                              VerticalContentAlignment="Center"
-                                                             LostFocus="FarmingSettings_Changed" />
+                                                             Text="{Binding DispatchDelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
                                                     <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                                     VerticalAlignment="Center"
                                                                     ToolTip="Delay between farm sends: a random wait between Min and Max minutes is picked for every send." />
@@ -346,8 +346,7 @@
                                                     <CheckBox x:Name="DeactivateFarmLossesCheckBox"
                                                               Content="Deactivate red/yellow attacks"
                                                               Margin="0,0,8,0"
-                                                              Checked="FarmingSettings_Changed"
-                                                              Unchecked="FarmingSettings_Changed" />
+                                                              IsChecked="{Binding DeactivateLosses, Mode=TwoWay}" />
                                                     <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                                     VerticalAlignment="Center"
                                                                     ToolTip="Before sending farmlists, disable targets whose last raid shows red or yellow losses." />
@@ -356,8 +355,8 @@
                                                     <CheckBox x:Name="MoveFarmLossesCheckBox"
                                                               Content="Move red/yellow farms to list"
                                                               Margin="0,0,6,0"
-                                                              Checked="MoveFarmLossesCheckBox_Checked"
-                                                              Unchecked="FarmingSettings_Changed" />
+                                                              IsEnabled="{Binding CanMoveLosses}"
+                                                              IsChecked="{Binding MoveLosses, Mode=TwoWay}" />
                                                     <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                                     Margin="0,0,8,0"
                                                                     VerticalAlignment="Center"
@@ -365,14 +364,15 @@
                                                     <ComboBox x:Name="FarmLossDestinationComboBox"
                                                               Width="260"
                                                               DisplayMemberPath="DisplayText"
-                                                              SelectionChanged="FarmingSettings_Changed" />
+                                                              IsEnabled="{Binding CanMoveLosses}"
+                                                              ItemsSource="{Binding LossDestinations}"
+                                                              SelectedItem="{Binding SelectedLossDestination, Mode=TwoWay}" />
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal">
                                                     <CheckBox x:Name="DeactivateFarmOasisLossesCheckBox"
                                                               Content="Deactivate oasis with losses"
                                                               Margin="0,0,8,0"
-                                                              Checked="FarmingSettings_Changed"
-                                                              Unchecked="FarmingSettings_Changed" />
+                                                              IsChecked="{Binding DeactivateOasisLosses, Mode=TwoWay}" />
                                                     <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                                     VerticalAlignment="Center"
                                                                     ToolTip="When loss deactivation is enabled, also disable oasis targets that show losses." />
@@ -382,7 +382,7 @@
                                                     Content="Inactive / oasis analysis"
                                                     MinWidth="170"
                                                     HorizontalAlignment="Left"
-                                                    Click="TravcoInactiveSearchButton_Click" />
+                                                    Command="{Binding TravcoInactiveSearchCommand}" />
                                         </StackPanel>
                                     </Border>
                                 </Grid>

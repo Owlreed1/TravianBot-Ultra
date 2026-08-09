@@ -14,11 +14,9 @@ namespace TbotUltra.Desktop;
 
 /// <summary>
 /// Hero / Adventures host-side logic. After 3b5 the Hero TabItem is rendered
-/// by <see cref="Views.HeroPanel"/>; this partial holds the methods that
-/// panel calls back into for service-bound work (refresh stats, refresh
-/// adventures, queue adventure) plus the
-/// host-only helpers (priority persist, blocked-state interplay) that need
-/// access to MainWindow's private state.
+/// by <see cref="Views.HeroPanel"/>; <see cref="HeroPanelService"/> owns the
+/// panel's persistence, payload creation, and Worker calls. This partial keeps
+/// host-only lifecycle, cancellation, dialog, and dashboard integration.
 ///
 /// Drag-and-drop scratch state and the drag handlers themselves live on
 /// <see cref="Views.HeroPanel"/>.
@@ -88,9 +86,7 @@ public partial class MainWindow
     {
         try
         {
-            var config = _botConfigStore.Load();
-            config[BotOptionPayloadKeys.HeroStatPriority] = _heroViewModel.BuildPriorityPayload();
-            _botConfigStore.Save(config);
+            _heroPanelService.PersistPriority(_heroViewModel);
         }
         catch (Exception ex)
         {
@@ -102,20 +98,7 @@ public partial class MainWindow
     {
         try
         {
-            var config = _botConfigStore.Load();
-            config[BotOptionPayloadKeys.HeroMinHpForAdventure] = _heroViewModel.MinHpForAdventure;
-            config[BotOptionPayloadKeys.HeroAutoRevive] = _heroViewModel.AutoRevive;
-            config[BotOptionPayloadKeys.HeroAutoAssignPoints] = _heroViewModel.AutoAssignPoints;
-            config[BotOptionPayloadKeys.HeroAutoUseOintments] = _heroViewModel.AutoUseOintments;
-            config[BotOptionPayloadKeys.HeroStatPriority] = _heroViewModel.BuildPriorityPayload();
-            config[BotOptionPayloadKeys.HeroAdventurePickOrder] = _heroViewModel.AdventurePickOrder;
-            config.Remove("hero_hide_mode_enabled");
-            config.Remove("hero_hide_mode");
-            config[BotOptionPayloadKeys.HeroContinuousAdventures] = _heroViewModel.ContinuousAdventures;
-            config[BotOptionPayloadKeys.IncreaseAdventuresToHard] = _heroViewModel.IncreaseAdventuresToHard;
-            config[BotOptionPayloadKeys.ReduceAdventureTime] = _heroViewModel.ReduceAdventureTime;
-            config[BotOptionPayloadKeys.HeroAdventureVideoChancePercent] = _heroViewModel.AdventureVideoChancePercent;
-            _botConfigStore.Save(config);
+            _heroPanelService.PersistSettings(_heroViewModel);
         }
         catch (Exception ex)
         {
@@ -223,7 +206,7 @@ public partial class MainWindow
     private async Task<HeroAttributeSnapshot> RefreshHeroStatsAsync(CancellationToken cancellationToken)
     {
         var options = ApplySelectedVillageToOptions(LoadBotOptions());
-        var snapshot = await _botService.ReadHeroAttributesAsync(options, AppendLog, cancellationToken);
+        var snapshot = await _heroPanelService.ReadAttributesAsync(options, AppendLog, cancellationToken);
         ApplyHeroSnapshotToUi(snapshot);
         return snapshot;
     }
@@ -242,26 +225,15 @@ public partial class MainWindow
             return;
         }
 
-        var payload = new HeroPayload(
-            MinHpForAdventure: minHp,
-            AutoRevive: _heroViewModel.AutoRevive,
-            AutoAssignPoints: _heroViewModel.AutoAssignPoints,
-            AutoUseOintments: _heroViewModel.AutoUseOintments,
-            StatPriority: _heroViewModel.BuildPriorityPayload(),
-            AdventurePickOrder: _heroViewModel.AdventurePickOrder).ToDictionary();
-
-        var continuous = _heroViewModel.ContinuousAdventures;
-        var copies = 1;
-        if (continuous && int.TryParse(_heroViewModel.AdventureCountText.Trim(), out var available) && available > 1)
-        {
-            copies = Math.Min(available, 20); // hard cap to avoid runaway queues if count is wrong
-        }
-
-        for (var i = 0; i < copies; i++)
+        var hasAvailableAdventures = int.TryParse(_heroViewModel.AdventureCountText.Trim(), out var available);
+        var payloads = _heroPanelService.CreateAdventurePayloads(_heroViewModel, hasAvailableAdventures ? available : 0);
+        foreach (var payload in payloads)
         {
             EnqueueQuickTask("hero_manage", "Hero adventure (with revive/points checks)", payload);
         }
-        BuildingsInfoTextBlock.Text = continuous && copies > 1
+
+        var copies = payloads.Count;
+        BuildingsInfoTextBlock.Text = _heroViewModel.ContinuousAdventures && copies > 1
             ? $"Queued {copies} hero adventures."
             : "Queued hero adventure.";
     }
@@ -284,7 +256,7 @@ public partial class MainWindow
         {
             await EnsureChromiumInstalledAsync();
             var options = ApplySelectedVillageToOptions(LoadBotOptions());
-            var count = await _botService.RefreshAdventureCountAsync(
+            var count = await _heroPanelService.ReadAdventureCountAsync(
                 options,
                 AppendLog,
                 _loopController.AcquireSessionScopeToken());
@@ -348,7 +320,7 @@ public partial class MainWindow
         BotOptions options,
         CancellationToken cancellationToken)
     {
-        var hpPercent = await _botService.ReadHeroHpFromCurrentPageAsync(
+        var hpPercent = await _heroPanelService.ReadHpAsync(
             options,
             AppendLog,
             cancellationToken);
@@ -445,7 +417,7 @@ public partial class MainWindow
         {
             await EnsureChromiumInstalledAsync();
             var options = ApplySelectedVillageToOptions(LoadBotOptions());
-            var resources = await _botService.RefreshHeroInventoryAsync(
+            var resources = await _heroPanelService.ReadInventoryAsync(
                 options,
                 AppendLog,
                 _loopController.AcquireSessionScopeToken());

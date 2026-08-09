@@ -1,5 +1,3 @@
-using System.Windows;
-
 namespace TbotUltra.Desktop;
 
 public partial class MainWindow
@@ -20,7 +18,4 @@ public partial class MainWindow
     private System.Windows.Controls.ComboBox FarmLossDestinationComboBox => FarmingPanelControl.LossDestinationOption;
     private System.Windows.Controls.Button TravcoInactiveSearchButton => FarmingPanelControl.TravcoSearchButton;
 
-    internal void OnFarmingSettingsChanged(object sender, RoutedEventArgs e) => FarmingSettings_Changed(sender, e);
-    internal void OnMoveFarmLossesChecked(object sender, RoutedEventArgs e) => MoveFarmLossesCheckBox_Checked(sender, e);
-    internal void OnTravcoInactiveSearchClicked(object sender, RoutedEventArgs e) => TravcoInactiveSearchButton_Click(sender, e);
 }

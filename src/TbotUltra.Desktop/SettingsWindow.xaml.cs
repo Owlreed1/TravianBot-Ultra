@@ -1,8 +1,8 @@
 using System.Globalization;
-using System.Collections.ObjectModel;
 using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Services;
@@ -35,11 +35,8 @@ public partial class SettingsWindow : Window
     private readonly bool _sessionSleeping;
     // Server-local hour the bot auto-detected for the active account (null when not yet detected). Display-only.
     private readonly int? _detectedDailyResetHour;
-    private readonly Func<JsonObject, string?>? _validateBeforeSave;
     private readonly Action? _resetDailyGoldSpending;
     private readonly Action? _resetDailySilverSpending;
-    private int _dailyGoldSpent;
-    private int _dailySilverSpent;
     private bool _suppressDetailedBrowserLoggingConfirmation;
     private string _initialTownHallFingerprint = string.Empty;
     private readonly Func<DateTimeOffset>? _villageStatusSweepNextScanProvider;
@@ -50,31 +47,6 @@ public partial class SettingsWindow : Window
 
     public SettingsDialogViewModel SettingsVm { get; }
 
-    public ObservableCollection<TownHallOverviewRow> TownHallRows { get; } = [];
-    public TownHallQueueSettings TownHallQueue { get; } = new(
-        TownHallCelebrationDefaults.DefaultRestartDelayEnabled,
-        TownHallCelebrationDefaults.DefaultCount,
-        TownHallCelebrationDefaults.DefaultRestartDelayMinMinutes,
-        TownHallCelebrationDefaults.DefaultRestartDelayMaxMinutes);
-    public RestartDelaySettings BreweryRestartDelay { get; } = new(
-        BreweryCelebrationDefaults.DefaultRestartDelayEnabled,
-        BreweryCelebrationDefaults.DefaultRestartDelayMinMinutes,
-        BreweryCelebrationDefaults.DefaultRestartDelayMaxMinutes,
-        BreweryCelebrationDefaults.DefaultRestartDelayMinMinutes,
-        BreweryCelebrationDefaults.DefaultRestartDelayMaxMinutes);
-    public RestartDelaySettings HeroAdventureRestartDelay { get; } = new(
-        HeroAdventureRestartDelayDefaults.Enabled,
-        HeroAdventureRestartDelayDefaults.MinMinutes,
-        HeroAdventureRestartDelayDefaults.MaxMinutes,
-        HeroAdventureRestartDelayDefaults.MinMinutes,
-        HeroAdventureRestartDelayDefaults.MaxMinutes);
-    public IReadOnlyList<int> HeroHpRegenOptions { get; } = [20, 30, 40, 50, 60, 70, 80, 90, 100];
-    public RestartDelaySettings SmithyUpgradeRestartDelay { get; } = new(
-        SmithyUpgradeRestartDelayDefaults.Enabled,
-        SmithyUpgradeRestartDelayDefaults.MinMinutes,
-        SmithyUpgradeRestartDelayDefaults.MaxMinutes,
-        SmithyUpgradeRestartDelayDefaults.MinMinutes,
-        SmithyUpgradeRestartDelayDefaults.MaxMinutes);
     public IReadOnlyList<TownHallOverviewResult> TownHallResults { get; private set; } = [];
     public bool TownHallSettingsChanged { get; private set; }
 
@@ -103,11 +75,8 @@ public partial class SettingsWindow : Window
         _settingsPersistence = new SettingsPersistenceService(_store, validateBeforeSave);
         _sessionSleeping = sessionSleeping;
         _detectedDailyResetHour = detectedDailyResetHour;
-        _validateBeforeSave = validateBeforeSave;
         _resetDailyGoldSpending = resetDailyGoldSpending;
         _resetDailySilverSpending = resetDailySilverSpending;
-        _dailyGoldSpent = Math.Max(0, dailyGoldSpent);
-        _dailySilverSpent = Math.Max(0, dailySilverSpent);
         _villageStatusSweepNextScanProvider = villageStatusSweepNextScanProvider;
         _continuousKeepAliveNextReloadProvider = continuousKeepAliveNextReloadProvider;
         _runVillageStatusSweepNow = runVillageStatusSweepNow;
@@ -117,18 +86,25 @@ public partial class SettingsWindow : Window
             villageStatusSweepEnabled: _runVillageStatusSweepNow is not null,
             dailyGoldSpendingResetEnabled: _resetDailyGoldSpending is not null,
             dailySilverSpendingResetEnabled: _resetDailySilverSpending is not null);
+        SettingsVm.DailyGoldSpent = dailyGoldSpent;
+        SettingsVm.DailySilverSpent = dailySilverSpent;
         SettingsVm.SaveRequested += SaveSettings;
         SettingsVm.CancelRequested += CancelSettings;
         SettingsVm.ResetSettingsRequested += ResetSettings;
+        SettingsVm.ResetPacingRequested += ApplyPacingDefaultsToUi;
         SettingsVm.SleepNowRequested += RequestSleepNow;
         SettingsVm.VillageStatusSweepNowRequested += () => _ = RunVillageStatusSweepNowAsync();
         SettingsVm.ResetDailyGoldSpendingRequested += ResetDailyGoldLimit;
         SettingsVm.ResetDailySilverSpendingRequested += ResetDailySilverLimit;
         foreach (var row in townHallRows ?? [])
         {
-            TownHallRows.Add(row);
+            SettingsVm.Celebrations.TownHallRows.Add(row);
         }
         DataContext = this;
+        AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(SettingsInputChanged));
+        AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(SettingsInputChanged));
+        AddHandler(ToggleButton.CheckedEvent, new RoutedEventHandler(SettingsInputChanged));
+        AddHandler(ToggleButton.UncheckedEvent, new RoutedEventHandler(SettingsInputChanged));
         InitializeSessionPacingChoices();
         InitializeConstructionChoices();
         PopulateDailyServerResetHours();
@@ -136,7 +112,6 @@ public partial class SettingsWindow : Window
         UpdateNewAccountAnalysisStatus();
         SettingsCategoryTabControl.SelectedIndex = (int)initialCategory;
         _initialTownHallFingerprint = BuildTownHallFingerprint();
-        UpdateDailySpendingUsage();
         _villageStatusSweepTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _villageStatusSweepTimer.Tick += (_, _) =>
         {
@@ -190,7 +165,7 @@ public partial class SettingsWindow : Window
 
     private void UpdateContinuousKeepAliveNextReloadDisplay()
     {
-        if (ContinuousKeepAliveEnabledCheckBox.IsChecked != true)
+        if (!SettingsVm.Pacing.ContinuousKeepAliveEnabled)
         {
             ContinuousKeepAliveNextReloadTextBlock.Text = "Off";
             ApplyNextScheduleBadgeTheme(
@@ -240,100 +215,135 @@ public partial class SettingsWindow : Window
 
     private void LoadConfig()
     {
+        using var suppressChanges = SettingsVm.SuppressChangeTracking();
         _config = _settingsPersistence.Load();
-        DontNotifyNewVersionCheckBox.IsChecked = _config[BotOptionPayloadKeys.DontNotifyNewVersion]?.GetValue<bool>() ?? false;
-        QuickReloginCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginQuickReloginEnabled]?.GetValue<bool>() ?? true;
-        AutomaticallyCheckLanguageCheckBox.IsChecked = _config[BotOptionPayloadKeys.AutomaticallyCheckLanguage]?.GetValue<bool>() ?? true;
+        SettingsVm.DontNotifyNewVersion = _config[BotOptionPayloadKeys.DontNotifyNewVersion]?.GetValue<bool>() ?? false;
+        SettingsVm.QuickReloginEnabled = _config[BotOptionPayloadKeys.PostLoginQuickReloginEnabled]?.GetValue<bool>() ?? true;
+        SettingsVm.AutomaticallyCheckLanguage = _config[BotOptionPayloadKeys.AutomaticallyCheckLanguage]?.GetValue<bool>() ?? true;
         _suppressDetailedBrowserLoggingConfirmation = true;
         try
         {
-            DetailedBrowserLoggingCheckBox.IsChecked =
+            SettingsVm.DetailedBrowserLoggingEnabled =
                 _config[BotOptionPayloadKeys.DetailedBrowserLoggingEnabled]?.GetValue<bool>() ?? false;
         }
         finally
         {
             _suppressDetailedBrowserLoggingConfirmation = false;
         }
-        AllowSilverSpendingCheckBox.IsChecked = _config["allow_silver_spending"]?.GetValue<bool>() ?? false;
-        AllowGoldSpendingCheckBox.IsChecked = _config[BotOptionPayloadKeys.AllowGoldSpending]?.GetValue<bool>() ?? false;
-        GoldLimitTextBox.Text = Math.Max(
+        SettingsVm.AllowSilverSpending = _config["allow_silver_spending"]?.GetValue<bool>() ?? false;
+        SettingsVm.AllowGoldSpending = _config[BotOptionPayloadKeys.AllowGoldSpending]?.GetValue<bool>() ?? false;
+        SettingsVm.GoldLimitText = Math.Max(
             0,
             _config[BotOptionPayloadKeys.GoldLimit]?.GetValue<int>() ?? DefaultGoldLimit).ToString(CultureInfo.InvariantCulture);
-        DailyGoldSpendingLimitTextBox.Text = Math.Max(
+        SettingsVm.DailyGoldSpendingLimitText = Math.Max(
             0,
             _config[BotOptionPayloadKeys.DailyGoldSpendingLimit]?.GetValue<int>() ?? DefaultDailyGoldSpendingLimit).ToString(CultureInfo.InvariantCulture);
         LoadDailyServerResetToUi();
         LoadPacingConfigToUi();
-        StorageUpgradeLevelsAheadComboBox.SelectedItem = ConstructionDefaults.NormalizeStorageUpgradeLevelsAhead(
+        SettingsVm.Construction.StorageUpgradeLevelsAhead = ConstructionDefaults.NormalizeStorageUpgradeLevelsAhead(
             _config[BotOptionPayloadKeys.ConstructionStorageUpgradeLevelsAhead]?.GetValue<int>()
             ?? ConstructionDefaults.StorageUpgradeLevelsAhead);
         LoadConstructionHumanizeConfigToUi();
-        ShowFarmListLastSentTimerCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ShowFarmListLastSentTimer, FarmingDefaults.ShowLastSentTimer);
-        FarmListLastSentLimitEnabledCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.FarmListLastSentLimitEnabled, FarmingDefaults.LastSentLimitEnabled);
-        FarmListLastSentLimitHoursTextBox.Text = FarmingDefaults.NormalizeLastSentLimitHours(ReadInt(
+        SettingsVm.Farming.ShowFarmListLastSentTimer = ReadBool(BotOptionPayloadKeys.ShowFarmListLastSentTimer, FarmingDefaults.ShowLastSentTimer);
+        SettingsVm.Farming.FarmListLastSentLimitEnabled = ReadBool(BotOptionPayloadKeys.FarmListLastSentLimitEnabled, FarmingDefaults.LastSentLimitEnabled);
+        SettingsVm.Farming.FarmListLastSentLimitHours = FarmingDefaults.NormalizeLastSentLimitHours(ReadInt(
             BotOptionPayloadKeys.FarmListLastSentLimitHours,
             FarmingDefaults.DefaultLastSentLimitHours)).ToString(CultureInfo.InvariantCulture);
-        PostLoginAnalyzeFarmlistsCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeFarmlists]?.GetValue<bool>() ?? false;
-        PostLoginAnalyzeHeroCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeHero]?.GetValue<bool>() ?? false;
-        PostLoginReadTroopTrainingQueueCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginReadTroopTrainingQueue]?.GetValue<bool>() ?? false;
-        PostLoginAnalyzeBreweryCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeBrewery]?.GetValue<bool>() ?? false;
-        PostLoginAnalyzeHeroInventoryCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeHeroInventory]?.GetValue<bool>() ?? false;
-        PostLoginAnalyzeNewVillagesCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeNewVillages]?.GetValue<bool>() ?? true;
-        PostLoginAnalyzeNewAccountCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginAnalyzeNewAccount]?.GetValue<bool>() ?? true;
-        SilverLimitTextBox.Text = Math.Max(
+        SynchronizeFarmingControls();
+        SettingsVm.PostLogin.AnalyzeFarmlists = _config[BotOptionPayloadKeys.PostLoginAnalyzeFarmlists]?.GetValue<bool>() ?? false;
+        SettingsVm.PostLogin.AnalyzeHero = _config[BotOptionPayloadKeys.PostLoginAnalyzeHero]?.GetValue<bool>() ?? false;
+        SettingsVm.PostLogin.ReadTroopTrainingQueue = _config[BotOptionPayloadKeys.PostLoginReadTroopTrainingQueue]?.GetValue<bool>() ?? false;
+        SettingsVm.PostLogin.AnalyzeBrewery = _config[BotOptionPayloadKeys.PostLoginAnalyzeBrewery]?.GetValue<bool>() ?? false;
+        SettingsVm.PostLogin.AnalyzeHeroInventory = _config[BotOptionPayloadKeys.PostLoginAnalyzeHeroInventory]?.GetValue<bool>() ?? false;
+        SettingsVm.PostLogin.AnalyzeNewVillages = _config[BotOptionPayloadKeys.PostLoginAnalyzeNewVillages]?.GetValue<bool>() ?? true;
+        SettingsVm.PostLogin.AnalyzeNewAccount = _config[BotOptionPayloadKeys.PostLoginAnalyzeNewAccount]?.GetValue<bool>() ?? true;
+        SynchronizePostLoginControls();
+        SettingsVm.SilverLimitText = Math.Max(
             0,
             _config[BotOptionPayloadKeys.SilverLimit]?.GetValue<int>() ?? DefaultSilverLimit).ToString(CultureInfo.InvariantCulture);
-        DailySilverSpendingLimitTextBox.Text = Math.Max(
+        SettingsVm.DailySilverSpendingLimitText = Math.Max(
             0,
             _config[BotOptionPayloadKeys.DailySilverSpendingLimit]?.GetValue<int>() ?? DefaultDailySilverSpendingLimit).ToString(CultureInfo.InvariantCulture);
         if (TownHallCelebrationDefaults.NormalizeCount(
                 ReadInt(BotOptionPayloadKeys.TownHallCelebrationCount, TownHallCelebrationDefaults.DefaultCount))
             >= TownHallCelebrationDefaults.MaxCount)
         {
-            TownHallQueue.IsTwo = true;
+            SettingsVm.Celebrations.TownHallQueue.IsTwo = true;
         }
         else
         {
-            TownHallQueue.IsOne = true;
+            SettingsVm.Celebrations.TownHallQueue.IsOne = true;
         }
-        TownHallQueue.DelayMinMinutes = FormatDelay(ReadDouble(
+        SettingsVm.Celebrations.TownHallQueue.DelayMinMinutes = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.TownHallCelebrationRestartDelayMinMinutes,
             TownHallCelebrationDefaults.DefaultRestartDelayMinMinutes));
-        TownHallQueue.DelayMaxMinutes = FormatDelay(ReadDouble(
+        SettingsVm.Celebrations.TownHallQueue.DelayMaxMinutes = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.TownHallCelebrationRestartDelayMaxMinutes,
             TownHallCelebrationDefaults.DefaultRestartDelayMaxMinutes));
-        TownHallQueue.IsRestartDelayEnabled =
+        SettingsVm.Celebrations.TownHallQueue.IsRestartDelayEnabled =
             _config[BotOptionPayloadKeys.TownHallCelebrationRestartDelayEnabled]?.GetValue<bool>()
             ?? TownHallCelebrationDefaults.DefaultRestartDelayEnabled;
-        BreweryRestartDelay.IsEnabled =
+        SettingsVm.Celebrations.BreweryRestartDelay.IsEnabled =
             _config[BotOptionPayloadKeys.BreweryCelebrationRestartDelayEnabled]?.GetValue<bool>()
             ?? BreweryCelebrationDefaults.DefaultRestartDelayEnabled;
-        BreweryRestartDelay.DelayMinMinutes = FormatDelay(ReadDouble(
+        SettingsVm.Celebrations.BreweryRestartDelay.DelayMinMinutes = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.BreweryCelebrationRestartDelayMinMinutes,
             BreweryCelebrationDefaults.DefaultRestartDelayMinMinutes));
-        BreweryRestartDelay.DelayMaxMinutes = FormatDelay(ReadDouble(
+        SettingsVm.Celebrations.BreweryRestartDelay.DelayMaxMinutes = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.BreweryCelebrationRestartDelayMaxMinutes,
             BreweryCelebrationDefaults.DefaultRestartDelayMaxMinutes));
-        HeroAdventureRestartDelay.IsEnabled =
+        SynchronizeCelebrationControls();
+        SettingsVm.Hero.AdventureRestartDelay.IsEnabled =
             _config[BotOptionPayloadKeys.HeroAdventureRestartDelayEnabled]?.GetValue<bool>()
             ?? HeroAdventureRestartDelayDefaults.Enabled;
-        HeroAdventureRestartDelay.DelayMinMinutes = FormatDelay(ReadDouble(
+        SettingsVm.Hero.AdventureRestartDelay.DelayMinMinutes = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.HeroAdventureRestartDelayMinMinutes,
             HeroAdventureRestartDelayDefaults.MinMinutes));
-        HeroAdventureRestartDelay.DelayMaxMinutes = FormatDelay(ReadDouble(
+        SettingsVm.Hero.AdventureRestartDelay.DelayMaxMinutes = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.HeroAdventureRestartDelayMaxMinutes,
             HeroAdventureRestartDelayDefaults.MaxMinutes));
         var heroHpRegen = Math.Clamp(ReadInt(BotOptionPayloadKeys.HeroHpRegenPerDayPercent, 40), 20, 100);
-        HeroHpRegenPerDayComboBox.SelectedItem = Math.Clamp(((heroHpRegen + 5) / 10) * 10, 20, 100);
-        SmithyUpgradeRestartDelay.IsEnabled =
+        SettingsVm.Hero.HpRegenPerDayPercent = Math.Clamp(((heroHpRegen + 5) / 10) * 10, 20, 100);
+        SettingsVm.Hero.SmithyUpgradeRestartDelay.IsEnabled =
             _config[BotOptionPayloadKeys.SmithyUpgradeRestartDelayEnabled]?.GetValue<bool>()
             ?? SmithyUpgradeRestartDelayDefaults.Enabled;
-        SmithyUpgradeRestartDelay.DelayMinMinutes = FormatDelay(ReadDouble(
+        SettingsVm.Hero.SmithyUpgradeRestartDelay.DelayMinMinutes = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.SmithyUpgradeRestartDelayMinMinutes,
             SmithyUpgradeRestartDelayDefaults.MinMinutes));
-        SmithyUpgradeRestartDelay.DelayMaxMinutes = FormatDelay(ReadDouble(
+        SettingsVm.Hero.SmithyUpgradeRestartDelay.DelayMaxMinutes = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.SmithyUpgradeRestartDelayMaxMinutes,
             SmithyUpgradeRestartDelayDefaults.MaxMinutes));
+        SynchronizeHeroControls();
+        SynchronizeSpendingLimitControls();
+        SettingsVm.ResetChangeTracking();
+    }
+
+    private void SettingsInputChanged(object sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        if (e.OriginalSource is TextBox textBox)
+        {
+            if (ReferenceEquals(textBox, GoldLimitTextBox))
+            {
+                SettingsVm.GoldLimitText = textBox.Text;
+            }
+            else if (ReferenceEquals(textBox, DailyGoldSpendingLimitTextBox))
+            {
+                SettingsVm.DailyGoldSpendingLimitText = textBox.Text;
+            }
+            else if (ReferenceEquals(textBox, SilverLimitTextBox))
+            {
+                SettingsVm.SilverLimitText = textBox.Text;
+            }
+            else if (ReferenceEquals(textBox, DailySilverSpendingLimitTextBox))
+            {
+                SettingsVm.DailySilverSpendingLimitText = textBox.Text;
+            }
+
+            UpdateDailySpendingUsage();
+        }
+
+        SettingsVm.MarkChanged();
     }
 
     // Fills the reset-hour dropdown with 00:00..23:00 (Tag = the whole hour 0..23).
@@ -358,30 +368,31 @@ public partial class SettingsWindow : Window
 
     private void LoadConstructionHumanizeConfigToUi()
     {
-        ConstructionHumanizeCheckBox.IsChecked = ReadBool(
+        SettingsVm.Construction.HumanizeDelayEnabled = ReadBool(
             BotOptionPayloadKeys.ConstructionHumanizeDelayEnabled,
             PacingDefaults.ConstructionHumanizeDelayEnabled);
-        ConstructionHumanizeQueuePercentMinTextBox.Text = FormatDelay(ReadDouble(
+        SettingsVm.Construction.QueuePercentMin = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.ConstructionHumanizeQueuePercentMin,
             PacingDefaults.ConstructionHumanizeQueuePercentMin));
-        ConstructionHumanizeQueuePercentMaxTextBox.Text = FormatDelay(ReadDouble(
+        SettingsVm.Construction.QueuePercentMax = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.ConstructionHumanizeQueuePercentMax,
             PacingDefaults.ConstructionHumanizeQueuePercentMax));
-        ConstructionHumanizeMaxDelayTextBox.Text = FormatDelay(ReadDouble(
+        SettingsVm.Construction.MaxDelayMinutes = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.ConstructionHumanizeMaxDelayMinutes,
             PacingDefaults.ConstructionHumanizeMaxDelayMinutes));
-        ConstructionHumanizeNoPlusMinTextBox.Text = FormatDelay(ReadDouble(
+        SettingsVm.Construction.NoPlusDelayMinMinutes = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.ConstructionHumanizeNoPlusMinMinutes,
             PacingDefaults.ConstructionHumanizeNoPlusMinMinutes));
-        ConstructionHumanizeNoPlusMaxTextBox.Text = FormatDelay(ReadDouble(
+        SettingsVm.Construction.NoPlusDelayMaxMinutes = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.ConstructionHumanizeNoPlusMaxMinutes,
             PacingDefaults.ConstructionHumanizeNoPlusMaxMinutes));
-        DemolishDelayMinTextBox.Text = ReadInt(
+        SettingsVm.Construction.DemolishDelayMinMinutes = ReadInt(
             BotOptionPayloadKeys.DemolishDelayMinMinutes,
             DemolishDefaults.DefaultDelayMinMinutes).ToString(CultureInfo.InvariantCulture);
-        DemolishDelayMaxTextBox.Text = ReadInt(
+        SettingsVm.Construction.DemolishDelayMaxMinutes = ReadInt(
             BotOptionPayloadKeys.DemolishDelayMaxMinutes,
             DemolishDefaults.DefaultDelayMaxMinutes).ToString(CultureInfo.InvariantCulture);
+        SynchronizeConstructionControls();
     }
 
     private void SaveConstructionHumanizeConfigFromUi()
@@ -389,21 +400,21 @@ public partial class SettingsWindow : Window
         var wasEnabled = ReadBool(
             BotOptionPayloadKeys.ConstructionHumanizeDelayEnabled,
             PacingDefaults.ConstructionHumanizeDelayEnabled);
-        var enabled = ConstructionHumanizeCheckBox.IsChecked == true;
+        var enabled = SettingsVm.Construction.HumanizeDelayEnabled;
         var percentMin = Math.Clamp(ReadDoubleText(
-            ConstructionHumanizeQueuePercentMinTextBox,
+            SettingsVm.Construction.QueuePercentMin,
             PacingDefaults.ConstructionHumanizeQueuePercentMin), 0, 99);
         var percentMax = Math.Clamp(Math.Max(percentMin, ReadDoubleText(
-            ConstructionHumanizeQueuePercentMaxTextBox,
+            SettingsVm.Construction.QueuePercentMax,
             PacingDefaults.ConstructionHumanizeQueuePercentMax)), 0, 99);
         var maxDelay = Math.Clamp(ReadDoubleText(
-            ConstructionHumanizeMaxDelayTextBox,
+            SettingsVm.Construction.MaxDelayMinutes,
             PacingDefaults.ConstructionHumanizeMaxDelayMinutes), 0, 600);
         var noPlusMin = Math.Clamp(ReadDoubleText(
-            ConstructionHumanizeNoPlusMinTextBox,
+            SettingsVm.Construction.NoPlusDelayMinMinutes,
             PacingDefaults.ConstructionHumanizeNoPlusMinMinutes), 0, 600);
         var noPlusMax = Math.Clamp(Math.Max(noPlusMin, ReadDoubleText(
-            ConstructionHumanizeNoPlusMaxTextBox,
+            SettingsVm.Construction.NoPlusDelayMaxMinutes,
             PacingDefaults.ConstructionHumanizeNoPlusMaxMinutes)), 0, 600);
 
         _config[BotOptionPayloadKeys.ConstructionHumanizeDelayEnabled] = enabled;
@@ -412,8 +423,8 @@ public partial class SettingsWindow : Window
         _config[BotOptionPayloadKeys.ConstructionHumanizeMaxDelayMinutes] = maxDelay;
         _config[BotOptionPayloadKeys.ConstructionHumanizeNoPlusMinMinutes] = noPlusMin;
         _config[BotOptionPayloadKeys.ConstructionHumanizeNoPlusMaxMinutes] = noPlusMax;
-        _config[BotOptionPayloadKeys.DemolishDelayMinMinutes] = ReadIntText(DemolishDelayMinTextBox, DemolishDefaults.DefaultDelayMinMinutes, 0, 1440);
-        _config[BotOptionPayloadKeys.DemolishDelayMaxMinutes] = ReadIntText(DemolishDelayMaxTextBox, DemolishDefaults.DefaultDelayMaxMinutes, 0, 1440);
+        _config[BotOptionPayloadKeys.DemolishDelayMinMinutes] = ReadIntText(SettingsVm.Construction.DemolishDelayMinMinutes, DemolishDefaults.DefaultDelayMinMinutes, 0, 1440);
+        _config[BotOptionPayloadKeys.DemolishDelayMaxMinutes] = ReadIntText(SettingsVm.Construction.DemolishDelayMaxMinutes, DemolishDefaults.DefaultDelayMaxMinutes, 0, 1440);
         if (wasEnabled != enabled)
         {
             var stateVersion = ReadInt(BotOptionPayloadKeys.ConstructionHumanizeStateVersion, 0);
@@ -435,9 +446,8 @@ public partial class SettingsWindow : Window
     {
         var overrideEnabled = _config[BotOptionPayloadKeys.DailyServerResetManualOverrideEnabled]?.GetValue<bool>() ?? false;
         var manualHour = Math.Clamp(_config[BotOptionPayloadKeys.DailyServerResetManualHour]?.GetValue<int>() ?? 0, 0, 23);
-        DailyServerResetOverrideCheckBox.IsChecked = overrideEnabled;
-        SelectDailyServerResetHour(manualHour);
-        DailyServerResetHourComboBox.IsEnabled = overrideEnabled;
+        SettingsVm.DailyServerResetOverrideEnabled = overrideEnabled;
+        SettingsVm.DailyServerResetHour = manualHour;
         DailyServerResetDetectedTextBlock.Text = _detectedDailyResetHour is int detected
             ? $"detected: {detected:00}:00"
             : "detected: —";
@@ -445,36 +455,9 @@ public partial class SettingsWindow : Window
 
     private void SaveDailyServerResetFromUi()
     {
-        _config[BotOptionPayloadKeys.DailyServerResetManualOverrideEnabled] = DailyServerResetOverrideCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.DailyServerResetManualHour] = GetSelectedDailyServerResetHour();
+        _config[BotOptionPayloadKeys.DailyServerResetManualOverrideEnabled] = SettingsVm.DailyServerResetOverrideEnabled;
+        _config[BotOptionPayloadKeys.DailyServerResetManualHour] = SettingsVm.DailyServerResetHour;
     }
-
-    private void DailyServerResetOverride_Changed(object sender, RoutedEventArgs e)
-    {
-        // Toggle only enables/disables the hour dropdown; the value is persisted on Save.
-        if (DailyServerResetHourComboBox is not null)
-        {
-            DailyServerResetHourComboBox.IsEnabled = DailyServerResetOverrideCheckBox.IsChecked == true;
-        }
-    }
-
-    private void SelectDailyServerResetHour(int hour)
-    {
-        var clamped = Math.Clamp(hour, 0, 23);
-        foreach (var item in DailyServerResetHourComboBox.Items)
-        {
-            if (item is ComboBoxItem { Tag: int tag } comboItem && tag == clamped)
-            {
-                DailyServerResetHourComboBox.SelectedItem = comboItem;
-                return;
-            }
-        }
-    }
-
-    private int GetSelectedDailyServerResetHour()
-        => DailyServerResetHourComboBox.SelectedItem is ComboBoxItem { Tag: int hour }
-            ? Math.Clamp(hour, 0, 23)
-            : 0;
 
     private void SaveSettings()
     {
@@ -511,68 +494,62 @@ public partial class SettingsWindow : Window
 
             // The browser always runs visible; headless mode has been removed entirely.
             _config.Remove("headless");
-            _config[BotOptionPayloadKeys.DontNotifyNewVersion] = DontNotifyNewVersionCheckBox.IsChecked == true;
-            _config[BotOptionPayloadKeys.PostLoginQuickReloginEnabled] = QuickReloginCheckBox.IsChecked == true;
-            _config[BotOptionPayloadKeys.AutomaticallyCheckLanguage] = AutomaticallyCheckLanguageCheckBox.IsChecked == true;
-            _config[BotOptionPayloadKeys.DetailedBrowserLoggingEnabled] = DetailedBrowserLoggingCheckBox.IsChecked == true;
-            _config["allow_silver_spending"] = AllowSilverSpendingCheckBox.IsChecked == true;
-            _config[BotOptionPayloadKeys.AllowGoldSpending] = AllowGoldSpendingCheckBox.IsChecked == true;
+            _config[BotOptionPayloadKeys.DontNotifyNewVersion] = SettingsVm.DontNotifyNewVersion;
+            _config[BotOptionPayloadKeys.PostLoginQuickReloginEnabled] = SettingsVm.QuickReloginEnabled;
+            _config[BotOptionPayloadKeys.AutomaticallyCheckLanguage] = SettingsVm.AutomaticallyCheckLanguage;
+            _config[BotOptionPayloadKeys.DetailedBrowserLoggingEnabled] = SettingsVm.DetailedBrowserLoggingEnabled;
+            _config["allow_silver_spending"] = SettingsVm.AllowSilverSpending;
+            _config[BotOptionPayloadKeys.AllowGoldSpending] = SettingsVm.AllowGoldSpending;
             _config[BotOptionPayloadKeys.GoldLimit] = goldLimit;
             _config[BotOptionPayloadKeys.DailyGoldSpendingLimit] = dailyGoldSpendingLimit;
             _config[BotOptionPayloadKeys.TownHallCelebrationCount] =
-                TownHallCelebrationDefaults.NormalizeCount(TownHallQueue.Count);
+                TownHallCelebrationDefaults.NormalizeCount(SettingsVm.Celebrations.TownHallQueue.Count);
             _config[BotOptionPayloadKeys.TownHallCelebrationRestartDelayMinMinutes] =
-                TownHallQueue.ResolvedDelayMinMinutes;
+                SettingsVm.Celebrations.TownHallQueue.ResolvedDelayMinMinutes;
             _config[BotOptionPayloadKeys.TownHallCelebrationRestartDelayMaxMinutes] =
-                TownHallQueue.ResolvedDelayMaxMinutes;
+                SettingsVm.Celebrations.TownHallQueue.ResolvedDelayMaxMinutes;
             _config[BotOptionPayloadKeys.TownHallCelebrationRestartDelayEnabled] =
-                TownHallQueue.IsRestartDelayEnabled;
+                SettingsVm.Celebrations.TownHallQueue.IsRestartDelayEnabled;
             _config[BotOptionPayloadKeys.BreweryCelebrationRestartDelayEnabled] =
-                BreweryRestartDelay.IsEnabled;
+                SettingsVm.Celebrations.BreweryRestartDelay.IsEnabled;
             _config[BotOptionPayloadKeys.BreweryCelebrationRestartDelayMinMinutes] =
-                BreweryRestartDelay.ResolvedDelayMinMinutes;
+                SettingsVm.Celebrations.BreweryRestartDelay.ResolvedDelayMinMinutes;
             _config[BotOptionPayloadKeys.BreweryCelebrationRestartDelayMaxMinutes] =
-                BreweryRestartDelay.ResolvedDelayMaxMinutes;
+                SettingsVm.Celebrations.BreweryRestartDelay.ResolvedDelayMaxMinutes;
             _config[BotOptionPayloadKeys.HeroAdventureRestartDelayEnabled] =
-                HeroAdventureRestartDelay.IsEnabled;
+                SettingsVm.Hero.AdventureRestartDelay.IsEnabled;
             _config[BotOptionPayloadKeys.HeroAdventureRestartDelayMinMinutes] =
-                HeroAdventureRestartDelay.ResolvedDelayMinMinutes;
+                SettingsVm.Hero.AdventureRestartDelay.ResolvedDelayMinMinutes;
             _config[BotOptionPayloadKeys.HeroAdventureRestartDelayMaxMinutes] =
-                HeroAdventureRestartDelay.ResolvedDelayMaxMinutes;
-            _config[BotOptionPayloadKeys.HeroHpRegenPerDayPercent] =
-                HeroHpRegenPerDayComboBox.SelectedItem is int heroHpRegenPercent
-                    ? heroHpRegenPercent
-                    : 40;
+                SettingsVm.Hero.AdventureRestartDelay.ResolvedDelayMaxMinutes;
+            _config[BotOptionPayloadKeys.HeroHpRegenPerDayPercent] = SettingsVm.Hero.HpRegenPerDayPercent;
             _config[BotOptionPayloadKeys.SmithyUpgradeRestartDelayEnabled] =
-                SmithyUpgradeRestartDelay.IsEnabled;
+                SettingsVm.Hero.SmithyUpgradeRestartDelay.IsEnabled;
             _config[BotOptionPayloadKeys.SmithyUpgradeRestartDelayMinMinutes] =
-                SmithyUpgradeRestartDelay.ResolvedDelayMinMinutes;
+                SettingsVm.Hero.SmithyUpgradeRestartDelay.ResolvedDelayMinMinutes;
             _config[BotOptionPayloadKeys.SmithyUpgradeRestartDelayMaxMinutes] =
-                SmithyUpgradeRestartDelay.ResolvedDelayMaxMinutes;
+                SettingsVm.Hero.SmithyUpgradeRestartDelay.ResolvedDelayMaxMinutes;
             SaveDailyServerResetFromUi();
             SavePacingConfigFromUi();
             _config[BotOptionPayloadKeys.ConstructionStorageUpgradeLevelsAhead] =
-                ConstructionDefaults.NormalizeStorageUpgradeLevelsAhead(
-                    StorageUpgradeLevelsAheadComboBox.SelectedItem is int selectedLevels
-                        ? selectedLevels
-                        : ConstructionDefaults.StorageUpgradeLevelsAhead);
+                SettingsVm.Construction.StorageUpgradeLevelsAhead;
             SaveConstructionHumanizeConfigFromUi();
-            _config[BotOptionPayloadKeys.ShowFarmListLastSentTimer] = ShowFarmListLastSentTimerCheckBox.IsChecked == true;
-            _config[BotOptionPayloadKeys.FarmListLastSentLimitEnabled] = FarmListLastSentLimitEnabledCheckBox.IsChecked == true;
+            _config[BotOptionPayloadKeys.ShowFarmListLastSentTimer] = SettingsVm.Farming.ShowFarmListLastSentTimer;
+            _config[BotOptionPayloadKeys.FarmListLastSentLimitEnabled] = SettingsVm.Farming.FarmListLastSentLimitEnabled;
             _config[BotOptionPayloadKeys.FarmListLastSentLimitHours] = ReadIntText(
-                FarmListLastSentLimitHoursTextBox,
+                SettingsVm.Farming.FarmListLastSentLimitHours,
                 FarmingDefaults.DefaultLastSentLimitHours,
                 1,
                 FarmingDefaults.MaxLastSentLimitHours);
             // Queue-wait handling is always "smart" (defer); drop the removed threshold key.
             _config.Remove("queue_wait_threshold_mode");
-            _config[BotOptionPayloadKeys.PostLoginAnalyzeFarmlists] = PostLoginAnalyzeFarmlistsCheckBox.IsChecked == true;
-            _config[BotOptionPayloadKeys.PostLoginAnalyzeHero] = PostLoginAnalyzeHeroCheckBox.IsChecked == true;
-            _config[BotOptionPayloadKeys.PostLoginReadTroopTrainingQueue] = PostLoginReadTroopTrainingQueueCheckBox.IsChecked == true;
-            _config[BotOptionPayloadKeys.PostLoginAnalyzeBrewery] = PostLoginAnalyzeBreweryCheckBox.IsChecked == true;
-            _config[BotOptionPayloadKeys.PostLoginAnalyzeHeroInventory] = PostLoginAnalyzeHeroInventoryCheckBox.IsChecked == true;
-            _config[BotOptionPayloadKeys.PostLoginAnalyzeNewVillages] = PostLoginAnalyzeNewVillagesCheckBox.IsChecked == true;
-            _config[BotOptionPayloadKeys.PostLoginAnalyzeNewAccount] = PostLoginAnalyzeNewAccountCheckBox.IsChecked == true;
+            _config[BotOptionPayloadKeys.PostLoginAnalyzeFarmlists] = SettingsVm.PostLogin.AnalyzeFarmlists;
+            _config[BotOptionPayloadKeys.PostLoginAnalyzeHero] = SettingsVm.PostLogin.AnalyzeHero;
+            _config[BotOptionPayloadKeys.PostLoginReadTroopTrainingQueue] = SettingsVm.PostLogin.ReadTroopTrainingQueue;
+            _config[BotOptionPayloadKeys.PostLoginAnalyzeBrewery] = SettingsVm.PostLogin.AnalyzeBrewery;
+            _config[BotOptionPayloadKeys.PostLoginAnalyzeHeroInventory] = SettingsVm.PostLogin.AnalyzeHeroInventory;
+            _config[BotOptionPayloadKeys.PostLoginAnalyzeNewVillages] = SettingsVm.PostLogin.AnalyzeNewVillages;
+            _config[BotOptionPayloadKeys.PostLoginAnalyzeNewAccount] = SettingsVm.PostLogin.AnalyzeNewAccount;
             _config[BotOptionPayloadKeys.SilverLimit] = silverLimit;
             _config[BotOptionPayloadKeys.DailySilverSpendingLimit] = dailySilverSpendingLimit;
             var saveResult = _settingsPersistence.Save(_config);
@@ -1004,8 +981,7 @@ public partial class SettingsWindow : Window
     {
         if (ResetDailySpending(_resetDailySilverSpending))
         {
-            _dailySilverSpent = 0;
-            UpdateDailySpendingUsage();
+            SettingsVm.DailySilverSpent = 0;
         }
     }
 
@@ -1013,8 +989,7 @@ public partial class SettingsWindow : Window
     {
         if (ResetDailySpending(_resetDailyGoldSpending))
         {
-            _dailyGoldSpent = 0;
-            UpdateDailySpendingUsage();
+            SettingsVm.DailyGoldSpent = 0;
         }
     }
 
@@ -1037,27 +1012,154 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void DailySpendingLimitTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    // Tab content can remain disconnected until selected. Keep those controls in sync with the ViewModel
+    // so validation and the visible usage badges behave the same for every initially selected category.
+    private void SynchronizeSpendingLimitControls()
     {
+        GoldLimitTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.GoldLimitText);
+        DailyGoldSpendingLimitTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.DailyGoldSpendingLimitText);
+        SilverLimitTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.SilverLimitText);
+        DailySilverSpendingLimitTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.DailySilverSpendingLimitText);
         UpdateDailySpendingUsage();
     }
 
     private void UpdateDailySpendingUsage()
     {
-        if (DailyGoldSpendingUsageTextBlock is null || DailySilverSpendingUsageTextBlock is null)
-        {
-            return;
-        }
-
-        DailyGoldSpendingUsageTextBlock.Text = FormatDailySpendingUsage(_dailyGoldSpent, DailyGoldSpendingLimitTextBox.Text);
-        DailySilverSpendingUsageTextBlock.Text = FormatDailySpendingUsage(_dailySilverSpent, DailySilverSpendingLimitTextBox.Text);
+        DailyGoldSpendingUsageTextBlock.SetCurrentValue(
+            TextBlock.TextProperty,
+            SettingsVm.DailyGoldSpendingUsageText);
+        DailySilverSpendingUsageTextBlock.SetCurrentValue(
+            TextBlock.TextProperty,
+            SettingsVm.DailySilverSpendingUsageText);
     }
 
-    private static string FormatDailySpendingUsage(int spent, string? limitText)
+    private void SynchronizeActionPacingControls()
     {
-        return int.TryParse(limitText?.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var limit)
-            ? $"{spent} / {limit}"
-            : $"{spent} / ?";
+        ActionTaskMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.TaskMinSeconds);
+        ActionTaskMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.TaskMaxSeconds);
+        ActionPageLoadMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.PageLoadMinSeconds);
+        ActionPageLoadMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.PageLoadMaxSeconds);
+        ActionClickMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.ClickMinSeconds);
+        ActionClickMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.ClickMaxSeconds);
+        ActionLoopMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.LoopMinSeconds);
+        ActionLoopMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.LoopMaxSeconds);
+        FarmListStepDelayMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.FarmListStepDelayMinSeconds);
+        FarmListStepDelayMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.FarmListStepDelayMaxSeconds);
+        CollectStepDelayMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.CollectStepDelayMinSeconds);
+        CollectStepDelayMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.CollectStepDelayMaxSeconds);
+        IdleBreakEnabledCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.IdleBreakEnabled);
+        IdleBreakIntervalMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.IdleBreakIntervalMinMinutes);
+        IdleBreakIntervalMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.IdleBreakIntervalMaxMinutes);
+        IdleBreakDurationMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.IdleBreakDurationMinMinutes);
+        IdleBreakDurationMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.IdleBreakDurationMaxMinutes);
+        IdleBrowseEnabledCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.IdleBrowseEnabled);
+        IdleBrowseIntervalMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.IdleBrowseIntervalMinMinutes);
+        IdleBrowseIntervalMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.IdleBrowseIntervalMaxMinutes);
+        IdleBrowsePageMapCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.IdleBrowsePageMap);
+        IdleBrowsePageStatisticsCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.IdleBrowsePageStatistics);
+        IdleBrowsePageStatisticsHeroCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.IdleBrowsePageStatisticsHero);
+        IdleBrowsePageStatisticsTop10CheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.IdleBrowsePageStatisticsTop10);
+        IdleBrowsePageStatisticsDefendersCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.IdleBrowsePageStatisticsDefenders);
+        IdleBrowsePageStatisticsAttackersCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.IdleBrowsePageStatisticsAttackers);
+        IdleBrowsePageReportsCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.IdleBrowsePageReports);
+        IdleBrowsePageMessagesCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.IdleBrowsePageMessages);
+        ContinuousKeepAliveEnabledCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.ContinuousKeepAliveEnabled);
+        ContinuousKeepAliveMinMinutesTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.ContinuousKeepAliveMinMinutes);
+        ContinuousKeepAliveMaxMinutesTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.ContinuousKeepAliveMaxMinutes);
+        SessionPacingEnabledCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.SessionPacingEnabled);
+        SessionRunMinMinutesTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.SessionRunMinMinutes);
+        SessionRunMaxMinutesTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.SessionRunMaxMinutes);
+        SessionSleepMinMinutesTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.SessionSleepMinMinutes);
+        SessionSleepMaxMinutesTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.SessionSleepMaxMinutes);
+        VillageStatusSweepEnabledCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.VillageStatusSweepEnabled);
+        VillageStatusSweepDorf1CheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.VillageStatusSweepDorf1Enabled);
+        VillageStatusSweepDorf2CheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.VillageStatusSweepDorf2Enabled);
+        VillageStatusSweepSmithyCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.VillageStatusSweepSmithyEnabled);
+        VillageStatusSweepBarracksCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.VillageStatusSweepBarracksEnabled);
+        VillageStatusSweepStableCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.VillageStatusSweepStableEnabled);
+        VillageStatusSweepWorkshopCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.VillageStatusSweepWorkshopEnabled);
+        VillageStatusSweepTownHallCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.VillageStatusSweepTownHallEnabled);
+        VillageStatusSweepBreweryCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.Pacing.VillageStatusSweepBreweryEnabled);
+        VillageStatusSweepRoundMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.VillageStatusSweepRoundMinMinutes);
+        VillageStatusSweepRoundMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.VillageStatusSweepRoundMaxMinutes);
+        VillageStatusSweepVillageMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.VillageStatusSweepVillageMinSeconds);
+        VillageStatusSweepVillageMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Pacing.VillageStatusSweepVillageMaxSeconds);
+    }
+
+    private void SynchronizeConstructionControls()
+    {
+        StorageUpgradeLevelsAheadComboBox.SetCurrentValue(
+            Selector.SelectedItemProperty,
+            SettingsVm.Construction.StorageUpgradeLevelsAhead);
+        ConstructionHumanizeCheckBox.SetCurrentValue(
+            ToggleButton.IsCheckedProperty,
+            SettingsVm.Construction.HumanizeDelayEnabled);
+        ConstructionHumanizeQueuePercentMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Construction.QueuePercentMin);
+        ConstructionHumanizeQueuePercentMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Construction.QueuePercentMax);
+        ConstructionHumanizeMaxDelayTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Construction.MaxDelayMinutes);
+        ConstructionHumanizeNoPlusMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Construction.NoPlusDelayMinMinutes);
+        ConstructionHumanizeNoPlusMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Construction.NoPlusDelayMaxMinutes);
+        DemolishDelayMinTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Construction.DemolishDelayMinMinutes);
+        DemolishDelayMaxTextBox.SetCurrentValue(TextBox.TextProperty, SettingsVm.Construction.DemolishDelayMaxMinutes);
+    }
+
+    private void SynchronizeFarmingControls()
+    {
+        ShowFarmListLastSentTimerCheckBox.SetCurrentValue(
+            ToggleButton.IsCheckedProperty,
+            SettingsVm.Farming.ShowFarmListLastSentTimer);
+        FarmListLastSentLimitEnabledCheckBox.SetCurrentValue(
+            ToggleButton.IsCheckedProperty,
+            SettingsVm.Farming.FarmListLastSentLimitEnabled);
+        FarmListLastSentLimitHoursTextBox.SetCurrentValue(
+            TextBox.TextProperty,
+            SettingsVm.Farming.FarmListLastSentLimitHours);
+    }
+
+    private void SynchronizePostLoginControls()
+    {
+        PostLoginAnalyzeFarmlistsCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.PostLogin.AnalyzeFarmlists);
+        PostLoginAnalyzeHeroCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.PostLogin.AnalyzeHero);
+        PostLoginAnalyzeHeroInventoryCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.PostLogin.AnalyzeHeroInventory);
+        PostLoginReadTroopTrainingQueueCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.PostLogin.ReadTroopTrainingQueue);
+        PostLoginAnalyzeBreweryCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.PostLogin.AnalyzeBrewery);
+        PostLoginAnalyzeNewVillagesCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.PostLogin.AnalyzeNewVillages);
+        PostLoginAnalyzeNewAccountCheckBox.SetCurrentValue(ToggleButton.IsCheckedProperty, SettingsVm.PostLogin.AnalyzeNewAccount);
+    }
+
+    private void SynchronizeHeroControls()
+    {
+        HeroAdventureRestartDelayMinTextBox.SetCurrentValue(
+            TextBox.TextProperty,
+            SettingsVm.Hero.AdventureRestartDelay.DelayMinMinutes);
+        HeroAdventureRestartDelayMaxTextBox.SetCurrentValue(
+            TextBox.TextProperty,
+            SettingsVm.Hero.AdventureRestartDelay.DelayMaxMinutes);
+        HeroHpRegenPerDayComboBox.SetCurrentValue(
+            Selector.SelectedItemProperty,
+            SettingsVm.Hero.HpRegenPerDayPercent);
+        SmithyUpgradeRestartDelayMinTextBox.SetCurrentValue(
+            TextBox.TextProperty,
+            SettingsVm.Hero.SmithyUpgradeRestartDelay.DelayMinMinutes);
+        SmithyUpgradeRestartDelayMaxTextBox.SetCurrentValue(
+            TextBox.TextProperty,
+            SettingsVm.Hero.SmithyUpgradeRestartDelay.DelayMaxMinutes);
+    }
+
+    private void SynchronizeCelebrationControls()
+    {
+        TownHallRestartDelayMinTextBox.SetCurrentValue(
+            TextBox.TextProperty,
+            SettingsVm.Celebrations.TownHallQueue.DelayMinMinutes);
+        TownHallRestartDelayMaxTextBox.SetCurrentValue(
+            TextBox.TextProperty,
+            SettingsVm.Celebrations.TownHallQueue.DelayMaxMinutes);
+        BreweryRestartDelayMinTextBox.SetCurrentValue(
+            TextBox.TextProperty,
+            SettingsVm.Celebrations.BreweryRestartDelay.DelayMinMinutes);
+        BreweryRestartDelayMaxTextBox.SetCurrentValue(
+            TextBox.TextProperty,
+            SettingsVm.Celebrations.BreweryRestartDelay.DelayMaxMinutes);
     }
 
     private void DetailedBrowserLoggingCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -1153,253 +1255,163 @@ public partial class SettingsWindow : Window
         return panel;
     }
 
-    private void ResetPacingButton_Click(object sender, RoutedEventArgs e)
-    {
-        ApplyPacingDefaultsToUi();
-    }
-
     private void LoadPacingConfigToUi()
     {
-        SessionPacingEnabledCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.SessionPacingEnabled, PacingDefaults.SessionPacingEnabled);
-        SessionRunMinMinutesTextBox.Text = ReadInt(BotOptionPayloadKeys.SessionPacingRunMinMinutes, PacingDefaults.SessionPacingRunMinMinutes).ToString();
-        SessionRunMaxMinutesTextBox.Text = ReadInt(BotOptionPayloadKeys.SessionPacingRunMaxMinutes, PacingDefaults.SessionPacingRunMaxMinutes).ToString();
-        SessionSleepMinMinutesTextBox.Text = ReadInt(BotOptionPayloadKeys.SessionPacingSleepMinMinutes, PacingDefaults.SessionPacingSleepMinMinutes).ToString();
-        SessionSleepMaxMinutesTextBox.Text = ReadInt(BotOptionPayloadKeys.SessionPacingSleepMaxMinutes, PacingDefaults.SessionPacingSleepMaxMinutes).ToString();
-        SelectDailyMaxHours(ReadInt(BotOptionPayloadKeys.SessionPacingDailyMaxHours, PacingDefaults.SessionPacingDailyMaxHours));
-        SelectDailyMaxVariationPercent(ReadInt(BotOptionPayloadKeys.SessionPacingDailyMaxVariationPercent, PacingDefaults.SessionPacingDailyMaxVariationPercent));
-        var allowedHours = ReadAllowedHours();
-        foreach (var checkBox in SessionAllowedHoursGrid.Children.OfType<CheckBox>())
-        {
-            checkBox.IsChecked = int.TryParse(checkBox.Tag?.ToString(), out var hour) && allowedHours.Contains(hour);
-        }
+        SettingsVm.Pacing.SessionPacingEnabled = ReadBool(BotOptionPayloadKeys.SessionPacingEnabled, PacingDefaults.SessionPacingEnabled);
+        SettingsVm.Pacing.SessionRunMinMinutes = ReadInt(BotOptionPayloadKeys.SessionPacingRunMinMinutes, PacingDefaults.SessionPacingRunMinMinutes).ToString(CultureInfo.InvariantCulture);
+        SettingsVm.Pacing.SessionRunMaxMinutes = ReadInt(BotOptionPayloadKeys.SessionPacingRunMaxMinutes, PacingDefaults.SessionPacingRunMaxMinutes).ToString(CultureInfo.InvariantCulture);
+        SettingsVm.Pacing.SessionSleepMinMinutes = ReadInt(BotOptionPayloadKeys.SessionPacingSleepMinMinutes, PacingDefaults.SessionPacingSleepMinMinutes).ToString(CultureInfo.InvariantCulture);
+        SettingsVm.Pacing.SessionSleepMaxMinutes = ReadInt(BotOptionPayloadKeys.SessionPacingSleepMaxMinutes, PacingDefaults.SessionPacingSleepMaxMinutes).ToString(CultureInfo.InvariantCulture);
+        SettingsVm.Pacing.SessionDailyMaxHours = ReadInt(BotOptionPayloadKeys.SessionPacingDailyMaxHours, PacingDefaults.SessionPacingDailyMaxHours);
+        SettingsVm.Pacing.SessionDailyMaxVariationPercent = ReadInt(BotOptionPayloadKeys.SessionPacingDailyMaxVariationPercent, PacingDefaults.SessionPacingDailyMaxVariationPercent);
+        SettingsVm.Pacing.SetSessionAllowedHours(ReadAllowedHours());
 
-        SelectHoursVariationPercent(ReadInt(BotOptionPayloadKeys.SessionPacingHoursVariationPercent, PacingDefaults.SessionPacingHoursVariationPercent));
+        SettingsVm.Pacing.SessionHoursVariationPercent = ReadInt(BotOptionPayloadKeys.SessionPacingHoursVariationPercent, PacingDefaults.SessionPacingHoursVariationPercent);
 
-        ActionTaskMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingTaskMinSeconds, PacingDefaults.ActionPacingTaskMinSeconds));
-        ActionTaskMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingTaskMaxSeconds, PacingDefaults.ActionPacingTaskMaxSeconds));
-        ActionPageLoadMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingPageLoadMinSeconds, PacingDefaults.ActionPacingPageLoadMinSeconds));
-        ActionPageLoadMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingPageLoadMaxSeconds, PacingDefaults.ActionPacingPageLoadMaxSeconds));
-        ActionClickMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingClickMinSeconds, PacingDefaults.ActionPacingClickMinSeconds));
-        ActionClickMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingClickMaxSeconds, PacingDefaults.ActionPacingClickMaxSeconds));
-        ActionLoopMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingLoopMinSeconds, PacingDefaults.ActionPacingLoopMinSeconds));
-        ActionLoopMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingLoopMaxSeconds, PacingDefaults.ActionPacingLoopMaxSeconds));
-        ContinuousKeepAliveEnabledCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ContinuousKeepAliveEnabled, PacingDefaults.ContinuousKeepAliveEnabled);
-        ContinuousKeepAliveMinMinutesTextBox.Text = ReadInt(BotOptionPayloadKeys.ContinuousKeepAliveMinMinutes, PacingDefaults.ContinuousKeepAliveMinMinutes).ToString();
-        ContinuousKeepAliveMaxMinutesTextBox.Text = ReadInt(BotOptionPayloadKeys.ContinuousKeepAliveMaxMinutes, PacingDefaults.ContinuousKeepAliveMaxMinutes).ToString();
-        FarmListStepDelayMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.FarmListStepDelayMinSeconds, PacingDefaults.FarmListStepDelayMinSeconds));
-        FarmListStepDelayMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.FarmListStepDelayMaxSeconds, PacingDefaults.FarmListStepDelayMaxSeconds));
-        VillageStatusSweepEnabledCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepEnabled, PacingDefaults.VillageStatusSweepEnabled);
-        VillageStatusSweepDorf1CheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepDorf1Enabled, true);
-        VillageStatusSweepDorf2CheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepDorf2Enabled, false);
-        VillageStatusSweepSmithyCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepSmithyEnabled, false);
-        VillageStatusSweepBarracksCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepBarracksEnabled, false);
-        VillageStatusSweepStableCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepStableEnabled, false);
-        VillageStatusSweepWorkshopCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepWorkshopEnabled, false);
-        VillageStatusSweepTownHallCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepTownHallEnabled, false);
-        VillageStatusSweepBreweryCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.VillageStatusSweepBreweryEnabled, false);
-        VillageStatusSweepRoundMinTextBox.Text = ReadInt(BotOptionPayloadKeys.VillageStatusSweepRoundMinMinutes, PacingDefaults.VillageStatusSweepRoundMinMinutes).ToString();
-        VillageStatusSweepRoundMaxTextBox.Text = ReadInt(BotOptionPayloadKeys.VillageStatusSweepRoundMaxMinutes, PacingDefaults.VillageStatusSweepRoundMaxMinutes).ToString();
-        VillageStatusSweepVillageMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.VillageStatusSweepVillageMinSeconds, PacingDefaults.VillageStatusSweepVillageMinSeconds));
-        VillageStatusSweepVillageMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.VillageStatusSweepVillageMaxSeconds, PacingDefaults.VillageStatusSweepVillageMaxSeconds));
-        UpdateVillageStatusSweepDetailAvailability();
+        SettingsVm.Pacing.TaskMinSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingTaskMinSeconds, PacingDefaults.ActionPacingTaskMinSeconds));
+        SettingsVm.Pacing.TaskMaxSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingTaskMaxSeconds, PacingDefaults.ActionPacingTaskMaxSeconds));
+        SettingsVm.Pacing.PageLoadMinSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingPageLoadMinSeconds, PacingDefaults.ActionPacingPageLoadMinSeconds));
+        SettingsVm.Pacing.PageLoadMaxSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingPageLoadMaxSeconds, PacingDefaults.ActionPacingPageLoadMaxSeconds));
+        SettingsVm.Pacing.ClickMinSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingClickMinSeconds, PacingDefaults.ActionPacingClickMinSeconds));
+        SettingsVm.Pacing.ClickMaxSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingClickMaxSeconds, PacingDefaults.ActionPacingClickMaxSeconds));
+        SettingsVm.Pacing.LoopMinSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingLoopMinSeconds, PacingDefaults.ActionPacingLoopMinSeconds));
+        SettingsVm.Pacing.LoopMaxSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingLoopMaxSeconds, PacingDefaults.ActionPacingLoopMaxSeconds));
+        SettingsVm.Pacing.ContinuousKeepAliveEnabled = ReadBool(BotOptionPayloadKeys.ContinuousKeepAliveEnabled, PacingDefaults.ContinuousKeepAliveEnabled);
+        SettingsVm.Pacing.ContinuousKeepAliveMinMinutes = ReadInt(BotOptionPayloadKeys.ContinuousKeepAliveMinMinutes, PacingDefaults.ContinuousKeepAliveMinMinutes).ToString(CultureInfo.InvariantCulture);
+        SettingsVm.Pacing.ContinuousKeepAliveMaxMinutes = ReadInt(BotOptionPayloadKeys.ContinuousKeepAliveMaxMinutes, PacingDefaults.ContinuousKeepAliveMaxMinutes).ToString(CultureInfo.InvariantCulture);
+        SettingsVm.Pacing.FarmListStepDelayMinSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.FarmListStepDelayMinSeconds, PacingDefaults.FarmListStepDelayMinSeconds));
+        SettingsVm.Pacing.FarmListStepDelayMaxSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.FarmListStepDelayMaxSeconds, PacingDefaults.FarmListStepDelayMaxSeconds));
+        SettingsVm.Pacing.VillageStatusSweepEnabled = ReadBool(BotOptionPayloadKeys.VillageStatusSweepEnabled, PacingDefaults.VillageStatusSweepEnabled);
+        SettingsVm.Pacing.VillageStatusSweepDorf1Enabled = ReadBool(BotOptionPayloadKeys.VillageStatusSweepDorf1Enabled, true);
+        var villageStatusSweepDorf2Enabled = ReadBool(BotOptionPayloadKeys.VillageStatusSweepDorf2Enabled, false);
+        SettingsVm.Pacing.VillageStatusSweepDorf2Enabled = villageStatusSweepDorf2Enabled;
+        SettingsVm.Pacing.VillageStatusSweepSmithyEnabled = villageStatusSweepDorf2Enabled && ReadBool(BotOptionPayloadKeys.VillageStatusSweepSmithyEnabled, false);
+        SettingsVm.Pacing.VillageStatusSweepBarracksEnabled = villageStatusSweepDorf2Enabled && ReadBool(BotOptionPayloadKeys.VillageStatusSweepBarracksEnabled, false);
+        SettingsVm.Pacing.VillageStatusSweepStableEnabled = villageStatusSweepDorf2Enabled && ReadBool(BotOptionPayloadKeys.VillageStatusSweepStableEnabled, false);
+        SettingsVm.Pacing.VillageStatusSweepWorkshopEnabled = villageStatusSweepDorf2Enabled && ReadBool(BotOptionPayloadKeys.VillageStatusSweepWorkshopEnabled, false);
+        SettingsVm.Pacing.VillageStatusSweepTownHallEnabled = villageStatusSweepDorf2Enabled && ReadBool(BotOptionPayloadKeys.VillageStatusSweepTownHallEnabled, false);
+        SettingsVm.Pacing.VillageStatusSweepBreweryEnabled = villageStatusSweepDorf2Enabled && ReadBool(BotOptionPayloadKeys.VillageStatusSweepBreweryEnabled, false);
+        SettingsVm.Pacing.VillageStatusSweepRoundMinMinutes = ReadInt(BotOptionPayloadKeys.VillageStatusSweepRoundMinMinutes, PacingDefaults.VillageStatusSweepRoundMinMinutes).ToString(CultureInfo.InvariantCulture);
+        SettingsVm.Pacing.VillageStatusSweepRoundMaxMinutes = ReadInt(BotOptionPayloadKeys.VillageStatusSweepRoundMaxMinutes, PacingDefaults.VillageStatusSweepRoundMaxMinutes).ToString(CultureInfo.InvariantCulture);
+        SettingsVm.Pacing.VillageStatusSweepVillageMinSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.VillageStatusSweepVillageMinSeconds, PacingDefaults.VillageStatusSweepVillageMinSeconds));
+        SettingsVm.Pacing.VillageStatusSweepVillageMaxSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.VillageStatusSweepVillageMaxSeconds, PacingDefaults.VillageStatusSweepVillageMaxSeconds));
 
-        IdleBreakEnabledCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBreakEnabled, PacingDefaults.ActionPacingIdleBreakEnabled);
-        IdleBreakIntervalMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBreakIntervalMinMinutes, PacingDefaults.ActionPacingIdleBreakIntervalMinMinutes));
-        IdleBreakIntervalMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBreakIntervalMaxMinutes, PacingDefaults.ActionPacingIdleBreakIntervalMaxMinutes));
-        IdleBreakDurationMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBreakDurationMinMinutes, PacingDefaults.ActionPacingIdleBreakDurationMinMinutes));
-        IdleBreakDurationMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBreakDurationMaxMinutes, PacingDefaults.ActionPacingIdleBreakDurationMaxMinutes));
+        SettingsVm.Pacing.IdleBreakEnabled = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBreakEnabled, PacingDefaults.ActionPacingIdleBreakEnabled);
+        SettingsVm.Pacing.IdleBreakIntervalMinMinutes = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBreakIntervalMinMinutes, PacingDefaults.ActionPacingIdleBreakIntervalMinMinutes));
+        SettingsVm.Pacing.IdleBreakIntervalMaxMinutes = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBreakIntervalMaxMinutes, PacingDefaults.ActionPacingIdleBreakIntervalMaxMinutes));
+        SettingsVm.Pacing.IdleBreakDurationMinMinutes = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBreakDurationMinMinutes, PacingDefaults.ActionPacingIdleBreakDurationMinMinutes));
+        SettingsVm.Pacing.IdleBreakDurationMaxMinutes = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBreakDurationMaxMinutes, PacingDefaults.ActionPacingIdleBreakDurationMaxMinutes));
 
-        IdleBrowseEnabledCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowseEnabled, PacingDefaults.ActionPacingIdleBrowseEnabled);
-        IdleBrowseIntervalMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBrowseIntervalMinMinutes, PacingDefaults.ActionPacingIdleBrowseIntervalMinMinutes));
-        IdleBrowseIntervalMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBrowseIntervalMaxMinutes, PacingDefaults.ActionPacingIdleBrowseIntervalMaxMinutes));
-        IdleBrowsePageMapCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageMap, PacingDefaults.ActionPacingIdleBrowsePageMap);
-        IdleBrowsePageStatisticsCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatistics, PacingDefaults.ActionPacingIdleBrowsePageStatistics);
-        IdleBrowsePageStatisticsHeroCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsHero, PacingDefaults.ActionPacingIdleBrowsePageStatisticsHero);
-        IdleBrowsePageStatisticsTop10CheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsTop10, PacingDefaults.ActionPacingIdleBrowsePageStatisticsTop10);
-        IdleBrowsePageStatisticsDefendersCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsDefenders, PacingDefaults.ActionPacingIdleBrowsePageStatisticsDefenders);
-        IdleBrowsePageStatisticsAttackersCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsAttackers, PacingDefaults.ActionPacingIdleBrowsePageStatisticsAttackers);
-        IdleBrowsePageReportsCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageReports, PacingDefaults.ActionPacingIdleBrowsePageReports);
-        IdleBrowsePageMessagesCheckBox.IsChecked = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageMessages, PacingDefaults.ActionPacingIdleBrowsePageMessages);
+        SettingsVm.Pacing.IdleBrowseEnabled = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowseEnabled, PacingDefaults.ActionPacingIdleBrowseEnabled);
+        SettingsVm.Pacing.IdleBrowseIntervalMinMinutes = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBrowseIntervalMinMinutes, PacingDefaults.ActionPacingIdleBrowseIntervalMinMinutes));
+        SettingsVm.Pacing.IdleBrowseIntervalMaxMinutes = FormatDelay(ReadDouble(BotOptionPayloadKeys.ActionPacingIdleBrowseIntervalMaxMinutes, PacingDefaults.ActionPacingIdleBrowseIntervalMaxMinutes));
+        SettingsVm.Pacing.IdleBrowsePageMap = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageMap, PacingDefaults.ActionPacingIdleBrowsePageMap);
+        SettingsVm.Pacing.IdleBrowsePageStatistics = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatistics, PacingDefaults.ActionPacingIdleBrowsePageStatistics);
+        SettingsVm.Pacing.IdleBrowsePageStatisticsHero = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsHero, PacingDefaults.ActionPacingIdleBrowsePageStatisticsHero);
+        SettingsVm.Pacing.IdleBrowsePageStatisticsTop10 = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsTop10, PacingDefaults.ActionPacingIdleBrowsePageStatisticsTop10);
+        SettingsVm.Pacing.IdleBrowsePageStatisticsDefenders = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsDefenders, PacingDefaults.ActionPacingIdleBrowsePageStatisticsDefenders);
+        SettingsVm.Pacing.IdleBrowsePageStatisticsAttackers = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsAttackers, PacingDefaults.ActionPacingIdleBrowsePageStatisticsAttackers);
+        SettingsVm.Pacing.IdleBrowsePageReports = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageReports, PacingDefaults.ActionPacingIdleBrowsePageReports);
+        SettingsVm.Pacing.IdleBrowsePageMessages = ReadBool(BotOptionPayloadKeys.ActionPacingIdleBrowsePageMessages, PacingDefaults.ActionPacingIdleBrowsePageMessages);
 
-        CollectStepDelayMinTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.CollectStepDelayMinSeconds, PacingDefaults.CollectStepDelayMinSeconds));
-        CollectStepDelayMaxTextBox.Text = FormatDelay(ReadDouble(BotOptionPayloadKeys.CollectStepDelayMaxSeconds, PacingDefaults.CollectStepDelayMaxSeconds));
+        SettingsVm.Pacing.CollectStepDelayMinSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.CollectStepDelayMinSeconds, PacingDefaults.CollectStepDelayMinSeconds));
+        SettingsVm.Pacing.CollectStepDelayMaxSeconds = FormatDelay(ReadDouble(BotOptionPayloadKeys.CollectStepDelayMaxSeconds, PacingDefaults.CollectStepDelayMaxSeconds));
+        SynchronizeActionPacingControls();
     }
 
     private void SavePacingConfigFromUi()
     {
-        UpdateVillageStatusSweepDetailAvailability();
-        _config[BotOptionPayloadKeys.SessionPacingEnabled] = SessionPacingEnabledCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.SessionPacingRunMinMinutes] = ReadIntText(SessionRunMinMinutesTextBox, PacingDefaults.SessionPacingRunMinMinutes, 1, 10080);
-        _config[BotOptionPayloadKeys.SessionPacingRunMaxMinutes] = ReadIntText(SessionRunMaxMinutesTextBox, PacingDefaults.SessionPacingRunMaxMinutes, 1, 10080);
-        _config[BotOptionPayloadKeys.SessionPacingSleepMinMinutes] = ReadIntText(SessionSleepMinMinutesTextBox, PacingDefaults.SessionPacingSleepMinMinutes, 5, 10080);
-        _config[BotOptionPayloadKeys.SessionPacingSleepMaxMinutes] = ReadIntText(SessionSleepMaxMinutesTextBox, PacingDefaults.SessionPacingSleepMaxMinutes, 5, 10080);
-        _config[BotOptionPayloadKeys.SessionPacingDailyMaxHours] = GetSelectedDailyMaxHours();
-        _config[BotOptionPayloadKeys.SessionPacingDailyMaxVariationPercent] = GetSelectedDailyMaxVariationPercent();
+        _config[BotOptionPayloadKeys.SessionPacingEnabled] = SettingsVm.Pacing.SessionPacingEnabled;
+        _config[BotOptionPayloadKeys.SessionPacingRunMinMinutes] = ReadIntText(SettingsVm.Pacing.SessionRunMinMinutes, PacingDefaults.SessionPacingRunMinMinutes, 1, 10080);
+        _config[BotOptionPayloadKeys.SessionPacingRunMaxMinutes] = ReadIntText(SettingsVm.Pacing.SessionRunMaxMinutes, PacingDefaults.SessionPacingRunMaxMinutes, 1, 10080);
+        _config[BotOptionPayloadKeys.SessionPacingSleepMinMinutes] = ReadIntText(SettingsVm.Pacing.SessionSleepMinMinutes, PacingDefaults.SessionPacingSleepMinMinutes, 5, 10080);
+        _config[BotOptionPayloadKeys.SessionPacingSleepMaxMinutes] = ReadIntText(SettingsVm.Pacing.SessionSleepMaxMinutes, PacingDefaults.SessionPacingSleepMaxMinutes, 5, 10080);
+        _config[BotOptionPayloadKeys.SessionPacingDailyMaxHours] = SettingsVm.Pacing.SessionDailyMaxHours;
+        _config[BotOptionPayloadKeys.SessionPacingDailyMaxVariationPercent] = SettingsVm.Pacing.SessionDailyMaxVariationPercent;
         _config[BotOptionPayloadKeys.SessionPacingAllowedHours] = new JsonArray(
-            SessionAllowedHoursGrid.Children.OfType<CheckBox>()
-                .Where(checkBox => checkBox.IsChecked == true)
-                .Select(checkBox => JsonValue.Create(int.Parse(checkBox.Tag!.ToString()!)))
+            SettingsVm.Pacing.GetSelectedSessionHours()
+                .Select(hour => JsonValue.Create(hour))
                 .ToArray());
-        _config[BotOptionPayloadKeys.SessionPacingHoursVariationPercent] = GetSelectedHoursVariationPercent();
+        _config[BotOptionPayloadKeys.SessionPacingHoursVariationPercent] = SettingsVm.Pacing.SessionHoursVariationPercent;
 
         _config[BotOptionPayloadKeys.ActionPacingEnabled] = true;
-        WriteDelayRange(BotOptionPayloadKeys.ActionPacingTaskMinSeconds, BotOptionPayloadKeys.ActionPacingTaskMaxSeconds, ActionTaskMinTextBox, ActionTaskMaxTextBox, PacingDefaults.ActionPacingTaskMinSeconds, PacingDefaults.ActionPacingTaskMaxSeconds);
-        WriteDelayRange(BotOptionPayloadKeys.ActionPacingPageLoadMinSeconds, BotOptionPayloadKeys.ActionPacingPageLoadMaxSeconds, ActionPageLoadMinTextBox, ActionPageLoadMaxTextBox, PacingDefaults.ActionPacingPageLoadMinSeconds, PacingDefaults.ActionPacingPageLoadMaxSeconds);
-        WriteDelayRange(BotOptionPayloadKeys.ActionPacingClickMinSeconds, BotOptionPayloadKeys.ActionPacingClickMaxSeconds, ActionClickMinTextBox, ActionClickMaxTextBox, PacingDefaults.ActionPacingClickMinSeconds, PacingDefaults.ActionPacingClickMaxSeconds);
-        WriteDelayRange(BotOptionPayloadKeys.ActionPacingLoopMinSeconds, BotOptionPayloadKeys.ActionPacingLoopMaxSeconds, ActionLoopMinTextBox, ActionLoopMaxTextBox, PacingDefaults.ActionPacingLoopMinSeconds, PacingDefaults.ActionPacingLoopMaxSeconds);
-        _config[BotOptionPayloadKeys.ContinuousKeepAliveEnabled] = ContinuousKeepAliveEnabledCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.ContinuousKeepAliveMinMinutes] = ReadIntText(ContinuousKeepAliveMinMinutesTextBox, PacingDefaults.ContinuousKeepAliveMinMinutes, 1, 1440);
-        _config[BotOptionPayloadKeys.ContinuousKeepAliveMaxMinutes] = ReadIntText(ContinuousKeepAliveMaxMinutesTextBox, PacingDefaults.ContinuousKeepAliveMaxMinutes, 1, 1440);
+        WriteDelayRange(BotOptionPayloadKeys.ActionPacingTaskMinSeconds, BotOptionPayloadKeys.ActionPacingTaskMaxSeconds, SettingsVm.Pacing.TaskMinSeconds, SettingsVm.Pacing.TaskMaxSeconds, PacingDefaults.ActionPacingTaskMinSeconds, PacingDefaults.ActionPacingTaskMaxSeconds);
+        WriteDelayRange(BotOptionPayloadKeys.ActionPacingPageLoadMinSeconds, BotOptionPayloadKeys.ActionPacingPageLoadMaxSeconds, SettingsVm.Pacing.PageLoadMinSeconds, SettingsVm.Pacing.PageLoadMaxSeconds, PacingDefaults.ActionPacingPageLoadMinSeconds, PacingDefaults.ActionPacingPageLoadMaxSeconds);
+        WriteDelayRange(BotOptionPayloadKeys.ActionPacingClickMinSeconds, BotOptionPayloadKeys.ActionPacingClickMaxSeconds, SettingsVm.Pacing.ClickMinSeconds, SettingsVm.Pacing.ClickMaxSeconds, PacingDefaults.ActionPacingClickMinSeconds, PacingDefaults.ActionPacingClickMaxSeconds);
+        WriteDelayRange(BotOptionPayloadKeys.ActionPacingLoopMinSeconds, BotOptionPayloadKeys.ActionPacingLoopMaxSeconds, SettingsVm.Pacing.LoopMinSeconds, SettingsVm.Pacing.LoopMaxSeconds, PacingDefaults.ActionPacingLoopMinSeconds, PacingDefaults.ActionPacingLoopMaxSeconds);
+        _config[BotOptionPayloadKeys.ContinuousKeepAliveEnabled] = SettingsVm.Pacing.ContinuousKeepAliveEnabled;
+        _config[BotOptionPayloadKeys.ContinuousKeepAliveMinMinutes] = ReadIntText(SettingsVm.Pacing.ContinuousKeepAliveMinMinutes, PacingDefaults.ContinuousKeepAliveMinMinutes, 1, 1440);
+        _config[BotOptionPayloadKeys.ContinuousKeepAliveMaxMinutes] = ReadIntText(SettingsVm.Pacing.ContinuousKeepAliveMaxMinutes, PacingDefaults.ContinuousKeepAliveMaxMinutes, 1, 1440);
         WriteDelayRange(
             BotOptionPayloadKeys.FarmListStepDelayMinSeconds,
             BotOptionPayloadKeys.FarmListStepDelayMaxSeconds,
-            FarmListStepDelayMinTextBox,
-            FarmListStepDelayMaxTextBox,
+            SettingsVm.Pacing.FarmListStepDelayMinSeconds,
+            SettingsVm.Pacing.FarmListStepDelayMaxSeconds,
             PacingDefaults.FarmListStepDelayMinSeconds,
             PacingDefaults.FarmListStepDelayMaxSeconds);
-        _config[BotOptionPayloadKeys.VillageStatusSweepEnabled] = VillageStatusSweepEnabledCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.VillageStatusSweepDorf1Enabled] = VillageStatusSweepDorf1CheckBox.IsChecked == true;
-        var dorf2Enabled = VillageStatusSweepDorf2CheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.VillageStatusSweepEnabled] = SettingsVm.Pacing.VillageStatusSweepEnabled;
+        _config[BotOptionPayloadKeys.VillageStatusSweepDorf1Enabled] = SettingsVm.Pacing.VillageStatusSweepDorf1Enabled;
+        var dorf2Enabled = SettingsVm.Pacing.VillageStatusSweepDorf2Enabled;
         _config[BotOptionPayloadKeys.VillageStatusSweepDorf2Enabled] = dorf2Enabled;
-        _config[BotOptionPayloadKeys.VillageStatusSweepSmithyEnabled] = dorf2Enabled && VillageStatusSweepSmithyCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.VillageStatusSweepBarracksEnabled] = dorf2Enabled && VillageStatusSweepBarracksCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.VillageStatusSweepStableEnabled] = dorf2Enabled && VillageStatusSweepStableCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.VillageStatusSweepWorkshopEnabled] = dorf2Enabled && VillageStatusSweepWorkshopCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.VillageStatusSweepTownHallEnabled] = dorf2Enabled && VillageStatusSweepTownHallCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.VillageStatusSweepBreweryEnabled] = dorf2Enabled && VillageStatusSweepBreweryCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.VillageStatusSweepRoundMinMinutes] = ReadIntText(VillageStatusSweepRoundMinTextBox, PacingDefaults.VillageStatusSweepRoundMinMinutes, 1, 1440);
-        _config[BotOptionPayloadKeys.VillageStatusSweepRoundMaxMinutes] = ReadIntText(VillageStatusSweepRoundMaxTextBox, PacingDefaults.VillageStatusSweepRoundMaxMinutes, 1, 1440);
-        WriteDelayRange(BotOptionPayloadKeys.VillageStatusSweepVillageMinSeconds, BotOptionPayloadKeys.VillageStatusSweepVillageMaxSeconds, VillageStatusSweepVillageMinTextBox, VillageStatusSweepVillageMaxTextBox, PacingDefaults.VillageStatusSweepVillageMinSeconds, PacingDefaults.VillageStatusSweepVillageMaxSeconds);
+        _config[BotOptionPayloadKeys.VillageStatusSweepSmithyEnabled] = dorf2Enabled && SettingsVm.Pacing.VillageStatusSweepSmithyEnabled;
+        _config[BotOptionPayloadKeys.VillageStatusSweepBarracksEnabled] = dorf2Enabled && SettingsVm.Pacing.VillageStatusSweepBarracksEnabled;
+        _config[BotOptionPayloadKeys.VillageStatusSweepStableEnabled] = dorf2Enabled && SettingsVm.Pacing.VillageStatusSweepStableEnabled;
+        _config[BotOptionPayloadKeys.VillageStatusSweepWorkshopEnabled] = dorf2Enabled && SettingsVm.Pacing.VillageStatusSweepWorkshopEnabled;
+        _config[BotOptionPayloadKeys.VillageStatusSweepTownHallEnabled] = dorf2Enabled && SettingsVm.Pacing.VillageStatusSweepTownHallEnabled;
+        _config[BotOptionPayloadKeys.VillageStatusSweepBreweryEnabled] = dorf2Enabled && SettingsVm.Pacing.VillageStatusSweepBreweryEnabled;
+        _config[BotOptionPayloadKeys.VillageStatusSweepRoundMinMinutes] = ReadIntText(SettingsVm.Pacing.VillageStatusSweepRoundMinMinutes, PacingDefaults.VillageStatusSweepRoundMinMinutes, 1, 1440);
+        _config[BotOptionPayloadKeys.VillageStatusSweepRoundMaxMinutes] = ReadIntText(SettingsVm.Pacing.VillageStatusSweepRoundMaxMinutes, PacingDefaults.VillageStatusSweepRoundMaxMinutes, 1, 1440);
+        WriteDelayRange(BotOptionPayloadKeys.VillageStatusSweepVillageMinSeconds, BotOptionPayloadKeys.VillageStatusSweepVillageMaxSeconds, SettingsVm.Pacing.VillageStatusSweepVillageMinSeconds, SettingsVm.Pacing.VillageStatusSweepVillageMaxSeconds, PacingDefaults.VillageStatusSweepVillageMinSeconds, PacingDefaults.VillageStatusSweepVillageMaxSeconds);
 
         // Idle "step away" break (minutes). WriteDelayRange clamps and keeps max >= min.
-        _config[BotOptionPayloadKeys.ActionPacingIdleBreakEnabled] = IdleBreakEnabledCheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.ActionPacingIdleBreakEnabled] = SettingsVm.Pacing.IdleBreakEnabled;
         WriteDelayRange(
             BotOptionPayloadKeys.ActionPacingIdleBreakIntervalMinMinutes,
             BotOptionPayloadKeys.ActionPacingIdleBreakIntervalMaxMinutes,
-            IdleBreakIntervalMinTextBox,
-            IdleBreakIntervalMaxTextBox,
+            SettingsVm.Pacing.IdleBreakIntervalMinMinutes,
+            SettingsVm.Pacing.IdleBreakIntervalMaxMinutes,
             PacingDefaults.ActionPacingIdleBreakIntervalMinMinutes,
             PacingDefaults.ActionPacingIdleBreakIntervalMaxMinutes);
         WriteDelayRange(
             BotOptionPayloadKeys.ActionPacingIdleBreakDurationMinMinutes,
             BotOptionPayloadKeys.ActionPacingIdleBreakDurationMaxMinutes,
-            IdleBreakDurationMinTextBox,
-            IdleBreakDurationMaxTextBox,
+            SettingsVm.Pacing.IdleBreakDurationMinMinutes,
+            SettingsVm.Pacing.IdleBreakDurationMaxMinutes,
             PacingDefaults.ActionPacingIdleBreakDurationMinMinutes,
             PacingDefaults.ActionPacingIdleBreakDurationMaxMinutes);
 
         // Idle browse (interval minutes + per-page toggles). WriteDelayRange clamps and keeps max >= min.
-        _config[BotOptionPayloadKeys.ActionPacingIdleBrowseEnabled] = IdleBrowseEnabledCheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.ActionPacingIdleBrowseEnabled] = SettingsVm.Pacing.IdleBrowseEnabled;
         WriteDelayRange(
             BotOptionPayloadKeys.ActionPacingIdleBrowseIntervalMinMinutes,
             BotOptionPayloadKeys.ActionPacingIdleBrowseIntervalMaxMinutes,
-            IdleBrowseIntervalMinTextBox,
-            IdleBrowseIntervalMaxTextBox,
+            SettingsVm.Pacing.IdleBrowseIntervalMinMinutes,
+            SettingsVm.Pacing.IdleBrowseIntervalMaxMinutes,
             PacingDefaults.ActionPacingIdleBrowseIntervalMinMinutes,
             PacingDefaults.ActionPacingIdleBrowseIntervalMaxMinutes);
-        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageMap] = IdleBrowsePageMapCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatistics] = IdleBrowsePageStatisticsCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsHero] = IdleBrowsePageStatisticsHeroCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsTop10] = IdleBrowsePageStatisticsTop10CheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsDefenders] = IdleBrowsePageStatisticsDefendersCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsAttackers] = IdleBrowsePageStatisticsAttackersCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageReports] = IdleBrowsePageReportsCheckBox.IsChecked == true;
-        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageMessages] = IdleBrowsePageMessagesCheckBox.IsChecked == true;
+        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageMap] = SettingsVm.Pacing.IdleBrowsePageMap;
+        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatistics] = SettingsVm.Pacing.IdleBrowsePageStatistics;
+        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsHero] = SettingsVm.Pacing.IdleBrowsePageStatisticsHero;
+        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsTop10] = SettingsVm.Pacing.IdleBrowsePageStatisticsTop10;
+        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsDefenders] = SettingsVm.Pacing.IdleBrowsePageStatisticsDefenders;
+        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageStatisticsAttackers] = SettingsVm.Pacing.IdleBrowsePageStatisticsAttackers;
+        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageReports] = SettingsVm.Pacing.IdleBrowsePageReports;
+        _config[BotOptionPayloadKeys.ActionPacingIdleBrowsePageMessages] = SettingsVm.Pacing.IdleBrowsePageMessages;
 
         // Collect step delay (seconds). WriteDelayRange clamps and keeps max >= min.
         WriteDelayRange(
             BotOptionPayloadKeys.CollectStepDelayMinSeconds,
             BotOptionPayloadKeys.CollectStepDelayMaxSeconds,
-            CollectStepDelayMinTextBox,
-            CollectStepDelayMaxTextBox,
+            SettingsVm.Pacing.CollectStepDelayMinSeconds,
+            SettingsVm.Pacing.CollectStepDelayMaxSeconds,
             PacingDefaults.CollectStepDelayMinSeconds,
             PacingDefaults.CollectStepDelayMaxSeconds);
     }
 
-    private void VillageStatusSweepDorf2Changed(object sender, RoutedEventArgs e)
-    {
-        UpdateVillageStatusSweepDetailAvailability();
-    }
-
-    private void UpdateVillageStatusSweepDetailAvailability()
-    {
-        var enabled = VillageStatusSweepDorf2CheckBox.IsChecked == true;
-        foreach (var checkBox in new[]
-        {
-            VillageStatusSweepSmithyCheckBox,
-            VillageStatusSweepBarracksCheckBox,
-            VillageStatusSweepStableCheckBox,
-            VillageStatusSweepWorkshopCheckBox,
-            VillageStatusSweepTownHallCheckBox,
-            VillageStatusSweepBreweryCheckBox,
-        })
-        {
-            checkBox.IsEnabled = enabled;
-            if (!enabled)
-            {
-                checkBox.IsChecked = false;
-            }
-        }
-    }
-
     private void ApplyPacingDefaultsToUi()
     {
-        SessionPacingEnabledCheckBox.IsChecked = PacingDefaults.SessionPacingEnabled;
-        SessionRunMinMinutesTextBox.Text = PacingDefaults.SessionPacingRunMinMinutes.ToString();
-        SessionRunMaxMinutesTextBox.Text = PacingDefaults.SessionPacingRunMaxMinutes.ToString();
-        SessionSleepMinMinutesTextBox.Text = PacingDefaults.SessionPacingSleepMinMinutes.ToString();
-        SessionSleepMaxMinutesTextBox.Text = PacingDefaults.SessionPacingSleepMaxMinutes.ToString();
-        SelectDailyMaxHours(PacingDefaults.SessionPacingDailyMaxHours);
-        SelectDailyMaxVariationPercent(PacingDefaults.SessionPacingDailyMaxVariationPercent);
-        foreach (var checkBox in SessionAllowedHoursGrid.Children.OfType<CheckBox>())
-        {
-            checkBox.IsChecked = true;
-        }
-        SelectHoursVariationPercent(PacingDefaults.SessionPacingHoursVariationPercent);
-        ActionTaskMinTextBox.Text = FormatDelay(PacingDefaults.ActionPacingTaskMinSeconds);
-        ActionTaskMaxTextBox.Text = FormatDelay(PacingDefaults.ActionPacingTaskMaxSeconds);
-        ActionPageLoadMinTextBox.Text = FormatDelay(PacingDefaults.ActionPacingPageLoadMinSeconds);
-        ActionPageLoadMaxTextBox.Text = FormatDelay(PacingDefaults.ActionPacingPageLoadMaxSeconds);
-        ActionClickMinTextBox.Text = FormatDelay(PacingDefaults.ActionPacingClickMinSeconds);
-        ActionClickMaxTextBox.Text = FormatDelay(PacingDefaults.ActionPacingClickMaxSeconds);
-        ActionLoopMinTextBox.Text = FormatDelay(PacingDefaults.ActionPacingLoopMinSeconds);
-        ActionLoopMaxTextBox.Text = FormatDelay(PacingDefaults.ActionPacingLoopMaxSeconds);
-        ContinuousKeepAliveEnabledCheckBox.IsChecked = PacingDefaults.ContinuousKeepAliveEnabled;
-        ContinuousKeepAliveMinMinutesTextBox.Text = PacingDefaults.ContinuousKeepAliveMinMinutes.ToString();
-        ContinuousKeepAliveMaxMinutesTextBox.Text = PacingDefaults.ContinuousKeepAliveMaxMinutes.ToString();
-        FarmListStepDelayMinTextBox.Text = FormatDelay(PacingDefaults.FarmListStepDelayMinSeconds);
-        FarmListStepDelayMaxTextBox.Text = FormatDelay(PacingDefaults.FarmListStepDelayMaxSeconds);
-        VillageStatusSweepEnabledCheckBox.IsChecked = PacingDefaults.VillageStatusSweepEnabled;
-        VillageStatusSweepDorf1CheckBox.IsChecked = true;
-        VillageStatusSweepDorf2CheckBox.IsChecked = false;
-        VillageStatusSweepSmithyCheckBox.IsChecked = false;
-        VillageStatusSweepBarracksCheckBox.IsChecked = false;
-        VillageStatusSweepStableCheckBox.IsChecked = false;
-        VillageStatusSweepWorkshopCheckBox.IsChecked = false;
-        VillageStatusSweepTownHallCheckBox.IsChecked = false;
-        VillageStatusSweepBreweryCheckBox.IsChecked = false;
-        VillageStatusSweepRoundMinTextBox.Text = PacingDefaults.VillageStatusSweepRoundMinMinutes.ToString();
-        VillageStatusSweepRoundMaxTextBox.Text = PacingDefaults.VillageStatusSweepRoundMaxMinutes.ToString();
-        VillageStatusSweepVillageMinTextBox.Text = FormatDelay(PacingDefaults.VillageStatusSweepVillageMinSeconds);
-        VillageStatusSweepVillageMaxTextBox.Text = FormatDelay(PacingDefaults.VillageStatusSweepVillageMaxSeconds);
-        IdleBreakEnabledCheckBox.IsChecked = PacingDefaults.ActionPacingIdleBreakEnabled;
-        IdleBreakIntervalMinTextBox.Text = FormatDelay(PacingDefaults.ActionPacingIdleBreakIntervalMinMinutes);
-        IdleBreakIntervalMaxTextBox.Text = FormatDelay(PacingDefaults.ActionPacingIdleBreakIntervalMaxMinutes);
-        IdleBreakDurationMinTextBox.Text = FormatDelay(PacingDefaults.ActionPacingIdleBreakDurationMinMinutes);
-        IdleBreakDurationMaxTextBox.Text = FormatDelay(PacingDefaults.ActionPacingIdleBreakDurationMaxMinutes);
-        IdleBrowseEnabledCheckBox.IsChecked = PacingDefaults.ActionPacingIdleBrowseEnabled;
-        IdleBrowseIntervalMinTextBox.Text = FormatDelay(PacingDefaults.ActionPacingIdleBrowseIntervalMinMinutes);
-        IdleBrowseIntervalMaxTextBox.Text = FormatDelay(PacingDefaults.ActionPacingIdleBrowseIntervalMaxMinutes);
-        IdleBrowsePageMapCheckBox.IsChecked = PacingDefaults.ActionPacingIdleBrowsePageMap;
-        IdleBrowsePageStatisticsCheckBox.IsChecked = PacingDefaults.ActionPacingIdleBrowsePageStatistics;
-        IdleBrowsePageStatisticsHeroCheckBox.IsChecked = PacingDefaults.ActionPacingIdleBrowsePageStatisticsHero;
-        IdleBrowsePageStatisticsTop10CheckBox.IsChecked = PacingDefaults.ActionPacingIdleBrowsePageStatisticsTop10;
-        IdleBrowsePageStatisticsDefendersCheckBox.IsChecked = PacingDefaults.ActionPacingIdleBrowsePageStatisticsDefenders;
-        IdleBrowsePageStatisticsAttackersCheckBox.IsChecked = PacingDefaults.ActionPacingIdleBrowsePageStatisticsAttackers;
-        IdleBrowsePageReportsCheckBox.IsChecked = PacingDefaults.ActionPacingIdleBrowsePageReports;
-        IdleBrowsePageMessagesCheckBox.IsChecked = PacingDefaults.ActionPacingIdleBrowsePageMessages;
-        CollectStepDelayMinTextBox.Text = FormatDelay(PacingDefaults.CollectStepDelayMinSeconds);
-        CollectStepDelayMaxTextBox.Text = FormatDelay(PacingDefaults.CollectStepDelayMaxSeconds);
+        SettingsVm.Pacing.ResetDefaults();
+        SynchronizeActionPacingControls();
     }
 
     private bool ReadBool(string key, bool defaultValue) => _config[key]?.GetValue<bool>() ?? defaultValue;
@@ -1440,16 +1452,6 @@ public partial class SettingsWindow : Window
             });
         }
 
-        for (var hour = 0; hour < 24; hour++)
-        {
-            SessionAllowedHoursGrid.Children.Add(new CheckBox
-            {
-                Content = $"{hour:00}:00",
-                Tag = hour.ToString(CultureInfo.InvariantCulture),
-                IsChecked = true,
-                Margin = new Thickness(0, 2, 8, 2),
-            });
-        }
     }
 
     private HashSet<int> ReadAllowedHours()
@@ -1465,25 +1467,6 @@ public partial class SettingsWindow : Window
             .ToHashSet();
     }
 
-    private static int ParseTag(ComboBoxItem item)
-        => int.TryParse(item.Tag?.ToString(), out var value) ? value : 0;
-
-    private void SelectDailyMaxHours(int hours)
-    {
-        var normalized = Math.Clamp(hours, 0, 24).ToString(CultureInfo.InvariantCulture);
-        SessionDailyMaxHoursComboBox.SelectedItem = SessionDailyMaxHoursComboBox.Items
-            .OfType<ComboBoxItem>()
-            .First(item => string.Equals(item.Tag?.ToString(), normalized, StringComparison.Ordinal));
-    }
-
-    private int GetSelectedDailyMaxHours()
-    {
-        return SessionDailyMaxHoursComboBox.SelectedItem is ComboBoxItem item
-            && int.TryParse(item.Tag?.ToString(), out var hours)
-                ? Math.Clamp(hours, 0, 24)
-                : PacingDefaults.SessionPacingDailyMaxHours;
-    }
-
     private void SessionDailyMaxHoursComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _ = sender;
@@ -1493,7 +1476,7 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        var dailyMaxHours = GetSelectedDailyMaxHours();
+        var dailyMaxHours = SettingsVm.Pacing.SessionDailyMaxHours;
         if (dailyMaxHours is > 0 and <= PacingDefaults.SessionPacingDailyMaxHours)
         {
             return;
@@ -1510,50 +1493,26 @@ public partial class SettingsWindow : Window
             successResult: MessageBoxResult.OK);
     }
 
-    private void SelectDailyMaxVariationPercent(int percent)
-    {
-        var items = SessionDailyMaxVariationComboBox.Items.OfType<ComboBoxItem>().ToList();
-        var match = items.FirstOrDefault(item =>
-                string.Equals(item.Tag?.ToString(), percent.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
-            ?? items.OrderBy(item => Math.Abs(ParseTag(item) - percent)).FirstOrDefault();
-        SessionDailyMaxVariationComboBox.SelectedItem = match;
-    }
-
-    private int GetSelectedDailyMaxVariationPercent()
-    {
-        return SessionDailyMaxVariationComboBox.SelectedItem is ComboBoxItem item
-            && int.TryParse(item.Tag?.ToString(), out var percent)
-                ? Math.Clamp(percent, 0, 50)
-                : PacingDefaults.SessionPacingDailyMaxVariationPercent;
-    }
-
-    private void SelectHoursVariationPercent(int percent)
-    {
-        var items = SessionHoursVariationComboBox.Items.OfType<ComboBoxItem>().ToList();
-        var match = items.FirstOrDefault(item =>
-                string.Equals(item.Tag?.ToString(), percent.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
-            ?? items.OrderBy(item => Math.Abs(ParseTag(item) - percent)).FirstOrDefault();
-        SessionHoursVariationComboBox.SelectedItem = match;
-    }
-
-    private int GetSelectedHoursVariationPercent()
-    {
-        return SessionHoursVariationComboBox.SelectedItem is ComboBoxItem item
-            && int.TryParse(item.Tag?.ToString(), out var percent)
-                ? Math.Clamp(percent, 0, 49)
-                : PacingDefaults.SessionPacingHoursVariationPercent;
-    }
-
     private static int ReadIntText(TextBox textBox, int defaultValue, int min, int max)
     {
-        return int.TryParse(textBox.Text, out var value)
+        return ReadIntText(textBox.Text, defaultValue, min, max);
+    }
+
+    private static int ReadIntText(string? text, int defaultValue, int min, int max)
+    {
+        return int.TryParse(text, out var value)
             ? Math.Clamp(value, min, max)
             : defaultValue;
     }
 
     private static double ReadDoubleText(TextBox textBox, double defaultValue)
     {
-        return double.TryParse(textBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+        return ReadDoubleText(textBox.Text, defaultValue);
+    }
+
+    private static double ReadDoubleText(string? text, double defaultValue)
+    {
+        return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
             ? Math.Clamp(value, 0, 3600)
             : defaultValue;
     }
@@ -1565,8 +1524,13 @@ public partial class SettingsWindow : Window
 
     private void WriteDelayRange(string minKey, string maxKey, TextBox minTextBox, TextBox maxTextBox, double defaultMin, double defaultMax)
     {
-        var min = ReadDoubleText(minTextBox, defaultMin);
-        var max = Math.Max(min, ReadDoubleText(maxTextBox, defaultMax));
+        WriteDelayRange(minKey, maxKey, minTextBox.Text, maxTextBox.Text, defaultMin, defaultMax);
+    }
+
+    private void WriteDelayRange(string minKey, string maxKey, string minText, string maxText, double defaultMin, double defaultMax)
+    {
+        var min = ReadDoubleText(minText, defaultMin);
+        var max = Math.Max(min, ReadDoubleText(maxText, defaultMax));
         _config[minKey] = min;
         _config[maxKey] = max;
     }
@@ -1579,15 +1543,15 @@ public partial class SettingsWindow : Window
     {
         var fields = new[]
         {
-            (TextBox: GoldLimitTextBox, Label: "Minimum gold balance"),
-            (TextBox: DailyGoldSpendingLimitTextBox, Label: "Daily gold spending limit"),
-            (TextBox: SilverLimitTextBox, Label: "Minimum silver balance"),
-            (TextBox: DailySilverSpendingLimitTextBox, Label: "Daily silver spending limit"),
+            (TextBox: GoldLimitTextBox, Text: SettingsVm.GoldLimitText, Label: "Minimum gold balance"),
+            (TextBox: DailyGoldSpendingLimitTextBox, Text: SettingsVm.DailyGoldSpendingLimitText, Label: "Daily gold spending limit"),
+            (TextBox: SilverLimitTextBox, Text: SettingsVm.SilverLimitText, Label: "Minimum silver balance"),
+            (TextBox: DailySilverSpendingLimitTextBox, Text: SettingsVm.DailySilverSpendingLimitText, Label: "Daily silver spending limit"),
         };
         var values = new int[fields.Length];
         for (var index = 0; index < fields.Length; index++)
         {
-            if (!int.TryParse(fields[index].TextBox.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out values[index]))
+            if (!int.TryParse(fields[index].Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out values[index]))
             {
                 AppDialog.Show(
                     this,
@@ -1611,7 +1575,7 @@ public partial class SettingsWindow : Window
 
     private void CaptureTownHallResults()
     {
-        TownHallResults = TownHallRows
+        TownHallResults = SettingsVm.Celebrations.TownHallRows
             .Select(row => new TownHallOverviewResult(
                 row.VillageKey,
                 row.VillageName,
@@ -1628,10 +1592,10 @@ public partial class SettingsWindow : Window
     {
         var villages = string.Join(
             ";",
-            TownHallRows
+            SettingsVm.Celebrations.TownHallRows
                 .OrderBy(row => row.VillageKey, StringComparer.OrdinalIgnoreCase)
                 .Select(row => $"{row.VillageKey}|{row.IsTownHallEnabled}|{row.Mode}"));
-        return $"{villages}#{TownHallQueue.Count}|{TownHallQueue.ResolvedDelayMinMinutes:0.##}|{TownHallQueue.ResolvedDelayMaxMinutes:0.##}";
+        return $"{villages}#{SettingsVm.Celebrations.TownHallQueue.Count}|{SettingsVm.Celebrations.TownHallQueue.ResolvedDelayMinMinutes:0.##}|{SettingsVm.Celebrations.TownHallQueue.ResolvedDelayMaxMinutes:0.##}";
     }
 
 }

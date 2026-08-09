@@ -42,17 +42,17 @@ public sealed class SettingsWindowTests : IDisposable
 
             var tabs = Assert.IsType<TabControl>(window.FindName("SettingsCategoryTabControl"));
             Assert.Equal((int)SettingsCategory.Celebrations, tabs.SelectedIndex);
-            Assert.Single(window.TownHallRows);
-            Assert.True(window.TownHallQueue.IsRestartDelayEnabled);
-            Assert.True(window.BreweryRestartDelay.IsEnabled);
-            Assert.Equal("5", window.BreweryRestartDelay.DelayMinMinutes);
-            Assert.Equal("40", window.BreweryRestartDelay.DelayMaxMinutes);
-            Assert.True(window.HeroAdventureRestartDelay.IsEnabled);
-            Assert.Equal("3", window.HeroAdventureRestartDelay.DelayMinMinutes);
-            Assert.Equal("15", window.HeroAdventureRestartDelay.DelayMaxMinutes);
-            Assert.True(window.SmithyUpgradeRestartDelay.IsEnabled);
-            Assert.Equal("10", window.SmithyUpgradeRestartDelay.DelayMinMinutes);
-            Assert.Equal("30", window.SmithyUpgradeRestartDelay.DelayMaxMinutes);
+            Assert.Single(window.SettingsVm.Celebrations.TownHallRows);
+            Assert.True(window.SettingsVm.Celebrations.TownHallQueue.IsRestartDelayEnabled);
+            Assert.True(window.SettingsVm.Celebrations.BreweryRestartDelay.IsEnabled);
+            Assert.Equal("5", window.SettingsVm.Celebrations.BreweryRestartDelay.DelayMinMinutes);
+            Assert.Equal("40", window.SettingsVm.Celebrations.BreweryRestartDelay.DelayMaxMinutes);
+            Assert.True(window.SettingsVm.Hero.AdventureRestartDelay.IsEnabled);
+            Assert.Equal("3", window.SettingsVm.Hero.AdventureRestartDelay.DelayMinMinutes);
+            Assert.Equal("15", window.SettingsVm.Hero.AdventureRestartDelay.DelayMaxMinutes);
+            Assert.True(window.SettingsVm.Hero.SmithyUpgradeRestartDelay.IsEnabled);
+            Assert.Equal("10", window.SettingsVm.Hero.SmithyUpgradeRestartDelay.DelayMinMinutes);
+            Assert.Equal("30", window.SettingsVm.Hero.SmithyUpgradeRestartDelay.DelayMaxMinutes);
             Assert.Equal("100", Assert.IsType<TextBox>(window.FindName("GoldLimitTextBox")).Text);
             Assert.Equal("20", Assert.IsType<TextBox>(window.FindName("DailyGoldSpendingLimitTextBox")).Text);
             Assert.Equal("100", Assert.IsType<TextBox>(window.FindName("SilverLimitTextBox")).Text);

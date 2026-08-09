@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Threading;
 using TbotUltra.Desktop.Models;
@@ -20,6 +19,7 @@ namespace TbotUltra.Desktop;
 public partial class VillageSettingsWindow : Window
 {
     private readonly IReadOnlyList<VillageSettingsRow> _rows;
+    private readonly IReadOnlyList<VillageSettingsRow> _gridRows;
     private readonly Action<VillageSettingsRow>? _onEnabledChanged;
     private readonly Action<VillageSettingsRow>? _onNpcTradeChanged;
     private readonly Action<VillageSettingsRow>? _onHeroResourcesChanged;
@@ -54,6 +54,7 @@ public partial class VillageSettingsWindow : Window
         InitializeComponent();
         ThemeChrome.EnableEarlyDarkTitleBar(this);
         _rows = rows;
+        _gridRows = rows.Count == 0 ? rows : [CreateCheckAllRow(rows), .. rows];
         _onEnabledChanged = onEnabledChanged;
         _onNpcTradeChanged = onNpcTradeChanged;
         _onHeroResourcesChanged = onHeroResourcesChanged;
@@ -69,7 +70,7 @@ public partial class VillageSettingsWindow : Window
         BuildGroupColumns(rows);
         BuildOverviewColumns();
         ApplyTribeColumnVisibility(rows);
-        VillageSettingsDataGrid.ItemsSource = rows;
+        VillageSettingsDataGrid.ItemsSource = _gridRows;
         UpcomingTasksDataGrid.ItemsSource = _upcomingTaskRows;
         VillageOverviewDataGrid.ItemsSource = _overviewVillageRows;
 
@@ -82,6 +83,17 @@ public partial class VillageSettingsWindow : Window
             Closed += (_, _) => _overviewRefreshTimer.Stop();
         }
     }
+
+    private static VillageSettingsRow CreateCheckAllRow(IReadOnlyList<VillageSettingsRow> rows) => new()
+    {
+        IsCheckAllRow = true,
+        GroupToggles = rows[0].GroupToggles.Select(toggle => new VillageGroupToggle
+        {
+            GroupKey = toggle.GroupKey,
+            Title = toggle.Title,
+            Description = toggle.Description,
+        }).ToList(),
+    };
 
     private void RefreshOverview()
     {
@@ -158,26 +170,29 @@ public partial class VillageSettingsWindow : Window
 
             VillageSettingsDataGrid.Columns.Add(new DataGridTemplateColumn
             {
-                Header = BuildToggleColumnHeader(headerTitle, tooltip, (_, _) => ToggleAllGroup(groupIndex)),
+                Header = BuildColumnHeader(headerTitle, tooltip),
                 Width = DataGridLength.Auto,
-                CellTemplate = BuildGroupCellTemplate(toggle.GroupKey, $"GroupToggles[{i}].IsEnabled"),
+                CellTemplate = BuildGroupCellTemplate(
+                    toggle.GroupKey,
+                    $"GroupToggles[{i}].IsEnabled",
+                    (_, _) => ToggleAllGroup(groupIndex)),
             });
 
             if (string.Equals(toggle.GroupKey, QueueGroupCatalog.GetKey(QueueGroup.Construction), StringComparison.OrdinalIgnoreCase))
             {
                 VillageSettingsDataGrid.Columns.Add(new DataGridTemplateColumn
                 {
-                    Header = BuildToggleColumnHeader(
+                    Header = BuildColumnHeader(
                         "25% construct.",
-                        "Construct 25% faster. Enables Official Travian construct-faster bonus videos for this village.",
-                        (_, _) => ToggleAllRows(
-                            row => row.ConstructFasterEnabled,
-                            (row, isEnabled) => row.ConstructFasterEnabled = isEnabled)),
+                        "Construct 25% faster. Enables Official Travian construct-faster bonus videos for this village."),
                     Width = DataGridLength.Auto,
                     CellTemplate = BuildToggleWithGearCellTemplate(
                         nameof(VillageSettingsRow.ConstructFasterEnabled),
                         "Open Construct 25% faster settings",
                         ConstructFasterSettingsButton_Click,
+                        (_, _) => ToggleAllRows(
+                            row => row.ConstructFasterEnabled,
+                            (row, isEnabled) => row.ConstructFasterEnabled = isEnabled),
                         "ToggleSwitchPurpleStyle"),
                 });
             }
@@ -186,17 +201,17 @@ public partial class VillageSettingsWindow : Window
             {
                 VillageSettingsDataGrid.Columns.Add(new DataGridTemplateColumn
                 {
-                    Header = BuildToggleColumnHeader(
+                    Header = BuildColumnHeader(
                         "Hero res.",
-                        "Selects which villages may use hero inventory resources.",
-                        (_, _) => ToggleAllRows(
-                            row => row.HeroResourcesEnabled,
-                            (row, isEnabled) => row.HeroResourcesEnabled = isEnabled)),
+                        "Selects which villages may use hero inventory resources."),
                     Width = DataGridLength.Auto,
                     CellTemplate = BuildToggleWithGearCellTemplate(
                         nameof(VillageSettingsRow.HeroResourcesEnabled),
                         "Open Hero resource settings",
-                        HeroResourceSettingsButton_Click),
+                        HeroResourceSettingsButton_Click,
+                        (_, _) => ToggleAllRows(
+                            row => row.HeroResourcesEnabled,
+                            (row, isEnabled) => row.HeroResourcesEnabled = isEnabled)),
                 });
             }
         }
@@ -282,32 +297,16 @@ public partial class VillageSettingsWindow : Window
         };
     }
 
-    // The second header line controls the whole toggle column. This keeps mass edits visible without
-    // adding a separate control row whose widths could drift away from the DataGrid columns.
-    private FrameworkElement BuildToggleColumnHeader(string title, string tooltip, RoutedEventHandler checkAllClick)
+    private static FrameworkElement BuildColumnHeader(string title, string tooltip)
     {
-        var header = new StackPanel();
-        var titleText = new TextBlock
+        var header = new TextBlock
         {
             Text = title,
             FontSize = 11,
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = tooltip,
         };
-        ToolTipService.SetInitialShowDelay(titleText, 100);
-        header.Children.Add(titleText);
-
-        var checkAll = new Button
-        {
-            Content = "Check all",
-            FontSize = 9,
-            Padding = new Thickness(3, 1, 3, 1),
-            Margin = new Thickness(0, 3, 0, 1),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            ToolTip = "Checks every available village in this column. If all are checked, clears them.",
-        };
-        checkAll.Click += checkAllClick;
-        header.Children.Add(checkAll);
+        ToolTipService.SetInitialShowDelay(header, 100);
         return header;
     }
 
@@ -370,17 +369,31 @@ public partial class VillageSettingsWindow : Window
         _ => title,
     };
 
-    private static DataTemplate BuildToggleCellTemplate(string bindingPath)
+    private static DataTemplate BuildToggleCellTemplate(string bindingPath, RoutedEventHandler checkAllClick)
     {
         var canToggleBindingPath = ResolveCanToggleBindingPath(bindingPath);
-        var xaml =
-            "<DataTemplate xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\">"
-            + "<CheckBox Style=\"{DynamicResource ToggleSwitchBlueStyle}\" HorizontalAlignment=\"Center\" "
-            + "VerticalAlignment=\"Center\" Margin=\"2,0\" "
-            + $"IsEnabled=\"{{Binding {canToggleBindingPath}}}\" "
-            + $"IsChecked=\"{{Binding {bindingPath}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}}\" />"
-            + "</DataTemplate>";
-        return (DataTemplate)XamlReader.Parse(xaml);
+        var template = new DataTemplate();
+        var grid = new FrameworkElementFactory(typeof(Grid));
+
+        var toggle = new FrameworkElementFactory(typeof(CheckBox)) { Name = "Toggle" };
+        toggle.SetResourceReference(FrameworkElement.StyleProperty, "ToggleSwitchBlueStyle");
+        toggle.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        toggle.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        toggle.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 0, 2, 0));
+        toggle.SetBinding(UIElement.IsEnabledProperty, new System.Windows.Data.Binding(canToggleBindingPath));
+        toggle.SetBinding(UIElement.VisibilityProperty, new System.Windows.Data.Binding(nameof(VillageSettingsRow.ToggleVisibility)));
+        toggle.SetBinding(ToggleButton.IsCheckedProperty, new System.Windows.Data.Binding(bindingPath)
+        {
+            Mode = System.Windows.Data.BindingMode.TwoWay,
+            UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged,
+        });
+        grid.AppendChild(toggle);
+
+        var checkAll = BuildCheckAllButton(checkAllClick, "CheckAll");
+        grid.AppendChild(checkAll);
+        template.VisualTree = grid;
+        template.Seal();
+        return template;
     }
 
     private static string ResolveCanToggleBindingPath(string bindingPath)
@@ -391,36 +404,39 @@ public partial class VillageSettingsWindow : Window
             : "CanToggle";
     }
 
-    private DataTemplate BuildGroupCellTemplate(string groupKey, string bindingPath)
+    private DataTemplate BuildGroupCellTemplate(string groupKey, string bindingPath, RoutedEventHandler checkAllClick)
     {
         if (string.Equals(groupKey, QueueGroupCatalog.GetKey(QueueGroup.TroopTraining), StringComparison.OrdinalIgnoreCase))
         {
-            return BuildToggleWithGearCellTemplate(bindingPath, "Open troop settings", TroopSettingsButton_Click);
+            return BuildToggleWithGearCellTemplate(bindingPath, "Open troop settings", TroopSettingsButton_Click, checkAllClick);
         }
 
         if (string.Equals(groupKey, QueueGroupCatalog.GetKey(QueueGroup.Troops), StringComparison.OrdinalIgnoreCase))
         {
-            return BuildToggleWithGearCellTemplate(bindingPath, "Open Upgrade options", SmithyUpgradeSettingsButton_Click);
+            return BuildToggleWithGearCellTemplate(bindingPath, "Open Upgrade options", SmithyUpgradeSettingsButton_Click, checkAllClick);
         }
 
         if (string.Equals(groupKey, QueueGroupCatalog.GetKey(QueueGroup.TownHallCelebration), StringComparison.OrdinalIgnoreCase))
         {
-            return BuildToggleWithGearCellTemplate(bindingPath, "Open Bot Settings > Celebrations", TownHallSettingsButton_Click);
+            return BuildToggleWithGearCellTemplate(bindingPath, "Open Bot Settings > Celebrations", TownHallSettingsButton_Click, checkAllClick);
         }
 
-        return BuildToggleCellTemplate(bindingPath);
+        return BuildToggleCellTemplate(bindingPath, checkAllClick);
     }
 
     private static DataTemplate BuildToggleWithGearCellTemplate(
         string bindingPath,
         string tooltip,
         RoutedEventHandler clickHandler,
+        RoutedEventHandler checkAllClick,
         string toggleStyleKey = "ToggleSwitchBlueStyle")
     {
         var template = new DataTemplate();
-        var panel = new FrameworkElementFactory(typeof(StackPanel));
+        var grid = new FrameworkElementFactory(typeof(Grid));
+        var panel = new FrameworkElementFactory(typeof(StackPanel)) { Name = "RowControls" };
         panel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
         panel.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        panel.SetBinding(UIElement.VisibilityProperty, new System.Windows.Data.Binding(nameof(VillageSettingsRow.ToggleVisibility)));
         panel.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
 
         var toggle = new FrameworkElementFactory(typeof(CheckBox));
@@ -429,6 +445,7 @@ public partial class VillageSettingsWindow : Window
         toggle.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
         toggle.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 0, 0, 0));
         toggle.SetBinding(UIElement.IsEnabledProperty, new System.Windows.Data.Binding(ResolveCanToggleBindingPath(bindingPath)));
+        toggle.SetBinding(UIElement.VisibilityProperty, new System.Windows.Data.Binding(nameof(VillageSettingsRow.ToggleVisibility)));
         toggle.SetBinding(ToggleButton.IsCheckedProperty, new System.Windows.Data.Binding(bindingPath)
         {
             Mode = System.Windows.Data.BindingMode.TwoWay,
@@ -447,8 +464,25 @@ public partial class VillageSettingsWindow : Window
         button.AddHandler(ButtonBase.ClickEvent, clickHandler);
         panel.AppendChild(button);
 
-        template.VisualTree = panel;
+        grid.AppendChild(panel);
+        grid.AppendChild(BuildCheckAllButton(checkAllClick, "CheckAll"));
+        template.VisualTree = grid;
+        template.Seal();
         return template;
+    }
+
+    private static FrameworkElementFactory BuildCheckAllButton(RoutedEventHandler clickHandler, string name)
+    {
+        var button = new FrameworkElementFactory(typeof(Button)) { Name = name };
+        button.SetValue(ContentControl.ContentProperty, "Check all");
+        button.SetValue(Control.FontSizeProperty, 9d);
+        button.SetValue(Control.PaddingProperty, new Thickness(3, 1, 3, 1));
+        button.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        button.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        button.SetBinding(UIElement.VisibilityProperty, new System.Windows.Data.Binding(nameof(VillageSettingsRow.CheckAllVisibility)));
+        button.SetValue(FrameworkElement.ToolTipProperty, "Checks every available village in this column. If all are checked, clears them.");
+        button.AddHandler(ButtonBase.ClickEvent, clickHandler);
+        return button;
     }
 
     private void TroopSettingsButton_Click(object sender, RoutedEventArgs e)

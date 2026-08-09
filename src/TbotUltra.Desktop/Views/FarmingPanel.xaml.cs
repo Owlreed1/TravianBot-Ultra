@@ -11,11 +11,7 @@ public partial class FarmingPanel : UserControl
         typeof(FarmingPanel),
         new PropertyMetadata("Next send: --"));
 
-    private MainWindow? _host;
-
     public FarmingPanel() => InitializeComponent();
-
-    private MainWindow? Host => _host ??= Window.GetWindow(this) as MainWindow;
 
     internal Button AnalyzeButton => AnalyzeFarmListsButton;
     internal Button AddFarmsButton => AddFarmsToListButton;
@@ -41,7 +37,4 @@ public partial class FarmingPanel : UserControl
 
     internal void SetNextSendDisplay(string text) => NextSendDisplay = text;
 
-    private void FarmingSettings_Changed(object sender, RoutedEventArgs e) => Host?.OnFarmingSettingsChanged(sender, e);
-    private void MoveFarmLossesCheckBox_Checked(object sender, RoutedEventArgs e) => Host?.OnMoveFarmLossesChecked(sender, e);
-    private void TravcoInactiveSearchButton_Click(object sender, RoutedEventArgs e) => Host?.OnTravcoInactiveSearchClicked(sender, e);
 }

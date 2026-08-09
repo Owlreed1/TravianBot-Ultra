@@ -28,7 +28,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                result = await client.SendHeroOnAdventureAsync(cancellationToken);
+                result = await new HeroAutomationOperation(client).DispatchAdventureAsync(cancellationToken);
                 log(result.Message);
             });
 
@@ -52,7 +52,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                revived = await client.CheckAndReviveDeadHeroOnCurrentPageAsync(autoRevive, cancellationToken);
+                revived = await new HeroAutomationOperation(client).ReviveIfNeededAsync(autoRevive, cancellationToken);
             });
 
         return revived;
@@ -78,7 +78,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                count = await client.RefreshAdventureCountAsync(cancellationToken: cancellationToken);
+                count = await new HeroAutomationOperation(client).RefreshAdventureCountAsync(cancellationToken);
                 found = count is not null;
             });
 
@@ -110,7 +110,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                found = await client.HasHeroLevelUpIndicatorOnCurrentPageAsync(cancellationToken);
+                found = await new HeroAutomationOperation(client).HasLevelUpIndicatorAsync(cancellationToken);
             },
             saveStateMode: BrowserStateSaveMode.Skip);
 
@@ -135,7 +135,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                reviving = await client.IsHeroRevivingOnCurrentPageAsync(cancellationToken);
+                reviving = await new HeroAutomationOperation(client).IsRevivingAsync(cancellationToken);
             },
             saveStateMode: BrowserStateSaveMode.Skip);
 
@@ -157,7 +157,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                home = await client.IsHeroHomeOnCurrentPageAsync(cancellationToken);
+                home = await new HeroAutomationOperation(client).IsHomeAsync(cancellationToken);
             },
             saveStateMode: BrowserStateSaveMode.Skip);
 
@@ -179,7 +179,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                hpPercent = await client.ReadHeroHpFromCurrentPageAsync(cancellationToken);
+                hpPercent = await new HeroAutomationOperation(client).ReadCurrentPageHpAsync(cancellationToken);
             },
             saveStateMode: BrowserStateSaveMode.Skip);
 
@@ -204,7 +204,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                claimable = await client.HasClaimableTasksOnCurrentPageAsync(cancellationToken);
+                claimable = await new HeroAutomationOperation(client).HasClaimableTasksAsync(cancellationToken);
             },
             saveStateMode: BrowserStateSaveMode.Skip);
 
@@ -228,7 +228,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                claimable = await client.HasClaimableDailyQuestsOnCurrentPageAsync(cancellationToken);
+                claimable = await new HeroAutomationOperation(client).HasClaimableDailyQuestsAsync(cancellationToken);
             },
             saveStateMode: BrowserStateSaveMode.Skip);
 
@@ -250,7 +250,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                snapshot = await client.ReadHeroAttributeSnapshotAsync(cancellationToken);
+                snapshot = await new HeroAutomationOperation(client).ReadAttributesAsync(cancellationToken);
                 log(
                     $"Hero attributes: free points={snapshot.FreePoints}, fighting strength={snapshot.FightingStrength}, offence bonus={snapshot.OffenceBonus}, defence bonus={snapshot.DefenceBonus}, resources={snapshot.Resources}, adventures={(snapshot.AdventureCount?.ToString() ?? "?")}.");
             });
@@ -273,7 +273,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                resources = await client.ReadHeroInventoryResourcesAsync(cancellationToken);
+                resources = await new HeroAutomationOperation(client).ReadInventoryResourcesAsync(cancellationToken);
                 log($"Hero inventory: wood={resources.Wood}, clay={resources.Clay}, iron={resources.Iron}, crop={resources.Crop}.");
             });
 

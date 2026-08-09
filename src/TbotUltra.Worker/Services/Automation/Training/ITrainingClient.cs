@@ -1,4 +1,5 @@
 using TbotUltra.Core.Tasks;
+using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Worker.Services;
 
@@ -8,6 +9,10 @@ namespace TbotUltra.Worker.Services;
 /// </summary>
 internal interface ITrainingClient
 {
+    Task<IReadOnlyList<TroopTrainingQueueStatus>> ReadTroopTrainingQueuesAsync(
+        IReadOnlyList<Building>? knownBuildings = null,
+        CancellationToken cancellationToken = default);
+
     Task<string> UpgradeSelectedTroopsAtSmithyAsync(
         IReadOnlyList<SmithyTroopTarget> targets,
         CancellationToken cancellationToken = default);

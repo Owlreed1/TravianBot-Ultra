@@ -7,7 +7,8 @@ public sealed partial class BotTaskRunner
     private static async Task ExecuteSendResourcesBetweenVillagesAsync(TaskExecutionContext context)
     {
         context.Log("send_resources_between_villages: starting.");
-        var result = await context.Client.SendResourcesBetweenOwnVillagesAsync(context.CancellationToken);
+        var result = await new CombatOperation(context.Client)
+            .SendResourcesBetweenOwnVillagesAsync(context.CancellationToken);
         context.Log(result);
         ThrowIfTaskBlocked("send_resources_between_villages", result);
     }

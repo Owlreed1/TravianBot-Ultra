@@ -196,4 +196,20 @@ public sealed class ResourcesViewModelTests
 
         Assert.True(loadRequested);
     }
+
+    [Fact]
+    public void SettingsChanged_EmitsOnlyForUserChanges_NotSettingsLoads()
+    {
+        var vm = new ResourcesViewModel();
+        var changes = new List<ResourceSettingsChange>();
+        vm.SettingsChanged += changes.Add;
+
+        vm.LoadResourceUpgradeTypes(["wood", "crop"]);
+        vm.IsBuildSmart = true;
+        vm.UpgradeWood = false;
+
+        Assert.Equal(
+            [ResourceSettingsChange.BuildStrategy, ResourceSettingsChange.UpgradeTypes],
+            changes);
+    }
 }

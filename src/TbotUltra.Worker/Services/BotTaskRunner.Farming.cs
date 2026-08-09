@@ -30,7 +30,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                result = await client.CheckCapitalFromProfileAsync(cancellationToken);
+                result = await new CapitalProfileOperation(client).CheckAsync(cancellationToken);
             });
 
         return result ?? throw new InvalidOperationException("The player profile returned no capital village.");
@@ -50,7 +50,7 @@ public sealed partial class BotTaskRunner
             accountName,
             interactive: true,
             cancellationToken,
-            client => client.SetVerifiedCapitalStateAsync(capital, cancellationToken));
+            client => new CapitalProfileOperation(client).SetVerifiedStateAsync(capital, cancellationToken));
     }
 
     private static FarmListLossHandlingRequest CreateFarmListLossHandlingRequest(
@@ -98,7 +98,7 @@ public sealed partial class BotTaskRunner
             return;
         }
 
-        var result = await context.Client.HandleFarmListLossTargetsAsync(
+        var result = await new ManualFarmingOperation(context.Client).HandleLossTargetsAsync(
             CreateFarmListLossHandlingRequest(context.Options),
             context.CancellationToken);
         context.Log($"Continuous farming loss handling result: found={result.RowsFound}, deactivated={result.RowsDeactivated}, moved={result.RowsMoved}, moveFailures={result.MoveFailures}, skippedOasis={result.SkippedOasisRows}.");
@@ -152,7 +152,7 @@ public sealed partial class BotTaskRunner
                 var request = CreateFarmListLossHandlingRequest(options)
                     with { IncludeUnoccupiedOasis = false };
                 log($"[farm-list:debug] running red/yellow farm move/deactivate to '{request.DestinationListName}'.");
-                result = await client.HandleFarmListLossTargetsAsync(request, cancellationToken);
+                result = await new ManualFarmingOperation(client).HandleLossTargetsAsync(request, cancellationToken);
             });
 
         var completed = result ?? throw new InvalidOperationException("The red/yellow farm move returned no result.");
@@ -176,7 +176,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                overview = await client.ReadFarmListsOverviewAsync(cancellationToken);
+                overview = await new ManualFarmingOperation(client).ReadOverviewAsync(cancellationToken);
             });
 
         return overview;
@@ -199,7 +199,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                remainingSeconds = await client.SendFarmListNowAsync(farmListName, cancellationToken);
+                remainingSeconds = await new ManualFarmingOperation(client).SendOneAsync(farmListName, cancellationToken);
             });
 
         return remainingSeconds;
@@ -222,7 +222,7 @@ public sealed partial class BotTaskRunner
             {
                 await client.LoginAsync(cancellationToken);
                 await RunFarmListLossDeactivationIfEnabledAsync(new TaskExecutionContext(this, options, client, log, cancellationToken, _ => { }));
-                listCount = await client.SendAllFarmListsNowAsync(cancellationToken);
+                listCount = await new ManualFarmingOperation(client).SendAllAsync(cancellationToken);
             });
 
         return listCount;
@@ -247,7 +247,7 @@ public sealed partial class BotTaskRunner
             {
                 await client.LoginAsync(cancellationToken);
                 await RunFarmListLossDeactivationIfEnabledAsync(new TaskExecutionContext(this, options, client, log, cancellationToken, _ => { }));
-                sent = await client.SendSelectedFarmListsNowAsync(selectedNames, selectedIds, cancellationToken);
+                sent = await new ManualFarmingOperation(client).SendSelectedAsync(selectedNames, selectedIds, cancellationToken);
             });
 
         return sent;
@@ -270,7 +270,7 @@ public sealed partial class BotTaskRunner
             {
                 await client.LoginAsync(cancellationToken);
                 await RunFarmListLossDeactivationIfEnabledAsync(new TaskExecutionContext(this, options, client, log, cancellationToken, _ => { }));
-                listCount = await client.SendAllFarmListsViaStartAllButtonAsync(cancellationToken);
+                listCount = await new ManualFarmingOperation(client).SendAllViaStartAllButtonAsync(cancellationToken);
             });
 
         return listCount;
@@ -299,7 +299,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                result = await client.AddFarmsFromCoordinatesAsync(
+                result = await new ManualFarmingOperation(client).AddFarmsAsync(
                     farmListName,
                     troopType,
                     troopCount,
@@ -331,7 +331,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                result = await client.CreateFarmListsAsync(request, progress, cancellationToken);
+                result = await new ManualFarmingOperation(client).CreateListsAsync(request, progress, cancellationToken);
             });
 
         return result ?? throw new InvalidOperationException("Could not create farm lists.");

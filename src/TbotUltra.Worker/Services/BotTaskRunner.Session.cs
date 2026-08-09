@@ -173,122 +173,8 @@ public sealed partial class BotTaskRunner
         Action<string> log,
         CancellationToken cancellationToken)
     {
-        log($"Loading post-login data for server {options.ServerName}.");
-
-        _accountAnalysisStore.TryLoad(client.AccountName, out var persistedAnalysis, client.ServerUrl);
-        var newAccountAnalysisPending = NewAccountAnalysisDecisions.IsPending(
-            options.PostLoginAnalyzeNewAccount,
-            persistedAnalysis?.NewAccountAnalysisCompleted);
-
-        // When enabled, read the hero inventory FIRST — right after login and before the profile
-        // navigation (ReadAccountSnapshotAsync reads villages from spieler.php/profile).
-        HeroInventoryResources? heroInventory = null;
-        if (options.PostLoginAnalyzeHeroInventory || newAccountAnalysisPending)
-        {
-            // Suppress the village/profile UI-sync so the inventory is read before the profile nav.
-            // Non-fatal: a transient nav timeout here must NOT abort the whole login (it once left the bot
-            // parked idle overnight). Continue with heroInventory=null so skipOverviewNavigation stays false
-            // and ReadAccountSnapshotAsync does its normal dorf1 hop; the rest of the snapshot proceeds.
-            try
-            {
-                heroInventory = await client.ReadHeroInventoryResourcesAsync(cancellationToken, suppressUiSync: true);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                log($"[hero-inventory] post-login read failed (continuing without it): {ex.Message}");
-            }
-        }
-
-        var hasPersistedVillageSnapshot = persistedAnalysis?.Villages is { Count: > 0 };
-        log(hasPersistedVillageSnapshot
-            ? "[post-login] reusing stable village snapshot; merging current sidebar instead of opening profile."
-            : "[post-login] no stable village snapshot; opening profile for complete cold-start village data.");
-
-        var accountSnapshot = await client.ReadAccountSnapshotAsync(
-            forceRefreshVillages: !hasPersistedVillageSnapshot,
-            preferCurrentPageVillages: hasPersistedVillageSnapshot,
-            restorePageAfterProfile: false,
-            suppressEnsureUiSync: true,
-            // We just read the hero inventory and will refresh villages from the profile next —
-            // skip the redundant dorf1 hop in that case.
-            skipOverviewNavigation: heroInventory is not null,
-            cancellationToken);
-
-        var buildingStatus = await client.ReadBuildingsStatusAsync(cancellationToken);
-        var villageStatus = await client.ReadVillageStatusAsync(
-            accountSnapshot.Villages,
-            buildingStatus.Buildings,
-            cancellationToken);
-
-        if (options.PostLoginReadTroopTrainingQueue)
-        {
-            var troopQueues = await client.ReadTroopTrainingQueuesAsync(villageStatus.Buildings, cancellationToken);
-            villageStatus = villageStatus with { TroopTrainingQueues = troopQueues };
-        }
-
-        var inboxStatus = new InboxStatus(villageStatus.UnreadMessages, villageStatus.UnreadReports);
-        var adventureCount = await client.RefreshAdventureCountAsync(forceReload: false, cancellationToken);
-
-        PersistStableAccountSignals(
-            client,
-            accountSnapshot.Tribe,
-            accountSnapshot.Villages,
-            newAccountAnalysisPending,
-            log);
-
-        return new PostLoginSnapshot(villageStatus, inboxStatus, adventureCount, heroInventory, newAccountAnalysisPending);
-    }
-
-    private void PersistStableAccountSignals(
-        TravianClient client,
-        string? fallbackTribe,
-        IReadOnlyList<Village> villages,
-        bool newAccountAnalysisPending,
-        Action<string> log)
-    {
-        var completed = _accountAnalysisStore.Update(client.AccountName, client.ServerUrl, existing =>
-        {
-            var tribe = IsKnownTribe(client.KnownAccountTribe)
-                ? client.KnownAccountTribe!
-                : IsKnownTribe(fallbackTribe)
-                    ? fallbackTribe!
-                    : existing?.Tribe ?? "Unknown";
-            var goldClubEnabled = client.KnownGoldClubEnabled == true || existing?.GoldClubEnabled == true;
-            if (!IsKnownTribe(tribe) && !goldClubEnabled && villages.Count == 0)
-            {
-                return null;
-            }
-
-            return new AccountAnalysisSnapshot(
-                SchemaVersion: AccountAnalysisConstants.CurrentSchemaVersion,
-                AnalyzedAtUtc: DateTimeOffset.UtcNow,
-                AccountName: client.AccountName,
-                ServerUrl: client.ServerUrl,
-                Tribe: IsKnownTribe(tribe) ? tribe : "Unknown",
-                GoldClubEnabled: goldClubEnabled,
-                BuildingCatalog: existing?.BuildingCatalog ?? (IsKnownTribe(tribe) ? BuildingCatalogService.GetCatalogForTribe(tribe) : []),
-                AutoCelebrationEnabled: existing?.AutoCelebrationEnabled,
-                AutomationLoopEnabledGroups: existing?.AutomationLoopEnabledGroups,
-                AutomationLoopVisibleGroups: existing?.AutomationLoopVisibleGroups,
-                WorldUid: existing?.WorldUid,
-                Villages: villages.Count > 0 ? villages.Select(village => village with { }).ToList() : existing?.Villages,
-                NewAccountAnalysisCompleted: existing is null
-                    ? (newAccountAnalysisPending ? false : null)
-                    : existing.NewAccountAnalysisCompleted);
-        });
-        if (completed is null)
-        {
-            return;
-        }
-
-        log($"[cache] stable account signals saved for '{completed.AccountName}' (tribe={completed.Tribe}, goldclub={completed.GoldClubEnabled}).");
-        // Emit the real-time signal the desktop UI parses (GoldClubStatusRegex) so the Gold Club
-        // indicator flips at login instead of waiting for the next stored-analysis read (~1 min later).
-        log($"[goldclub] active={completed.GoldClubEnabled}");
+        return await new PostLoginSnapshotOperation(client, _accountAnalysisStore)
+            .LoadAsync(options, log, cancellationToken);
     }
 
     private static bool IsKnownTribe(string? tribe)
@@ -309,8 +195,6 @@ public sealed partial class BotTaskRunner
         }
 
         var detectedGoldClubEnabled = false;
-        var serverUrl = options.BaseUrl.TrimEnd('/');
-        var tribe = existing?.Tribe ?? "Unknown";
 
         await ExecuteWithClientAsync(
             options,
@@ -321,35 +205,11 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await new SessionOperation(client).LoginAsync(cancellationToken);
-                detectedGoldClubEnabled = await client.ReadGoldClubStatusAsync(cancellationToken);
-                serverUrl = client.ServerUrl;
-                if (string.IsNullOrWhiteSpace(tribe) || string.Equals(tribe, "Unknown", StringComparison.OrdinalIgnoreCase))
-                {
-                    var snapshot = await client.ReadAccountSnapshotAsync(cancellationToken: cancellationToken);
-                    tribe = snapshot.Tribe;
-                }
+                detectedGoldClubEnabled = await new GoldClubStatusOperation(client, _accountAnalysisStore)
+                    .ReadAndPersistAsync(account, options, log, cancellationToken);
             });
 
-        if (!detectedGoldClubEnabled)
-        {
-            return false;
-        }
-
-        var completed = _accountAnalysisStore.Update(account.Name, serverUrl, latest => new AccountAnalysisSnapshot(
-            SchemaVersion: AccountAnalysisConstants.CurrentSchemaVersion,
-            AnalyzedAtUtc: DateTimeOffset.UtcNow,
-            AccountName: account.Name,
-            ServerUrl: serverUrl,
-            Tribe: string.IsNullOrWhiteSpace(tribe) ? latest?.Tribe ?? "Unknown" : tribe,
-            GoldClubEnabled: true,
-            BuildingCatalog: latest?.BuildingCatalog ?? existing?.BuildingCatalog ?? [],
-            AutoCelebrationEnabled: latest?.AutoCelebrationEnabled ?? existing?.AutoCelebrationEnabled,
-            AutomationLoopEnabledGroups: latest?.AutomationLoopEnabledGroups ?? existing?.AutomationLoopEnabledGroups,
-            AutomationLoopVisibleGroups: latest?.AutomationLoopVisibleGroups ?? existing?.AutomationLoopVisibleGroups,
-            WorldUid: latest?.WorldUid ?? existing?.WorldUid,
-            Villages: latest?.Villages ?? existing?.Villages))!;
-        log($"Gold Club activated and saved for '{completed.AccountName}'.");
-        return true;
+        return detectedGoldClubEnabled;
     }
 
     public async Task ExecuteLogoutAsync(

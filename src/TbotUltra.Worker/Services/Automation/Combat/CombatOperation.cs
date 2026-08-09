@@ -25,6 +25,9 @@ internal sealed class CombatOperation(ICombatClient client)
     public Task<string> SendReinforcementsBetweenOwnVillagesAsync(CancellationToken cancellationToken)
         => client.SendReinforcementsBetweenOwnVillagesAsync(cancellationToken);
 
+    public Task<string> SendResourcesBetweenOwnVillagesAsync(CancellationToken cancellationToken)
+        => client.SendResourcesBetweenOwnVillagesAsync(cancellationToken);
+
     public Task<string> TestSendReinforcementsBetweenOwnVillagesAsync(CancellationToken cancellationToken)
         => client.TestSendReinforcementsBetweenOwnVillagesAsync(cancellationToken);
 }

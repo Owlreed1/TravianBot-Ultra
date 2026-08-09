@@ -1,4 +1,5 @@
 using TbotUltra.Core.Tasks;
+using TbotUltra.Worker.Domain;
 using TbotUltra.Worker.Services;
 
 namespace TbotUltra.Worker.Services.Automation;
@@ -6,6 +7,11 @@ namespace TbotUltra.Worker.Services.Automation;
 /// <summary>Owns task-level troop-training decisions behind the browser client seam.</summary>
 internal sealed class TroopTrainingOperation(ITrainingClient client)
 {
+    public Task<IReadOnlyList<TroopTrainingQueueStatus>> ReadQueuesAsync(
+        IReadOnlyList<Building>? knownBuildings,
+        CancellationToken cancellationToken)
+        => client.ReadTroopTrainingQueuesAsync(knownBuildings, cancellationToken);
+
     public async Task<SmithyUpgradeOperationResult> UpgradeSelectedAtSmithyAsync(
         string? targetPayload,
         CancellationToken cancellationToken)

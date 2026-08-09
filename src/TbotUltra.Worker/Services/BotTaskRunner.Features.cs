@@ -30,7 +30,7 @@ public sealed partial class BotTaskRunner
             {
                 await client.LoginAsync(cancellationToken);
                 await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken, skipFeatureRefresh: true);
-                statuses = await client.ReadTroopTrainingQueuesAsync(knownBuildings, cancellationToken);
+                statuses = await new TroopTrainingOperation(client).ReadQueuesAsync(knownBuildings, cancellationToken);
             });
 
         return statuses;
@@ -54,7 +54,8 @@ public sealed partial class BotTaskRunner
             {
                 await client.LoginAsync(cancellationToken);
                 await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken, skipFeatureRefresh: true);
-                status = await client.ReadBreweryCelebrationStatusAsync(knownBuildings, cancellationToken);
+                status = await new BuildingAutomationOperation(client)
+                    .ReadBreweryCelebrationStatusAsync(knownBuildings, cancellationToken);
             });
 
         return status ?? new BreweryCelebrationStatus(false, null, false, null, false, null, "N/A", "Status unavailable.");
@@ -78,7 +79,8 @@ public sealed partial class BotTaskRunner
             {
                 await client.LoginAsync(cancellationToken);
                 await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken, skipFeatureRefresh: true);
-                status = await client.ReadSmithyUpgradeStatusAsync(knownBuildings, cancellationToken);
+                status = await new BuildingAutomationOperation(client)
+                    .ReadSmithyUpgradeStatusAsync(knownBuildings, cancellationToken);
             });
 
         return status ?? new SmithyUpgradeStatus(false, null, 0, null, [], "N/A", "Status unavailable.");
@@ -147,7 +149,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                result = await client.IncreaseAdventuresToHardAsync(cancellationToken);
+                result = await new HeroAutomationOperation(client).IncreaseAdventuresToHardAsync(cancellationToken);
             });
 
         log(result);
@@ -170,7 +172,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                result = await client.ReduceAdventuresTimeAsync(cancellationToken);
+                result = await new HeroAutomationOperation(client).ReduceAdventuresTimeAsync(cancellationToken);
             });
 
         log(result);
@@ -244,7 +246,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                result = await client.ReadSmithyQueueFromCurrentPageTestAsync(cancellationToken);
+                result = await new BuildingAutomationOperation(client).ReadSmithyQueueFromCurrentPageAsync(cancellationToken);
             });
 
         log(result);
@@ -292,7 +294,7 @@ public sealed partial class BotTaskRunner
             {
                 await client.LoginAsync(cancellationToken);
                 await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken, skipFeatureRefresh: true);
-                result = await client.RunBreweryCelebrationAsync(
+                result = await new BuildingAutomationOperation(client).RunBreweryCelebrationAsync(
                     options.BreweryCelebrationRestartDelayEnabled,
                     options.BreweryCelebrationRestartDelayMinMinutes,
                     options.BreweryCelebrationRestartDelayMaxMinutes,
@@ -319,7 +321,7 @@ public sealed partial class BotTaskRunner
             {
                 await client.LoginAsync(cancellationToken);
                 await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken, skipFeatureRefresh: true);
-                result = await client.RunTownHallCelebrationAsync(
+                result = await new BuildingAutomationOperation(client).RunTownHallCelebrationAsync(
                     options.TownHallCelebrationMode,
                     options.TownHallCelebrationCount,
                     options.TownHallCelebrationRestartDelayEnabled,

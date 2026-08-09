@@ -107,6 +107,12 @@ public partial class MainWindow : Window
     private readonly AccountAutomationHoldStore _accountAutomationHoldStore;
     private readonly ServerCatalogStore _serverCatalogStore;
     private readonly IDesktopBotService _botService;
+    private readonly HeroPanelService _heroPanelService;
+    private readonly ResourcesPanelService _resourcesPanelService;
+    private readonly FarmingPanelService _farmingPanelService;
+    private readonly BuildingsPanelService _buildingsPanelService;
+    private readonly TroopTrainingPanelService _troopTrainingPanelService;
+    private readonly QueuePanelService _queuePanelService;
     private readonly DispatcherTimer _clockTimer;
     private bool _isUiPresentationPulse;
     private readonly DispatcherTimer _copyFeedbackTimer;
@@ -446,6 +452,12 @@ public partial class MainWindow : Window
         var queueScheduler = new PriorityFifoQueueScheduler();
         var queueExecutor = new QueueExecutor(taskRunner);
         _botService = new DesktopBotService(taskRunner, queueStore, queueScheduler, queueExecutor);
+        _heroPanelService = new HeroPanelService(_botService, _botConfigStore);
+        _resourcesPanelService = new ResourcesPanelService(_botConfigStore, _villageSettingsStore);
+        _farmingPanelService = new FarmingPanelService(_botService, _botConfigStore);
+        _buildingsPanelService = new BuildingsPanelService(_botService);
+        _troopTrainingPanelService = new TroopTrainingPanelService(_botService, _botConfigStore, _projectRoot);
+        _queuePanelService = new QueuePanelService(_botService);
         _botService.FarmLossDestinationChanged += OnFarmLossDestinationChanged;
         _travianQueueViewModel.RemoveRequested += QueueRemoveSelected;
         _travianQueueViewModel.RestoreRequested += RestoreRemovedQueueItems;
@@ -602,6 +614,9 @@ public partial class MainWindow : Window
         _farmListsViewModel.CreateFarmListRequested += () => _ = GuardUiAsync(CreateFarmListButtonClickAsync);
         _farmListsViewModel.SendAllNowRequested += () => _ = GuardUiAsync(FarmListSendAllNowButtonClickAsync);
         _farmListsViewModel.SendNowRequested += list => _ = GuardUiAsync(() => FarmListSendNowButtonClickAsync(list));
+        _farmListsViewModel.SettingsChanged += PersistFarmingSettings;
+        _farmListsViewModel.MoveLossesEnabledRequested += () => _ = GuardUiAsync(EnsureFarmLossDestinationSelectedAsync);
+        _farmListsViewModel.TravcoInactiveSearchRequested += () => _ = GuardUiAsync(TravcoInactiveSearchButtonClickAsync);
         _troopTrainingViewModel.Initialize();
         _troopTrainingViewModel.UpdateTroopOptions(ResolveStoredTroopTrainingTribe());
         _troopTrainingViewModel.ResetQueueStatus();
@@ -622,6 +637,7 @@ public partial class MainWindow : Window
         _resourcesViewModel.UpgradeAllRequested += UpgradeAllResources;
         _resourcesViewModel.UpgradeAllToMaxRequested += UpgradeAllResourcesToMax;
         _resourcesViewModel.LevelBadgeRequested += QueueResourceLevelBadgeUpgrade;
+        _resourcesViewModel.SettingsChanged += OnResourcesSettingsChanged;
         _heroViewModel.RefreshAdventuresRequested += () => _ = RunHeroPanelOperationAsync(RefreshAdventuresCoreAsync);
         _heroViewModel.RefreshHpRequested += () => _ = RunHeroPanelOperationAsync(RefreshHeroHpCoreAsync);
         _heroViewModel.RefreshStatsRequested += () => _ = RunHeroPanelOperationAsync(RefreshHeroStatsCoreAsync);

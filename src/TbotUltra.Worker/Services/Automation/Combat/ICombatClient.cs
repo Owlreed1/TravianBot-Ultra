@@ -24,5 +24,7 @@ public interface ICombatClient
 
     Task<string> SendReinforcementsBetweenOwnVillagesAsync(CancellationToken cancellationToken = default);
 
+    Task<string> SendResourcesBetweenOwnVillagesAsync(CancellationToken cancellationToken = default);
+
     Task<string> TestSendReinforcementsBetweenOwnVillagesAsync(CancellationToken cancellationToken = default);
 }

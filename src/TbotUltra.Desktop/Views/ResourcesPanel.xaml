@@ -39,10 +39,10 @@
                             </Border>
                         </StackPanel>
                         <WrapPanel>
-                            <CheckBox Content="Wood" IsChecked="{Binding UpgradeWood}" Checked="ResourceUpgradeTypeCheckBox_Changed" Unchecked="ResourceUpgradeTypeCheckBox_Changed" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,20,0" />
-                            <CheckBox Content="Clay" IsChecked="{Binding UpgradeClay}" Checked="ResourceUpgradeTypeCheckBox_Changed" Unchecked="ResourceUpgradeTypeCheckBox_Changed" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,20,0" />
-                            <CheckBox Content="Iron" IsChecked="{Binding UpgradeIron}" Checked="ResourceUpgradeTypeCheckBox_Changed" Unchecked="ResourceUpgradeTypeCheckBox_Changed" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,20,0" />
-                            <CheckBox Content="Crop" IsChecked="{Binding UpgradeCrop}" Checked="ResourceUpgradeTypeCheckBox_Changed" Unchecked="ResourceUpgradeTypeCheckBox_Changed" IsEnabled="{Binding ActionsEnabled}" />
+                            <CheckBox Content="Wood" IsChecked="{Binding UpgradeWood}" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,20,0" />
+                            <CheckBox Content="Clay" IsChecked="{Binding UpgradeClay}" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,20,0" />
+                            <CheckBox Content="Iron" IsChecked="{Binding UpgradeIron}" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,20,0" />
+                            <CheckBox Content="Crop" IsChecked="{Binding UpgradeCrop}" IsEnabled="{Binding ActionsEnabled}" />
                         </WrapPanel>
                     </StackPanel>
                 </Border>
@@ -62,10 +62,10 @@
                     <TextBlock Text="i" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" />
                 </Border>
                 <RadioButton Content="Smart" GroupName="ResourceBuildStrategy" VerticalAlignment="Center" Margin="0,0,16,0"
-                             IsChecked="{Binding IsBuildSmart}" Click="ResourceBuildStrategyRadio_Click"
+                             IsChecked="{Binding IsBuildSmart}"
                              ToolTip="When using 'Upgrade all', prioritize fields that produce the resource you currently have the least of in storage (wood/clay/iron/crop), re-evaluated each pass to balance your stockpile." />
                 <RadioButton Content="Lowest level first" GroupName="ResourceBuildStrategy" VerticalAlignment="Center"
-                             IsChecked="{Binding IsBuildLowestFirst}" Click="ResourceBuildStrategyRadio_Click"
+                             IsChecked="{Binding IsBuildLowestFirst}"
                              ToolTip="When using 'Upgrade all', always upgrade the resource field with the lowest level first, so all fields rise evenly toward the target level." />
             </StackPanel>
             <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="8" Margin="0,8,0,0">

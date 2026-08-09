@@ -1,4 +1,5 @@
 using TbotUltra.Worker.Services;
+using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Worker.Services.Automation;
 
@@ -9,6 +10,45 @@ namespace TbotUltra.Worker.Services.Automation;
 /// </summary>
 internal sealed class BuildingAutomationOperation(IBuildingClient client)
 {
+    public Task<BreweryCelebrationStatus> ReadBreweryCelebrationStatusAsync(
+        IReadOnlyList<Building>? knownBuildings,
+        CancellationToken cancellationToken)
+        => client.ReadBreweryCelebrationStatusAsync(knownBuildings, cancellationToken);
+
+    public Task<SmithyUpgradeStatus> ReadSmithyUpgradeStatusAsync(
+        IReadOnlyList<Building>? knownBuildings,
+        CancellationToken cancellationToken)
+        => client.ReadSmithyUpgradeStatusAsync(knownBuildings, cancellationToken);
+
+    public Task<string> ReadSmithyQueueFromCurrentPageAsync(CancellationToken cancellationToken)
+        => client.ReadSmithyQueueFromCurrentPageTestAsync(cancellationToken);
+
+    public Task<string> RunBreweryCelebrationAsync(
+        bool restartDelayEnabled,
+        double restartDelayMinMinutes,
+        double restartDelayMaxMinutes,
+        CancellationToken cancellationToken)
+        => client.RunBreweryCelebrationAsync(
+            restartDelayEnabled,
+            restartDelayMinMinutes,
+            restartDelayMaxMinutes,
+            cancellationToken);
+
+    public Task<string> RunTownHallCelebrationAsync(
+        string mode,
+        int count,
+        bool restartDelayEnabled,
+        double restartDelayMinMinutes,
+        double restartDelayMaxMinutes,
+        CancellationToken cancellationToken)
+        => client.RunTownHallCelebrationAsync(
+            mode,
+            count,
+            restartDelayEnabled,
+            restartDelayMinMinutes,
+            restartDelayMaxMinutes,
+            cancellationToken);
+
     public Task<string> ExecuteAsync(BuildingAutomationRequest request, CancellationToken cancellationToken)
     {
         return request.Action switch

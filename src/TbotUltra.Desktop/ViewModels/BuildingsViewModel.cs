@@ -11,10 +11,9 @@ using TbotUltra.Worker.Services;
 namespace TbotUltra.Desktop.ViewModels;
 
 /// <summary>
-/// View model backing the Buildings panel. First MVVM slice for that panel:
-/// it owns the building-slot collection that the panel renders. The service-
-/// and queue-bound mutation logic still lives in MainWindow code-behind and
-/// mutates this collection in place; it will migrate here in later steps.
+/// View model backing the Buildings panel. It owns the rendered building-slot
+/// state and panel command enablement; <see cref="Services.BuildingsPanelService"/>
+/// owns persisted queue access while MainWindow retains lifecycle and dialogs.
 /// </summary>
 public sealed class BuildingsViewModel : BaseViewModel
 {

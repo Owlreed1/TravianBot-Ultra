@@ -1068,28 +1068,6 @@ public partial class MainWindow
         return Math.Clamp(_activeVillageResourceMaxLevel, NonCapitalResourceMaxLevel, ResourceFieldMaxLevel);
     }
 
-    private void ResourceBuildStrategyRadio_Click(object sender, RoutedEventArgs e)
-    {
-        PersistResourceBuildStrategyToConfig();
-    }
-
-    private void ResourceUpgradeTypesCheckBox_Changed(object sender, RoutedEventArgs e)
-    {
-        if (_loadingResourceUpgradeTypes)
-        {
-            return;
-        }
-
-        var village = GetSelectedVillageKeyInfoOrNull();
-        if (village is null)
-        {
-            return;
-        }
-
-        _villageSettingsStore.SetResourceUpgradeTypes(village, _resourcesViewModel.SelectedUpgradeTypes);
-        AppendLog($"Resource upgrade types for '{village.Name}' set to {ResourceUpgradeSelection.Serialize(_resourcesViewModel.SelectedUpgradeTypes)}.");
-    }
-
     private void LoadResourceUpgradeTypesForSelectedVillage(VillageSelectionItem village)
     {
         _loadingResourceUpgradeTypes = true;
@@ -1108,9 +1086,7 @@ public partial class MainWindow
     {
         try
         {
-            var config = _botConfigStore.Load();
-            config[BotOptionPayloadKeys.ResourceBuildStrategy] = _resourcesViewModel.BuildStrategy;
-            _botConfigStore.Save(config);
+            _resourcesPanelService.SaveBuildStrategy(_resourcesViewModel.BuildStrategy);
         }
         catch (Exception ex)
         {

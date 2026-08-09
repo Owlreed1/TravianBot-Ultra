@@ -9,7 +9,11 @@ public sealed partial class BotTaskRunner
     private static async Task ExecuteRunBreweryCelebrationAsync(TaskExecutionContext context)
     {
         context.Log("[brewery] run_brewery_celebration starting");
-        var result = await context.Client.RunBreweryCelebrationAsync(context.Options.BreweryCelebrationRestartDelayEnabled, context.Options.BreweryCelebrationRestartDelayMinMinutes, context.Options.BreweryCelebrationRestartDelayMaxMinutes, context.CancellationToken);
+        var result = await new BuildingAutomationOperation(context.Client).RunBreweryCelebrationAsync(
+            context.Options.BreweryCelebrationRestartDelayEnabled,
+            context.Options.BreweryCelebrationRestartDelayMinMinutes,
+            context.Options.BreweryCelebrationRestartDelayMaxMinutes,
+            context.CancellationToken);
         context.Log(result);
         ThrowIfTaskBlocked("run_brewery_celebration", result);
     }
@@ -19,7 +23,13 @@ public sealed partial class BotTaskRunner
         var mode = TownHallCelebrationDefaults.NormalizeMode(context.Options.TownHallCelebrationMode);
         var count = TownHallCelebrationDefaults.NormalizeCount(context.Options.TownHallCelebrationCount);
         context.Log($"[town-hall] run_town_hall_celebration starting mode={mode} count={count}");
-        var result = await context.Client.RunTownHallCelebrationAsync(mode, count, context.Options.TownHallCelebrationRestartDelayEnabled, context.Options.TownHallCelebrationRestartDelayMinMinutes, context.Options.TownHallCelebrationRestartDelayMaxMinutes, context.CancellationToken);
+        var result = await new BuildingAutomationOperation(context.Client).RunTownHallCelebrationAsync(
+            mode,
+            count,
+            context.Options.TownHallCelebrationRestartDelayEnabled,
+            context.Options.TownHallCelebrationRestartDelayMinMinutes,
+            context.Options.TownHallCelebrationRestartDelayMaxMinutes,
+            context.CancellationToken);
         context.Log(result);
         if (result.Contains("town_hall_unavailable=missing", StringComparison.OrdinalIgnoreCase))
         {

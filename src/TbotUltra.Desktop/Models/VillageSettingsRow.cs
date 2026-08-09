@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using TbotUltra.Desktop.Services;
 
 namespace TbotUltra.Desktop.Models;
@@ -11,6 +12,10 @@ namespace TbotUltra.Desktop.Models;
 // many villages at once. INotifyPropertyChanged so the window can persist each change immediately.
 public sealed class VillageSettingsRow : INotifyPropertyChanged
 {
+    // Presentation-only first row in Village settings. It is never persisted or passed to save callbacks.
+    public bool IsCheckAllRow { get; init; }
+    public Visibility ToggleVisibility => IsCheckAllRow ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility CheckAllVisibility => IsCheckAllRow ? Visibility.Visible : Visibility.Collapsed;
     public string Name { get; init; } = string.Empty;
     public string PopText { get; init; } = string.Empty;
 

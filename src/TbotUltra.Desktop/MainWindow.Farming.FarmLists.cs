@@ -119,7 +119,7 @@ public partial class MainWindow
 
     private async Task<bool> RefreshFarmListsFromServerAsync(BotOptions options, CancellationToken cancellationToken)
     {
-        var goldClubEnabled = await _botService.ReadAndPersistGoldClubStatusAsync(options, AppendLog, cancellationToken);
+        var goldClubEnabled = await _farmingPanelService.ReadAndPersistGoldClubStatusAsync(options, AppendLog, cancellationToken);
         UpdateGoldClubInfo(goldClubEnabled);
         if (!goldClubEnabled)
         {
@@ -133,7 +133,7 @@ public partial class MainWindow
             return false;
         }
 
-        var lists = await _botService.ReadFarmListsOverviewAsync(options, AppendLog, cancellationToken) ?? [];
+        var lists = await _farmingPanelService.ReadOverviewAsync(options, AppendLog, cancellationToken) ?? [];
         await ApplyFarmListOverviewToUiAsync(lists);
         await Dispatcher.InvokeAsync(() =>
             UpdateSelectedCachedTimerStatus(status => status with { FarmLists = lists }));
@@ -712,7 +712,7 @@ public partial class MainWindow
                         $"Add farms from Travco: target='{plan.TargetName}', requested={plan.DesiredCount}, " +
                         $"candidates={plan.Coordinates.Count}, " +
                         $"troops={(useDefaultTroops ? "default" : $"{troopCount} {troopType}")}.");
-                    var result = await _botService.AddFarmsFromCoordinatesAsync(
+                    var result = await _farmingPanelService.AddFarmsAsync(
                         options,
                         plan.TargetName,
                         troopType,
@@ -901,7 +901,7 @@ public partial class MainWindow
                 AppendLog(
                     $"[farm-list-create] requested={request.Names.Count}, village='{request.VillageName}', " +
                     $"default={request.TroopCount} {request.TroopType}.");
-                return await _botService.CreateFarmListsAsync(
+                return await _farmingPanelService.CreateListsAsync(
                     options,
                     request,
                     AppendLog,
@@ -1055,7 +1055,7 @@ public partial class MainWindow
         {
             var options = ApplySelectedVillageToOptions(LoadBotOptions());
             await EnsureChromiumInstalledAsync();
-            var timerSeconds = await _botService.SendFarmListNowAsync(options, list.Name, AppendLog, operationToken);
+            var timerSeconds = await _farmingPanelService.SendOneAsync(options, list.Name, AppendLog, operationToken);
             list.RemainingSeconds = timerSeconds is > 0 ? timerSeconds : null;
             RecordFarmListDispatch(list, succeeded: true);
             UpdateFarmingUiState();
@@ -1143,8 +1143,8 @@ public partial class MainWindow
             var options = ApplySelectedVillageToOptions(LoadBotOptions());
             await EnsureChromiumInstalledAsync();
             var sentCount = sendToggled
-                ? await _botService.SendSelectedFarmListsNowAsync(options, toggledNames, toggledIds, AppendLog, operationToken)
-                : await _botService.SendAllFarmListsViaStartAllButtonAsync(options, AppendLog, operationToken);
+                ? await _farmingPanelService.SendSelectedAsync(options, toggledNames, toggledIds, AppendLog, operationToken)
+                : await _farmingPanelService.SendAllAsync(options, AppendLog, operationToken);
             await RefreshFarmListsFromServerAsync(options, operationToken);
             ReconcileFarmListDispatches(attemptedKeys);
             CompleteOperation(operationId, operationSw, $"Sent {(sendToggled ? "toggled" : "all")} farmlists ({sentCount} list(s)).");
@@ -1330,36 +1330,14 @@ public partial class MainWindow
         try
         {
             var mode = FarmingDefaults.NormalizeSendMode(options.ContinuousFarmSendMode);
-            if (FarmSendListPerListRadioButton is not null)
-            {
-                FarmSendListPerListRadioButton.IsChecked = string.Equals(mode, FarmingDefaults.SendModeListPerList, StringComparison.Ordinal);
-            }
-
-            if (FarmSendAllAtOnceRadioButton is not null)
-            {
-                FarmSendAllAtOnceRadioButton.IsChecked = string.Equals(mode, FarmingDefaults.SendModeAllAtOnce, StringComparison.Ordinal);
-            }
-
-            SelectFarmDispatchDelayMinMinutes(options.ContinuousFarmDispatchDelayMinMinutes);
-            SelectFarmDispatchDelayMaxMinutes(options.ContinuousFarmDispatchDelayMaxMinutes);
-
-            if (DeactivateFarmLossesCheckBox is not null)
-            {
-                DeactivateFarmLossesCheckBox.IsChecked = options.ContinuousFarmDeactivateLosses;
-            }
-
-            if (DeactivateFarmOasisLossesCheckBox is not null)
-            {
-                DeactivateFarmOasisLossesCheckBox.IsChecked = options.ContinuousFarmDeactivateOasisLosses;
-            }
-
+            _farmListsViewModel.LoadSettings(
+                string.Equals(mode, FarmingDefaults.SendModeAllAtOnce, StringComparison.Ordinal),
+                options.ContinuousFarmDispatchDelayMinMinutes,
+                options.ContinuousFarmDispatchDelayMaxMinutes,
+                options.ContinuousFarmDeactivateLosses,
+                options.ContinuousFarmDeactivateOasisLosses,
+                options.ContinuousFarmMoveLosses);
             RefreshFarmLossDestinationOptions(options);
-            if (MoveFarmLossesCheckBox is not null)
-            {
-                MoveFarmLossesCheckBox.IsChecked = options.ContinuousFarmDeactivateLosses
-                    && options.ContinuousFarmMoveLosses;
-            }
-            SyncFarmLossMoveControls();
         }
         finally
         {
@@ -1367,7 +1345,7 @@ public partial class MainWindow
         }
     }
 
-    private void FarmingSettings_Changed(object sender, RoutedEventArgs e)
+    private void PersistFarmingSettings()
     {
         if (_suppressFarmingSettingsConfigWrite)
         {
@@ -1376,41 +1354,21 @@ public partial class MainWindow
 
         try
         {
-            if (DeactivateFarmLossesCheckBox?.IsChecked != true && MoveFarmLossesCheckBox?.IsChecked == true)
-            {
-                _suppressFarmingSettingsConfigWrite = true;
-                MoveFarmLossesCheckBox.IsChecked = false;
-                _suppressFarmingSettingsConfigWrite = false;
-            }
-
-            SyncFarmLossMoveControls();
-            var config = _botConfigStore.Load();
-            var mode = FarmSendAllAtOnceRadioButton?.IsChecked == true
-                ? FarmingDefaults.SendModeAllAtOnce
-                : FarmingDefaults.SendModeListPerList;
-            var delayMinMinutes = GetSelectedFarmDispatchDelayMinMinutes();
-            var delayMaxMinutes = GetSelectedFarmDispatchDelayMaxMinutes();
-            config[BotOptionPayloadKeys.ContinuousFarmSendMode] = mode;
-            config[BotOptionPayloadKeys.ContinuousFarmDispatchDelayMinMinutes] = delayMinMinutes;
-            config[BotOptionPayloadKeys.ContinuousFarmDispatchDelayMaxMinutes] = delayMaxMinutes;
-            config[BotOptionPayloadKeys.ContinuousFarmDeactivateLosses] = DeactivateFarmLossesCheckBox?.IsChecked == true;
-            config[BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses] = DeactivateFarmOasisLossesCheckBox?.IsChecked == true;
-            var destination = FarmLossDestinationComboBox?.SelectedItem as FarmLossDestinationOption;
-            var moveEnabled = DeactivateFarmLossesCheckBox?.IsChecked == true
-                && MoveFarmLossesCheckBox?.IsChecked == true
-                && destination is not null;
-            var existingDestinationId = config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId]?.GetValue<string>() ?? string.Empty;
-            config[BotOptionPayloadKeys.ContinuousFarmMoveLosses] = moveEnabled;
-            config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId] = destination?.ListId ?? string.Empty;
-            config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListName] = destination?.Name ?? string.Empty;
-            var priorBaseName = config[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName]?.GetValue<string>();
-            var destinationChangedByUser = destination is not null
-                && !string.Equals(existingDestinationId, destination.ListId, StringComparison.OrdinalIgnoreCase);
-            config[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] = destinationChangedByUser || string.IsNullOrWhiteSpace(priorBaseName)
-                ? destination?.Name ?? string.Empty
-                : priorBaseName;
-            _botConfigStore.Save(config);
-            AppendLog($"[farm-settings] mode={mode}; delay={delayMinMinutes}-{delayMaxMinutes}m; deactivateLosses={DeactivateFarmLossesCheckBox?.IsChecked == true}; deactivateOasis={DeactivateFarmOasisLossesCheckBox?.IsChecked == true}; moveLosses={moveEnabled}; destination='{destination?.Name ?? "-"}'");
+            var delayMinMinutes = FarmingDefaults.NormalizeDispatchDelayMinMinutes(
+                int.TryParse(_farmListsViewModel.DispatchDelayMinMinutes, out var parsedMin) ? parsedMin : 0);
+            var delayMaxMinutes = Math.Max(
+                delayMinMinutes,
+                FarmingDefaults.NormalizeDispatchDelayMaxMinutes(
+                    int.TryParse(_farmListsViewModel.DispatchDelayMaxMinutes, out var parsedMax) ? parsedMax : 0));
+            var saved = _farmingPanelService.SaveSettings(new FarmingPanelSettings(
+                _farmListsViewModel.SendAllLists,
+                delayMinMinutes,
+                delayMaxMinutes,
+                _farmListsViewModel.DeactivateLosses,
+                _farmListsViewModel.DeactivateOasisLosses,
+                _farmListsViewModel.MoveLosses,
+                _farmListsViewModel.SelectedLossDestination));
+            AppendLog($"[farm-settings] mode={saved.SendMode}; delay={saved.DelayMinMinutes}-{saved.DelayMaxMinutes}m; deactivateLosses={_farmListsViewModel.DeactivateLosses}; deactivateOasis={_farmListsViewModel.DeactivateOasisLosses}; moveLosses={saved.MoveLossesEnabled}; destination='{saved.DestinationName ?? "-"}'");
             UpdateAutomationLoopRunningIndicators();
             RefreshQueuedFarmLossDestinationSettings();
         }
@@ -1419,6 +1377,9 @@ public partial class MainWindow
             AppendLog($"Could not save farm settings: {ex.Message}");
         }
     }
+
+    private void FarmingSettings_Changed(object sender, RoutedEventArgs e)
+        => PersistFarmingSettings();
 
     private void UpdateNextFarmListSendDisplay()
     {
@@ -1730,7 +1691,7 @@ public partial class MainWindow
         {
             ShowBusyOverlay("Creating loss farmlist", $"Creating '{dialog.ListName}'...");
             await EnsureChromiumInstalledAsync();
-            var createResult = await _botService.CreateFarmListsAsync(
+            var createResult = await _farmingPanelService.CreateListsAsync(
                 options,
                 request,
                 AppendLog,
@@ -1752,7 +1713,7 @@ public partial class MainWindow
                 // The panel intentionally limits displayed rows, but a holding list created beyond that
                 // limit is still valid. Read the complete overview to obtain its stable lid, then add
                 // just this destination to the picker instead of reporting a false creation failure.
-                var verifiedLists = await _botService.ReadFarmListsOverviewAsync(
+                var verifiedLists = await _farmingPanelService.ReadOverviewAsync(
                     options,
                     AppendLog,
                     _loopController.AcquireSessionScopeToken());

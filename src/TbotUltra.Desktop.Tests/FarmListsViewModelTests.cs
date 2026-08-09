@@ -148,4 +148,25 @@ public sealed class FarmListsViewModelTests
 
         Assert.Equal("Swollster (120 | 14)", header);
     }
+
+    [Fact]
+    public void FarmingSettings_NotifyForUserChanges_NotInitialLoad()
+    {
+        var vm = new FarmListsViewModel();
+        var changes = 0;
+        vm.SettingsChanged += () => changes++;
+
+        vm.LoadSettings(
+            sendAllLists: true,
+            dispatchDelayMinMinutes: 10,
+            dispatchDelayMaxMinutes: 20,
+            deactivateLosses: true,
+            deactivateOasisLosses: false,
+            moveLosses: false);
+        vm.DeactivateOasisLosses = true;
+
+        Assert.Equal(1, changes);
+        Assert.True(vm.SendAllLists);
+        Assert.Equal("10", vm.DispatchDelayMinMinutes);
+    }
 }

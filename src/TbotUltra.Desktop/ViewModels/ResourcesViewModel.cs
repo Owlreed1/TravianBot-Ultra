@@ -12,6 +12,12 @@ using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Desktop.ViewModels;
 
+public enum ResourceSettingsChange
+{
+    BuildStrategy,
+    UpgradeTypes,
+}
+
 /// <summary>
 /// View model backing the Resources tab. Owns the resource-field collections,
 /// pending targets, click cooldowns, queued-target observations, storage
@@ -33,6 +39,7 @@ public sealed class ResourcesViewModel : BaseViewModel
     private readonly Dictionary<int, DateTimeOffset> _slotClickCooldownBySlot = new();
     private readonly Dictionary<int, (int Target, DateTimeOffset At)> _lastQueuedTargetBySlot = new();
     private List<ResourceFieldRow> _allFields = [];
+    private int _settingsNotificationSuppressionCount;
 
     public ResourcesViewModel()
     {
@@ -50,6 +57,7 @@ public sealed class ResourcesViewModel : BaseViewModel
     public event Action? UpgradeAllRequested;
     public event Action? UpgradeAllToMaxRequested;
     public event Action<ResourceFieldRow>? LevelBadgeRequested;
+    public event Action<ResourceSettingsChange>? SettingsChanged;
 
     /// <summary>Resource fields grouped into the Wood column on the Resources tab.</summary>
     public ObservableCollection<ResourceFieldRow> WoodFields { get; } = [];
@@ -134,7 +142,11 @@ public sealed class ResourcesViewModel : BaseViewModel
         {
             if (SetProperty(ref _isBuildLowestFirst, value) && value)
             {
-                IsBuildSmart = false;
+                using (SuppressSettingsNotifications())
+                {
+                    IsBuildSmart = false;
+                }
+                NotifySettingsChanged(ResourceSettingsChange.BuildStrategy);
             }
         }
     }
@@ -151,7 +163,11 @@ public sealed class ResourcesViewModel : BaseViewModel
         {
             if (SetProperty(ref _isBuildSmart, value) && value)
             {
-                IsBuildLowestFirst = false;
+                using (SuppressSettingsNotifications())
+                {
+                    IsBuildLowestFirst = false;
+                }
+                NotifySettingsChanged(ResourceSettingsChange.BuildStrategy);
             }
         }
     }
@@ -164,10 +180,10 @@ public sealed class ResourcesViewModel : BaseViewModel
     private bool _upgradeIron = true;
     private bool _upgradeCrop = true;
 
-    public bool UpgradeWood { get => _upgradeWood; set => SetProperty(ref _upgradeWood, value); }
-    public bool UpgradeClay { get => _upgradeClay; set => SetProperty(ref _upgradeClay, value); }
-    public bool UpgradeIron { get => _upgradeIron; set => SetProperty(ref _upgradeIron, value); }
-    public bool UpgradeCrop { get => _upgradeCrop; set => SetProperty(ref _upgradeCrop, value); }
+    public bool UpgradeWood { get => _upgradeWood; set => SetUpgradeType(ref _upgradeWood, value); }
+    public bool UpgradeClay { get => _upgradeClay; set => SetUpgradeType(ref _upgradeClay, value); }
+    public bool UpgradeIron { get => _upgradeIron; set => SetUpgradeType(ref _upgradeIron, value); }
+    public bool UpgradeCrop { get => _upgradeCrop; set => SetUpgradeType(ref _upgradeCrop, value); }
 
     public IReadOnlyList<string> SelectedUpgradeTypes =>
         new[]
@@ -183,6 +199,7 @@ public sealed class ResourcesViewModel : BaseViewModel
 
     public void LoadResourceUpgradeTypes(IEnumerable<string> types)
     {
+        using var suppress = SuppressSettingsNotifications();
         var selected = new HashSet<string>(types ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
         UpgradeWood = selected.Contains("wood");
         UpgradeClay = selected.Contains("clay");
@@ -193,6 +210,7 @@ public sealed class ResourcesViewModel : BaseViewModel
     /// <summary>Loads the resource build strategy from a freshly read <see cref="BotOptions"/>.</summary>
     public void LoadSettingsFromConfig(BotOptions options)
     {
+        using var suppress = SuppressSettingsNotifications();
         if (string.Equals(options.ResourceBuildStrategy, "smart", StringComparison.OrdinalIgnoreCase))
         {
             IsBuildSmart = true;
@@ -393,6 +411,36 @@ public sealed class ResourcesViewModel : BaseViewModel
 
         _slotClickCooldownBySlot[slotId] = now;
         return true;
+    }
+
+    private void SetUpgradeType(ref bool field, bool value)
+    {
+        if (SetProperty(ref field, value))
+        {
+            NotifySettingsChanged(ResourceSettingsChange.UpgradeTypes);
+        }
+    }
+
+    private IDisposable SuppressSettingsNotifications()
+    {
+        _settingsNotificationSuppressionCount++;
+        return new SettingsNotificationSuppression(this);
+    }
+
+    private void NotifySettingsChanged(ResourceSettingsChange change)
+    {
+        if (_settingsNotificationSuppressionCount == 0)
+        {
+            SettingsChanged?.Invoke(change);
+        }
+    }
+
+    private sealed class SettingsNotificationSuppression(ResourcesViewModel owner) : IDisposable
+    {
+        public void Dispose()
+        {
+            owner._settingsNotificationSuppressionCount = Math.Max(0, owner._settingsNotificationSuppressionCount - 1);
+        }
     }
 
     /// <summary>Suppresses duplicate resource-upgrade queue requests during a double click.</summary>

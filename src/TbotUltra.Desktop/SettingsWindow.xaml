@@ -209,25 +209,29 @@
                                        Margin="0,0,0,10" />
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="DontNotifyNewVersionCheckBox"
-                                          Content="Dont notify for new version" />
+                                          Content="Dont notify for new version"
+                                          IsChecked="{Binding SettingsVm.DontNotifyNewVersion, Mode=TwoWay}" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="Suppresses the popup shown when a newer version is available. Updates can still be checked and installed manually from the version window." />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="QuickReloginCheckBox"
-                                          Content="Quick re-login within 2 hours" />
+                                          Content="Quick re-login within 2 hours"
+                                          IsChecked="{Binding SettingsVm.QuickReloginEnabled, Mode=TwoWay}" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="When logging in less than 2hrs after the last full login, skip the post-login analyzes and only confirm the session. &#10;Recommended to keep ON" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="AutomaticallyCheckLanguageCheckBox"
-                                          Content="Automatically check language" />
+                                          Content="Automatically check language"
+                                          IsChecked="{Binding SettingsVm.AutomaticallyCheckLanguage, Mode=TwoWay}" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="Checks that Travian is set to English before automation parses pages. Turn off only if the language guard itself causes problems." />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="DetailedBrowserLoggingCheckBox"
                                           Content="Detailed browser logging (development only)"
+                                          IsChecked="{Binding SettingsVm.DetailedBrowserLoggingEnabled, Mode=TwoWay}"
                                           Checked="DetailedBrowserLoggingCheckBox_Changed"
                                           Unchecked="DetailedBrowserLoggingCheckBox_Changed" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
@@ -237,14 +241,16 @@
                                 <CheckBox x:Name="DailyServerResetOverrideCheckBox"
                                           Content="Daily server reset (manual)"
                                           VerticalAlignment="Center"
-                                          Checked="DailyServerResetOverride_Changed"
-                                          Unchecked="DailyServerResetOverride_Changed" />
+                                          IsChecked="{Binding SettingsVm.DailyServerResetOverrideEnabled, Mode=TwoWay}" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="The server-local whole hour when the game day resets. The bot auto-detects this from the daily quests dialog per account — the detected value is shown on the right. Leave the toggle OFF to use the detected value; turn it ON only to override it manually (e.g. if detection is wrong)." />
                                 <ComboBox x:Name="DailyServerResetHourComboBox"
                                           Width="80"
                                           Margin="10,0,0,0"
-                                          VerticalAlignment="Center" />
+                                          VerticalAlignment="Center"
+                                          IsEnabled="{Binding SettingsVm.DailyServerResetOverrideEnabled}"
+                                          SelectedValuePath="Tag"
+                                          SelectedValue="{Binding SettingsVm.DailyServerResetHour, Mode=TwoWay}" />
                                 <Border Background="{DynamicResource SuccessBgBrush}"
                                         BorderBrush="{DynamicResource SuccessBorderBrush}"
                                         BorderThickness="1"
@@ -271,14 +277,15 @@
                                         Style="{StaticResource RefreshIconButtonStyle}"
                                         Margin="8,0,0,0"
                                         ToolTip="Reset pacing defaults"
-                                        Click="ResetPacingButton_Click" />
+                                        Command="{Binding SettingsVm.ResetPacingCommand}" />
                             </StackPanel>
 
                             <Border Style="{StaticResource SettingsGroupBox}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <CheckBox x:Name="SessionPacingEnabledCheckBox"
-                                                  Content="Session pacing" />
+                                                  Content="Session pacing"
+                                                  IsChecked="{Binding SettingsVm.Pacing.SessionPacingEnabled, Mode=TwoWay}" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="Limits how long the bot runs before it logs out, sleeps, and resumes automatically." />
                                     </StackPanel>
@@ -297,15 +304,15 @@
                                         <TextBlock Grid.Row="0" Grid.Column="1" Text="Min" FontWeight="SemiBold" Margin="0,2" />
                                         <TextBlock Grid.Row="0" Grid.Column="2" Text="Max" FontWeight="SemiBold" Margin="6,2,0,2" />
                                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Run (min)" VerticalAlignment="Center" Margin="0,2" />
-                                        <TextBox x:Name="SessionRunMinMinutesTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2" />
-                                        <TextBox x:Name="SessionRunMaxMinutesTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="6,2,0,2" />
+                                        <TextBox x:Name="SessionRunMinMinutesTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2" Text="{Binding SettingsVm.Pacing.SessionRunMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="SessionRunMaxMinutesTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="6,2,0,2" Text="{Binding SettingsVm.Pacing.SessionRunMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Sleep (min)" VerticalAlignment="Center" Margin="0,2" />
-                                        <TextBox x:Name="SessionSleepMinMinutesTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2" />
-                                        <TextBox x:Name="SessionSleepMaxMinutesTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="6,2,0,2" />
+                                        <TextBox x:Name="SessionSleepMinMinutesTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2" Text="{Binding SettingsVm.Pacing.SessionSleepMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="SessionSleepMaxMinutesTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="6,2,0,2" Text="{Binding SettingsVm.Pacing.SessionSleepMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Daily max" VerticalAlignment="Center" Margin="0,2" />
-                                        <ComboBox x:Name="SessionDailyMaxHoursComboBox" Grid.Row="3" Grid.Column="1" Height="24" Margin="0,2"
+                                        <ComboBox x:Name="SessionDailyMaxHoursComboBox" Grid.Row="3" Grid.Column="1" Height="24" Margin="0,2" SelectedValuePath="Tag" SelectedValue="{Binding SettingsVm.Pacing.SessionDailyMaxHours, Mode=TwoWay}"
                                                   SelectionChanged="SessionDailyMaxHoursComboBox_SelectionChanged" />
-                                        <ComboBox x:Name="SessionDailyMaxVariationComboBox" Grid.Row="3" Grid.Column="2" Height="24" Margin="6,2,0,2"
+                                        <ComboBox x:Name="SessionDailyMaxVariationComboBox" Grid.Row="3" Grid.Column="2" Height="24" Margin="6,2,0,2" SelectedValuePath="Tag" SelectedValue="{Binding SettingsVm.Pacing.SessionDailyMaxVariationPercent, Mode=TwoWay}"
                                                   ToolTip="Daily max variation: randomizes the daily limit by this much each day (applies only to Daily max)." />
                                     </Grid>
                                     <StackPanel Orientation="Horizontal" Margin="18,0,0,6">
@@ -313,14 +320,26 @@
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="Checked hours may run. Unchecked hours log out and stay stopped until the next checked hour." />
                                     </StackPanel>
-                                    <local:VerticalFirstUniformGrid x:Name="SessionAllowedHoursGrid"
-                                                                    Columns="6"
-                                                                    Margin="18,0,0,0" />
+                                    <ItemsControl ItemsSource="{Binding SettingsVm.Pacing.SessionAllowedHours}"
+                                                  Margin="18,0,0,0">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <local:VerticalFirstUniformGrid Columns="6" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Content="{Binding Label}"
+                                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                          Margin="0,2,8,2" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                     <StackPanel Orientation="Horizontal" Margin="18,12,0,0" VerticalAlignment="Center">
                                         <TextBlock Text="Daily variation" FontWeight="SemiBold" VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="Shifts each allowed-hours on/off boundary by ± this percent of an hour (e.g. 30% = ±18 min), so the bot does not start or stop at the exact same clock time every day. Set to 0 to keep exact hours." />
-                                        <ComboBox x:Name="SessionHoursVariationComboBox" Width="110" Height="24" Margin="8,0,0,0" />
+                                        <ComboBox x:Name="SessionHoursVariationComboBox" Width="110" Height="24" Margin="8,0,0,0" SelectedValuePath="Tag" SelectedValue="{Binding SettingsVm.Pacing.SessionHoursVariationPercent, Mode=TwoWay}" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -355,40 +374,40 @@
                                                             VerticalAlignment="Center"
                                                             ToolTip="Randomized pause before each state-changing bot task (build, upgrade, send, etc.), so actions are not fired back-to-back at machine speed." />
                                         </StackPanel>
-                                        <TextBox x:Name="ActionTaskMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="ActionTaskMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <TextBox x:Name="ActionTaskMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.TaskMinSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="ActionTaskMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.TaskMaxSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4">
                                             <TextBlock Text="Page load" VerticalAlignment="Center" />
                                             <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                             VerticalAlignment="Center"
                                                             ToolTip="Randomized pause after a page finishes loading or reloading, before the bot reads it or acts on it." />
                                         </StackPanel>
-                                        <TextBox x:Name="ActionPageLoadMinTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="ActionPageLoadMaxTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <TextBox x:Name="ActionPageLoadMinTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.PageLoadMinSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="ActionPageLoadMaxTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.PageLoadMaxSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <StackPanel Grid.Row="3" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4">
                                             <TextBlock Text="Click" VerticalAlignment="Center" />
                                             <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                             VerticalAlignment="Center"
                                                             ToolTip="Randomized pause before each click (buttons, links, menu entries), mimicking human reaction time." />
                                         </StackPanel>
-                                        <TextBox x:Name="ActionClickMinTextBox" Grid.Row="3" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="ActionClickMaxTextBox" Grid.Row="3" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <TextBox x:Name="ActionClickMinTextBox" Grid.Row="3" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.ClickMinSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="ActionClickMaxTextBox" Grid.Row="3" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.ClickMaxSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <StackPanel Grid.Row="4" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4">
                                             <TextBlock Text="Loop" VerticalAlignment="Center" />
                                             <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                             VerticalAlignment="Center"
                                                             ToolTip="Randomized pause between continuous-loop passes, so the account is not re-scanned at a constant robotic interval." />
                                         </StackPanel>
-                                        <TextBox x:Name="ActionLoopMinTextBox" Grid.Row="4" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="ActionLoopMaxTextBox" Grid.Row="4" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <TextBox x:Name="ActionLoopMinTextBox" Grid.Row="4" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.LoopMinSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="ActionLoopMaxTextBox" Grid.Row="4" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.LoopMaxSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <StackPanel Grid.Row="5" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4">
                                             <TextBlock Text="Send farmlists" VerticalAlignment="Center" />
                                             <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                             VerticalAlignment="Center"
                                                             ToolTip="Wait between clicking each farm list's Start button when sending all lists. Lists are sent one at a time and each is confirmed dispatched before the next click." />
                                         </StackPanel>
-                                        <TextBox x:Name="FarmListStepDelayMinTextBox" Grid.Row="5" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="FarmListStepDelayMaxTextBox" Grid.Row="5" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <TextBox x:Name="FarmListStepDelayMinTextBox" Grid.Row="5" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.FarmListStepDelayMinSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="FarmListStepDelayMaxTextBox" Grid.Row="5" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.FarmListStepDelayMaxSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </Grid>
 
                                     <StackPanel Orientation="Horizontal" Margin="0,14,0,8">
@@ -409,8 +428,8 @@
                                         <TextBlock Grid.Row="0" Grid.Column="1" Text="Min s" FontWeight="SemiBold" />
                                         <TextBlock Grid.Row="0" Grid.Column="2" Text="Max s" FontWeight="SemiBold" />
                                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Click/step" VerticalAlignment="Center" Margin="0,4" />
-                                        <TextBox x:Name="CollectStepDelayMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="CollectStepDelayMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <TextBox x:Name="CollectStepDelayMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.CollectStepDelayMinSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="CollectStepDelayMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.CollectStepDelayMaxSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -420,6 +439,7 @@
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <CheckBox x:Name="IdleBreakEnabledCheckBox"
                                                   Content="Idle break"
+                                                  IsChecked="{Binding SettingsVm.Pacing.IdleBreakEnabled, Mode=TwoWay}"
                                                   VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}">
                                             <ContentControl.ToolTip>
@@ -444,11 +464,11 @@
                                         <TextBlock Grid.Row="0" Grid.Column="1" Text="Min" FontWeight="SemiBold" />
                                         <TextBlock Grid.Row="0" Grid.Column="2" Text="Max" FontWeight="SemiBold" />
                                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Every (min)" VerticalAlignment="Center" Margin="0,4" />
-                                        <TextBox x:Name="IdleBreakIntervalMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="IdleBreakIntervalMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <TextBox x:Name="IdleBreakIntervalMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.IdleBreakIntervalMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="IdleBreakIntervalMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.IdleBreakIntervalMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Length (min)" VerticalAlignment="Center" Margin="0,4" />
-                                        <TextBox x:Name="IdleBreakDurationMinTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="IdleBreakDurationMaxTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <TextBox x:Name="IdleBreakDurationMinTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.IdleBreakDurationMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="IdleBreakDurationMaxTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.IdleBreakDurationMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -468,6 +488,7 @@
                                     <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                         <CheckBox x:Name="IdleBrowseEnabledCheckBox"
                                                   Content="Idle browse"
+                                                  IsChecked="{Binding SettingsVm.Pacing.IdleBrowseEnabled, Mode=TwoWay}"
                                                   VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}">
                                             <ContentControl.ToolTip>
@@ -480,8 +501,8 @@
                                     </StackPanel>
                                     <TextBlock Grid.Row="0" Grid.Column="1" Text="Min" FontWeight="SemiBold" />
                                     <TextBlock Grid.Row="0" Grid.Column="2" Text="Max" FontWeight="SemiBold" />
-                                    <TextBox x:Name="IdleBrowseIntervalMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                    <TextBox x:Name="IdleBrowseIntervalMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                    <TextBox x:Name="IdleBrowseIntervalMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.IdleBrowseIntervalMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBox x:Name="IdleBrowseIntervalMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.IdleBrowseIntervalMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     <Expander Grid.Row="1" Grid.Column="3" Header="Pages to visit" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}">
                                         <Grid Margin="4,4,0,0">
                                             <Grid.ColumnDefinitions>
@@ -489,16 +510,16 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0" Margin="0,0,20,0">
-                                                <CheckBox x:Name="IdleBrowsePageMapCheckBox" Content="Map" Margin="0,2" />
-                                                <CheckBox x:Name="IdleBrowsePageReportsCheckBox" Content="Reports" Margin="0,2" />
-                                                <CheckBox x:Name="IdleBrowsePageMessagesCheckBox" Content="Messages" Margin="0,2" />
-                                                <CheckBox x:Name="IdleBrowsePageStatisticsCheckBox" Content="Statistics - General" Margin="0,2" />
+                                                <CheckBox x:Name="IdleBrowsePageMapCheckBox" Content="Map" Margin="0,2" IsChecked="{Binding SettingsVm.Pacing.IdleBrowsePageMap, Mode=TwoWay}" />
+                                                <CheckBox x:Name="IdleBrowsePageReportsCheckBox" Content="Reports" Margin="0,2" IsChecked="{Binding SettingsVm.Pacing.IdleBrowsePageReports, Mode=TwoWay}" />
+                                                <CheckBox x:Name="IdleBrowsePageMessagesCheckBox" Content="Messages" Margin="0,2" IsChecked="{Binding SettingsVm.Pacing.IdleBrowsePageMessages, Mode=TwoWay}" />
+                                                <CheckBox x:Name="IdleBrowsePageStatisticsCheckBox" Content="Statistics - General" Margin="0,2" IsChecked="{Binding SettingsVm.Pacing.IdleBrowsePageStatistics, Mode=TwoWay}" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="1">
-                                                <CheckBox x:Name="IdleBrowsePageStatisticsHeroCheckBox" Content="Statistics - Hero" Margin="0,2" />
-                                                <CheckBox x:Name="IdleBrowsePageStatisticsTop10CheckBox" Content="Statistics - Top10" Margin="0,2" />
-                                                <CheckBox x:Name="IdleBrowsePageStatisticsDefendersCheckBox" Content="Statistics - Defender" Margin="0,2" />
-                                                <CheckBox x:Name="IdleBrowsePageStatisticsAttackersCheckBox" Content="Statistics - Attacker" Margin="0,2" />
+                                                <CheckBox x:Name="IdleBrowsePageStatisticsHeroCheckBox" Content="Statistics - Hero" Margin="0,2" IsChecked="{Binding SettingsVm.Pacing.IdleBrowsePageStatisticsHero, Mode=TwoWay}" />
+                                                <CheckBox x:Name="IdleBrowsePageStatisticsTop10CheckBox" Content="Statistics - Top10" Margin="0,2" IsChecked="{Binding SettingsVm.Pacing.IdleBrowsePageStatisticsTop10, Mode=TwoWay}" />
+                                                <CheckBox x:Name="IdleBrowsePageStatisticsDefendersCheckBox" Content="Statistics - Defender" Margin="0,2" IsChecked="{Binding SettingsVm.Pacing.IdleBrowsePageStatisticsDefenders, Mode=TwoWay}" />
+                                                <CheckBox x:Name="IdleBrowsePageStatisticsAttackersCheckBox" Content="Statistics - Attacker" Margin="0,2" IsChecked="{Binding SettingsVm.Pacing.IdleBrowsePageStatisticsAttackers, Mode=TwoWay}" />
                                             </StackPanel>
                                         </Grid>
                                     </Expander>
@@ -541,7 +562,9 @@
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
                                     <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
-                                        <CheckBox x:Name="ContinuousKeepAliveEnabledCheckBox" Content="Keep Alive" />
+                                        <CheckBox x:Name="ContinuousKeepAliveEnabledCheckBox"
+                                                  Content="Keep Alive"
+                                                  IsChecked="{Binding SettingsVm.Pacing.ContinuousKeepAliveEnabled, Mode=TwoWay}" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="Reloads the current page occasionally while continuous-loop work is due soon, to prevent the session from becoming stale." />
                                         <Border x:Name="ContinuousKeepAliveNextReloadBadge"
@@ -567,14 +590,16 @@
                                     </StackPanel>
                                     <TextBlock Grid.Row="1" Grid.Column="1" Text="Min min" FontWeight="SemiBold" />
                                     <TextBlock Grid.Row="1" Grid.Column="2" Text="Max min" FontWeight="SemiBold" />
-                                    <TextBox x:Name="ContinuousKeepAliveMinMinutesTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                    <TextBox x:Name="ContinuousKeepAliveMaxMinutesTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                    <TextBox x:Name="ContinuousKeepAliveMinMinutesTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.ContinuousKeepAliveMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBox x:Name="ContinuousKeepAliveMaxMinutesTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.ContinuousKeepAliveMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </Grid>
                             </Border>
                             <Border Style="{StaticResource SettingsGroupBox}" BorderThickness="0" Padding="0" Margin="0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                        <CheckBox x:Name="VillageStatusSweepEnabledCheckBox" Content="Village scan" />
+                                        <CheckBox x:Name="VillageStatusSweepEnabledCheckBox"
+                                                  Content="Village scan"
+                                                  IsChecked="{Binding SettingsVm.Pacing.VillageStatusSweepEnabled, Mode=TwoWay}" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Scan all villages to update the current actual state to the program. Choose what you want the scan to do." />
                                         <StackPanel Orientation="Horizontal" Margin="22,0,0,0" VerticalAlignment="Center">
                                             <Border x:Name="VillageStatusSweepNextScanBadge"
@@ -612,26 +637,26 @@
                                         <TextBlock Grid.Row="0" Grid.Column="1" Text="Min" FontWeight="SemiBold" />
                                         <TextBlock Grid.Row="0" Grid.Column="2" Text="Max" FontWeight="SemiBold" />
                                         <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="Function delay (min)" /><ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Random delay after a completed round before the next round starts." /></StackPanel>
-                                        <TextBox x:Name="VillageStatusSweepRoundMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="VillageStatusSweepRoundMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <TextBox x:Name="VillageStatusSweepRoundMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.VillageStatusSweepRoundMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="VillageStatusSweepRoundMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.VillageStatusSweepRoundMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="Village delay (s)" /><ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Random delay before switching to the next village. Normal click pacing also applies to the navigation." /></StackPanel>
-                                        <TextBox x:Name="VillageStatusSweepVillageMinTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="VillageStatusSweepVillageMaxTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" />
+                                        <TextBox x:Name="VillageStatusSweepVillageMinTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.VillageStatusSweepVillageMinSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="VillageStatusSweepVillageMaxTextBox" Grid.Row="2" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.VillageStatusSweepVillageMaxSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </Grid>
                                     <StackPanel Margin="18,0,0,8">
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                            <CheckBox x:Name="VillageStatusSweepDorf1CheckBox" Content="Dorf1" IsChecked="True" Margin="0,2,8,2" />
+                                            <CheckBox x:Name="VillageStatusSweepDorf1CheckBox" Content="Dorf1" IsChecked="{Binding SettingsVm.Pacing.VillageStatusSweepDorf1Enabled, Mode=TwoWay}" Margin="0,2,8,2" />
                                             <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Reads resources, hourly production, Warehouse and Granary capacity, population, construction queue, tasks, daily quests, unread messages and reports." />
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal">
-                                            <CheckBox x:Name="VillageStatusSweepDorf2CheckBox" Content="Dorf2" Margin="0,2,8,2" Checked="VillageStatusSweepDorf2Changed" Unchecked="VillageStatusSweepDorf2Changed" />
+                                            <CheckBox x:Name="VillageStatusSweepDorf2CheckBox" Content="Dorf2" Margin="0,2,8,2" IsChecked="{Binding SettingsVm.Pacing.VillageStatusSweepDorf2Enabled, Mode=TwoWay}" />
                                             <ContentControl Style="{StaticResource SettingInfoIconStyle}" ToolTip="Reads all buildings in the village center. Required before Smithy, Barracks, Stable, Workshop, Town Hall or Brewery can be scanned." Margin="0,0,12,0" />
-                                            <CheckBox x:Name="VillageStatusSweepSmithyCheckBox" Content="Smithy" Margin="0,2,12,2" />
-                                            <CheckBox x:Name="VillageStatusSweepBarracksCheckBox" Content="Barracks" Margin="0,2,12,2" />
-                                            <CheckBox x:Name="VillageStatusSweepStableCheckBox" Content="Stable" Margin="0,2,12,2" />
-                                            <CheckBox x:Name="VillageStatusSweepWorkshopCheckBox" Content="Workshop" Margin="0,2,12,2" />
-                                            <CheckBox x:Name="VillageStatusSweepTownHallCheckBox" Content="Town Hall" Margin="0,2,12,2" />
-                                            <CheckBox x:Name="VillageStatusSweepBreweryCheckBox" Content="Brewery" ToolTip="Teutons only" Margin="0,2" />
+                                            <CheckBox x:Name="VillageStatusSweepSmithyCheckBox" Content="Smithy" Margin="0,2,12,2" IsEnabled="{Binding SettingsVm.Pacing.VillageStatusSweepDorf2DetailsEnabled}" IsChecked="{Binding SettingsVm.Pacing.VillageStatusSweepSmithyEnabled, Mode=TwoWay}" />
+                                            <CheckBox x:Name="VillageStatusSweepBarracksCheckBox" Content="Barracks" Margin="0,2,12,2" IsEnabled="{Binding SettingsVm.Pacing.VillageStatusSweepDorf2DetailsEnabled}" IsChecked="{Binding SettingsVm.Pacing.VillageStatusSweepBarracksEnabled, Mode=TwoWay}" />
+                                            <CheckBox x:Name="VillageStatusSweepStableCheckBox" Content="Stable" Margin="0,2,12,2" IsEnabled="{Binding SettingsVm.Pacing.VillageStatusSweepDorf2DetailsEnabled}" IsChecked="{Binding SettingsVm.Pacing.VillageStatusSweepStableEnabled, Mode=TwoWay}" />
+                                            <CheckBox x:Name="VillageStatusSweepWorkshopCheckBox" Content="Workshop" Margin="0,2,12,2" IsEnabled="{Binding SettingsVm.Pacing.VillageStatusSweepDorf2DetailsEnabled}" IsChecked="{Binding SettingsVm.Pacing.VillageStatusSweepWorkshopEnabled, Mode=TwoWay}" />
+                                            <CheckBox x:Name="VillageStatusSweepTownHallCheckBox" Content="Town Hall" Margin="0,2,12,2" IsEnabled="{Binding SettingsVm.Pacing.VillageStatusSweepDorf2DetailsEnabled}" IsChecked="{Binding SettingsVm.Pacing.VillageStatusSweepTownHallEnabled, Mode=TwoWay}" />
+                                            <CheckBox x:Name="VillageStatusSweepBreweryCheckBox" Content="Brewery" ToolTip="Teutons only" Margin="0,2" IsEnabled="{Binding SettingsVm.Pacing.VillageStatusSweepDorf2DetailsEnabled}" IsChecked="{Binding SettingsVm.Pacing.VillageStatusSweepBreweryEnabled, Mode=TwoWay}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
@@ -659,7 +684,8 @@
                                     <ComboBox x:Name="StorageUpgradeLevelsAheadComboBox"
                                               Width="72"
                                               Margin="12,0,0,0"
-                                              VerticalAlignment="Center" />
+                                              VerticalAlignment="Center"
+                                              SelectedItem="{Binding SettingsVm.Construction.StorageUpgradeLevelsAhead, Mode=TwoWay}" />
                                 </StackPanel>
                             </Border>
 
@@ -671,9 +697,9 @@
                                                         ToolTip="After Travian finishes one demolition, wait a random time before starting the next one. The chosen delay is stored with the queue timer." />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                        <TextBox x:Name="DemolishDelayMinTextBox" Width="64" Height="24" />
+                                        <TextBox x:Name="DemolishDelayMinTextBox" Width="64" Height="24" Text="{Binding SettingsVm.Construction.DemolishDelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <TextBlock Text="to" Margin="8,0" VerticalAlignment="Center" />
-                                        <TextBox x:Name="DemolishDelayMaxTextBox" Width="64" Height="24" />
+                                        <TextBox x:Name="DemolishDelayMaxTextBox" Width="64" Height="24" Text="{Binding SettingsVm.Construction.DemolishDelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -688,6 +714,7 @@
                                                   Content="Construction start delay"
                                                   FontWeight="SemiBold"
                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                  IsChecked="{Binding SettingsVm.Construction.HumanizeDelayEnabled, Mode=TwoWay}"
                                                   VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="Wait a bit before starting the next construction instead of reacting the instant a slot frees. Shortly before a session-pacing sleep, delayed starts are pulled forward automatically so every build slot that can be filled is occupied when the sleep begins. Off means builds start immediately." />
@@ -715,23 +742,23 @@
                                             <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                             ToolTip="When a build is already running and Plus allows another build to be queued, wait a random percentage of the running build's remaining time. Max delay is still respected." />
                                         </StackPanel>
-                                        <TextBox x:Name="ConstructionHumanizeQueuePercentMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="ConstructionHumanizeQueuePercentMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2" />
+                                        <TextBox x:Name="ConstructionHumanizeQueuePercentMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Construction.QueuePercentMin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="ConstructionHumanizeQueuePercentMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2" Text="{Binding SettingsVm.Construction.QueuePercentMax, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                                         <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2">
                                             <TextBlock Text="Max delay (min)" VerticalAlignment="Center" />
                                             <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                             ToolTip="Absolute cap on the queue-delay percentage." />
                                         </StackPanel>
-                                        <TextBox x:Name="ConstructionHumanizeMaxDelayTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" />
+                                        <TextBox x:Name="ConstructionHumanizeMaxDelayTextBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Construction.MaxDelayMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                                         <StackPanel Grid.Row="3" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2">
                                             <TextBlock Text="No-Plus delay (min)" VerticalAlignment="Center" />
                                             <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                             ToolTip="When only one build slot is available, wait a random number of minutes in this range after a build finishes before starting the next." />
                                         </StackPanel>
-                                        <TextBox x:Name="ConstructionHumanizeNoPlusMinTextBox" Grid.Row="3" Grid.Column="1" Height="24" Margin="0,2,6,2" />
-                                        <TextBox x:Name="ConstructionHumanizeNoPlusMaxTextBox" Grid.Row="3" Grid.Column="2" Height="24" Margin="0,2" />
+                                        <TextBox x:Name="ConstructionHumanizeNoPlusMinTextBox" Grid.Row="3" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Construction.NoPlusDelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="ConstructionHumanizeNoPlusMaxTextBox" Grid.Row="3" Grid.Column="2" Height="24" Margin="0,2" Text="{Binding SettingsVm.Construction.NoPlusDelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -753,49 +780,56 @@
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="PostLoginAnalyzeFarmlistsCheckBox"
-                                        Content="Analyze farmlists" />
+                                        Content="Analyze farmlists"
+                                        IsChecked="{Binding SettingsVm.PostLogin.AnalyzeFarmlists, Mode=TwoWay}" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="Reads all configured farmlists and updates local data." />
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="PostLoginAnalyzeHeroCheckBox"
-                                        Content="Analyze hero attributes" />
+                                        Content="Analyze hero attributes"
+                                        IsChecked="{Binding SettingsVm.PostLogin.AnalyzeHero, Mode=TwoWay}" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="Reads the hero attribute values and updates local data." />
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="PostLoginAnalyzeHeroInventoryCheckBox"
-                                        Content="Analyze hero inventory" />
+                                        Content="Analyze hero inventory"
+                                        IsChecked="{Binding SettingsVm.PostLogin.AnalyzeHeroInventory, Mode=TwoWay}" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="Reads hero inventory resources and items." />
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="PostLoginReadTroopTrainingQueueCheckBox"
-                                        Content="Read troop training queue" />
+                                        Content="Read troop training queue"
+                                        IsChecked="{Binding SettingsVm.PostLogin.ReadTroopTrainingQueue, Mode=TwoWay}" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="Reads current troop training queues from: &#10;Barracks &#10;Stable &#10;Workshop"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="PostLoginAnalyzeBreweryCheckBox"
-                                        Content="Analyze brewery" />
+                                        Content="Analyze brewery"
+                                        IsChecked="{Binding SettingsVm.PostLogin.AnalyzeBrewery, Mode=TwoWay}" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="Reads brewery level and current bonus information/timer." />
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="PostLoginAnalyzeNewVillagesCheckBox"
-                                          Content="Analyze new village startup" />
+                                          Content="Analyze new village startup"
+                                          IsChecked="{Binding SettingsVm.PostLogin.AnalyzeNewVillages, Mode=TwoWay}" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="If there is a new villages after login without cached status a analysis will be made to scan dorf1 and dorf2. &#10;Recommended to keep ON." />
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <CheckBox x:Name="PostLoginAnalyzeNewAccountCheckBox"
-                                          Content="New account analysis" />
+                                          Content="New account analysis"
+                                          IsChecked="{Binding SettingsVm.PostLogin.AnalyzeNewAccount, Mode=TwoWay}" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="On the first full login for a new account, analyzes hero inventory, hero attributes, and new village startup regardless of their individual settings." />
                                 <Border x:Name="NewAccountAnalysisStatusCard"
@@ -822,16 +856,16 @@
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <CheckBox Content="Restart delay (min)"
                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                              IsChecked="{Binding HeroAdventureRestartDelay.IsEnabled, Mode=TwoWay}" />
+                                              IsChecked="{Binding SettingsVm.Hero.AdventureRestartDelay.IsEnabled, Mode=TwoWay}" />
                                     <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                     ToolTip="Waits a random time before sending the hero after returning home or after an adventure becomes available." />
                                     <StackPanel Orientation="Horizontal"
                                                 Margin="8,0,0,0"
                                                 VerticalAlignment="Center"
-                                                IsEnabled="{Binding HeroAdventureRestartDelay.IsEnabled}">
-                                            <TextBox x:Name="HeroAdventureRestartDelayMinTextBox" Width="56" Text="{Binding HeroAdventureRestartDelay.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                IsEnabled="{Binding SettingsVm.Hero.AdventureRestartDelay.IsEnabled}">
+                                            <TextBox x:Name="HeroAdventureRestartDelayMinTextBox" Width="56" Text="{Binding SettingsVm.Hero.AdventureRestartDelay.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <TextBlock Text="–" Margin="8,0" VerticalAlignment="Center" />
-                                            <TextBox x:Name="HeroAdventureRestartDelayMaxTextBox" Width="56" Text="{Binding HeroAdventureRestartDelay.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBox x:Name="HeroAdventureRestartDelayMaxTextBox" Width="56" Text="{Binding SettingsVm.Hero.AdventureRestartDelay.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -846,7 +880,8 @@
                                     </StackPanel>
                                     <ComboBox x:Name="HeroHpRegenPerDayComboBox"
                                               Width="80"
-                                              ItemsSource="{Binding HeroHpRegenOptions}" />
+                                              ItemsSource="{Binding SettingsVm.Hero.HpRegenOptions}"
+                                              SelectedItem="{Binding SettingsVm.Hero.HpRegenPerDayPercent, Mode=TwoWay}" />
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -863,6 +898,7 @@
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                         <CheckBox x:Name="ShowFarmListLastSentTimerCheckBox"
                                                   Content="Show last sent timer"
+                                                  IsChecked="{Binding SettingsVm.Farming.ShowFarmListLastSentTimer, Mode=TwoWay}"
                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="Shows the Last sent column for farm lists on the Farming page." />
@@ -870,13 +906,14 @@
                                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0" VerticalAlignment="Center">
                                         <CheckBox x:Name="FarmListLastSentLimitEnabledCheckBox"
                                                   Content="Last sent limit"
+                                                  IsChecked="{Binding SettingsVm.Farming.FarmListLastSentLimitEnabled, Mode=TwoWay}"
                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="After this many hours the timer shows e.g. 24h+. Turn it off to show elapsed time up to the hard 5-day display limit." />
                                         <StackPanel Orientation="Horizontal"
                                                     Margin="8,0,0,0"
-                                                    IsEnabled="{Binding IsChecked, ElementName=FarmListLastSentLimitEnabledCheckBox}">
-                                            <TextBox x:Name="FarmListLastSentLimitHoursTextBox" Width="56" />
+                                                    IsEnabled="{Binding SettingsVm.Farming.FarmListLastSentLimitEnabled}">
+                                            <TextBox x:Name="FarmListLastSentLimitHoursTextBox" Width="56" Text="{Binding SettingsVm.Farming.FarmListLastSentLimitHours, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                             <TextBlock Text="hours" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
                                         </StackPanel>
                                     </StackPanel>
@@ -892,16 +929,16 @@
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <CheckBox Content="Restart delay (min)"
                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                              IsChecked="{Binding SmithyUpgradeRestartDelay.IsEnabled, Mode=TwoWay}" />
+                                              IsChecked="{Binding SettingsVm.Hero.SmithyUpgradeRestartDelay.IsEnabled, Mode=TwoWay}" />
                                     <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                     ToolTip="Waits after a Smithy queue slot becomes free. An empty queue starts immediately and Travian Plus slots are filled together without a delay between them." />
                                     <StackPanel Orientation="Horizontal"
                                                 Margin="8,0,0,0"
                                                 VerticalAlignment="Center"
-                                                IsEnabled="{Binding SmithyUpgradeRestartDelay.IsEnabled}">
-                                            <TextBox x:Name="SmithyUpgradeRestartDelayMinTextBox" Width="56" Text="{Binding SmithyUpgradeRestartDelay.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                IsEnabled="{Binding SettingsVm.Hero.SmithyUpgradeRestartDelay.IsEnabled}">
+                                            <TextBox x:Name="SmithyUpgradeRestartDelayMinTextBox" Width="56" Text="{Binding SettingsVm.Hero.SmithyUpgradeRestartDelay.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <TextBlock Text="–" Margin="8,0" VerticalAlignment="Center" />
-                                            <TextBox x:Name="SmithyUpgradeRestartDelayMaxTextBox" Width="56" Text="{Binding SmithyUpgradeRestartDelay.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBox x:Name="SmithyUpgradeRestartDelayMaxTextBox" Width="56" Text="{Binding SettingsVm.Hero.SmithyUpgradeRestartDelay.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -940,7 +977,7 @@
                                             <TextBlock Grid.Column="2" Text="MODE" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}" />
                                         </Grid>
                                     </Border>
-                                    <ItemsControl ItemsSource="{Binding TownHallRows}">
+                                    <ItemsControl ItemsSource="{Binding SettingsVm.Celebrations.TownHallRows}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Border BorderBrush="{DynamicResource BorderSubtleBrush}"
@@ -982,7 +1019,7 @@
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding TownHallRows.Count}" Value="0">
+                                                    <DataTrigger Binding="{Binding SettingsVm.Celebrations.TownHallRows.Count}" Value="0">
                                                         <Setter Property="Visibility" Value="Visible" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -1001,17 +1038,17 @@
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0" VerticalAlignment="Center">
                                         <TextBlock Text="Run" Width="120" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                                        <RadioButton Content="One" Margin="0,0,18,0" IsChecked="{Binding TownHallQueue.IsOne, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                        <RadioButton Content="Two (one queued)" IsChecked="{Binding TownHallQueue.IsTwo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <RadioButton Content="One" Margin="0,0,18,0" IsChecked="{Binding SettingsVm.Celebrations.TownHallQueue.IsOne, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <RadioButton Content="Two (one queued)" IsChecked="{Binding SettingsVm.Celebrations.TownHallQueue.IsTwo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0" VerticalAlignment="Center">
-                                        <CheckBox Content="Restart delay (min)" Foreground="{DynamicResource TextSecondaryBrush}" IsChecked="{Binding TownHallQueue.IsRestartDelayEnabled, Mode=TwoWay}" />
+                                        <CheckBox Content="Restart delay (min)" Foreground="{DynamicResource TextSecondaryBrush}" IsChecked="{Binding SettingsVm.Celebrations.TownHallQueue.IsRestartDelayEnabled, Mode=TwoWay}" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="Random waiting time after a Town Hall celebration finishes before the next celebration is started." />
-                                        <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center" IsEnabled="{Binding TownHallQueue.IsRestartDelayEnabled}">
-                                                    <TextBox x:Name="TownHallRestartDelayMinTextBox" Width="56" Text="{Binding TownHallQueue.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center" IsEnabled="{Binding SettingsVm.Celebrations.TownHallQueue.IsRestartDelayEnabled}">
+                                                    <TextBox x:Name="TownHallRestartDelayMinTextBox" Width="56" Text="{Binding SettingsVm.Celebrations.TownHallQueue.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                             <TextBlock Text="–" Margin="8,0" VerticalAlignment="Center" />
-                                                    <TextBox x:Name="TownHallRestartDelayMaxTextBox" Width="56" Text="{Binding TownHallQueue.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                    <TextBox x:Name="TownHallRestartDelayMaxTextBox" Width="56" Text="{Binding SettingsVm.Celebrations.TownHallQueue.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
@@ -1024,13 +1061,13 @@
                             <Border Style="{StaticResource SettingsGroupBox}" Margin="0,10,0,0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <CheckBox Content="Restart delay (min)" Foreground="{DynamicResource TextSecondaryBrush}" IsChecked="{Binding BreweryRestartDelay.IsEnabled, Mode=TwoWay}" />
+                                        <CheckBox Content="Restart delay (min)" Foreground="{DynamicResource TextSecondaryBrush}" IsChecked="{Binding SettingsVm.Celebrations.BreweryRestartDelay.IsEnabled, Mode=TwoWay}" />
                                         <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                         ToolTip="Random waiting time after a Brewery celebration finishes before the next celebration is started." />
-                                        <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center" IsEnabled="{Binding BreweryRestartDelay.IsEnabled}">
-                                            <TextBox x:Name="BreweryRestartDelayMinTextBox" Width="56" Text="{Binding BreweryRestartDelay.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center" IsEnabled="{Binding SettingsVm.Celebrations.BreweryRestartDelay.IsEnabled}">
+                                            <TextBox x:Name="BreweryRestartDelayMinTextBox" Width="56" Text="{Binding SettingsVm.Celebrations.BreweryRestartDelay.DelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                             <TextBlock Text="–" Margin="8,0" VerticalAlignment="Center" />
-                                            <TextBox x:Name="BreweryRestartDelayMaxTextBox" Width="56" Text="{Binding BreweryRestartDelay.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBox x:Name="BreweryRestartDelayMaxTextBox" Width="56" Text="{Binding SettingsVm.Celebrations.BreweryRestartDelay.DelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
@@ -1047,7 +1084,9 @@
                                            Foreground="{DynamicResource TextPrimaryBrush}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                <CheckBox x:Name="AllowSilverSpendingCheckBox" Content="Allow silver spending" />
+                                <CheckBox x:Name="AllowSilverSpendingCheckBox"
+                                          Content="Allow silver spending"
+                                          IsChecked="{Binding SettingsVm.AllowSilverSpending, Mode=TwoWay}" />
                                 <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                 ToolTip="Not used by any automation yet — reserved for future auction/silver features. The bot only reads your silver amount for display today; nothing spends silver regardless of this setting." />
                             </StackPanel>
@@ -1062,7 +1101,9 @@
                                     <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                     ToolTip="Minimum silver balance to keep. Silver spending must not reduce the balance below this value." />
                                 </StackPanel>
-                                <TextBox x:Name="SilverLimitTextBox" Grid.Column="1" Text="100" />
+                                <TextBox x:Name="SilverLimitTextBox"
+                                         Grid.Column="1"
+                                         Text="{Binding SettingsVm.SilverLimitText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </Grid>
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
@@ -1076,8 +1117,7 @@
                                 </StackPanel>
                                 <TextBox x:Name="DailySilverSpendingLimitTextBox"
                                          Grid.Column="1"
-                                         Text="10000"
-                                         TextChanged="DailySpendingLimitTextBox_TextChanged" />
+                                         Text="{Binding SettingsVm.DailySilverSpendingLimitText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </Grid>
                             <StackPanel Orientation="Horizontal">
                                 <Border Height="30"
@@ -1089,7 +1129,7 @@
                                         BorderThickness="1"
                                         CornerRadius="4">
                                     <TextBlock x:Name="DailySilverSpendingUsageTextBlock"
-                                               Text="0 / 10000"
+                                               Text="{Binding SettingsVm.DailySilverSpendingUsageText}"
                                                Foreground="{DynamicResource SuccessTextBrush}"
                                                FontWeight="SemiBold"
                                                HorizontalAlignment="Center"
@@ -1111,6 +1151,7 @@
                             </StackPanel>
                             <CheckBox x:Name="AllowGoldSpendingCheckBox"
                                       Content="Allow gold spending"
+                                      IsChecked="{Binding SettingsVm.AllowGoldSpending, Mode=TwoWay}"
                                       Margin="0,0,0,12"
                                       ToolTip="Allows gold-spending features such as NPC trade. Spending respects the daily gold limit below." />
                             <Grid Margin="0,0,0,10">
@@ -1123,7 +1164,9 @@
                                     <ContentControl Style="{StaticResource SettingInfoIconStyle}"
                                                     ToolTip="Minimum gold balance to keep. Gold spending must not reduce the balance below this value." />
                                 </StackPanel>
-                                <TextBox x:Name="GoldLimitTextBox" Grid.Column="1" Text="100" />
+                                <TextBox x:Name="GoldLimitTextBox"
+                                         Grid.Column="1"
+                                         Text="{Binding SettingsVm.GoldLimitText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </Grid>
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
@@ -1137,8 +1180,7 @@
                                 </StackPanel>
                                 <TextBox x:Name="DailyGoldSpendingLimitTextBox"
                                          Grid.Column="1"
-                                         Text="20"
-                                         TextChanged="DailySpendingLimitTextBox_TextChanged" />
+                                         Text="{Binding SettingsVm.DailyGoldSpendingLimitText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </Grid>
                             <StackPanel Orientation="Horizontal">
                                 <Border Height="30"
@@ -1150,7 +1192,7 @@
                                         BorderThickness="1"
                                         CornerRadius="4">
                                     <TextBlock x:Name="DailyGoldSpendingUsageTextBlock"
-                                               Text="0 / 20"
+                                               Text="{Binding SettingsVm.DailyGoldSpendingUsageText}"
                                                Foreground="{DynamicResource SuccessTextBrush}"
                                                FontWeight="SemiBold"
                                                HorizontalAlignment="Center"

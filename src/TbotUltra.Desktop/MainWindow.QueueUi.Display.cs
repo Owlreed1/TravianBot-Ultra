@@ -52,13 +52,13 @@ public partial class MainWindow
         _isRefreshingQueueUi = true;
         try
         {
-            var ordered = _botService.GetQueueItemsForDisplay().ToList();
+            var ordered = _queuePanelService.GetItems().ToList();
             ClearStaleBuildingPendingCaches(ordered);
             // Drop construction upgrades whose target level is already reached (built manually or covered
             // by an earlier queued step) so the queue only shows real remaining work. Re-fetch after a prune.
             if (PruneCompletedConstructionQueueItems(ordered))
             {
-                ordered = _botService.GetQueueItemsForDisplay().ToList();
+                ordered = _queuePanelService.GetItems().ToList();
             }
 
             _queueServerTimeOffset = ResolveQueueServerTimeOffset();

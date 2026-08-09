@@ -33,6 +33,24 @@ public interface IBuildingClient
         bool allowSlotFallback = false,
         string? fallbackExcludedSlots = null);
 
+    Task<string> RunBreweryCelebrationAsync(
+        bool restartDelayEnabled,
+        double restartDelayMinMinutes,
+        double restartDelayMaxMinutes,
+        CancellationToken cancellationToken = default);
+
+    Task<BreweryCelebrationStatus> ReadBreweryCelebrationStatusAsync(
+        IReadOnlyList<Building>? knownBuildings = null,
+        CancellationToken cancellationToken = default);
+
+    Task<string> RunTownHallCelebrationAsync(
+        string mode,
+        int count,
+        bool restartDelayEnabled,
+        double restartDelayMinMinutes,
+        double restartDelayMaxMinutes,
+        CancellationToken cancellationToken = default);
+
     Task<string> UpgradeSelectedTroopsAtSmithyAsync(
         IReadOnlyList<SmithyTroopTarget> targets,
         CancellationToken cancellationToken = default);

@@ -571,7 +571,7 @@ public partial class MainWindow
             try
             {
                 var options = ApplySelectedVillageToOptions(LoadBotOptions());
-                var smithyStatus = await _botService.ReadSmithyUpgradeStatusAsync(options, AppendLog, knownBuildings, cancellationToken);
+                var smithyStatus = await _troopTrainingPanelService.ReadSmithyStatusAsync(options, AppendLog, knownBuildings, cancellationToken);
                 await Dispatcher.InvokeAsync(() =>
                 {
                     ApplySmithyUpgradeStatus(smithyStatus);
@@ -632,7 +632,7 @@ public partial class MainWindow
 
         try
         {
-            var celebrationStatus = await _botService.ReadBreweryCelebrationStatusAsync(options, AppendLog, status.Buildings, cancellationToken);
+            var celebrationStatus = await _troopTrainingPanelService.ReadBreweryStatusAsync(options, AppendLog, status.Buildings, cancellationToken);
             await Dispatcher.InvokeAsync(() =>
             {
                 // Seed the per-village brewery cache from authoritative remote reads so
@@ -893,7 +893,7 @@ public partial class MainWindow
         foreach (var village in villages)
         {
             var tribe = ResolveVillageTribeByKey(village.Key, village.Name);
-            var saved = TroopTrainingSettingsStore.Load(_projectRoot, account, village.Key);
+            var saved = _troopTrainingPanelService.LoadVillageSettings(account, village.Key);
             // When the village has an override, overlay it on the global options so the row opens on that
             // village's own settings; otherwise it opens on the global defaults.
             var effectiveOptions = saved is null
@@ -915,7 +915,7 @@ public partial class MainWindow
 
         foreach (var result in window.Results)
         {
-            TroopTrainingSettingsStore.Save(_projectRoot, account, result.VillageKey, result.Settings);
+            _troopTrainingPanelService.SaveVillageSettings(account, result.VillageKey, result.Settings);
             CacheDashboardTroopTrainingPayload(account, result.VillageKey, result.Settings);
             var village = villages.FirstOrDefault(v => string.Equals(v.Key, result.VillageKey, StringComparison.OrdinalIgnoreCase))
                 ?? new VillageSettingsStore.VillageKeyInfo(result.VillageKey, result.VillageName, null, null, false);
@@ -1035,7 +1035,7 @@ public partial class MainWindow
         }
 
         var syncedPayload = _troopTrainingViewModel.BuildVillageTrainingPayload();
-        TroopTrainingSettingsStore.SaveForVillages(_projectRoot, account, keys, syncedPayload);
+        _troopTrainingPanelService.SaveVillageSettings(account, keys, syncedPayload);
         foreach (var key in keys)
         {
             CacheDashboardTroopTrainingPayload(account, key, syncedPayload);
@@ -1059,7 +1059,7 @@ public partial class MainWindow
             return;
         }
 
-        var payload = TroopTrainingSettingsStore.Load(_projectRoot, account, key)
+        var payload = _troopTrainingPanelService.LoadVillageSettings(account, key)
             ?? TroopTrainingQuickSettings.FromOptions(LoadBotOptions());
         _troopTrainingViewModel.ApplyVillageTrainingPayload(payload);
     }
@@ -1105,7 +1105,7 @@ public partial class MainWindow
         try
         {
             var payload = _troopTrainingViewModel.BuildVillageTrainingPayload();
-            TroopTrainingSettingsStore.Save(_projectRoot, account, key, payload);
+            _troopTrainingPanelService.SaveVillageSettings(account, key, payload);
             CacheDashboardTroopTrainingPayload(account, key, payload);
         }
         catch (Exception ex)
@@ -1199,9 +1199,7 @@ public partial class MainWindow
     {
         try
         {
-            var config = _botConfigStore.Load();
-            _troopTrainingViewModel.WriteToConfig(config);
-            _botConfigStore.Save(config);
+            _troopTrainingPanelService.SaveGlobalSettings(_troopTrainingViewModel);
         }
         catch (Exception ex)
         {
@@ -1221,7 +1219,7 @@ public partial class MainWindow
         {
             try
             {
-                var refreshedStatus = await _botService.ReadBuildingsStatusAsync(options, AppendLog, cancellationToken);
+                var refreshedStatus = await _troopTrainingPanelService.ReadBuildingsAsync(options, AppendLog, cancellationToken);
                 effectiveBuildings = refreshedStatus.Buildings;
                 await Dispatcher.InvokeAsync(() =>
                 {
@@ -1257,11 +1255,11 @@ public partial class MainWindow
             }
         }
 
-        var queueStatuses = await _botService.ReadTroopTrainingQueuesAsync(options, AppendLog, effectiveBuildings, cancellationToken);
+        var queueStatuses = await _troopTrainingPanelService.ReadQueuesAsync(options, AppendLog, effectiveBuildings, cancellationToken);
         SmithyUpgradeStatus? smithyStatus = null;
         if (includeSmithyStatus)
         {
-            smithyStatus = await _botService.ReadSmithyUpgradeStatusAsync(options, AppendLog, effectiveBuildings, cancellationToken);
+            smithyStatus = await _troopTrainingPanelService.ReadSmithyStatusAsync(options, AppendLog, effectiveBuildings, cancellationToken);
         }
 
         await Dispatcher.InvokeAsync(() =>

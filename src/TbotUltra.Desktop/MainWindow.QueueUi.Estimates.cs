@@ -43,7 +43,7 @@ public partial class MainWindow
                 ResolveBuildingStatusForQueueItem(item));
             if (activeCoveredLevel is int coveredLevel)
             {
-                if (_botService.RemoveQueueItem(item.Id))
+                if (_queuePanelService.Remove(item.Id))
                 {
                     removedAny = true;
                     AppendLog($"[queue] removed covered construction '{BuildQueueDisplayName(item)}' — " +
@@ -61,7 +61,7 @@ public partial class MainWindow
                 continue;
             }
 
-            if (_botService.RemoveQueueItem(item.Id))
+            if (_queuePanelService.Remove(item.Id))
             {
                 removedAny = true;
                 AppendLog($"[queue] removed already-completed construction '{BuildQueueDisplayName(item)}' — target level already reached, nothing left to build.");
