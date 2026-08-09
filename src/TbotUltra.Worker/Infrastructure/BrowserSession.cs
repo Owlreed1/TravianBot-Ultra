@@ -116,11 +116,22 @@ public sealed partial class BrowserSession : IAsyncDisposable
         }
 
         Directory.CreateDirectory(authDirectory);
-        ConfigureLocalPlaywrightEnvironment(_projectRoot);
+        var driverPath = ConfigureLocalPlaywrightEnvironment(_projectRoot);
 
         try
         {
-            _playwright = await Playwright.CreateAsync();
+            try
+            {
+                _playwright = await Playwright.CreateAsync();
+            }
+            catch (PlaywrightException ex)
+            {
+                _log?.Invoke(
+                    $"[browser] Playwright driver failed to start from '{driverPath}'. " +
+                    $"nodeExists={File.Exists(Path.Combine(driverPath, "node", "win32_x64", "node.exe"))} " +
+                    $"cliExists={File.Exists(Path.Combine(driverPath, "package", "cli.js"))}. {ex.Message}");
+                throw;
+            }
             var launchOptions = CreateChromiumLaunchOptions(keepNativePopupBlocker: true);
             // Record the process this launch creates so a crashed run's browser window can be closed on the
             // next start. The session runs the user's system Chrome, so its processes are indistinguishable
@@ -718,14 +729,27 @@ public sealed partial class BrowserSession : IAsyncDisposable
     // Pin Playwright to the driver and browsers shipped inside the app folder. PLAYWRIGHT_DRIVER_PATH
     // is required for the single-file build: the bundled node.exe driver is not auto-discovered from the
     // exe location (Playwright otherwise reports "Driver not found"). Browsers live under ms-playwright.
-    private static void ConfigureLocalPlaywrightEnvironment(string projectRoot)
+    private static string ConfigureLocalPlaywrightEnvironment(string projectRoot)
     {
-        var driverPath = Path.Combine(projectRoot, LocalPlaywrightDriverDirectoryName);
+        var driverPath = ResolvePlaywrightDriverPath(projectRoot, AppContext.BaseDirectory);
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_PATH", driverPath);
 
         var browsersPath = Path.Combine(projectRoot, LocalPlaywrightBrowsersDirectoryName);
         Directory.CreateDirectory(browsersPath);
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", browsersPath);
+        return driverPath;
+    }
+
+    internal static string ResolvePlaywrightDriverPath(string projectRoot, string appBaseDirectory)
+    {
+        var bundledDriverPath = Path.Combine(appBaseDirectory, LocalPlaywrightDriverDirectoryName);
+        if (File.Exists(Path.Combine(bundledDriverPath, "node", "win32_x64", "node.exe")) &&
+            File.Exists(Path.Combine(bundledDriverPath, "package", "cli.js")))
+        {
+            return bundledDriverPath;
+        }
+
+        return Path.Combine(projectRoot, LocalPlaywrightDriverDirectoryName);
     }
 
 }
