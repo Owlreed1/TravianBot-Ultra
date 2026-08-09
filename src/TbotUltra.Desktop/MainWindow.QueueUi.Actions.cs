@@ -18,9 +18,9 @@ public partial class MainWindow
     // kept so the user can restore an accidental removal. One-shot: cleared once restored.
     private List<RemovedQueueSnapshot> _lastRemovedQueueItems = [];
 
-    private void QueueRemoveButton_Click(object sender, RoutedEventArgs e)
+    private void QueueRemoveSelected()
     {
-        if (QueueDataGrid.SelectedItem is not QueueItemRow selected)
+        if (_travianQueueViewModel.SelectedActiveQueueRow is not { } selected)
         {
             AppendLog("Select a queue item first.");
             return;
@@ -86,10 +86,8 @@ public partial class MainWindow
             .ToList();
     }
 
-    private void QueueRedoButton_Click(object sender, RoutedEventArgs e)
+    private void RestoreRemovedQueueItems()
     {
-        _ = sender;
-        _ = e;
         if (_lastRemovedQueueItems.Count == 0)
         {
             AppendLog("Nothing to restore — no recently removed queue items.");
@@ -120,9 +118,9 @@ public partial class MainWindow
         RefreshQueueUi();
     }
 
-    private void QueueMoveUpButton_Click(object sender, RoutedEventArgs e)
+    private void MoveSelectedQueueItemUp()
     {
-        if (QueueDataGrid.SelectedItem is not QueueItemRow selected)
+        if (_travianQueueViewModel.SelectedActiveQueueRow is not { } selected)
         {
             AppendLog("Select a queue item first.");
             return;
@@ -143,9 +141,9 @@ public partial class MainWindow
         AppendLog("Move up is only available within the same priority group.");
     }
 
-    private void QueueMoveDownButton_Click(object sender, RoutedEventArgs e)
+    private void MoveSelectedQueueItemDown()
     {
-        if (QueueDataGrid.SelectedItem is not QueueItemRow selected)
+        if (_travianQueueViewModel.SelectedActiveQueueRow is not { } selected)
         {
             AppendLog("Select a queue item first.");
             return;
@@ -202,7 +200,7 @@ public partial class MainWindow
             && constructSlotId == upgradeSlotId;
     }
 
-    private void QueueClearButton_Click(object sender, RoutedEventArgs e)
+    private void ClearQueueOrHistory()
     {
         try
         {
@@ -240,10 +238,8 @@ public partial class MainWindow
 
     // Clears only the queued (active) tasks for the village currently selected in the dropdown. Other
     // villages' queues are untouched. No global stop — just removes that village's items.
-    private void ClearVillageQueueButton_Click(object sender, RoutedEventArgs e)
+    private void ClearVillageQueue()
     {
-        _ = sender;
-        _ = e;
         try
         {
             // Match by the stable coordinate KEY, not the name. This clears the selected village's queue
@@ -294,11 +290,6 @@ public partial class MainWindow
         }
     }
 
-    private void QueueRefreshButton_Click(object sender, RoutedEventArgs e)
-    {
-        RefreshQueueUi();
-    }
-
     private void ClearActiveQueueItems()
     {
         // QueueDataGrid is filtered to the selected village. Read the account-scoped store directly so
@@ -331,8 +322,7 @@ public partial class MainWindow
             removed += 1;
         }
 
-        _buildingLastQueuedTargetBySlot.Clear();
-        _buildingLastQueuedConstructBySlot.Clear();
+        _buildingsViewModel.ClearQueuedItemState();
         ClearPendingResourceLevelsFromUi();
         RefreshQueueUi();
         RefreshSelectedBuildingsAfterQueueClear();

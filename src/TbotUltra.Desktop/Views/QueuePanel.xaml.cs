@@ -31,12 +31,4 @@ public partial class QueuePanel : UserControl
     internal Button ClearAccountButton => QueueClearButton;
 
     private void QueueSectionTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e) => Host?.OnQueueSectionSelectionChanged(sender, e);
-    private void QueueRemoveButton_Click(object sender, RoutedEventArgs e) => Host?.OnQueueRemoveClicked(sender, e);
-    private void QueueRedoButton_Click(object sender, RoutedEventArgs e) => Host?.OnQueueRedoClicked(sender, e);
-    private void QueueMoveUpButton_Click(object sender, RoutedEventArgs e) => Host?.OnQueueMoveUpClicked(sender, e);
-    private void QueueMoveDownButton_Click(object sender, RoutedEventArgs e) => Host?.OnQueueMoveDownClicked(sender, e);
-    private void QueueRefreshButton_Click(object sender, RoutedEventArgs e) => Host?.OnQueueRefreshClicked(sender, e);
-    private void ClearVillageQueueButton_Click(object sender, RoutedEventArgs e) => Host?.OnClearVillageQueueClicked(sender, e);
-    private void QueueClearButton_Click(object sender, RoutedEventArgs e) => Host?.OnQueueClearClicked(sender, e);
-    private void QueuePopoutButton_Click(object sender, RoutedEventArgs e) => Host?.OnQueuePopoutClicked(sender, e);
 }

@@ -153,17 +153,12 @@ public partial class MainWindow : Window
     // code-behind that mutates them in place keeps working unchanged.
     private ObservableCollection<BuildingCatalogOption> _buildingCatalogOptions => _buildingsViewModel.BuildingCatalogOptions;
     private ObservableCollection<BuildingSlotRow> _demolishableBuildings => _buildingsViewModel.DemolishableBuildings;
-    private readonly Dictionary<int, DateTimeOffset> _resourceClickCooldownBySlot = new();
-    private readonly Dictionary<int, (int Target, DateTimeOffset At)> _resourceLastQueuedTargetBySlot = new();
     private FunctionTestWindow? _resourceTestFunctionsWindow;
     private SavePageHtmlWindow? _savePageHtmlWindow;
     private SaveReportPngWindow? _saveReportPngWindow;
     private BulkSavePageHtmlWindow? _bulkSavePageHtmlWindow;
     private BulkMessagesWindow? _bulkMessagesWindow;
     private bool _serverSpeedAlarmRaised;
-    private readonly Dictionary<int, DateTimeOffset> _buildingClickCooldownBySlot = new();
-    private readonly Dictionary<int, (int Target, DateTimeOffset At)> _buildingLastQueuedTargetBySlot = new();
-    private readonly Dictionary<int, (string Name, int Gid, DateTimeOffset At)> _buildingLastQueuedConstructBySlot = new();
     private readonly HashSet<int> _buildingDemolishingSlots = new();
     private static readonly IReadOnlyDictionary<int, (double Left, double Top)> BuildingSlotLayoutById = BuildingsViewModel.CreateBuildingSlotLayout();
 
@@ -213,6 +208,7 @@ public partial class MainWindow : Window
     private readonly FarmListsViewModel _farmListsViewModel = App.Services.GetRequiredService<FarmListsViewModel>();
     private readonly TravianQueueViewModel _travianQueueViewModel = App.Services.GetRequiredService<TravianQueueViewModel>();
     private readonly AutomationLoopViewModel _automationLoopViewModel = App.Services.GetRequiredService<AutomationLoopViewModel>();
+    private readonly DashboardProjectionService _dashboardProjectionService = App.Services.GetRequiredService<DashboardProjectionService>();
     private readonly AlarmsViewModel _alarmsViewModel = App.Services.GetRequiredService<AlarmsViewModel>();
     private readonly TerminalViewModel _terminalViewModel = App.Services.GetRequiredService<TerminalViewModel>();
 
@@ -241,6 +237,9 @@ public partial class MainWindow : Window
     /// inherits this as DataContext.
     /// </summary>
     public ResourcesViewModel ResourcesVm => _resourcesViewModel;
+
+    /// <summary>Public accessor for the Farming panel's rows and commands.</summary>
+    public FarmListsViewModel FarmListsVm => _farmListsViewModel;
     private readonly SemaphoreSlim _inboxRefreshGate = new(1, 1);
     private readonly DispatcherTimer _queueUiRefreshTimer;
     // UI-thread micro-snapshot of the queue (see GetQueueSnapshotForUi): coalesces the per-tick burst of
@@ -344,6 +343,9 @@ public partial class MainWindow : Window
     /// </summary>
     public BuildingsViewModel BuildingsVm => _buildingsViewModel;
 
+    /// <summary>Queue-panel presentation state for XAML bindings.</summary>
+    public TravianQueueViewModel QueueVm => _travianQueueViewModel;
+
     private void InitializeBuildingSlotPlaceholders()
     {
         if (_buildingRows.Count > 0)
@@ -445,6 +447,14 @@ public partial class MainWindow : Window
         var queueExecutor = new QueueExecutor(taskRunner);
         _botService = new DesktopBotService(taskRunner, queueStore, queueScheduler, queueExecutor);
         _botService.FarmLossDestinationChanged += OnFarmLossDestinationChanged;
+        _travianQueueViewModel.RemoveRequested += QueueRemoveSelected;
+        _travianQueueViewModel.RestoreRequested += RestoreRemovedQueueItems;
+        _travianQueueViewModel.MoveUpRequested += MoveSelectedQueueItemUp;
+        _travianQueueViewModel.MoveDownRequested += MoveSelectedQueueItemDown;
+        _travianQueueViewModel.RefreshRequested += () => RefreshQueueUi();
+        _travianQueueViewModel.ClearVillageRequested += ClearVillageQueue;
+        _travianQueueViewModel.ClearAccountRequested += ClearQueueOrHistory;
+        _travianQueueViewModel.PopOutRequested += OpenQueuePopout;
         if (ShouldClearQueueOnStartup())
         {
             _botService.ClearQueue();
@@ -586,12 +596,37 @@ public partial class MainWindow : Window
         ReinforcementTargetVillageComboBox.ItemsSource = _reinforcementVillages;
         ReinforcementSourceVillagesItemsControl.ItemsSource = _reinforcementSourceVillages;
         InitializeReinforcementSendSettings();
-        FarmListsItemsControl.ItemsSource = _farmLists;
         EnsureFarmListPlaceholderRow();
+        _farmListsViewModel.AnalyzeRequested += () => _ = GuardUiAsync(AnalyzeFarmListsButtonClickAsync);
+        _farmListsViewModel.AddFarmsRequested += () => _ = GuardUiAsync(AddFarmsToListButtonClickAsync);
+        _farmListsViewModel.CreateFarmListRequested += () => _ = GuardUiAsync(CreateFarmListButtonClickAsync);
+        _farmListsViewModel.SendAllNowRequested += () => _ = GuardUiAsync(FarmListSendAllNowButtonClickAsync);
+        _farmListsViewModel.SendNowRequested += list => _ = GuardUiAsync(() => FarmListSendNowButtonClickAsync(list));
         _troopTrainingViewModel.Initialize();
         _troopTrainingViewModel.UpdateTroopOptions(ResolveStoredTroopTrainingTribe());
         _troopTrainingViewModel.ResetQueueStatus();
         _troopTrainingViewModel.ConfigChanged += OnTroopTrainingConfigChanged;
+        _troopTrainingViewModel.UpgradeOptionsRequested += OnTroopsUpgradeOptionsClicked;
+        _troopTrainingViewModel.SyncSettingsRequested += OnTroopsSyncSettingsClicked;
+        _troopTrainingViewModel.BuildNowRequested += OnTroopsBuildNowClicked;
+        _troopTrainingViewModel.RefreshQueuesRequested += () => _ = RunTroopTrainingStatusRefreshAsync(RefreshTroopQueuesCoreAsync);
+        _troopTrainingViewModel.CheckCelebrationRequested += () => _ = RunTroopTrainingStatusRefreshAsync(OnCheckCelebrationClickedAsync);
+        _buildingsViewModel.LoadRequested += () => _ = GuardUiAsync(OnLoadBuildingsClicked);
+        _buildingsViewModel.UpgradeAllToMaxRequested += OnUpgradeAllBuildingsToMaxClicked;
+        _buildingsViewModel.TemplatesRequested += OnBuildingTemplatesClicked;
+        _buildingsViewModel.ShowSlotsRequested += OnShowBuildingSlotsClicked;
+        _buildingsViewModel.DemolishOverviewRequested += OnDemolishOverviewClicked;
+        _buildingsViewModel.StopDemolitionRequested += OnStopDemolitionClicked;
+        _buildingsViewModel.SlotSelected += HandleBuildingSlotSelection;
+        _resourcesViewModel.LoadRequested += () => _ = GuardUiAsync(LoadResourcesButtonClickAsync);
+        _resourcesViewModel.UpgradeAllRequested += UpgradeAllResources;
+        _resourcesViewModel.UpgradeAllToMaxRequested += UpgradeAllResourcesToMax;
+        _resourcesViewModel.LevelBadgeRequested += QueueResourceLevelBadgeUpgrade;
+        _heroViewModel.RefreshAdventuresRequested += () => _ = RunHeroPanelOperationAsync(RefreshAdventuresCoreAsync);
+        _heroViewModel.RefreshHpRequested += () => _ = RunHeroPanelOperationAsync(RefreshHeroHpCoreAsync);
+        _heroViewModel.RefreshStatsRequested += () => _ = RunHeroPanelOperationAsync(RefreshHeroStatsCoreAsync);
+        _heroViewModel.RefreshInventoryRequested += () => _ = RunHeroPanelOperationAsync(RefreshHeroInventoryCoreAsync);
+        _heroViewModel.OpenResourceSettingsRequested += OpenHeroResourceSettingsFromHeroPanel;
         SubscribeToHeroInventoryUpdates();
         InitializeBuildingSlotPlaceholders();
         _farmLists.CollectionChanged += (_, _) =>
@@ -1210,11 +1245,7 @@ public partial class MainWindow : Window
             SetEnabled(LoginButton, defaultEnabled);
             SetEnabled(LogoutButton, defaultEnabled);
             SetEnabled(SettingsButton, !busy && !frozen);
-            SetEnabled(QueueRemoveButton, !busy && !frozen);
-            SetEnabled(QueueMoveUpButton, !busy && !frozen);
-            SetEnabled(QueueMoveDownButton, !busy && !frozen);
-            SetEnabled(QueueClearButton, !busy && !frozen);
-            SetEnabled(QueueRefreshButton, !busy && !frozen);
+            _travianQueueViewModel.SetPrimaryCommandAvailability(!busy && !frozen);
             SetEnabled(ResetProgramButton, !frozen);
             SetEnabled(StorageRefreshButton, defaultEnabled);
             var automationActive = _autoQueueRunning || (_loopTask is not null && !_loopTask.IsCompleted);

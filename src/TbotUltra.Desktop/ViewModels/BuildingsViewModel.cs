@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Windows.Input;
 using TbotUltra.Desktop.Common;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Worker.Domain;
@@ -17,8 +18,45 @@ namespace TbotUltra.Desktop.ViewModels;
 /// </summary>
 public sealed class BuildingsViewModel : BaseViewModel
 {
+    private readonly RelayCommand _loadCommand;
+    private readonly RelayCommand _upgradeAllToMaxCommand;
+    private readonly RelayCommand _templatesCommand;
+    private readonly RelayCommand _showSlotsCommand;
+    private readonly RelayCommand _demolishOverviewCommand;
+    private readonly RelayCommand _stopDemolitionCommand;
+    private readonly RelayCommand<BuildingSlotRow> _slotSelectedCommand;
+    private readonly Dictionary<int, DateTimeOffset> _slotClickCooldownBySlot = new();
+    private readonly Dictionary<int, (int Target, DateTimeOffset At)> _lastQueuedTargetBySlot = new();
+    private readonly Dictionary<int, (string Name, int Gid, DateTimeOffset At)> _lastQueuedConstructBySlot = new();
     private string _demolishStatusText = "No demolition queued for this village.";
     private bool _demolishStatusHasTimer;
+
+    public BuildingsViewModel()
+    {
+        _loadCommand = new RelayCommand(() => LoadRequested?.Invoke());
+        _upgradeAllToMaxCommand = new RelayCommand(() => UpgradeAllToMaxRequested?.Invoke());
+        _templatesCommand = new RelayCommand(() => TemplatesRequested?.Invoke());
+        _showSlotsCommand = new RelayCommand(() => ShowSlotsRequested?.Invoke());
+        _demolishOverviewCommand = new RelayCommand(() => DemolishOverviewRequested?.Invoke());
+        _stopDemolitionCommand = new RelayCommand(() => StopDemolitionRequested?.Invoke());
+        _slotSelectedCommand = new RelayCommand<BuildingSlotRow>(row => SlotSelected?.Invoke(row));
+    }
+
+    public ICommand LoadCommand => _loadCommand;
+    public ICommand UpgradeAllToMaxCommand => _upgradeAllToMaxCommand;
+    public ICommand TemplatesCommand => _templatesCommand;
+    public ICommand ShowSlotsCommand => _showSlotsCommand;
+    public ICommand DemolishOverviewCommand => _demolishOverviewCommand;
+    public ICommand StopDemolitionCommand => _stopDemolitionCommand;
+    public ICommand SlotSelectedCommand => _slotSelectedCommand;
+
+    public event Action? LoadRequested;
+    public event Action? UpgradeAllToMaxRequested;
+    public event Action? TemplatesRequested;
+    public event Action? ShowSlotsRequested;
+    public event Action? DemolishOverviewRequested;
+    public event Action? StopDemolitionRequested;
+    public event Action<BuildingSlotRow>? SlotSelected;
 
     public string DemolishStatusText
     {
@@ -47,6 +85,93 @@ public sealed class BuildingsViewModel : BaseViewModel
     /// Buildings constructable in the active village (bound to the construct picker).
     /// </summary>
     public ObservableCollection<BuildingCatalogOption> BuildingCatalogOptions { get; } = [];
+
+    public void ClearQueueInteractionState()
+    {
+        _slotClickCooldownBySlot.Clear();
+        ClearQueuedItemState();
+    }
+
+    public void ClearQueuedItemState()
+    {
+        _lastQueuedTargetBySlot.Clear();
+        _lastQueuedConstructBySlot.Clear();
+    }
+
+    public bool TryBeginSlotClick(int slotId, DateTimeOffset now)
+    {
+        if (_slotClickCooldownBySlot.TryGetValue(slotId, out var lastClickAt)
+            && (now - lastClickAt).TotalMilliseconds < 120)
+        {
+            return false;
+        }
+
+        _slotClickCooldownBySlot[slotId] = now;
+        return true;
+    }
+
+    public bool WasUpgradeQueuedRecently(int slotId, int target, DateTimeOffset now)
+    {
+        return _lastQueuedTargetBySlot.TryGetValue(slotId, out var lastQueued)
+            && lastQueued.Target == target
+            && (now - lastQueued.At).TotalMilliseconds < 2500;
+    }
+
+    public void RememberQueuedUpgrade(int slotId, int target, DateTimeOffset now)
+        => _lastQueuedTargetBySlot[slotId] = (target, now);
+
+    public bool TryGetQueuedUpgrade(int slotId, out int target)
+    {
+        if (_lastQueuedTargetBySlot.TryGetValue(slotId, out var queued))
+        {
+            target = queued.Target;
+            return true;
+        }
+
+        target = default;
+        return false;
+    }
+
+    public bool WasConstructQueuedRecently(int slotId, string name, DateTimeOffset now)
+    {
+        return _lastQueuedConstructBySlot.TryGetValue(slotId, out var lastQueued)
+            && string.Equals(lastQueued.Name, name, StringComparison.OrdinalIgnoreCase)
+            && (now - lastQueued.At).TotalMilliseconds < 2500;
+    }
+
+    public void RememberQueuedConstruct(int slotId, string name, int gid, DateTimeOffset now)
+        => _lastQueuedConstructBySlot[slotId] = (name, gid, now);
+
+    public bool TryGetQueuedConstruct(int slotId, out string name, out int gid)
+    {
+        if (_lastQueuedConstructBySlot.TryGetValue(slotId, out var queued))
+        {
+            name = queued.Name;
+            gid = queued.Gid;
+            return true;
+        }
+
+        name = string.Empty;
+        gid = default;
+        return false;
+    }
+
+    public void ForgetQueuedUpgrade(int slotId) => _lastQueuedTargetBySlot.Remove(slotId);
+
+    public void ForgetQueuedConstruct(int slotId) => _lastQueuedConstructBySlot.Remove(slotId);
+
+    public void ForgetInactiveQueueItems(IReadOnlySet<int> activeUpgradeSlots, IReadOnlySet<int> activeConstructSlots)
+    {
+        foreach (var slotId in _lastQueuedTargetBySlot.Keys.Except(activeUpgradeSlots).ToList())
+        {
+            _lastQueuedTargetBySlot.Remove(slotId);
+        }
+
+        foreach (var slotId in _lastQueuedConstructBySlot.Keys.Except(activeConstructSlots).ToList())
+        {
+            _lastQueuedConstructBySlot.Remove(slotId);
+        }
+    }
 
     /// <summary>
     /// Slots pinned to the top row of the Buildings tab (Main Building, Rally Point, Wall).

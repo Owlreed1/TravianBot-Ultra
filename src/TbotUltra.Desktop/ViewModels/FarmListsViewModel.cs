@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Windows.Input;
 using TbotUltra.Desktop.Common;
 using TbotUltra.Desktop.Models;
 
@@ -7,16 +8,61 @@ namespace TbotUltra.Desktop.ViewModels;
 
 /// <summary>
 /// View model backing the farm-lists panel: owns the farm-list status rows,
-/// the placeholder-row invariant and the status line. The send/refresh/scan
-/// logic stays in MainWindow code-behind and mutates the collection in place.
+/// the placeholder-row invariant, and panel commands. The service-bound
+/// send/refresh/scan flows stay hosted by MainWindow during the transition.
 /// </summary>
 public sealed class FarmListsViewModel : BaseViewModel
 {
+    private readonly RelayCommand _analyzeCommand;
+    private readonly RelayCommand _addFarmsCommand;
+    private readonly RelayCommand _createFarmListCommand;
+    private readonly RelayCommand _sendAllNowCommand;
+    private readonly RelayCommand<FarmListStatusRow> _sendNowCommand;
+    private bool _canAnalyze = true;
+    private bool _canManageLists;
+    private bool _canCreate = true;
+    private bool _canSendAll;
+
+    public FarmListsViewModel()
+    {
+        _analyzeCommand = new RelayCommand(() => AnalyzeRequested?.Invoke(), () => _canAnalyze);
+        _addFarmsCommand = new RelayCommand(() => AddFarmsRequested?.Invoke(), () => _canManageLists);
+        _createFarmListCommand = new RelayCommand(() => CreateFarmListRequested?.Invoke(), () => _canCreate);
+        _sendAllNowCommand = new RelayCommand(() => SendAllNowRequested?.Invoke(), () => _canSendAll);
+        _sendNowCommand = new RelayCommand<FarmListStatusRow>(row => SendNowRequested?.Invoke(row), row => _canManageLists && row.CanSendNow);
+    }
+
     /// <summary>
     /// Farm-list status rows shown on the farming tab. Created once and mutated
     /// in place so the panel's ItemsSource assignment stays stable.
     /// </summary>
     public ObservableCollection<FarmListStatusRow> FarmLists { get; } = [];
+
+    public ICommand AnalyzeCommand => _analyzeCommand;
+    public ICommand AddFarmsCommand => _addFarmsCommand;
+    public ICommand CreateFarmListCommand => _createFarmListCommand;
+    public ICommand SendAllNowCommand => _sendAllNowCommand;
+    public ICommand SendNowCommand => _sendNowCommand;
+
+    public event Action? AnalyzeRequested;
+    public event Action? AddFarmsRequested;
+    public event Action? CreateFarmListRequested;
+    public event Action? SendAllNowRequested;
+    public event Action<FarmListStatusRow>? SendNowRequested;
+
+    /// <summary>Applies MainWindow's global session/busy gate to panel commands.</summary>
+    public void UpdateCommandAvailability(bool canAnalyze, bool canManageLists, bool canCreate, bool canSendAll)
+    {
+        _canAnalyze = canAnalyze;
+        _canManageLists = canManageLists;
+        _canCreate = canCreate;
+        _canSendAll = canSendAll;
+        _analyzeCommand.RaiseCanExecuteChanged();
+        _addFarmsCommand.RaiseCanExecuteChanged();
+        _createFarmListCommand.RaiseCanExecuteChanged();
+        _sendAllNowCommand.RaiseCanExecuteChanged();
+        _sendNowCommand.RaiseCanExecuteChanged();
+    }
 
     public static bool IsRealRow(FarmListStatusRow row) => !row.IsPlaceholder;
 

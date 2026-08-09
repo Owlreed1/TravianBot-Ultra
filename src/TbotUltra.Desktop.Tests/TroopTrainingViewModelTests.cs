@@ -92,6 +92,26 @@ public sealed class TroopTrainingViewModelTests
         Assert.Equal("N/A", vm.AutoCelebrationTimerText);
     }
 
+    [Fact]
+    public void ManualStatusCommands_ShareBusyGateWithoutBlockingBuildNow()
+    {
+        var vm = new TroopTrainingViewModel();
+        var buildRequested = false;
+        vm.BuildNowRequested += () => buildRequested = true;
+
+        vm.SetManualRefreshRunning(true);
+        vm.BuildNowCommand.Execute(null);
+
+        Assert.False(vm.RefreshQueuesCommand.CanExecute(null));
+        Assert.False(vm.CheckCelebrationCommand.CanExecute(null));
+        Assert.True(buildRequested);
+
+        vm.SetManualRefreshRunning(false);
+
+        Assert.True(vm.RefreshQueuesCommand.CanExecute(null));
+        Assert.True(vm.CheckCelebrationCommand.CanExecute(null));
+    }
+
     private static TroopTrainingViewModel ReadyCelebrationViewModel()
     {
         var vm = new TroopTrainingViewModel();

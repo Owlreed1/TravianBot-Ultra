@@ -27,7 +27,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                isLoggedIn = await client.CheckLoggedInAsync(cancellationToken);
+                isLoggedIn = await new SessionOperation(client).CheckLoggedInAsync(cancellationToken);
             });
 
         return isLoggedIn;
@@ -50,7 +50,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 log($"Starting login for server {options.ServerName}.");
-                await client.LoginAsync(cancellationToken);
+                await new SessionOperation(client).LoginAsync(cancellationToken);
                 await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken, skipFeatureRefresh: true);
                 log("Login completed and browser session saved. Browser stays open.");
             });
@@ -71,11 +71,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                language = await client.ReadCurrentLanguageAsync(cancellationToken);
-                if (!string.Equals(language?.Trim(), "en-US", StringComparison.OrdinalIgnoreCase))
-                {
-                    log($"[language] current Travian language: {language ?? "unknown"}.");
-                }
+                language = await new SessionOperation(client).ReadCurrentLanguageAsync(log, cancellationToken);
             });
 
         return language;
@@ -95,7 +91,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                await client.EnsureExpectedLanguageAsync(cancellationToken);
+                await new SessionOperation(client).EnsureExpectedLanguageAsync(cancellationToken);
             });
     }
 
@@ -114,8 +110,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                language = await client.SetLanguageToEnglishAsync(cancellationToken);
-                log("[language] Travian language set to English.");
+                language = await new SessionOperation(client).SetLanguageToEnglishAsync(log, cancellationToken);
             });
 
         return language;
@@ -139,7 +134,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 log($"Starting login for server {options.ServerName}.");
-                await client.LoginAsync(cancellationToken);
+                await new SessionOperation(client).LoginAsync(cancellationToken);
                 await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken, skipFeatureRefresh: true);
                 log("Login completed and browser session saved. Browser stays open.");
 
@@ -164,7 +159,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                await client.LoginAsync(cancellationToken);
+                await new SessionOperation(client).LoginAsync(cancellationToken);
                 await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken, skipFeatureRefresh: true);
                 snapshot = await LoadPostLoginSnapshotAsync(client, options, log, cancellationToken);
             });
@@ -325,7 +320,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
-                await client.LoginAsync(cancellationToken);
+                await new SessionOperation(client).LoginAsync(cancellationToken);
                 detectedGoldClubEnabled = await client.ReadGoldClubStatusAsync(cancellationToken);
                 serverUrl = client.ServerUrl;
                 if (string.IsNullOrWhiteSpace(tribe) || string.Equals(tribe, "Unknown", StringComparison.OrdinalIgnoreCase))
@@ -372,7 +367,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 log($"Starting logout for server {options.ServerName}.");
-                await client.LogoutAsync(cancellationToken);
+                await new SessionOperation(client).LogoutAsync(cancellationToken);
                 log("Logout completed.");
                 // Drop all session-scoped cache (villages, population, plus/gold, logged-in state)
                 // so a subsequent login on this shared browser starts from a clean slate and never

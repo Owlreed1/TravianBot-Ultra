@@ -43,7 +43,9 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                result = await client.ReadAvailableTroopsForCatapultWavesAsync(forceRefresh, cancellationToken);
+                result = await new CombatOperation(client).ReadAvailableTroopsForCatapultWavesAsync(
+                    forceRefresh,
+                    cancellationToken);
             });
 
         return result;
@@ -66,7 +68,9 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                result = await client.ReadCatapultWaveSetupInfoAsync(forceRefresh, cancellationToken);
+                result = await new CombatOperation(client).ReadCatapultWaveSetupInfoAsync(
+                    forceRefresh,
+                    cancellationToken);
             });
 
         return result ?? new CatapultWaveSetupInfo(new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase), null);
@@ -89,7 +93,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                result = await client.StartCatapultWavesAsync(request, cancellationToken);
+                result = await new CombatOperation(client).StartCatapultWavesAsync(request, cancellationToken);
             });
 
         return result ?? throw new InvalidOperationException("Could not start catapult waves.");

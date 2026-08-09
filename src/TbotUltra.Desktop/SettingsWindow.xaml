@@ -603,7 +603,7 @@
                                                     Padding="9,1"
                                                     VerticalAlignment="Center"
                                                     ToolTip="Clear the current timer and run Village scan immediately."
-                                                    Click="VillageStatusSweepScanNowButton_Click" />
+                                                    Command="{Binding SettingsVm.RunVillageStatusSweepNowCommand}" />
                                         </StackPanel>
                                     </StackPanel>
                                     <Grid Margin="18,0,0,0">
@@ -1097,7 +1097,7 @@
                                 </Border>
                                 <Button x:Name="ResetDailySilverLimitButton"
                                         Content="Reset daily limits"
-                                        Click="ResetDailySilverLimitButton_Click" />
+                                        Command="{Binding SettingsVm.ResetDailySilverSpendingCommand}" />
                             </StackPanel>
 
                             <Border Height="1"
@@ -1158,7 +1158,7 @@
                                 </Border>
                                 <Button x:Name="ResetDailyGoldLimitButton"
                                         Content="Reset daily limits"
-                                        Click="ResetDailyGoldLimitButton_Click" />
+                                        Command="{Binding SettingsVm.ResetDailyGoldSpendingCommand}" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -1179,7 +1179,7 @@
                         Background="{DynamicResource WarningBgBrush}"
                         Foreground="{DynamicResource WarningTextBrush}"
                         BorderBrush="{DynamicResource WarningBorderBrush}"
-                        Click="ResetSettingsButton_Click" />
+                        Command="{Binding SettingsVm.ResetSettingsCommand}" />
                 <Button x:Name="SleepNowButton"
                         MinWidth="88"
                         Height="32"
@@ -1191,7 +1191,7 @@
                         Foreground="{DynamicResource InfoTextBrush}"
                         BorderBrush="{DynamicResource InfoBrush}"
                         ToolTip="Stop automation, log out, and sleep now for the configured sleep time."
-                        Click="SleepNowButton_Click" />
+                        Command="{Binding SettingsVm.SleepNowCommand}" />
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
@@ -1205,8 +1205,8 @@
                         Background="{DynamicResource SuccessBgBrush}"
                         Foreground="{DynamicResource SuccessTextBrush}"
                         BorderBrush="{DynamicResource SuccessBorderBrush}"
-                        Click="SaveButton_Click" />
-                <Button x:Name="CancelButtonControl" Width="100" Content="Cancel" Click="CancelButton_Click" />
+                        Command="{Binding SettingsVm.SaveCommand}" />
+                <Button x:Name="CancelButtonControl" Width="100" Content="Cancel" Command="{Binding SettingsVm.CancelCommand}" />
             </StackPanel>
         </Grid>
     </Grid>

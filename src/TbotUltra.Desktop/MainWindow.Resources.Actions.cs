@@ -17,9 +17,6 @@ namespace TbotUltra.Desktop;
 public partial class MainWindow
 {
     private bool _loadingResourceUpgradeTypes;
-    private async void LoadResourcesButton_Click(object sender, RoutedEventArgs e)
-        => await GuardUiAsync(LoadResourcesButtonClickAsync);
-
     private async Task LoadResourcesButtonClickAsync()
     {
         if (BlockIfSessionSleeping("Load resources"))
@@ -933,7 +930,7 @@ public partial class MainWindow
             });
     }
 
-    private void UpgradeAllResourcesButton_Click(object sender, RoutedEventArgs e)
+    private void UpgradeAllResources()
     {
         var operationId = BeginOperation("UpgradeAllResources");
         var targetLevel = _resourcesViewModel.SelectedTargetLevel;
@@ -953,7 +950,7 @@ public partial class MainWindow
         }
     }
 
-    private void UpgradeAllResourcesToMaxButton_Click(object sender, RoutedEventArgs e)
+    private void UpgradeAllResourcesToMax()
     {
         var operationId = BeginOperation("UpgradeAllResourcesToMax");
         try

@@ -52,14 +52,14 @@
                                                         Foreground="{DynamicResource SuccessTextBrush}"
                                                         BorderBrush="{DynamicResource SuccessBorderBrush}"
                                                         MinWidth="150"
-                                                        Click="AnalyzeFarmListsButton_Click" />
+                                                        Command="{Binding AnalyzeCommand}" />
                                                 <Button x:Name="FarmListSendAllNowButton"
                                                         Grid.Column="2"
                                                         Content="Send all Now"
                                                         MinWidth="110"
                                                         Height="32"
                                                         IsEnabled="False"
-                                                        Click="FarmListSendAllNowButton_Click">
+                                                        Command="{Binding SendAllNowCommand}">
                                                     <Button.Style>
                                                         <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                                                             <Setter Property="Background" Value="{DynamicResource SuccessBgBrush}" />
@@ -81,12 +81,12 @@
                                                     <Button x:Name="CreateFarmListButton"
                                                             Content="Create Farmlist"
                                                             MinWidth="150"
-                                                            Click="CreateFarmListButton_Click" />
+                                                            Command="{Binding CreateFarmListCommand}" />
                                                 </StackPanel>
                                                 <Button x:Name="AddFarmsToListButton"
                                                         Content="Add Farms to List"
                                                         MinWidth="140"
-                                                        Click="AddFarmsToListButton_Click" />
+                                                        Command="{Binding AddFarmsCommand}" />
                                             </WrapPanel>
                                             <TextBlock x:Name="FarmingStatusTextBlock"
                                                        Foreground="{DynamicResource TextMutedBrush}"
@@ -96,7 +96,8 @@
                                         </StackPanel>
 
                                         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                                <ItemsControl x:Name="FarmListsItemsControl">
+                                                <ItemsControl x:Name="FarmListsItemsControl"
+                                                              ItemsSource="{Binding FarmLists}">
                                                     <ItemsControl.GroupStyle>
                                                         <GroupStyle>
                                                             <GroupStyle.HeaderTemplate>
@@ -254,9 +255,10 @@
                                                                         <Button Content="{Binding ActionText}"
                                                                                 MinWidth="90"
                                                                                 Height="32"
-                                                                                Tag="{Binding}"
+                                                                                Command="{Binding DataContext.SendNowCommand, RelativeSource={RelativeSource AncestorType={x:Type views:FarmingPanel}}}"
+                                                                                CommandParameter="{Binding}"
                                                                                 IsEnabled="{Binding CanSendNow}"
-                                                                                Click="FarmListSendNowButton_Click">
+                                                                                >
                                                                             <Button.Style>
                                                                                 <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                                                                                     <Setter Property="Background" Value="{DynamicResource SuccessBgBrush}" />

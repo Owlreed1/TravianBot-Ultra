@@ -121,6 +121,33 @@ public sealed class ResourcesViewModelTests
     }
 
     [Fact]
+    public void TryBeginSlotClick_BlocksOnlyRapidRepeatForTheSameSlot()
+    {
+        var vm = new ResourcesViewModel();
+        var now = DateTimeOffset.UtcNow;
+
+        Assert.True(vm.TryBeginSlotClick(3, now));
+        Assert.False(vm.TryBeginSlotClick(3, now.AddMilliseconds(119)));
+        Assert.True(vm.TryBeginSlotClick(4, now.AddMilliseconds(119)));
+        Assert.True(vm.TryBeginSlotClick(3, now.AddMilliseconds(120)));
+    }
+
+    [Fact]
+    public void WasTargetQueuedRecently_TracksAndClearsQueuedTarget()
+    {
+        var vm = new ResourcesViewModel();
+        var now = DateTimeOffset.UtcNow;
+        vm.RememberQueuedTarget(3, 6, now);
+
+        Assert.True(vm.WasTargetQueuedRecently(3, 6, now.AddMilliseconds(2499)));
+        Assert.False(vm.WasTargetQueuedRecently(3, 7, now.AddMilliseconds(1)));
+
+        vm.ClearInteractionState();
+
+        Assert.False(vm.WasTargetQueuedRecently(3, 6, now.AddMilliseconds(1)));
+    }
+
+    [Fact]
     public void ApplyStorageForecasts_NegativeCropProduction_ShowsEmptyCountdownAndMarksCropStorage()
     {
         var vm = new ResourcesViewModel();
@@ -150,5 +177,23 @@ public sealed class ResourcesViewModelTests
         Assert.Equal("-600/h", crop.ProductionText);
         Assert.Equal("Empty in 2h 0m", crop.TimeUntilFullText);
         Assert.Contains("Time until empty: Empty in 2h 0m", crop.TooltipText);
+    }
+
+    [Fact]
+    public void TopCommands_FollowActionsEnabledAndRaiseRequests()
+    {
+        var vm = new ResourcesViewModel();
+        var loadRequested = false;
+        vm.LoadRequested += () => loadRequested = true;
+
+        vm.ActionsEnabled = false;
+
+        Assert.False(vm.LoadCommand.CanExecute(null));
+        Assert.False(vm.UpgradeAllCommand.CanExecute(null));
+
+        vm.ActionsEnabled = true;
+        vm.LoadCommand.Execute(null);
+
+        Assert.True(loadRequested);
     }
 }

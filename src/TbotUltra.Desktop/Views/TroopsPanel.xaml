@@ -55,7 +55,7 @@
                         <Button Content="Upgrade options"
                                 Width="150"
                                 HorizontalAlignment="Left"
-                                Click="UpgradeOptionsButton_Click" />
+                                Command="{Binding UpgradeOptionsCommand}" />
                     </StackPanel>
                 </Border>
 
@@ -160,7 +160,7 @@
                                 Content="Check celebration"
                                 Width="150"
                                 HorizontalAlignment="Left"
-                                Click="CheckCelebrationButton_Click" />
+                                Command="{Binding CheckCelebrationCommand}" />
                     </StackPanel>
                 </Border>
 
@@ -191,7 +191,7 @@
                             <Button Content="Sync settings"
                                     Width="110"
                                     Margin="0,0,8,0"
-                                    Click="SyncSettingsButton_Click"
+                                    Command="{Binding SyncSettingsCommand}"
                                     Background="{DynamicResource PrimaryButtonBrush}"
                                     BorderBrush="{DynamicResource AccentBrush}"
                                     Foreground="{DynamicResource OnAccentBrush}"
@@ -199,11 +199,11 @@
                             <Button Content="Build now"
                                     Width="92"
                                     Margin="0,0,8,0"
-                                    Click="BuildTroopsNowButton_Click" />
+                                    Command="{Binding BuildNowCommand}" />
                             <Button x:Name="RefreshTroopQueuesButton"
                                     Content="Refresh queues"
                                     Width="110"
-                                    Click="RefreshTroopQueuesButton_Click" />
+                                    Command="{Binding RefreshQueuesCommand}" />
                         </StackPanel>
                     </Grid>
 

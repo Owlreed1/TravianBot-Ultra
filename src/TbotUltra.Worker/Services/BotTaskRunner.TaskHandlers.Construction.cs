@@ -1,5 +1,6 @@
 using System.Text.Json;
 using TbotUltra.Core.Configuration;
+using TbotUltra.Worker.Services.Automation;
 
 namespace TbotUltra.Worker.Services;
 
@@ -71,7 +72,12 @@ public sealed partial class BotTaskRunner
             context.Log("Task 'demolish_building_to_level' requires config values target_building_slot_or_name and target_level.");
             return;
         }
-        var result = await context.Client.DemolishBuildingToLevelAsync(context.Options.TargetBuildingSlotOrName, context.Options.TargetLevel.Value, context.CancellationToken);
+        var result = await new BuildingAutomationOperation(context.Client).ExecuteAsync(
+            new BuildingAutomationRequest(
+                BuildingAutomationAction.Demolish,
+                TargetLevel: context.Options.TargetLevel,
+                TargetBuildingSlotOrName: context.Options.TargetBuildingSlotOrName),
+            context.CancellationToken);
         if (TryExtractQueueWaitSeconds(result, out var serverWaitSeconds))
         {
             var delay = DemolishDefaults.CalculateDelay(
@@ -94,7 +100,10 @@ public sealed partial class BotTaskRunner
             context.Log("Task 'upgrade_resource_to_level' requires config values resource_upgrade_slot_id and resource_upgrade_target_level.");
             return;
         }
-        var result = await context.Client.UpgradeResourceToLevelAsync(context.Options.ResourceUpgradeSlotId.Value, context.Options.ResourceUpgradeTargetLevel.Value, context.CancellationToken);
+        var result = await new ResourceAutomationOperation(context.Client).UpgradeSingleAsync(
+            context.Options.ResourceUpgradeSlotId.Value,
+            context.Options.ResourceUpgradeTargetLevel.Value,
+            context.CancellationToken);
         context.Log(result);
         context.RecordTaskResult("upgrade_resource_to_level", result);
         ThrowIfTaskBlocked("upgrade_resource_to_level", result);
@@ -107,7 +116,7 @@ public sealed partial class BotTaskRunner
             context.Log("Task 'upgrade_all_resources_to_level' requires config value resource_upgrade_target_level.");
             return;
         }
-        var result = await context.Client.UpgradeAllResourcesToLevelAsync(
+        var result = await new ResourceAutomationOperation(context.Client).UpgradeAllAsync(
             context.Options.ResourceUpgradeTargetLevel.Value,
             context.Options.ResourceBuildStrategy,
             context.Options.ResourceUpgradeTypes,
@@ -124,7 +133,12 @@ public sealed partial class BotTaskRunner
             context.Log("Task 'upgrade_building_to_level' requires config values building_upgrade_slot_id and building_upgrade_target_level.");
             return;
         }
-        var result = await context.Client.UpgradeBuildingToLevelAsync(context.Options.BuildingUpgradeSlotId.Value, context.Options.BuildingUpgradeTargetLevel.Value, context.CancellationToken);
+        var result = await new BuildingAutomationOperation(context.Client).ExecuteAsync(
+            new BuildingAutomationRequest(
+                BuildingAutomationAction.UpgradeToLevel,
+                SlotId: context.Options.BuildingUpgradeSlotId,
+                TargetLevel: context.Options.BuildingUpgradeTargetLevel),
+            context.CancellationToken);
         context.Log(result);
         context.RecordTaskResult("upgrade_building_to_level", result);
         ThrowIfTaskBlocked("upgrade_building_to_level", result);
@@ -137,7 +151,12 @@ public sealed partial class BotTaskRunner
             context.Log("Task 'upgrade_building_to_max' requires config value building_upgrade_slot_id.");
             return;
         }
-        var result = await context.Client.UpgradeBuildingToMaxAsync(context.Options.BuildingUpgradeSlotId.Value, context.Options.BuildingUpgradeMaxAttempts, context.CancellationToken);
+        var result = await new BuildingAutomationOperation(context.Client).ExecuteAsync(
+            new BuildingAutomationRequest(
+                BuildingAutomationAction.UpgradeToMax,
+                SlotId: context.Options.BuildingUpgradeSlotId,
+                MaxAttempts: context.Options.BuildingUpgradeMaxAttempts),
+            context.CancellationToken);
         context.Log(result);
         context.RecordTaskResult("upgrade_building_to_max", result);
         ThrowIfTaskBlocked("upgrade_building_to_max", result);
@@ -151,7 +170,15 @@ public sealed partial class BotTaskRunner
             return;
         }
         var buildingName = string.IsNullOrWhiteSpace(context.Options.BuildingConstructName) ? $"gid {context.Options.BuildingConstructGid.Value}" : context.Options.BuildingConstructName;
-        var result = await context.Client.ConstructBuildingAsync(context.Options.BuildingConstructSlotId.Value, context.Options.BuildingConstructGid.Value, buildingName, context.CancellationToken, context.Options.BuildingConstructAllowSlotFallback, context.Options.BuildingConstructFallbackExcludedSlots);
+        var result = await new BuildingAutomationOperation(context.Client).ExecuteAsync(
+            new BuildingAutomationRequest(
+                BuildingAutomationAction.Construct,
+                SlotId: context.Options.BuildingConstructSlotId,
+                Gid: context.Options.BuildingConstructGid,
+                Name: buildingName,
+                AllowSlotFallback: context.Options.BuildingConstructAllowSlotFallback,
+                FallbackExcludedSlots: context.Options.BuildingConstructFallbackExcludedSlots),
+            context.CancellationToken);
         context.Log(result);
         context.RecordTaskResult("construct_building", result);
         ThrowIfTaskBlocked("construct_building", result);

@@ -21,7 +21,7 @@ public sealed class VillageStatusSweepSourceTests
             "MainWindow.ContinuousLoop.cs"));
 
         Assert.Contains("Content=\"Scan now\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Click=\"VillageStatusSweepScanNowButton_Click\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding SettingsVm.RunVillageStatusSweepNowCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ResetVillageStatusSweepSchedule();", continuousLoopSource, StringComparison.Ordinal);
         Assert.Contains("force: true", continuousLoopSource, StringComparison.Ordinal);
         Assert.Contains("_villageStatusSweepForceRequested", continuousLoopSource, StringComparison.Ordinal);

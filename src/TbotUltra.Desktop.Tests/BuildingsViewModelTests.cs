@@ -10,6 +10,28 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class BuildingsViewModelTests
 {
     [Fact]
+    public void QueueInteractionState_BlocksRapidDuplicateRequestsAndCanBeReset()
+    {
+        var vm = new BuildingsViewModel();
+        var now = DateTimeOffset.UtcNow;
+
+        Assert.True(vm.TryBeginSlotClick(25, now));
+        Assert.False(vm.TryBeginSlotClick(25, now.AddMilliseconds(119)));
+        Assert.True(vm.TryBeginSlotClick(25, now.AddMilliseconds(120)));
+
+        vm.RememberQueuedUpgrade(25, 7, now);
+        vm.RememberQueuedConstruct(26, "Granary", 11, now);
+        Assert.True(vm.WasUpgradeQueuedRecently(25, 7, now.AddMilliseconds(2499)));
+        Assert.True(vm.WasConstructQueuedRecently(26, "Granary", now.AddMilliseconds(2499)));
+
+        vm.ClearQueueInteractionState();
+
+        Assert.False(vm.WasUpgradeQueuedRecently(25, 7, now));
+        Assert.False(vm.TryGetQueuedConstruct(26, out _, out _));
+        Assert.True(vm.TryBeginSlotClick(25, now.AddMilliseconds(121)));
+    }
+
+    [Fact]
     public void DescribeLoadedSlots_CountsOccupiedAndFree()
     {
         var vm = new BuildingsViewModel();
@@ -165,5 +187,22 @@ public sealed class BuildingsViewModelTests
     {
         Assert.True(BuildingsViewModel.IsEmptyBuilding(new Building(25, "Empty", 0, null, null)));
         Assert.False(BuildingsViewModel.IsEmptyBuilding(new Building(25, "Warehouse", 1, null, 10)));
+    }
+
+    [Fact]
+    public void PanelCommands_ForwardActionsAndSelectedSlot()
+    {
+        var vm = new BuildingsViewModel();
+        var loadRequested = false;
+        BuildingSlotRow? selected = null;
+        vm.LoadRequested += () => loadRequested = true;
+        vm.SlotSelected += row => selected = row;
+        var row = new BuildingSlotRow { SlotId = 25, Name = "Warehouse", Level = 2 };
+
+        vm.LoadCommand.Execute(null);
+        vm.SlotSelectedCommand.Execute(row);
+
+        Assert.True(loadRequested);
+        Assert.Same(row, selected);
     }
 }

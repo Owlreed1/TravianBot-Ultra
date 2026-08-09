@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:views="clr-namespace:TbotUltra.Desktop.Views"
              mc:Ignorable="d"
              d:DesignHeight="600"
              d:DesignWidth="760">
@@ -22,8 +23,8 @@
                     Padding="8,7"
                     Width="110"
                     MinHeight="72"
-                    Tag="{Binding}"
-                    Click="BuildingSlotCircleButton_Click"
+                    Command="{Binding DataContext.SlotSelectedCommand, RelativeSource={RelativeSource AncestorType={x:Type views:BuildingsPanel}}}"
+                    CommandParameter="{Binding}"
                     HorizontalContentAlignment="Stretch"
                     VerticalContentAlignment="Stretch">
                 <Button.Template>
@@ -137,7 +138,7 @@
                         Background="{DynamicResource SuccessBgBrush}"
                         Foreground="{DynamicResource SuccessTextBrush}"
                         BorderBrush="{DynamicResource SuccessBorderBrush}"
-                        Click="LoadBuildingsButton_Click"
+                        Command="{Binding LoadCommand}"
                         ToolTip="Read the current buildings from the village and refresh the buildings list with their slots and levels." />
                 <Button Content="Upgrade all to max"
                         Width="136"
@@ -147,7 +148,7 @@
                         Foreground="{DynamicResource WarningTextBrush}"
                         BorderBrush="{DynamicResource WarningBorderBrush}"
                         ToolTip="Queues upgrades for all buildings until each one reaches its maximum level."
-                        Click="UpgradeAllBuildingsToMaxButton_Click" />
+                        Command="{Binding UpgradeAllToMaxCommand}" />
             </StackPanel>
 
             <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
@@ -228,12 +229,12 @@
                             BorderBrush="{DynamicResource SuccessBorderBrush}"
                             FontWeight="SemiBold"
                             ToolTip="Create, save, and queue reusable building templates for the selected village."
-                            Click="BuildingTemplatesButton_Click" />
+                            Command="{Binding TemplatesCommand}" />
                     <Button Content="Show building slots"
                             Height="30"
                             Margin="0,6,0,0"
                             ToolTip="Open a reference image showing which building slot number sits where in a village."
-                            Click="ShowBuildingSlotsButton_Click" />
+                            Command="{Binding ShowSlotsCommand}" />
                 </StackPanel>
             </Border>
 
@@ -286,13 +287,13 @@
                     </Border>
                     <Button Content="Demolish overview" Height="30" Margin="0"
                             HorizontalAlignment="Stretch"
-                            Click="DemolishOverviewButton_Click" />
+                            Command="{Binding DemolishOverviewCommand}" />
                     <Button Content="Stop demolition" Height="30" Margin="0,6,0,0"
                             HorizontalAlignment="Stretch"
                             Background="{DynamicResource DangerBgBrush}"
                             Foreground="{DynamicResource DangerTextBrush}"
                             BorderBrush="{DynamicResource DangerBorderBrush}"
-                            Click="StopDemolitionButton_Click" />
+                            Command="{Binding StopDemolitionCommand}" />
                 </StackPanel>
             </Border>
 

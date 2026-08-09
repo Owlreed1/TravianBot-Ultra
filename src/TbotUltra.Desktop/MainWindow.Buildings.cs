@@ -27,9 +27,7 @@ public partial class MainWindow
     internal async Task OnLoadBuildingsClicked()
     {
         // Clear any stale pending/queued state so the upcoming snapshot is the source of truth.
-        _buildingLastQueuedTargetBySlot.Clear();
-        _buildingLastQueuedConstructBySlot.Clear();
-        _buildingClickCooldownBySlot.Clear();
+        _buildingsViewModel.ClearQueueInteractionState();
         _buildingDemolishingSlots.Clear();
 
         // When the bot is running it owns the browser session, so enqueue the snapshot to run inside the
@@ -121,9 +119,7 @@ public partial class MainWindow
             return;
         }
 
-        _buildingLastQueuedTargetBySlot.Clear();
-        _buildingLastQueuedConstructBySlot.Clear();
-        _buildingClickCooldownBySlot.Clear();
+        _buildingsViewModel.ClearQueueInteractionState();
 
         var candidateRows = _buildingRows
             .Where(row => row.SlotId is >= 19 and <= 40)
@@ -317,16 +313,11 @@ public partial class MainWindow
             + $"villageKey='{GetSelectedVillageKey() ?? "-"}'.{storageSuffix}{warningSuffix}");
     }
 
-    internal void BuildingSlotCircleButton_Click(object sender, RoutedEventArgs e)
+    private void HandleBuildingSlotSelection(BuildingSlotRow row)
     {
         if (ResolveSelectedVillageBuildingStatus() is null)
         {
             BuildingsInfoTextBlock.Text = "Load buildings for the selected village first.";
-            return;
-        }
-
-        if (sender is not FrameworkElement { Tag: BuildingSlotRow row })
-        {
             return;
         }
 
@@ -431,7 +422,7 @@ public partial class MainWindow
         }
 
         var now = DateTimeOffset.UtcNow;
-        if (!TryBeginSlotClick(_buildingClickCooldownBySlot, liveRow.SlotId, now))
+        if (!_buildingsViewModel.TryBeginSlotClick(liveRow.SlotId, now))
         {
             return;
         }
@@ -503,9 +494,7 @@ public partial class MainWindow
 
         targetLevel = Math.Clamp(targetLevel, currentLevel + 1, maxLevel);
         var now = DateTimeOffset.UtcNow;
-        if (_buildingLastQueuedTargetBySlot.TryGetValue(slotId, out var lastQueued)
-            && lastQueued.Target == targetLevel
-            && (now - lastQueued.At).TotalMilliseconds < 2500)
+        if (_buildingsViewModel.WasUpgradeQueuedRecently(slotId, targetLevel, now))
         {
             return false;
         }
@@ -521,7 +510,7 @@ public partial class MainWindow
         }
 
         var created = _botService.EnqueueBatch(plannedRequests);
-        _buildingLastQueuedTargetBySlot[slotId] = (targetLevel, now);
+        _buildingsViewModel.RememberQueuedUpgrade(slotId, targetLevel, now);
         ApplyStoragePreflightPendingState(storageUpgrades);
         SetPendingBuildingUpgrade(slotId, targetLevel);
         RequestQueueUiRefresh(selectId: created.LastOrDefault()?.Id);
@@ -869,9 +858,7 @@ public partial class MainWindow
         }
 
         var now = DateTimeOffset.UtcNow;
-        if (_buildingLastQueuedConstructBySlot.TryGetValue(slotId, out var lastQueued)
-            && string.Equals(lastQueued.Name, selectedBuilding.Name, StringComparison.OrdinalIgnoreCase)
-            && (now - lastQueued.At).TotalMilliseconds < 2500)
+        if (_buildingsViewModel.WasConstructQueuedRecently(slotId, selectedBuilding.Name, now))
         {
             return false;
         }
@@ -900,7 +887,7 @@ public partial class MainWindow
         }
 
         var created = _botService.EnqueueBatch(plannedRequests);
-        _buildingLastQueuedConstructBySlot[slotId] = (selectedBuilding.Name, selectedBuilding.Gid, now);
+        _buildingsViewModel.RememberQueuedConstruct(slotId, selectedBuilding.Name, selectedBuilding.Gid, now);
         ApplyStoragePreflightPendingState(storageUpgrades);
         SetPendingBuildingConstruct(slotId, selectedBuilding.Name, selectedBuilding.Gid);
         if (targetLevel > 1)
@@ -1261,20 +1248,20 @@ public partial class MainWindow
 
             int? pendingTarget = queuedTargetsBySlot.TryGetValue(slotId, out var queuedTarget)
                 ? queuedTarget
-                : _buildingLastQueuedTargetBySlot.TryGetValue(slotId, out var lastTarget)
-                    ? lastTarget.Target
+                : _buildingsViewModel.TryGetQueuedUpgrade(slotId, out var lastTarget)
+                    ? lastTarget
                     : externalUpgradeTargetsBySlot.TryGetValue(slotId, out var externalTarget)
                         ? externalTarget
                         : null;
             var pendingConstruct = queuedConstructsBySlot.TryGetValue(slotId, out var queuedConstruct)
                 ? queuedConstruct
-                : _buildingLastQueuedConstructBySlot.TryGetValue(slotId, out var lastConstruct)
-                    ? lastConstruct.Name
+                : _buildingsViewModel.TryGetQueuedConstruct(slotId, out var lastConstruct, out _)
+                    ? lastConstruct
                     : string.Empty;
             var pendingConstructGid = queuedConstructGidsBySlot.TryGetValue(slotId, out var queuedConstructGid)
                 ? queuedConstructGid
-                : _buildingLastQueuedConstructBySlot.TryGetValue(slotId, out var lastConstructGid)
-                    ? lastConstructGid.Gid
+                : _buildingsViewModel.TryGetQueuedConstruct(slotId, out _, out var lastConstructGid)
+                    ? lastConstructGid
                     : (int?)null;
 
             if (!BuildingSlotLayoutById.TryGetValue(slotId, out var layout))

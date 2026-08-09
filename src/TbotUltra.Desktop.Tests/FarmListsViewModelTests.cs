@@ -117,6 +117,26 @@ public sealed class FarmListsViewModelTests
     }
 
     [Fact]
+    public void Commands_FollowGlobalAvailabilityAndForwardSelectedFarmList()
+    {
+        var vm = new FarmListsViewModel();
+        var row = Real("List A");
+        FarmListStatusRow? requested = null;
+        vm.SendNowRequested += value => requested = value;
+
+        vm.UpdateCommandAvailability(canAnalyze: false, canManageLists: false, canCreate: false, canSendAll: false);
+
+        Assert.False(vm.AnalyzeCommand.CanExecute(null));
+        Assert.False(vm.SendNowCommand.CanExecute(row));
+
+        vm.UpdateCommandAvailability(canAnalyze: true, canManageLists: true, canCreate: true, canSendAll: true);
+        vm.SendNowCommand.Execute(row);
+
+        Assert.True(vm.AnalyzeCommand.CanExecute(null));
+        Assert.Same(row, requested);
+    }
+
+    [Fact]
     public void BuildFarmListVillageHeader_UsesKnownCoordinatesImmediately()
     {
         var header = MainWindow.BuildFarmListVillageHeader(

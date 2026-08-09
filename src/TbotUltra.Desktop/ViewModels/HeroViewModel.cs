@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Windows.Input;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Common;
 using TbotUltra.Desktop.Models;
+using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Desktop.ViewModels;
@@ -16,17 +18,24 @@ namespace TbotUltra.Desktop.ViewModels;
 /// Owns:
 ///   - <see cref="AttributePriorityItems"/> — drag-orderable hero attributes.
 ///   - The three status text fields shown on the Hero card.
+///   - Manual-panel command enablement and request signals.
 ///   - Pure helpers for parsing and serializing the priority list and for
 ///     applying a stats snapshot to the items collection.
 ///
 /// Hero state still on MainWindow (will migrate later):
 ///   - The drag-handler scratch state (anchor point, source item)
 ///   - The blocked-reason key + IsHeroGroupBlocked() helper
-///   - All the async / service-bound code (refresh stats, refresh adventures,
-///     queue manage). That moves once the relevant services live in DI.
+///   - All async/service-bound work; command subscribers on MainWindow retain
+///     dialog, cancellation, lifecycle, and service access during migration.
 /// </summary>
 public sealed class HeroViewModel : BaseViewModel
 {
+    private readonly RelayCommand _refreshAdventuresCommand;
+    private readonly RelayCommand _refreshHpCommand;
+    private readonly RelayCommand _refreshStatsCommand;
+    private readonly RelayCommand _refreshInventoryCommand;
+    private readonly RelayCommand _openResourceSettingsCommand;
+    private bool _isManualOperationRunning;
     private static readonly string[] DefaultPriorityOrder =
         ["resources", "fighting_strength", "offence_bonus", "defence_bonus"];
 
@@ -42,6 +51,9 @@ public sealed class HeroViewModel : BaseViewModel
     private string _heroInventoryIron = "-";
     private string _heroInventoryCrop = "-";
     private string _heroInventoryStatusText = "Hero inventory not loaded.";
+    private HeroInventoryResources? _lastObservedInventory;
+    private string? _lastObservedInventoryAccountName;
+    private string? _lastObservedInventoryServerUrl;
 
     private bool _heroResourceMaxUseEnabled = true;
     private int _heroResourceMaxUsePerResource = 5000;
@@ -61,6 +73,15 @@ public sealed class HeroViewModel : BaseViewModel
     private bool _reduceAdventureTime;
     private int _adventureVideoChancePercent = 70;
 
+    public HeroViewModel()
+    {
+        _refreshAdventuresCommand = new RelayCommand(() => RefreshAdventuresRequested?.Invoke(), CanRunManualCommand);
+        _refreshHpCommand = new RelayCommand(() => RefreshHpRequested?.Invoke(), CanRunManualCommand);
+        _refreshStatsCommand = new RelayCommand(() => RefreshStatsRequested?.Invoke(), CanRunManualCommand);
+        _refreshInventoryCommand = new RelayCommand(() => RefreshInventoryRequested?.Invoke(), CanRunManualCommand);
+        _openResourceSettingsCommand = new RelayCommand(() => OpenResourceSettingsRequested?.Invoke(), CanRunManualCommand);
+    }
+
     /// <summary>
     /// Optional sink for [ui-apply] trace lines. Defaulted to a no-op so
     /// the VM can be unit-tested without a logger; MainWindow assigns this
@@ -74,6 +95,34 @@ public sealed class HeroViewModel : BaseViewModel
     /// bindings to <c>ItemsSource</c> stay stable across config reloads.
     /// </summary>
     public ObservableCollection<HeroAttributePriorityItem> AttributePriorityItems { get; } = [];
+
+    public ICommand RefreshAdventuresCommand => _refreshAdventuresCommand;
+    public ICommand RefreshHpCommand => _refreshHpCommand;
+    public ICommand RefreshStatsCommand => _refreshStatsCommand;
+    public ICommand RefreshInventoryCommand => _refreshInventoryCommand;
+    public ICommand OpenResourceSettingsCommand => _openResourceSettingsCommand;
+
+    public event Action? RefreshAdventuresRequested;
+    public event Action? RefreshHpRequested;
+    public event Action? RefreshStatsRequested;
+    public event Action? RefreshInventoryRequested;
+    public event Action? OpenResourceSettingsRequested;
+
+    public void SetManualOperationRunning(bool isRunning)
+    {
+        if (!SetProperty(ref _isManualOperationRunning, isRunning))
+        {
+            return;
+        }
+
+        _refreshAdventuresCommand.RaiseCanExecuteChanged();
+        _refreshHpCommand.RaiseCanExecuteChanged();
+        _refreshStatsCommand.RaiseCanExecuteChanged();
+        _refreshInventoryCommand.RaiseCanExecuteChanged();
+        _openResourceSettingsCommand.RaiseCanExecuteChanged();
+    }
+
+    private bool CanRunManualCommand() => !_isManualOperationRunning;
 
     /// <summary>
     /// Caption under the priority list. Typically "Free points: N" after a
@@ -240,6 +289,25 @@ public sealed class HeroViewModel : BaseViewModel
         HeroInventoryStatusText = string.Empty;
     }
 
+    public void SeedObservedInventory(string? accountName, string? serverUrl, HeroInventoryResources? resources)
+    {
+        _lastObservedInventoryAccountName = accountName;
+        _lastObservedInventoryServerUrl = serverUrl;
+        _lastObservedInventory = resources;
+    }
+
+    public bool ApplyObservedInventory(string? accountName, string? serverUrl, HeroInventoryResources resources)
+    {
+        var previous = string.Equals(_lastObservedInventoryAccountName, accountName, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(_lastObservedInventoryServerUrl, serverUrl, StringComparison.OrdinalIgnoreCase)
+                ? _lastObservedInventory
+                : null;
+        var increased = ConstructionQueueState.HasHeroInventoryIncreased(previous, resources);
+        SeedObservedInventory(accountName, serverUrl, resources);
+        ApplyInventory(resources);
+        return increased;
+    }
+
     public void ResetRuntimeState()
     {
         AttributesStatusText = "Hero stats not loaded.";
@@ -252,6 +320,7 @@ public sealed class HeroViewModel : BaseViewModel
         HeroInventoryIron = "-";
         HeroInventoryCrop = "-";
         HeroInventoryStatusText = "Hero inventory not loaded.";
+        SeedObservedInventory(string.Empty, string.Empty, null);
 
         foreach (var item in AttributePriorityItems)
         {

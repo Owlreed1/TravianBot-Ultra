@@ -7,7 +7,7 @@ namespace TbotUltra.Desktop;
 
 public partial class MainWindow
 {
-    private void QueuePopoutButton_Click(object sender, RoutedEventArgs e)
+    private void OpenQueuePopout()
     {
         if (_queuePopupWindow is not null)
         {

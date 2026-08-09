@@ -702,7 +702,8 @@
                     <views:ResourcesPanel x:Name="ResourcesPanelControl" />
                 </TabItem>
 
-                <TabItem x:Name="BuildingsTabItem" Header="Buildings">
+                <TabItem x:Name="BuildingsTabItem" Header="Buildings"
+                         DataContext="{Binding BuildingsVm, ElementName=RootWindow}">
                     <Grid>
                         <views:BuildingsPanel />
 
@@ -726,7 +727,8 @@
                          HeroViewModel; all hero UI lives in Views/HeroPanel.xaml. -->
                     <views:HeroPanel />
                 </TabItem>
-                <TabItem x:Name="FarmingTabItem" Header="Farming">
+                <TabItem x:Name="FarmingTabItem" Header="Farming"
+                         DataContext="{Binding FarmListsVm, ElementName=RootWindow}">
                     <views:FarmingPanel x:Name="FarmingPanelControl" />
                 </TabItem>
 
@@ -747,7 +749,8 @@
                 </TabItem>
 
                 <TabItem x:Name="QueueTabItem" Header="Queue">
-                    <views:QueuePanel x:Name="QueuePanelControl" />
+                    <views:QueuePanel x:Name="QueuePanelControl"
+                                      DataContext="{Binding QueueVm, ElementName=RootWindow}" />
                 </TabItem>
 
                 <TabItem x:Name="LogsTabItem" Header="Logs">

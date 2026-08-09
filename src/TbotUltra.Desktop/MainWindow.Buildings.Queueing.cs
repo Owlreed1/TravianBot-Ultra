@@ -517,12 +517,12 @@ public partial class MainWindow
     {
         if (TryReadBuildingUpgradePayload(item.Payload, out var upgradeSlotId, out _))
         {
-            _buildingLastQueuedTargetBySlot.Remove(upgradeSlotId);
+            _buildingsViewModel.ForgetQueuedUpgrade(upgradeSlotId);
         }
 
         if (TryReadBuildingConstructPayload(item.Payload, out var constructSlotId, out _, out _))
         {
-            _buildingLastQueuedConstructBySlot.Remove(constructSlotId);
+            _buildingsViewModel.ForgetQueuedConstruct(constructSlotId);
         }
     }
 
@@ -799,15 +799,7 @@ public partial class MainWindow
             }
         }
 
-        foreach (var slotId in _buildingLastQueuedTargetBySlot.Keys.Except(activeUpgradeSlots).ToList())
-        {
-            _buildingLastQueuedTargetBySlot.Remove(slotId);
-        }
-
-        foreach (var slotId in _buildingLastQueuedConstructBySlot.Keys.Except(activeConstructSlots).ToList())
-        {
-            _buildingLastQueuedConstructBySlot.Remove(slotId);
-        }
+        _buildingsViewModel.ForgetInactiveQueueItems(activeUpgradeSlots, activeConstructSlots);
 
         // Drop the in-progress demolish highlight (red text) once the demolish task is no
         // longer active in the queue — this covers partial demolitions (target level > 0)

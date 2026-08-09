@@ -9,6 +9,16 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class HeroViewModelTests
 {
     [Fact]
+    public void ApplyObservedInventory_OnlyReportsAnIncreaseForTheSameAccountAndServer()
+    {
+        var vm = new HeroViewModel();
+        vm.SeedObservedInventory("main", "https://ts1.example", new HeroInventoryResources(1, 2, 3, 4));
+
+        Assert.True(vm.ApplyObservedInventory("main", "https://ts1.example", new HeroInventoryResources(2, 2, 3, 4)));
+        Assert.False(vm.ApplyObservedInventory("other", "https://ts1.example", new HeroInventoryResources(3, 2, 3, 4)));
+    }
+
+    [Fact]
     public void LoadSettingsFromConfig_UsesResourcesFirstDefaultPriority()
     {
         var vm = new HeroViewModel();
@@ -134,5 +144,24 @@ public sealed class HeroViewModelTests
         Assert.False(vm.HeroLoopTask.HasTimer);
         Assert.True(vm.HeroLoopTask.HasCountdown);
         Assert.Equal("01:04", vm.HeroLoopTask.TimerText);
+    }
+
+    [Fact]
+    public void ManualCommands_DisableTogetherWhileAnOperationRuns()
+    {
+        var vm = new HeroViewModel();
+        var refreshRequested = false;
+        vm.RefreshStatsRequested += () => refreshRequested = true;
+
+        vm.RefreshStatsCommand.Execute(null);
+        vm.SetManualOperationRunning(true);
+
+        Assert.True(refreshRequested);
+        Assert.False(vm.RefreshStatsCommand.CanExecute(null));
+        Assert.False(vm.RefreshInventoryCommand.CanExecute(null));
+
+        vm.SetManualOperationRunning(false);
+
+        Assert.True(vm.RefreshStatsCommand.CanExecute(null));
     }
 }

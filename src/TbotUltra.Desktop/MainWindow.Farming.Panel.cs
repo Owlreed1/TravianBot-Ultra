@@ -20,11 +20,6 @@ public partial class MainWindow
     private System.Windows.Controls.ComboBox FarmLossDestinationComboBox => FarmingPanelControl.LossDestinationOption;
     private System.Windows.Controls.Button TravcoInactiveSearchButton => FarmingPanelControl.TravcoSearchButton;
 
-    internal void OnAnalyzeFarmListsClicked(object sender, RoutedEventArgs e) => AnalyzeFarmListsButton_Click(sender, e);
-    internal void OnAddFarmsToListClicked(object sender, RoutedEventArgs e) => AddFarmsToListButton_Click(sender, e);
-    internal void OnCreateFarmListClicked(object sender, RoutedEventArgs e) => CreateFarmListButton_Click(sender, e);
-    internal void OnFarmListSendAllNowClicked(object sender, RoutedEventArgs e) => FarmListSendAllNowButton_Click(sender, e);
-    internal void OnFarmListSendNowClicked(object sender, RoutedEventArgs e) => FarmListSendNowButton_Click(sender, e);
     internal void OnFarmingSettingsChanged(object sender, RoutedEventArgs e) => FarmingSettings_Changed(sender, e);
     internal void OnMoveFarmLossesChecked(object sender, RoutedEventArgs e) => MoveFarmLossesCheckBox_Checked(sender, e);
     internal void OnTravcoInactiveSearchClicked(object sender, RoutedEventArgs e) => TravcoInactiveSearchButton_Click(sender, e);

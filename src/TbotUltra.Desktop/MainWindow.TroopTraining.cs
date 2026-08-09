@@ -34,6 +34,22 @@ namespace TbotUltra.Desktop;
 /// </summary>
 public partial class MainWindow
 {
+    private async Task RunTroopTrainingStatusRefreshAsync(Func<Task> action)
+    {
+        await GuardUiAsync(async () =>
+        {
+            _troopTrainingViewModel.SetManualRefreshRunning(true);
+            try
+            {
+                await action();
+            }
+            finally
+            {
+                _troopTrainingViewModel.SetManualRefreshRunning(false);
+            }
+        });
+    }
+
     private bool _lastAutoCelebrationEnabledForChangeTracking;
 
     private static bool IsTeutonsTribe(string? tribe)

@@ -17,4 +17,38 @@ public sealed class AutomationLoopViewModel : BaseViewModel
     /// collection view bound to the list stays stable.
     /// </summary>
     public ObservableCollection<LoopTaskOption> Tasks { get; } = [];
+
+    /// <summary>
+    /// Re-numbers only visible cards. The list keeps its existing instances so
+    /// bindings and drag ordering remain stable.
+    /// </summary>
+    public void UpdateVisibleOrders()
+    {
+        var visibleOrder = 1;
+        foreach (var item in Tasks)
+        {
+            if (item.IsVisible)
+            {
+                item.Order = visibleOrder++;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Advances the Dashboard countdowns once and reports whether any timer
+    /// reached zero, so the composition root can refresh live loop state.
+    /// </summary>
+    public bool TickCountdowns()
+    {
+        var reachedZero = false;
+        foreach (var item in Tasks)
+        {
+            if (item.TickOneSecond() && item.RemainingSeconds == 0)
+            {
+                reachedZero = true;
+            }
+        }
+
+        return reachedZero;
+    }
 }

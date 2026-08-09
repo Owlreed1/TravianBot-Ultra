@@ -3,6 +3,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using TbotUltra.Desktop.Services;
 using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Desktop.ViewModels;
 
@@ -79,6 +80,7 @@ public partial class App : Application
         services.AddSingleton<FarmListsViewModel>();
         services.AddSingleton<TravianQueueViewModel>();
         services.AddSingleton<AutomationLoopViewModel>();
+        services.AddSingleton<DashboardProjectionService>();
         services.AddSingleton<AlarmsViewModel>();
         services.AddSingleton<TerminalViewModel>();
 

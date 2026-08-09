@@ -6,7 +6,7 @@ using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Worker.Services;
 
-public sealed partial class TravianClient
+public sealed partial class TravianClient : ITrainingClient
 {
     private sealed record TroopTrainingRequest(
         TroopTrainingBuildingType BuildingType,

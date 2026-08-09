@@ -963,15 +963,12 @@ public partial class MainWindow
         {
             _botService.ClearQueue();
         }
-        _resourceClickCooldownBySlot.Clear();
+        _resourcesViewModel.ClearInteractionState();
         _collectTasksLastQueuedAtByVillage.Clear();
         _productionBackfillStateByVillage.Clear();
-        _resourceLastQueuedTargetBySlot.Clear();
         _resourcesViewModel.ClearPendingTargets();
         _resourcesViewModel.InfoText = "Resources not loaded yet.";
-        _buildingClickCooldownBySlot.Clear();
-        _buildingLastQueuedTargetBySlot.Clear();
-        _buildingLastQueuedConstructBySlot.Clear();
+        _buildingsViewModel.ClearQueueInteractionState();
         _buildingDemolishingSlots.Clear();
         _buildQueueActiveCount = 0;
         _buildQueueRemainingSeconds = -1;

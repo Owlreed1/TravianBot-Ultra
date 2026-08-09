@@ -121,7 +121,7 @@
                                     <Button x:Name="RefreshAdventuresButton"
                                             Style="{StaticResource RefreshIconButtonStyle}"
                                             ToolTip="Refresh adventure count"
-                                            Click="RefreshAdventuresButton_Click" />
+                                            Command="{Binding RefreshAdventuresCommand}" />
                                 </StackPanel>
                                 <StackPanel Margin="0,0,0,10">
                                     <Border BorderThickness="1"
@@ -184,7 +184,7 @@
                                         <Button x:Name="RefreshHeroHpButton"
                                                 Style="{StaticResource RefreshIconButtonStyle}"
                                                 ToolTip="Refresh hero HP"
-                                                Click="RefreshHeroHpButton_Click" />
+                                                Command="{Binding RefreshHpCommand}" />
                                     </StackPanel>
                                     <StackPanel>
                                         <Border Background="{DynamicResource HeroAdvBgBrush}"
@@ -374,7 +374,7 @@
                                     DockPanel.Dock="Right"
                                     Content="Refresh hero stats"
                                     Width="150"
-                                    Click="RefreshHeroStatsButton_Click"
+                                    Command="{Binding RefreshStatsCommand}"
                                     Background="{DynamicResource SurfaceBrush}"
                                     BorderBrush="{DynamicResource BorderSubtleBrush}" />
                         </DockPanel>
@@ -467,7 +467,7 @@
                                         Content="Refresh hero inventory"
                                         Width="170"
                                         HorizontalAlignment="Right"
-                                        Click="RefreshHeroInventoryButton_Click"
+                                        Command="{Binding RefreshInventoryCommand}"
                                         Background="{DynamicResource SurfaceBrush}"
                                         BorderBrush="{DynamicResource BorderSubtleBrush}" />
                             </StackPanel>
@@ -485,7 +485,7 @@
                                         FontFamily="Segoe MDL2 Assets"
                                         Content="&#xE713;"
                                         ToolTip="Open per-village Hero resource settings."
-                                        Click="HeroResourceSettingsButton_Click"
+                                        Command="{Binding OpenResourceSettingsCommand}"
                                         Background="{DynamicResource SurfaceBrush}"
                                         BorderBrush="{DynamicResource BorderSubtleBrush}" />
                             </StackPanel>

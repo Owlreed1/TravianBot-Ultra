@@ -1,3 +1,5 @@
+using TbotUltra.Worker.Services.Automation;
+
 namespace TbotUltra.Worker.Services;
 
 public sealed partial class BotTaskRunner
@@ -13,7 +15,8 @@ public sealed partial class BotTaskRunner
     private static async Task ExecuteSendReinforcementsBetweenVillagesAsync(TaskExecutionContext context)
     {
         context.Log("send_reinforcements_between_villages: starting.");
-        var result = await context.Client.SendReinforcementsBetweenOwnVillagesAsync(context.CancellationToken);
+        var result = await new CombatOperation(context.Client)
+            .SendReinforcementsBetweenOwnVillagesAsync(context.CancellationToken);
         context.Log(result);
         ThrowIfTaskBlocked("send_reinforcements_between_villages", result);
     }

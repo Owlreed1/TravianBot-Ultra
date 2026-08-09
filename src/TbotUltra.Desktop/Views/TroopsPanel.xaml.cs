@@ -12,81 +12,9 @@ namespace TbotUltra.Desktop.Views;
 /// </summary>
 public partial class TroopsPanel : UserControl
 {
-    private MainWindow? _hostCache;
-
     public TroopsPanel()
     {
         InitializeComponent();
     }
 
-    private MainWindow? Host
-    {
-        get
-        {
-            if (_hostCache is not null)
-            {
-                return _hostCache;
-            }
-
-            _hostCache = Window.GetWindow(this) as MainWindow;
-            return _hostCache;
-        }
-    }
-
-    private void UpgradeOptionsButton_Click(object sender, RoutedEventArgs e)
-    {
-        Host?.OnTroopsUpgradeOptionsClicked();
-    }
-
-    private void SyncSettingsButton_Click(object sender, RoutedEventArgs e)
-    {
-        Host?.OnTroopsSyncSettingsClicked();
-    }
-
-    private void BuildTroopsNowButton_Click(object sender, RoutedEventArgs e)
-    {
-        Host?.OnTroopsBuildNowClicked();
-    }
-
-    private async void RefreshTroopQueuesButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (Host is not { } host)
-        {
-            return;
-        }
-
-        await host.GuardUiAsync(async () =>
-        {
-            RefreshTroopQueuesButton.IsEnabled = false;
-            try
-            {
-                await host.RefreshTroopQueuesCoreAsync();
-            }
-            finally
-            {
-                RefreshTroopQueuesButton.IsEnabled = true;
-            }
-        });
-    }
-
-    private async void CheckCelebrationButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (Host is not { } host)
-        {
-            return;
-        }
-
-        await host.GuardUiAsync(async () =>
-        {
-            CheckCelebrationButton.IsEnabled = false;
-            try
-            {
-                await host.OnCheckCelebrationClickedAsync();
-            }
-            finally
-            {
-                CheckCelebrationButton.IsEnabled = true;
-            }
-        });
-    }
 }

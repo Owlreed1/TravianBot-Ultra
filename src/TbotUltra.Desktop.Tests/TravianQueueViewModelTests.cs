@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.ViewModels;
+using System.Windows.Input;
 using Xunit;
 
 namespace TbotUltra.Desktop.Tests;
@@ -55,5 +56,61 @@ public sealed class TravianQueueViewModelTests
         vm.ApplyBuildQueueRows(new List<TravianBuildQueueRow>());
 
         Assert.Empty(vm.BuildQueueRows);
+    }
+
+    [Fact]
+    public void ApplyActiveQueueRows_PreservesTheBoundCollection()
+    {
+        var vm = new TravianQueueViewModel();
+        var collection = vm.ActiveQueueRows;
+        vm.ApplyActiveQueueRows([new QueueItemRow { DisplayName = "Old" }]);
+
+        vm.ApplyActiveQueueRows([new QueueItemRow { DisplayName = "New" }]);
+
+        Assert.Same(collection, vm.ActiveQueueRows);
+        Assert.Equal("New", vm.ActiveQueueRows[0].DisplayName);
+    }
+
+    [Fact]
+    public void ApplyHistoryQueueRows_ClearsObsoleteRows()
+    {
+        var vm = new TravianQueueViewModel();
+        vm.ApplyHistoryQueueRows([new QueueItemRow { DisplayName = "Completed" }]);
+
+        vm.ApplyHistoryQueueRows([]);
+
+        Assert.Empty(vm.HistoryQueueRows);
+    }
+
+    [Fact]
+    public void QueueCommands_RequireSelectionOnlyForSelectedItemActions()
+    {
+        var vm = new TravianQueueViewModel();
+
+        Assert.False(vm.RemoveCommand.CanExecute(null));
+        Assert.False(vm.MoveUpCommand.CanExecute(null));
+        Assert.True(vm.RefreshCommand.CanExecute(null));
+
+        vm.SelectedActiveQueueRow = new QueueItemRow { DisplayName = "Upgrade" };
+
+        Assert.True(vm.RemoveCommand.CanExecute(null));
+        Assert.True(vm.MoveUpCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void PrimaryQueueCommands_FollowTheHostBusyGate()
+    {
+        var vm = new TravianQueueViewModel
+        {
+            SelectedActiveQueueRow = new QueueItemRow { DisplayName = "Upgrade" },
+        };
+
+        vm.SetPrimaryCommandAvailability(false);
+
+        Assert.False(vm.RemoveCommand.CanExecute(null));
+        Assert.False(vm.MoveDownCommand.CanExecute(null));
+        Assert.False(vm.RefreshCommand.CanExecute(null));
+        Assert.False(vm.ClearAccountCommand.CanExecute(null));
+        Assert.True(vm.PopOutCommand.CanExecute(null));
     }
 }

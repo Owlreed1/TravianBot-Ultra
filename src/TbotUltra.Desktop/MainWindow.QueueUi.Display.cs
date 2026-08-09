@@ -89,8 +89,8 @@ public partial class MainWindow
             var displayedActiveRows = FilterQueueRowsForSelectedVillage(activeRows);
             var displayedHistoryRows = FilterQueueRowsForSelectedVillage(historyRows);
 
-            QueueDataGrid.ItemsSource = displayedActiveRows;
-            QueueHistoryDataGrid.ItemsSource = displayedHistoryRows;
+            _travianQueueViewModel.ApplyActiveQueueRows(displayedActiveRows);
+            _travianQueueViewModel.ApplyHistoryQueueRows(displayedHistoryRows);
             RefreshTravianBuildQueueUi();
             RefreshTravianSmithyQueueUi();
             UpdateQueueEstimateTotals(displayedActiveRows);
@@ -109,12 +109,12 @@ public partial class MainWindow
             {
                 if (queuePopupRoot.Children[0] is DataGrid popupActiveGrid)
                 {
-                    popupActiveGrid.ItemsSource = displayedActiveRows;
+                    popupActiveGrid.ItemsSource = _travianQueueViewModel.ActiveQueueRows;
                 }
 
                 if (queuePopupRoot.Children[1] is DataGrid popupHistoryGrid)
                 {
-                    popupHistoryGrid.ItemsSource = displayedHistoryRows;
+                    popupHistoryGrid.ItemsSource = _travianQueueViewModel.HistoryQueueRows;
                 }
             }
             UpdateExecutionStateIndicator();

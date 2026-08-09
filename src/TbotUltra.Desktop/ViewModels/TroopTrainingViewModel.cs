@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Text.Json.Nodes;
+using System.Windows.Input;
 using System.Windows.Media;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Core.Tasks;
@@ -28,6 +29,12 @@ namespace TbotUltra.Desktop.ViewModels;
 /// </summary>
 public sealed partial class TroopTrainingViewModel : BaseViewModel
 {
+    private readonly RelayCommand _upgradeOptionsCommand;
+    private readonly RelayCommand _syncSettingsCommand;
+    private readonly RelayCommand _buildNowCommand;
+    private readonly RelayCommand _refreshQueuesCommand;
+    private readonly RelayCommand _checkCelebrationCommand;
+    private bool _isManualRefreshRunning;
     private static readonly string[] RelevantOptionProperties =
     [
         nameof(TroopTrainingBuildingOption.IsEnabled),
@@ -71,8 +78,42 @@ public sealed partial class TroopTrainingViewModel : BaseViewModel
     private bool _allowGoldSpending = true;
     private int _goldLimit = 800;
 
+    public TroopTrainingViewModel()
+    {
+        _upgradeOptionsCommand = new RelayCommand(() => UpgradeOptionsRequested?.Invoke());
+        _syncSettingsCommand = new RelayCommand(() => SyncSettingsRequested?.Invoke());
+        _buildNowCommand = new RelayCommand(() => BuildNowRequested?.Invoke());
+        _refreshQueuesCommand = new RelayCommand(() => RefreshQueuesRequested?.Invoke(), CanRefreshManualStatus);
+        _checkCelebrationCommand = new RelayCommand(() => CheckCelebrationRequested?.Invoke(), CanRefreshManualStatus);
+    }
+
     /// <summary>The three building rules shown as rows on the panel.</summary>
     public ObservableCollection<TroopTrainingBuildingOption> Buildings { get; } = [];
+
+    public ICommand UpgradeOptionsCommand => _upgradeOptionsCommand;
+    public ICommand SyncSettingsCommand => _syncSettingsCommand;
+    public ICommand BuildNowCommand => _buildNowCommand;
+    public ICommand RefreshQueuesCommand => _refreshQueuesCommand;
+    public ICommand CheckCelebrationCommand => _checkCelebrationCommand;
+
+    public event Action? UpgradeOptionsRequested;
+    public event Action? SyncSettingsRequested;
+    public event Action? BuildNowRequested;
+    public event Action? RefreshQueuesRequested;
+    public event Action? CheckCelebrationRequested;
+
+    public void SetManualRefreshRunning(bool isRunning)
+    {
+        if (!SetProperty(ref _isManualRefreshRunning, isRunning))
+        {
+            return;
+        }
+
+        _refreshQueuesCommand.RaiseCanExecuteChanged();
+        _checkCelebrationCommand.RaiseCanExecuteChanged();
+    }
+
+    private bool CanRefreshManualStatus() => !_isManualRefreshRunning;
 
     /// <summary>
     /// Status / hint line shown above the row list (e.g. "Queued: build troops.",

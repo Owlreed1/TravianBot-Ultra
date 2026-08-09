@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using System.Windows.Input;
 using System.Windows.Media;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Common;
@@ -12,24 +13,43 @@ using TbotUltra.Worker.Domain;
 namespace TbotUltra.Desktop.ViewModels;
 
 /// <summary>
-/// View model backing the Resources tab. First slice of the Resources MVVM
-/// migration â€” owns just the four per-resource collections that the XAML
-/// columns bind to (Wood / Clay / Iron / Cropland). Subsequent commits
-/// will fold the pending-target / click-cooldown dictionaries, the active
-/// village max-level int, and the pure-logic helpers
-/// (RepopulateResourceGroups, GetBucket, ApplyResourceStatusToUi,
-/// ResolveQueuedResourceTarget, etc.) here too. Async / service-bound
-/// methods will stay on MainWindow.
+/// View model backing the Resources tab. Owns the resource-field collections,
+/// pending targets, click cooldowns, queued-target observations, storage
+/// projections, and panel command availability. MainWindow remains the
+/// composition root for guarded Worker calls and configuration event bridges.
 /// </summary>
 public sealed class ResourcesViewModel : BaseViewModel
 {
+    private readonly RelayCommand _loadCommand;
+    private readonly RelayCommand _upgradeAllCommand;
+    private readonly RelayCommand _upgradeAllToMaxCommand;
+    private readonly RelayCommand<ResourceFieldRow> _levelBadgeCommand;
     private const string NotFillingText = "Not filling";
     private static readonly Brush FullBrush = ThemeColors.Brush("DangerStrongBrush");
     private static readonly Brush DefaultBrush = ThemeColors.Brush("TextPrimaryBrush");
     private Dictionary<string, ResourceStorageForecast> _baseForecasts = new(StringComparer.OrdinalIgnoreCase);
     private DateTimeOffset? _baseForecastCapturedAtUtc;
     private readonly Dictionary<int, int> _pendingTargetBySlot = new();
+    private readonly Dictionary<int, DateTimeOffset> _slotClickCooldownBySlot = new();
+    private readonly Dictionary<int, (int Target, DateTimeOffset At)> _lastQueuedTargetBySlot = new();
     private List<ResourceFieldRow> _allFields = [];
+
+    public ResourcesViewModel()
+    {
+        _loadCommand = new RelayCommand(() => LoadRequested?.Invoke(), () => ActionsEnabled);
+        _upgradeAllCommand = new RelayCommand(() => UpgradeAllRequested?.Invoke(), () => ActionsEnabled);
+        _upgradeAllToMaxCommand = new RelayCommand(() => UpgradeAllToMaxRequested?.Invoke(), () => ActionsEnabled);
+        _levelBadgeCommand = new RelayCommand<ResourceFieldRow>(row => LevelBadgeRequested?.Invoke(row), _ => ActionsEnabled);
+    }
+
+    public ICommand LoadCommand => _loadCommand;
+    public ICommand UpgradeAllCommand => _upgradeAllCommand;
+    public ICommand UpgradeAllToMaxCommand => _upgradeAllToMaxCommand;
+    public ICommand LevelBadgeCommand => _levelBadgeCommand;
+    public event Action? LoadRequested;
+    public event Action? UpgradeAllRequested;
+    public event Action? UpgradeAllToMaxRequested;
+    public event Action<ResourceFieldRow>? LevelBadgeRequested;
 
     /// <summary>Resource fields grouped into the Wood column on the Resources tab.</summary>
     public ObservableCollection<ResourceFieldRow> WoodFields { get; } = [];
@@ -88,7 +108,16 @@ public sealed class ResourcesViewModel : BaseViewModel
     public bool ActionsEnabled
     {
         get => _actionsEnabled;
-        set => SetProperty(ref _actionsEnabled, value);
+        set
+        {
+            if (SetProperty(ref _actionsEnabled, value))
+            {
+                _loadCommand.RaiseCanExecuteChanged();
+                _upgradeAllCommand.RaiseCanExecuteChanged();
+                _upgradeAllToMaxCommand.RaiseCanExecuteChanged();
+                _levelBadgeCommand.RaiseCanExecuteChanged();
+            }
+        }
     }
 
     private bool _isBuildLowestFirst = true;
@@ -352,6 +381,36 @@ public sealed class ResourcesViewModel : BaseViewModel
 
     /// <summary>Forgets all remembered pending targets (e.g. on village switch).</summary>
     public void ClearPendingTargets() => _pendingTargetBySlot.Clear();
+
+    /// <summary>Guards rapid repeat clicks on a resource slot.</summary>
+    public bool TryBeginSlotClick(int slotId, DateTimeOffset now)
+    {
+        if (_slotClickCooldownBySlot.TryGetValue(slotId, out var lastClickAt)
+            && (now - lastClickAt).TotalMilliseconds < 120)
+        {
+            return false;
+        }
+
+        _slotClickCooldownBySlot[slotId] = now;
+        return true;
+    }
+
+    /// <summary>Suppresses duplicate resource-upgrade queue requests during a double click.</summary>
+    public bool WasTargetQueuedRecently(int slotId, int target, DateTimeOffset now)
+    {
+        return _lastQueuedTargetBySlot.TryGetValue(slotId, out var lastQueued)
+            && lastQueued.Target == target
+            && (now - lastQueued.At).TotalMilliseconds < 2500;
+    }
+
+    public void RememberQueuedTarget(int slotId, int target, DateTimeOffset now)
+        => _lastQueuedTargetBySlot[slotId] = (target, now);
+
+    public void ClearInteractionState()
+    {
+        _slotClickCooldownBySlot.Clear();
+        _lastQueuedTargetBySlot.Clear();
+    }
 
     private static ResourceStorageBarItem CreateBar(string key, string name, string barBrushKey, string trackBrushKey)
     {

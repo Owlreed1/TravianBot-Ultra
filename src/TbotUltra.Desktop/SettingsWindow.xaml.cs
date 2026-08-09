@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Services;
+using TbotUltra.Desktop.ViewModels;
 
 namespace TbotUltra.Desktop;
 
@@ -28,6 +29,7 @@ public partial class SettingsWindow : Window
     private const int DefaultSilverLimit = 100;
     private const int DefaultDailySilverSpendingLimit = 10000;
     private readonly BotConfigStore _store;
+    private readonly SettingsPersistenceService _settingsPersistence;
     private JsonObject _config = [];
     private bool _isClosing;
     private readonly bool _sessionSleeping;
@@ -45,6 +47,8 @@ public partial class SettingsWindow : Window
     private readonly Func<Task>? _runVillageStatusSweepNow;
     private readonly bool _newAccountAnalysisCompleted;
     private readonly DispatcherTimer _villageStatusSweepTimer;
+
+    public SettingsDialogViewModel SettingsVm { get; }
 
     public ObservableCollection<TownHallOverviewRow> TownHallRows { get; } = [];
     public TownHallQueueSettings TownHallQueue { get; } = new(
@@ -96,6 +100,7 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         ThemeChrome.EnableEarlyDarkTitleBar(this);
         _store = store;
+        _settingsPersistence = new SettingsPersistenceService(_store, validateBeforeSave);
         _sessionSleeping = sessionSleeping;
         _detectedDailyResetHour = detectedDailyResetHour;
         _validateBeforeSave = validateBeforeSave;
@@ -107,6 +112,18 @@ public partial class SettingsWindow : Window
         _continuousKeepAliveNextReloadProvider = continuousKeepAliveNextReloadProvider;
         _runVillageStatusSweepNow = runVillageStatusSweepNow;
         _newAccountAnalysisCompleted = newAccountAnalysisCompleted;
+        SettingsVm = new SettingsDialogViewModel(
+            sleepNowEnabled: !_sessionSleeping,
+            villageStatusSweepEnabled: _runVillageStatusSweepNow is not null,
+            dailyGoldSpendingResetEnabled: _resetDailyGoldSpending is not null,
+            dailySilverSpendingResetEnabled: _resetDailySilverSpending is not null);
+        SettingsVm.SaveRequested += SaveSettings;
+        SettingsVm.CancelRequested += CancelSettings;
+        SettingsVm.ResetSettingsRequested += ResetSettings;
+        SettingsVm.SleepNowRequested += RequestSleepNow;
+        SettingsVm.VillageStatusSweepNowRequested += () => _ = RunVillageStatusSweepNowAsync();
+        SettingsVm.ResetDailyGoldSpendingRequested += ResetDailyGoldLimit;
+        SettingsVm.ResetDailySilverSpendingRequested += ResetDailySilverLimit;
         foreach (var row in townHallRows ?? [])
         {
             TownHallRows.Add(row);
@@ -119,10 +136,6 @@ public partial class SettingsWindow : Window
         UpdateNewAccountAnalysisStatus();
         SettingsCategoryTabControl.SelectedIndex = (int)initialCategory;
         _initialTownHallFingerprint = BuildTownHallFingerprint();
-        SleepNowButton.IsEnabled = !_sessionSleeping;
-        ResetDailyGoldLimitButton.IsEnabled = _resetDailyGoldSpending is not null;
-        ResetDailySilverLimitButton.IsEnabled = _resetDailySilverSpending is not null;
-        VillageStatusSweepScanNowButton.IsEnabled = _runVillageStatusSweepNow is not null;
         UpdateDailySpendingUsage();
         _villageStatusSweepTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _villageStatusSweepTimer.Tick += (_, _) =>
@@ -147,16 +160,14 @@ public partial class SettingsWindow : Window
             _newAccountAnalysisCompleted ? "SuccessBrush" : "WarningBorderBrush");
     }
 
-    private async void VillageStatusSweepScanNowButton_Click(object sender, RoutedEventArgs e)
+    private async Task RunVillageStatusSweepNowAsync()
     {
-        _ = sender;
-        _ = e;
         if (_runVillageStatusSweepNow is null)
         {
             return;
         }
 
-        VillageStatusSweepScanNowButton.IsEnabled = false;
+        SettingsVm.SetVillageStatusSweepRunning(true);
         try
         {
             await _runVillageStatusSweepNow();
@@ -164,7 +175,7 @@ public partial class SettingsWindow : Window
         }
         finally
         {
-            VillageStatusSweepScanNowButton.IsEnabled = true;
+            SettingsVm.SetVillageStatusSweepRunning(false);
         }
     }
 
@@ -229,7 +240,7 @@ public partial class SettingsWindow : Window
 
     private void LoadConfig()
     {
-        _config = _store.Load();
+        _config = _settingsPersistence.Load();
         DontNotifyNewVersionCheckBox.IsChecked = _config[BotOptionPayloadKeys.DontNotifyNewVersion]?.GetValue<bool>() ?? false;
         QuickReloginCheckBox.IsChecked = _config[BotOptionPayloadKeys.PostLoginQuickReloginEnabled]?.GetValue<bool>() ?? true;
         AutomaticallyCheckLanguageCheckBox.IsChecked = _config[BotOptionPayloadKeys.AutomaticallyCheckLanguage]?.GetValue<bool>() ?? true;
@@ -465,7 +476,7 @@ public partial class SettingsWindow : Window
             ? Math.Clamp(hour, 0, 23)
             : 0;
 
-    private void SaveButton_Click(object sender, RoutedEventArgs e)
+    private void SaveSettings()
     {
         if (!PersistConfig())
         {
@@ -564,13 +575,18 @@ public partial class SettingsWindow : Window
             _config[BotOptionPayloadKeys.PostLoginAnalyzeNewAccount] = PostLoginAnalyzeNewAccountCheckBox.IsChecked == true;
             _config[BotOptionPayloadKeys.SilverLimit] = silverLimit;
             _config[BotOptionPayloadKeys.DailySilverSpendingLimit] = dailySilverSpendingLimit;
-            var validationError = _validateBeforeSave?.Invoke(_config);
-            if (!string.IsNullOrWhiteSpace(validationError))
+            var saveResult = _settingsPersistence.Save(_config);
+            if (!string.IsNullOrWhiteSpace(saveResult.ValidationError))
             {
-                AppDialog.Show(this, validationError, "Proxy setup conflict", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppDialog.Show(this, saveResult.ValidationError, "Proxy setup conflict", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
-            _store.Save(_config);
+            if (saveResult.Exception is not null)
+            {
+                AppDialog.Show(this, saveResult.Exception.Message, "Save settings", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
             return true;
         }
         catch (Exception ex)
@@ -906,7 +922,7 @@ public partial class SettingsWindow : Window
         };
     }
 
-    private void SleepNowButton_Click(object sender, RoutedEventArgs e)
+    private void RequestSleepNow()
     {
         var confirm = AppDialog.Show(
             this,
@@ -932,7 +948,7 @@ public partial class SettingsWindow : Window
         Close();
     }
 
-    private void CancelButton_Click(object sender, RoutedEventArgs e)
+    private void CancelSettings()
     {
         _isClosing = true;
         DialogResult = false;
@@ -949,7 +965,7 @@ public partial class SettingsWindow : Window
         _isClosing = true;
     }
 
-    private void ResetSettingsButton_Click(object sender, RoutedEventArgs e)
+    private void ResetSettings()
     {
         var confirm = AppDialog.Show(
             this,
@@ -962,34 +978,29 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        try
+        var result = _settingsPersistence.ResetToDefaults(_config);
+        if (!string.IsNullOrWhiteSpace(result.ValidationError))
         {
-            var previous = (JsonObject)_config.DeepClone();
-            _store.ResetSettingsToDefaults();
-            var reset = _store.Load();
-            var validationError = _validateBeforeSave?.Invoke(reset);
-            if (!string.IsNullOrWhiteSpace(validationError))
-            {
-                _store.Save(previous);
-                LoadConfig();
-                AppDialog.Show(
-                    this,
-                    validationError + "\n\nThe previous Settings values were restored.",
-                    "Proxy setup conflict",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
-
             LoadConfig();
+            AppDialog.Show(
+                this,
+                result.ValidationError + "\n\nThe previous Settings values were restored.",
+                "Proxy setup conflict",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
         }
-        catch (Exception ex)
+
+        if (result.Exception is null)
         {
-            AppDialog.Show(this, ex.Message, "Reset settings", MessageBoxButton.OK, MessageBoxImage.Warning);
+            LoadConfig();
+            return;
         }
+
+        AppDialog.Show(this, result.Exception.Message, "Reset settings", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
-    private void ResetDailySilverLimitButton_Click(object sender, RoutedEventArgs e)
+    private void ResetDailySilverLimit()
     {
         if (ResetDailySpending(_resetDailySilverSpending))
         {
@@ -998,7 +1009,7 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void ResetDailyGoldLimitButton_Click(object sender, RoutedEventArgs e)
+    private void ResetDailyGoldLimit()
     {
         if (ResetDailySpending(_resetDailyGoldSpending))
         {

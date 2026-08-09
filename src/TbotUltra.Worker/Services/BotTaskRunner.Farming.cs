@@ -88,6 +88,23 @@ public sealed partial class BotTaskRunner
             yellowLossesOnly);
     }
 
+    // Manual farming actions still use this path. The queued continuous-farming
+    // task owns the same decision through ContinuousFarmingOperation.
+    private static async Task RunFarmListLossDeactivationIfEnabledAsync(TaskExecutionContext context)
+    {
+        if (!context.Options.ContinuousFarmDeactivateLosses)
+        {
+            context.Log("Continuous farming loss deactivation disabled.");
+            return;
+        }
+
+        var result = await context.Client.HandleFarmListLossTargetsAsync(
+            CreateFarmListLossHandlingRequest(context.Options),
+            context.CancellationToken);
+        context.Log($"Continuous farming loss handling result: found={result.RowsFound}, deactivated={result.RowsDeactivated}, moved={result.RowsMoved}, moveFailures={result.MoveFailures}, skippedOasis={result.SkippedOasisRows}.");
+        context.Runner.PublishFarmLossDestinationChange(context.Options, result);
+    }
+
     private void PublishFarmLossDestinationChange(BotOptions options, FarmListLossDeactivationResult result)
     {
         if (!result.DestinationChanged

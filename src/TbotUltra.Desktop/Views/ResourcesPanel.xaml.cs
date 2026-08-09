@@ -15,10 +15,6 @@ public partial class ResourcesPanel : UserControl
     internal StackPanel CroplandColumn => CroplandColumnPanel;
     internal ItemsControl CroplandItems => CroplandItemsControl;
 
-    private void LoadResourcesButton_Click(object sender, RoutedEventArgs e) => Host?.OnLoadResourcesClicked(sender, e);
-    private void UpgradeAllResourcesButton_Click(object sender, RoutedEventArgs e) => Host?.OnUpgradeAllResourcesClicked(sender, e);
-    private void UpgradeAllResourcesToMaxButton_Click(object sender, RoutedEventArgs e) => Host?.OnUpgradeAllResourcesToMaxClicked(sender, e);
     private void ResourceBuildStrategyRadio_Click(object sender, RoutedEventArgs e) => Host?.OnResourceBuildStrategyChanged(sender, e);
     private void ResourceUpgradeTypeCheckBox_Changed(object sender, RoutedEventArgs e) => Host?.OnResourceUpgradeTypesChanged(sender, e);
-    private void ResourceLevelBadge_Click(object sender, RoutedEventArgs e) => Host?.OnResourceLevelBadgeClicked(sender, e);
 }

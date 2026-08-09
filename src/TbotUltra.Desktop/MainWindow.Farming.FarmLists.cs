@@ -1025,16 +1025,16 @@ public partial class MainWindow
     }
 
     private async void FarmListSendNowButton_Click(object sender, RoutedEventArgs e)
-        => await GuardUiAsync(() => FarmListSendNowButtonClickAsync(sender, e));
+    {
+        if (sender is Button { Tag: FarmListStatusRow list })
+        {
+            await GuardUiAsync(() => FarmListSendNowButtonClickAsync(list));
+        }
+    }
 
-    private async Task FarmListSendNowButtonClickAsync(object sender, RoutedEventArgs e)
+    private async Task FarmListSendNowButtonClickAsync(FarmListStatusRow list)
     {
         if (BlockIfSessionSleeping("Farm send now"))
-        {
-            return;
-        }
-
-        if (sender is not Button { Tag: FarmListStatusRow list })
         {
             return;
         }
@@ -1179,6 +1179,11 @@ public partial class MainWindow
         SetEnabled(FarmListSendAllNowButton, farmControlsEnabled && HasFarmListWithFarms());
         SetEnabled(AnalyzeFarmListsButton, sleepAllowsActions && !_farmingOperationBusy);
         SetEnabled(StartCatapultWavesButton, sleepAllowsActions && !_farmingOperationBusy);
+        _farmListsViewModel.UpdateCommandAvailability(
+            sleepAllowsActions && !_farmingOperationBusy,
+            farmControlsEnabled,
+            sleepAllowsActions && !_farmingOperationBusy,
+            farmControlsEnabled && HasFarmListWithFarms());
     }
 
     private void RefreshFarmListsItemsControl()
@@ -1196,13 +1201,8 @@ public partial class MainWindow
 
         try
         {
-            if (!ReferenceEquals(FarmListsItemsControl.ItemsSource, _farmLists))
-            {
-                FarmListsItemsControl.ItemsSource = _farmLists;
-            }
-
             EnsureFarmListPlaceholderRow();
-            var view = CollectionViewSource.GetDefaultView(FarmListsItemsControl.ItemsSource);
+            var view = CollectionViewSource.GetDefaultView(_farmLists);
             // Group rows under their owning village so each village gets its own heading. Grouped by the
             // village ordinal (not name) so two villages sharing a display name stay in separate groups; the
             // placeholder row (ordinal -1, empty header) forms one group whose header is hidden.

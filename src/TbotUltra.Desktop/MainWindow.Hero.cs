@@ -25,9 +25,21 @@ namespace TbotUltra.Desktop;
 /// </summary>
 public partial class MainWindow
 {
-    private HeroInventoryResources? _lastObservedHeroInventory;
-    private string? _lastObservedHeroInventoryAccountName;
-    private string? _lastObservedHeroInventoryServerUrl;
+    private async Task RunHeroPanelOperationAsync(Func<Task> action)
+    {
+        await GuardUiAsync(async () =>
+        {
+            _heroViewModel.SetManualOperationRunning(true);
+            try
+            {
+                await action();
+            }
+            finally
+            {
+                _heroViewModel.SetManualOperationRunning(false);
+            }
+        });
+    }
 
     private void LoadHeroAttributeSnapshotForActiveAccount(string accountName)
     {
@@ -51,13 +63,11 @@ public partial class MainWindow
         try
         {
             var serverUrl = GetActiveAccountServerUrl();
-            _lastObservedHeroInventory = null;
-            _lastObservedHeroInventoryAccountName = accountName;
-            _lastObservedHeroInventoryServerUrl = serverUrl;
+            _heroViewModel.SeedObservedInventory(accountName, serverUrl, null);
             if (_heroInventorySnapshotStore.TryLoad(accountName, serverUrl, out var resources)
                 && resources is not null)
             {
-                _lastObservedHeroInventory = resources;
+                _heroViewModel.SeedObservedInventory(accountName, serverUrl, resources);
                 _heroViewModel.ApplyInventory(resources);
                 AppendLog(
                     $"Loaded cached hero inventory. wood={resources.Wood}, clay={resources.Clay}, "
@@ -388,21 +398,7 @@ public partial class MainWindow
         RunOrPostToUi(() =>
         {
             var serverUrl = GetActiveAccountServerUrl();
-            var previous = string.Equals(
-                    _lastObservedHeroInventoryAccountName,
-                    accountName,
-                    StringComparison.OrdinalIgnoreCase)
-                && string.Equals(
-                    _lastObservedHeroInventoryServerUrl,
-                    serverUrl,
-                    StringComparison.OrdinalIgnoreCase)
-                ? _lastObservedHeroInventory
-                : null;
-            var inventoryIncreased = ConstructionQueueState.HasHeroInventoryIncreased(previous, resources);
-            _lastObservedHeroInventory = resources;
-            _lastObservedHeroInventoryAccountName = accountName;
-            _lastObservedHeroInventoryServerUrl = serverUrl;
-            _heroViewModel.ApplyInventory(resources);
+            var inventoryIncreased = _heroViewModel.ApplyObservedInventory(accountName, serverUrl, resources);
             if (inventoryIncreased)
             {
                 ReleaseDeferredConstructionResourceHeadsNow("hero inventory increased");

@@ -77,7 +77,7 @@ public partial class MainWindow
             _heroViewModel.HeroLoopTask = _automationLoopTasks.FirstOrDefault(item =>
                 string.Equals(item.TaskName, QueueGroupCatalog.GetKey(QueueGroup.Hero), StringComparison.OrdinalIgnoreCase));
 
-            UpdateAutomationLoopOrders();
+            _automationLoopViewModel.UpdateVisibleOrders();
             // Snapshot the configured enabled set as the global default for villages with no per-village
             // override yet (so a new village inherits the account's configured groups). Derived from the
             // configured set (not the cards' IsEnabled) so the login gate above does not blank the default.
@@ -161,23 +161,9 @@ public partial class MainWindow
             .ToList();
     }
 
-    private void UpdateAutomationLoopOrders()
-    {
-        var visibleOrder = 1;
-        foreach (var item in _automationLoopTasks)
-        {
-            if (!item.IsVisible)
-            {
-                continue;
-            }
-
-            item.Order = visibleOrder++;
-        }
-    }
-
     private void RefreshAutomationLoopDashboardUi()
     {
-        UpdateAutomationLoopOrders();
+        _automationLoopViewModel.UpdateVisibleOrders();
         _automationLoopTasksView?.Refresh();
         UpdateAutomationLoopSummaryText();
         UpdateAutomationLoopRunningIndicators();
@@ -214,34 +200,27 @@ public partial class MainWindow
             return "-";
         }
 
-        var running = items.FirstOrDefault(item => item.Status == QueueStatus.Running);
-        if (running is not null)
-        {
-            return $"Running: {DescribeNextTask(running)}";
-        }
-
-        // Exact: the item the live loop would pick right now (preview = no side effects).
-        var next = SelectNextQueueItemForContinuousLoop(preview: true);
-        if (next is not null)
-        {
-            return $"Next: {DescribeNextTask(next)}";
-        }
-
-        // Nothing ready now — surface the soonest eligible deferred item and its countdown so the user sees
-        // what the loop is waiting for and when it retries.
         var now = DateTimeOffset.UtcNow;
-        var soonest = items
+        var eligibleDeferredItems = items
             .Where(item => item.Status == QueueStatus.Pending && item.NextAttemptAt > now)
             .Where(IsQueueItemVillageEnabled)
             .Where(IsQueueItemGroupEnabledForItsVillage)
-            .OrderBy(item => item.NextAttemptAt)
-            .FirstOrDefault();
-        if (soonest is not null)
-        {
-            return $"Waiting {FormatNextTaskCountdown(soonest.NextAttemptAt - now)}: {DescribeNextTask(soonest)}";
-        }
+            .ToList();
+        var projection = _dashboardProjectionService.ProjectNextTask(new DashboardNextTaskRequest(
+            IsLoggedIn: true,
+            QueueItems: items,
+            EligibleDeferredItems: eligibleDeferredItems,
+            PreviewNextTask: SelectNextQueueItemForContinuousLoop(preview: true),
+            NowUtc: now));
 
-        return "Nothing queued";
+        return projection.State switch
+        {
+            DashboardNextTaskState.Running => $"Running: {DescribeNextTask(projection.QueueItem!)}",
+            DashboardNextTaskState.Next => $"Next: {DescribeNextTask(projection.QueueItem!)}",
+            DashboardNextTaskState.Waiting => $"Waiting {FormatNextTaskCountdown(projection.Remaining ?? TimeSpan.Zero)}: {DescribeNextTask(projection.QueueItem!)}",
+            DashboardNextTaskState.NothingQueued => "Nothing queued",
+            _ => "Idle",
+        };
     }
 
     private string DescribeNextTask(QueueItem item)
@@ -265,23 +244,7 @@ public partial class MainWindow
 
     private void TickAutomationLoopCountdowns()
     {
-        var changed = false;
-        var reachedZero = false;
-        foreach (var item in _automationLoopTasks)
-        {
-            if (!item.TickOneSecond())
-            {
-                continue;
-            }
-
-            changed = true;
-            if (item.RemainingSeconds == 0)
-            {
-                reachedZero = true;
-            }
-        }
-
-        if (changed && reachedZero)
+        if (_automationLoopViewModel.TickCountdowns())
         {
             UpdateAutomationLoopRunningIndicators();
         }
@@ -1219,7 +1182,7 @@ public partial class MainWindow
         }
 
         _automationLoopTasks.Move(fromIndex, toIndex);
-        UpdateAutomationLoopOrders();
+        _automationLoopViewModel.UpdateVisibleOrders();
         RefreshAutomationLoopDashboardUi();
         PersistAutomationLoopTasksToConfig();
     }

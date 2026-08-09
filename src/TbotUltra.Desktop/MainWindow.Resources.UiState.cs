@@ -361,20 +361,15 @@ public partial class MainWindow
             CroplandColumnPanel.Width = isDenseCropland ? 350 : 190;
         }
     }
-    private void ResourceLevelBadge_Click(object sender, RoutedEventArgs e)
+    private void QueueResourceLevelBadgeUpgrade(ResourceFieldRow row)
     {
-        if (sender is not Button { Tag: ResourceFieldRow row })
-        {
-            return;
-        }
-
         var liveRow = _resourcesViewModel.AllFields
             .FirstOrDefault(item => item.SlotId == row.SlotId) ?? row;
         var currentLevel = liveRow.Level ?? 0;
         var rowName = string.IsNullOrWhiteSpace(liveRow.Name) ? row.Name : liveRow.Name;
 
         var now = DateTimeOffset.UtcNow;
-        if (!TryBeginSlotClick(_resourceClickCooldownBySlot, row.SlotId, now))
+        if (!_resourcesViewModel.TryBeginSlotClick(row.SlotId, now))
         {
             return;
         }
@@ -389,9 +384,7 @@ public partial class MainWindow
         var pendingLevel = liveRow.PendingTargetLevel ?? currentLevel;
         var baseLevel = Math.Max(currentLevel, pendingLevel);
         var target = Math.Clamp(baseLevel + 1, 1, _activeVillageResourceMaxLevel);
-        if (_resourceLastQueuedTargetBySlot.TryGetValue(row.SlotId, out var lastQueued)
-            && lastQueued.Target == target
-            && (now - lastQueued.At).TotalMilliseconds < 2500)
+        if (_resourcesViewModel.WasTargetQueuedRecently(row.SlotId, target, now))
         {
             return;
         }
@@ -408,7 +401,7 @@ public partial class MainWindow
 
         var created = _botService.EnqueueBatch(plannedRequests);
         ApplyStoragePreflightPendingState(storageUpgrades);
-        _resourceLastQueuedTargetBySlot[row.SlotId] = (target, now);
+        _resourcesViewModel.RememberQueuedTarget(row.SlotId, target, now);
         SetPendingResourceLevel(row.SlotId, target);
         RequestQueueUiRefresh(selectId: created.LastOrDefault()?.Id);
         TriggerQueueAutoRunFromEnqueue();

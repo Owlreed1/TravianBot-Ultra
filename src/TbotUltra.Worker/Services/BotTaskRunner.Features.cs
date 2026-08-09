@@ -267,7 +267,8 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
-                result = await client.TestSendReinforcementsBetweenOwnVillagesAsync(cancellationToken);
+                result = await new CombatOperation(client)
+                    .TestSendReinforcementsBetweenOwnVillagesAsync(cancellationToken);
             });
 
         log(result);

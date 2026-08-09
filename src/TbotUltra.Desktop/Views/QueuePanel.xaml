@@ -155,18 +155,20 @@
                                VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button x:Name="QueueRemoveButton" Content="Remove" Width="76" Click="QueueRemoveButton_Click" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" />
-                    <Button x:Name="QueueRedoButton" Content="Redo" Width="76" Margin="6,0,0,0" Click="QueueRedoButton_Click" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" ToolTip="Bring back the queue item(s) removed by the last Remove" />
+                    <Button x:Name="QueueRemoveButton" Content="Remove" Width="76" Command="{Binding RemoveCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" />
+                    <Button x:Name="QueueRedoButton" Content="Redo" Width="76" Margin="6,0,0,0" Command="{Binding RestoreCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" ToolTip="Bring back the queue item(s) removed by the last Remove" />
                     <Rectangle Width="1" Fill="{DynamicResource BorderSubtleBrush}" Margin="10,3,10,3" />
-                    <Button x:Name="QueueMoveUpButton" Content="↑" Width="36" Click="QueueMoveUpButton_Click" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" ToolTip="Move up" />
-                    <Button x:Name="QueueMoveDownButton" Content="↓" Width="36" Margin="6,0,0,0" Click="QueueMoveDownButton_Click" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" ToolTip="Move down" />
+                    <Button x:Name="QueueMoveUpButton" Content="↑" Width="36" Command="{Binding MoveUpCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" ToolTip="Move up" />
+                    <Button x:Name="QueueMoveDownButton" Content="↓" Width="36" Margin="6,0,0,0" Command="{Binding MoveDownCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" ToolTip="Move down" />
                     <Rectangle Width="1" Fill="{DynamicResource BorderSubtleBrush}" Margin="10,3,10,3" />
-                    <Button x:Name="QueueRefreshButton" Content="Refresh" Width="76" Click="QueueRefreshButton_Click" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" />
+                    <Button x:Name="QueueRefreshButton" Content="Refresh" Width="76" Command="{Binding RefreshCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" />
                 </StackPanel>
             </DockPanel>
 
             <DataGrid x:Name="QueueDataGrid"
                       Grid.Row="1"
+                      ItemsSource="{Binding ActiveQueueRows}"
+                      SelectedItem="{Binding SelectedActiveQueueRow, Mode=TwoWay}"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
                       SelectionMode="Single"
@@ -358,6 +360,7 @@
             </StackPanel>
             <DataGrid x:Name="QueueHistoryDataGrid"
                       Grid.Row="1"
+                      ItemsSource="{Binding HistoryQueueRows}"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
                       SelectionMode="Single"
@@ -455,7 +458,7 @@
                     Width="124"
                     Height="26"
                     Margin="8,0,0,0"
-                    Click="ClearVillageQueueButton_Click"
+                    Command="{Binding ClearVillageCommand}"
                     ToolTip="Clears only the queued tasks for the village selected in the Dashboard dropdown."
                     Background="{DynamicResource DangerBgBrush}"
                     BorderBrush="{DynamicResource DangerBorderBrush}"
@@ -465,7 +468,7 @@
                     Width="132"
                     Height="26"
                     Margin="6,0,0,0"
-                    Click="QueueClearButton_Click"
+                    Command="{Binding ClearAccountCommand}"
                     Background="{DynamicResource DangerBgBrush}"
                     BorderBrush="{DynamicResource DangerBorderBrush}"
                     Foreground="{DynamicResource DangerTextBrush}" />
@@ -474,7 +477,7 @@
                     Width="74"
                     Height="26"
                     Margin="6,0,0,0"
-                    Click="QueuePopoutButton_Click"
+                    Command="{Binding PopOutCommand}"
                     Background="{DynamicResource SurfaceBrush}"
                     BorderBrush="{DynamicResource BorderSubtleBrush}" />
         </StackPanel>
