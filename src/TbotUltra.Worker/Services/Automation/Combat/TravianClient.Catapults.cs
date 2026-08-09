@@ -12,8 +12,19 @@ namespace TbotUltra.Worker.Services;
 // this partial to co-locate the contract with the domain it covers.
 public sealed partial class TravianClient : ICombatClient
 {
+    private static readonly string[] CatapultSendButtonSelectors =
+    [
+        "button#ok[name='ok'][value='ok'][type='submit']",
+        "button#ok",
+        "button[name='ok'][value='ok'][type='submit']",
+        "input[type='submit'][name='ok'][value='ok']",
+    ];
+
     private static readonly string[] CatapultConfirmButtonSelectors =
     [
+        "button#confirmSendTroops.rallyPointConfirm",
+        "button#confirmSendTroops",
+        "button[name='confirmSendTroops']",
         ".button-container:has(.button-content:text-is('Confirm'))",
         "button:has(.button-content:text-is('Confirm'))",
         "button:has-text('Confirm')",
@@ -81,50 +92,29 @@ public sealed partial class TravianClient : ICombatClient
         var prepared = new List<PreparedCatapultAttack>();
         try
         {
-            for (var i = 0; i < plan.Attacks.Count; i++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var attack = plan.Attacks[i];
-                var page = i == 0 ? _page : await _page.Context.NewPageAsync();
-                page.SetDefaultTimeout(_config.TimeoutMs);
+            await PrepareCatapultWaveTabsAsync(prepared, plan, request, cancellationToken);
+            prepared.Insert(0, await PrepareCatapultFirstAttackAsync(plan.Attacks[0], request, cancellationToken));
 
-                Notify($"[catapult:verbose] preparing {attack.Label.ToLowerInvariant()} to ({request.X}|{request.Y})");
-                var preparedAttack = await PrepareCatapultAttackPageAsync(
-                    page,
-                    attack,
-                    request,
-                    allowReuseCurrentPage: i == 0,
-                    cancellationToken);
-                prepared.Add(preparedAttack);
+            for (var index = 0; index < prepared.Count; index++)
+            {
+                prepared[index] = await PrepareCatapultConfirmationAsync(prepared[index], request, cancellationToken);
             }
 
             VerifyCatapultArrivalOrder(prepared);
-            foreach (var attack in prepared)
-            {
-                await attack.Page.BringToFrontAsync();
-                await EnsureCatapultConfirmReadyAsync(attack, cancellationToken);
-            }
-
             var sent = 0;
             var failed = 0;
+            var dispatched = new List<PreparedCatapultAttack>();
             foreach (var attack in prepared)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 await attack.Page.BringToFrontAsync();
-                await EnsureCatapultConfirmReadyAsync(attack, cancellationToken);
-                var clicked = await TryClickCatapultConfirmButtonAsync(attack.Page, cancellationToken);
+                var clicked = await TryClickCatapultConfirmButtonAsync(
+                    attack.Page,
+                    request.TabOpenDelayMilliseconds,
+                    cancellationToken);
                 if (clicked)
                 {
-                    if (await WaitForCatapultSendResultAsync(attack, cancellationToken))
-                    {
-                        sent++;
-                        Notify($"[catapult] sent {attack.Label.ToLowerInvariant()} to ({request.X}|{request.Y})");
-                    }
-                    else
-                    {
-                        failed++;
-                        Notify($"[catapult] FAILED to confirm {attack.Label.ToLowerInvariant()} to ({request.X}|{request.Y})");
-                    }
+                    dispatched.Add(attack);
                 }
                 else
                 {
@@ -133,7 +123,21 @@ public sealed partial class TravianClient : ICombatClient
                 }
             }
 
-            await Task.Delay(250, cancellationToken);
+            foreach (var attack in dispatched)
+            {
+                if (await WaitForCatapultSendResultAsync(attack, cancellationToken))
+                {
+                    sent++;
+                    Notify($"[catapult] sent {attack.Label.ToLowerInvariant()} to ({request.X}|{request.Y})");
+                }
+                else
+                {
+                    failed++;
+                    Notify($"[catapult] FAILED to confirm {attack.Label.ToLowerInvariant()} to ({request.X}|{request.Y})");
+                }
+            }
+
+            await Task.Delay(request.TabOpenDelayMilliseconds, cancellationToken);
             await EnsureLoggedInAsync(cancellationToken: cancellationToken);
 
             // Only mention failures when there are any: the word "failed" trips the alarm panel,
@@ -184,26 +188,82 @@ public sealed partial class TravianClient : ICombatClient
         }
     }
 
-    private async Task<PreparedCatapultAttack> PrepareCatapultAttackPageAsync(
-        IPage page,
-        CatapultWaveAttackPlan attack,
+    private async Task PrepareCatapultWaveTabsAsync(
+        ICollection<PreparedCatapultAttack> prepared,
+        CatapultWavePlan plan,
         CatapultWaveRequest request,
-        bool allowReuseCurrentPage,
         CancellationToken cancellationToken)
     {
-        if (!allowReuseCurrentPage || !await SendTroopsNavigator.IsSendTroopsPageAsync(page, cancellationToken))
+        if (request.WaveCount == 0)
         {
-            await GotoOnCatapultPageAsync(page, Paths.RallyPointSendTroops, cancellationToken);
+            return;
         }
 
-        if (!await SendTroopsNavigator.IsSendTroopsPageAsync(page, cancellationToken))
+        var wave = plan.Attacks[1];
+        Notify($"[catapult:verbose] filling wave troops before opening {request.WaveCount} tab(s)");
+        await FillCatapultAttackFormAsync(_page, wave, request, cancellationToken);
+
+        foreach (var attack in plan.Attacks.Skip(1))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var page = await OpenCatapultWaveTabAsync(_page, request.TabOpenDelayMilliseconds, cancellationToken);
+            page.SetDefaultTimeout(_config.TimeoutMs);
+            _browserTrace.AttachPage(page, "catapult-wave-tab");
+            prepared.Add(new PreparedCatapultAttack(page, attack.Label, attack.Troops, null));
+            Notify($"[catapult:verbose] opened tab for {attack.Label.ToLowerInvariant()} to ({request.X}|{request.Y})");
+        }
+    }
+
+    private async Task<PreparedCatapultAttack> PrepareCatapultFirstAttackAsync(
+        CatapultWaveAttackPlan attack,
+        CatapultWaveRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await SendTroopsNavigator.IsSendTroopsPageAsync(_page, cancellationToken))
         {
             throw new InvalidOperationException("Could not open Send Troops page for catapult waves.");
         }
 
+        Notify($"[catapult:verbose] changing original tab to {attack.Label.ToLowerInvariant()} to ({request.X}|{request.Y})");
+        await FillCatapultAttackFormAsync(_page, attack, request, cancellationToken);
+
+        if (!await TryClickCatapultSendButtonAsync(_page, request.TabOpenDelayMilliseconds, cancellationToken))
+        {
+            throw new InvalidOperationException($"Could not open confirmation page for {attack.Label.ToLowerInvariant()}.");
+        }
+
+        var attackError = await TryReadAttackErrorAsync(_page, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(attackError))
+        {
+            throw new InvalidOperationException(FormatCatapultAttackError(attack.Label, attackError));
+        }
+
+        if (!await WaitForSendTroopsConfirmationPageAsync(_page, cancellationToken))
+        {
+            attackError = await TryReadAttackErrorAsync(_page, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(attackError))
+            {
+                throw new InvalidOperationException(FormatCatapultAttackError(attack.Label, attackError));
+            }
+
+            throw new InvalidOperationException($"Confirmation page did not load for {attack.Label.ToLowerInvariant()}.");
+        }
+
+        return new PreparedCatapultAttack(_page, attack.Label, attack.Troops, null);
+    }
+
+    private async Task FillCatapultAttackFormAsync(
+        IPage page,
+        CatapultWaveAttackPlan attack,
+        CatapultWaveRequest request,
+        CancellationToken cancellationToken)
+    {
         await ClearTroopInputsAsync(page, cancellationToken);
-        await FillFirstAvailableAsync(page, ["input[name='x']", "input[name='xCoord']", "input[id*='xCoord' i]"], request.X.ToString(CultureInfo.InvariantCulture), cancellationToken);
-        await FillFirstAvailableAsync(page, ["input[name='y']", "input[name='yCoord']", "input[id*='yCoord' i]"], request.Y.ToString(CultureInfo.InvariantCulture), cancellationToken);
+        if (!await SetCatapultInputValueAsync(page, ["input[name='x']", "input[name='xCoord']", "input[id*='xCoord' i]"], request.X.ToString(CultureInfo.InvariantCulture), null, cancellationToken) ||
+            !await SetCatapultInputValueAsync(page, ["input[name='y']", "input[name='yCoord']", "input[id*='yCoord' i]"], request.Y.ToString(CultureInfo.InvariantCulture), null, cancellationToken))
+        {
+            throw new InvalidOperationException("Could not fill catapult target coordinates.");
+        }
 
         foreach (var troop in attack.Troops)
         {
@@ -230,43 +290,69 @@ public sealed partial class TravianClient : ICombatClient
             var attackMode = request.RaidAttack ? "raid" : "normal attack";
             throw new InvalidOperationException($"Could not select {attackMode} for {attack.Label.ToLowerInvariant()}.");
         }
+    }
 
-        if (!await TryClickCatapultConfirmButtonAsync(page, cancellationToken))
-        {
-            throw new InvalidOperationException($"Could not open confirmation page for {attack.Label.ToLowerInvariant()}.");
-        }
+    private async Task<PreparedCatapultAttack> PrepareCatapultConfirmationAsync(
+        PreparedCatapultAttack attack,
+        CatapultWaveRequest request,
+        CancellationToken cancellationToken)
+    {
+        await attack.Page.BringToFrontAsync();
+        await EnsureCatapultConfirmReadyAsync(attack, request.TabOpenDelayMilliseconds, cancellationToken);
 
-        var attackError = await TryReadAttackErrorAsync(page, cancellationToken);
+        var attackError = await TryReadAttackErrorAsync(attack.Page, cancellationToken);
         if (!string.IsNullOrWhiteSpace(attackError))
         {
             throw new InvalidOperationException(FormatCatapultAttackError(attack.Label, attackError));
         }
 
-        if (!await WaitForSendTroopsConfirmationPageAsync(page, cancellationToken))
-        {
-            attackError = await TryReadAttackErrorAsync(page, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(attackError))
-            {
-                throw new InvalidOperationException(FormatCatapultAttackError(attack.Label, attackError));
-            }
-
-            throw new InvalidOperationException($"Confirmation page did not load for {attack.Label.ToLowerInvariant()}.");
-        }
-
         if (HasCatapultTroops(attack.Troops))
         {
-            var targetResult = await TrySelectCatapultTargetsAsync(page, null, null, cancellationToken);
+            var firstAttack = string.Equals(attack.Label, CatapultWavePlanner.FirstAttackLabel, StringComparison.OrdinalIgnoreCase);
+            var targetResult = await TrySelectCatapultTargetsAsync(
+                attack.Page,
+                firstAttack ? request.Target1 : null,
+                firstAttack ? request.Target2 : null,
+                cancellationToken);
             if (!targetResult.Success)
             {
                 throw new InvalidOperationException(targetResult.Message);
             }
         }
 
-        var durationSeconds = await TryReadAttackDurationSecondsAsync(page, cancellationToken);
-        return new PreparedCatapultAttack(page, attack.Label, durationSeconds);
+        return attack with { DurationSeconds = await TryReadAttackDurationSecondsAsync(attack.Page, cancellationToken) };
     }
 
-    private async Task EnsureCatapultConfirmReadyAsync(PreparedCatapultAttack attack, CancellationToken cancellationToken)
+    private async Task<IPage> OpenCatapultWaveTabAsync(IPage sourcePage, int delayMilliseconds, CancellationToken cancellationToken)
+    {
+        var newPageTask = sourcePage.Context.WaitForPageAsync();
+        if (!await TryClickCatapultSendButtonAsync(sourcePage, delayMilliseconds, [KeyboardModifier.Control], cancellationToken))
+        {
+            throw new InvalidOperationException("Could not open a catapult wave tab from Send Troops.");
+        }
+
+        IPage newPage;
+        try
+        {
+            newPage = await newPageTask.WaitAsync(TimeSpan.FromMilliseconds(_config.TimeoutMs), cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            throw new InvalidOperationException("Catapult wave tab did not open after Ctrl+Send.");
+        }
+
+        if (!await SendTroopsNavigator.IsSendTroopsPageAsync(sourcePage, cancellationToken))
+        {
+            throw new InvalidOperationException("Opening a catapult wave tab navigated the original Send Troops tab.");
+        }
+
+        return newPage;
+    }
+
+    private async Task EnsureCatapultConfirmReadyAsync(
+        PreparedCatapultAttack attack,
+        int delayMilliseconds,
+        CancellationToken cancellationToken)
     {
         for (var attempt = 1; attempt <= 30; attempt++)
         {
@@ -297,7 +383,7 @@ public sealed partial class TravianClient : ICombatClient
                 return;
             }
 
-            await Task.Delay(150, cancellationToken);
+            await Task.Delay(delayMilliseconds, cancellationToken);
         }
 
         throw new InvalidOperationException($"Confirmation page is not ready for {attack.Label.ToLowerInvariant()}.");
@@ -415,68 +501,6 @@ public sealed partial class TravianClient : ICombatClient
         }
     }
 
-    // Intentionally lighter than Navigation's GotoAsync: navigates a secondary catapult tab without
-    // the main retry/proxy-classification/ready-wait/cache-invalidation pipeline. Do not merge them.
-    private async Task GotoOnCatapultPageAsync(IPage page, string pathOrUrl, CancellationToken cancellationToken)
-    {
-        var url = TravianUrls.ToAbsoluteUrl(_config.BaseUrl, pathOrUrl);
-
-        _browserTrace.AttachPage(page, "catapult-context");
-        using var trace = _browserTrace.BeginOperation(
-            "NAV",
-            "goto-catapult-context",
-            $"from={page.Url} target={url}",
-            url);
-        try
-        {
-            Notify($"[nav] GOTO start target='{url}' from='{page.Url}' pages={page.Context.Pages.Count}");
-            var response = await page.GotoAsync(url, new PageGotoOptions
-            {
-                WaitUntil = WaitUntilState.DOMContentLoaded,
-                Timeout = _config.TimeoutMs,
-            })
-            .WaitAsync(cancellationToken);
-            if (response is not null && response.Headers.TryGetValue("date", out var dateHeader))
-            {
-                RecordServerTime(dateHeader);
-            }
-
-            Notify($"[nav] GOTO done target='{url}' current='{page.Url}' pages={page.Context.Pages.Count}");
-
-            trace.Complete(
-                "success",
-                $"status={response?.Status.ToString() ?? "none"} loadState=DOMContentLoaded",
-                page.Url);
-        }
-        catch (OperationCanceledException)
-        {
-            trace.Complete("canceled", url: page.Url);
-            throw;
-        }
-        catch (Exception ex)
-        {
-            trace.Complete("failed", $"{ex.GetType().Name}: {ex.Message}", page.Url);
-            throw;
-        }
-    }
-
-    private async Task FillFirstAvailableAsync(IPage page, IEnumerable<string> selectors, string value, CancellationToken cancellationToken)
-    {
-        foreach (var selector in selectors)
-        {
-            var locator = page.Locator(selector).First;
-            if (await locator.CountAsync() == 0)
-            {
-                continue;
-            }
-
-            await TypeHumanlyAsync(locator, value, cancellationToken);
-            return;
-        }
-
-        throw new InvalidOperationException($"Could not find input field for selectors: {string.Join(", ", selectors)}.");
-    }
-
     private async Task<bool> HasVisibleSelectorAsync(IPage page, IEnumerable<string> selectors)
     {
         foreach (var selector in selectors)
@@ -498,52 +522,52 @@ public sealed partial class TravianClient : ICombatClient
 
     private async Task<bool> TryFillTroopInputAsync(IPage page, string fieldToken, string troopType, int troopCountToSend, CancellationToken cancellationToken)
     {
-        foreach (var selector in BuildTroopInputSelectors(fieldToken))
-        {
-            var locator = page.Locator(selector).First;
-            if (await locator.CountAsync() == 0)
-            {
-                continue;
-            }
+        return await SetCatapultInputValueAsync(
+            page,
+            BuildTroopInputSelectors(fieldToken),
+            troopCountToSend.ToString(CultureInfo.InvariantCulture),
+            troopType,
+            cancellationToken);
+    }
 
-            if (!await locator.IsVisibleAsync())
-            {
-                continue;
-            }
-
-            var isDisabled = await locator.EvaluateAsync<bool>("node => !!node.disabled || !!node.readOnly || node.getAttribute('disabled') !== null");
-            if (isDisabled)
-            {
-                continue;
-            }
-
-            await TypeHumanlyAsync(locator, troopCountToSend.ToString(CultureInfo.InvariantCulture), cancellationToken);
-            var filledValue = await locator.InputValueAsync(new LocatorInputValueOptions { Timeout = _config.TimeoutMs });
-            return string.Equals(filledValue.Trim(), troopCountToSend.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
-        }
-
+    private async Task<bool> SetCatapultInputValueAsync(
+        IPage page,
+        IEnumerable<string> selectors,
+        string value,
+        string? troopType,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         return await page.EvaluateAsync<bool>(
             """
             (args) => {
               const normalize = (value) => (value || '').replace(/\s+/g, ' ').trim().toLowerCase();
               const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="number"], input:not([type])'));
-              const candidate = inputs.find(node => {
+              const isUsable = (node) => {
                 if (node.disabled || node.readOnly || node.getAttribute('disabled') !== null) return false;
                 const style = window.getComputedStyle(node);
                 const rect = node.getBoundingClientRect();
-                if (style.display === 'none' || style.visibility === 'hidden' || rect.width <= 0 || rect.height <= 0) return false;
+                return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+              };
+              const candidate = args.selectors
+                .map(selector => document.querySelector(selector))
+                .find(node => node instanceof HTMLInputElement && isUsable(node))
+                || (!args.troopType ? null : inputs.find(node => {
+                if (!isUsable(node)) return false;
                 const text = normalize(`${node.closest('tr, td, div, label, li, .troop_details, .details')?.textContent || ''} ${node.getAttribute('title') || ''} ${node.getAttribute('aria-label') || ''}`);
                 return text.includes(normalize(args.troopType));
-              });
+              }));
               if (!candidate) return false;
               candidate.focus();
-              candidate.value = String(args.count);
+              const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+              if (setValue) setValue.call(candidate, args.value);
+              else candidate.value = args.value;
               candidate.dispatchEvent(new Event('input', { bubbles: true }));
               candidate.dispatchEvent(new Event('change', { bubbles: true }));
-              return candidate.value === String(args.count);
+              return candidate.value === args.value;
             }
             """,
-            new { troopType, count = troopCountToSend });
+            new { selectors = selectors.ToArray(), value, troopType });
     }
 
     private async Task<bool> TrySelectAttackModeAsync(IPage page, bool raidAttack, CancellationToken cancellationToken)
@@ -552,20 +576,13 @@ public sealed partial class TravianClient : ICombatClient
         return await page.EvaluateAsync<bool>(
             """
             (raidAttack) => {
-              // Attack (3) and raid (4) values are stable values.
-              const radioButtons = Array.from(document.querySelectorAll('input[type="radio"][name="eventType"]'));
-              const normalize = (value) => (value || '').replace(/\s+/g, ' ').trim().toLowerCase();
-              const radio = radioButtons.find(node => {
-                const value = (node.getAttribute('value') || '').trim();
-                const label = normalize(node.parentElement?.textContent || node.closest('label')?.textContent || '');
-                if (raidAttack) return value === '4' || label.includes('raid');
-                return value === '3' || label.includes('normal attack');
-              });
+              const eventTypeValue = raidAttack ? '4' : '3';
+              const radio = document.querySelector(`input[type="radio"][name="eventType"][value="${eventTypeValue}"]`);
               if (!radio) return false;
               radio.checked = true;
               radio.dispatchEvent(new Event('input', { bubbles: true }));
               radio.dispatchEvent(new Event('change', { bubbles: true }));
-              return true;
+              return radio.checked;
             }
             """,
             raidAttack);
@@ -599,11 +616,35 @@ public sealed partial class TravianClient : ICombatClient
         return false;
     }
 
-    // Intentionally separate from SendTroops' TryClickConfirmButtonAsync: different selector set,
-    // visibility gate and a forced single-pass click (no retry loop). Do not merge them.
-    private async Task<bool> TryClickCatapultConfirmButtonAsync(IPage page, CancellationToken cancellationToken)
+    private Task<bool> TryClickCatapultSendButtonAsync(
+        IPage page,
+        int delayMilliseconds,
+        CancellationToken cancellationToken)
+        => TryClickCatapultButtonAsync(page, CatapultSendButtonSelectors, delayMilliseconds, null, cancellationToken);
+
+    private Task<bool> TryClickCatapultSendButtonAsync(
+        IPage page,
+        int delayMilliseconds,
+        IReadOnlyList<KeyboardModifier> modifiers,
+        CancellationToken cancellationToken)
+        => TryClickCatapultButtonAsync(page, CatapultSendButtonSelectors, delayMilliseconds, modifiers, cancellationToken);
+
+    // Intentionally separate from SendTroops' TryClickConfirmButtonAsync: Catapult has a distinct
+    // confirmation form and must never click Send again after the page reload.
+    private Task<bool> TryClickCatapultConfirmButtonAsync(
+        IPage page,
+        int delayMilliseconds,
+        CancellationToken cancellationToken)
+        => TryClickCatapultButtonAsync(page, CatapultConfirmButtonSelectors, delayMilliseconds, null, cancellationToken);
+
+    private async Task<bool> TryClickCatapultButtonAsync(
+        IPage page,
+        IReadOnlyList<string> selectors,
+        int delayMilliseconds,
+        IReadOnlyList<KeyboardModifier>? modifiers,
+        CancellationToken cancellationToken)
     {
-        foreach (var selector in CatapultConfirmButtonSelectors)
+        foreach (var selector in selectors)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var locator = page.Locator(selector).First;
@@ -616,12 +657,22 @@ public sealed partial class TravianClient : ICombatClient
             {
                 continue;
             }
-            await DelayBeforeClickAsync(cancellationToken); // Action pacing "Click" delay
-            await locator.ClickAsync(new LocatorClickOptions { Timeout = _config.TimeoutMs, Force = true });
+            await DelayBeforeCatapultWaveClickAsync(delayMilliseconds, cancellationToken);
+            await locator.ClickAsync(new LocatorClickOptions
+            {
+                Timeout = _config.TimeoutMs,
+                Modifiers = modifiers,
+            });
             return true;
         }
 
         return false;
+    }
+
+    private async Task DelayBeforeCatapultWaveClickAsync(int delayMilliseconds, CancellationToken cancellationToken)
+    {
+        Notify($"[catapult:verbose] click pacing {delayMilliseconds} ms");
+        await Task.Delay(delayMilliseconds, cancellationToken);
     }
 
     private async Task<string?> TryReadAttackErrorAsync(IPage page, CancellationToken cancellationToken)
@@ -678,10 +729,10 @@ public sealed partial class TravianClient : ICombatClient
                 if (!match && desired !== 'random') {
                   match = options.find(option => normalize(option.textContent).includes(desired));
                 }
-                if (!match && desired === 'random') {
+                if (!match) {
                   match = options.find(option => normalize(option.textContent).includes('random') || ['0', '-1', '99'].includes((option.value || '').trim()));
                 }
-                if (!match && desired === 'random') {
+                if (!match) {
                   match = options[0];
                 }
                 if (!match) {
@@ -736,7 +787,11 @@ public sealed partial class TravianClient : ICombatClient
             """);
     }
 
-    private sealed record PreparedCatapultAttack(IPage Page, string Label, int? DurationSeconds);
+    private sealed record PreparedCatapultAttack(
+        IPage Page,
+        string Label,
+        IReadOnlyDictionary<string, int> Troops,
+        int? DurationSeconds);
 
     private sealed class CatapultTargetSelectResult
     {

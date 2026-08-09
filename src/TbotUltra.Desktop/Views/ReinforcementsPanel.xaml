@@ -262,9 +262,9 @@
                                 Width="180"
                                 HorizontalAlignment="Left"
                                 ToolTip="Opens Catapult Waves for the active village."
-                                Background="{DynamicResource AccentBrush}"
-                                Foreground="White"
-                                BorderBrush="{DynamicResource AccentBrush}"
+                                Background="{DynamicResource SuccessBgBrush}"
+                                Foreground="{DynamicResource SuccessTextBrush}"
+                                BorderBrush="{DynamicResource SuccessBorderBrush}"
                                 Click="StartCatapultWavesButton_Click" />
                         <TextBlock x:Name="CatapultWavesStatusTextBlock"
                                    Text="No catapult waves running."

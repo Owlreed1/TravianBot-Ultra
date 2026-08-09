@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Windows;
 using TbotUltra.Core.Configuration;
+using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Desktop;
@@ -27,14 +28,31 @@ public partial class MainWindow
 
     private void RefreshDemolishStatusForSelectedVillage()
     {
-        var item = _botService.GetQueueItemsForDisplay()
+        var now = DateTimeOffset.UtcNow;
+        var items = _botService.GetQueueItemsForDisplay()
             .Where(IsDemolishQueueItem)
             .Where(IsDemolishQueueItemForSelectedVillage)
             .Where(candidate => candidate.Status is QueueStatus.Pending or QueueStatus.Running)
             .OrderBy(candidate => candidate.CreatedAt)
-            .FirstOrDefault();
+            .ToList();
 
-        var status = GetDemolishStatus(item, DateTimeOffset.UtcNow, false);
+        var trackedSlots = items
+            .Where(DemolitionDisplayState.IsTracked)
+            .Select(item => item.Payload.GetValueOrDefault(BotOptionPayloadKeys.TargetBuildingSlotOrName))
+            .Where(slotText => int.TryParse(slotText, out _))
+            .Select(slotText => int.Parse(slotText!))
+            .ToHashSet();
+        foreach (var slotId in _buildingDemolishingSlots.Except(trackedSlots).ToList())
+        {
+            SetDemolishingFlag(slotId, false);
+        }
+
+        foreach (var slotId in trackedSlots.Except(_buildingDemolishingSlots).ToList())
+        {
+            SetDemolishingFlag(slotId, true);
+        }
+
+        var status = GetDemolishStatus(items.FirstOrDefault(), now, false);
         _buildingsViewModel.DemolishStatusText = status.Text;
         _buildingsViewModel.DemolishStatusHasTimer = status.HasTimer;
     }
@@ -58,7 +76,7 @@ public partial class MainWindow
             return ($"Starting demolition of {target}…", false);
         }
 
-        if (TryGetDemolishServerFinishAt(item, out var serverFinishAt) && serverFinishAt > now)
+        if (DemolitionDisplayState.TryGetServerFinishAt(item, out var serverFinishAt) && serverFinishAt > now)
         {
             return ($"Demolishing {target} — {FormatCountdown((int)Math.Ceiling((serverFinishAt - now).TotalSeconds))} remaining.", true);
         }
@@ -69,27 +87,6 @@ public partial class MainWindow
         }
 
         return ($"Demolition of {target} is ready to start.", false);
-    }
-
-    private static bool TryGetDemolishServerFinishAt(QueueItem item, out DateTimeOffset finishAt)
-    {
-        finishAt = default;
-        if (!item.Payload.TryGetValue(BotOptionPayloadKeys.DemolishServerFinishAtUnixSeconds, out var value)
-            || !long.TryParse(value, out var unixSeconds)
-            || unixSeconds <= 0)
-        {
-            return false;
-        }
-
-        try
-        {
-            finishAt = DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
-            return true;
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            return false;
-        }
     }
 
     internal void OnDemolishOverviewClicked()

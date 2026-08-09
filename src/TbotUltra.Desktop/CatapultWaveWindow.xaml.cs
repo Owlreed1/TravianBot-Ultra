@@ -4,7 +4,9 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using TbotUltra.Core.Travian;
+using TbotUltra.Desktop.Models;
 using TbotUltra.Worker.Domain;
+using TbotUltra.Worker.Services;
 
 namespace TbotUltra.Desktop;
 
@@ -18,6 +20,8 @@ public partial class CatapultWaveWindow : Window
     private readonly Dictionary<string, Run> _firstAttackAmountRuns = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Hyperlink> _firstAttackAmountLinks = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Run> _waveAmountRuns = new(StringComparer.OrdinalIgnoreCase);
+    private readonly IReadOnlyList<VillageSelectionItem> _villages;
+    private VillageSelectionItem? _activeVillage;
     private readonly CancellationTokenSource _windowCts = new();
     private bool _suppressRefresh;
     private bool _isRunning;
@@ -32,22 +36,34 @@ public partial class CatapultWaveWindow : Window
     /// with whatever troops were passed to the constructor.
     /// </summary>
     public Func<Action<string>, CancellationToken, Task<CatapultWaveSetupInfo>>? InitialLoadRequested { get; init; }
+    public Func<VillageSelectionItem, Action<string>, CancellationToken, Task<CatapultWaveSetupInfo>>? SwitchVillageRequested { get; init; }
 
-    public CatapultWaveWindow(string tribe, IReadOnlyDictionary<string, long>? availableTroops = null, int? rallyPointLevel = null)
+    public CatapultWaveWindow(
+        string tribe,
+        IReadOnlyDictionary<string, long>? availableTroops = null,
+        int? rallyPointLevel = null,
+        IReadOnlyList<VillageSelectionItem>? villages = null,
+        VillageSelectionItem? activeVillage = null)
     {
         InitializeComponent();
         ThemeChrome.EnableEarlyDarkTitleBar(this);
         _troopTypes = TroopCatalog.ResolveTroopTypesForTribe(tribe);
+        ConfigureFirstAttackTargetPickers(tribe);
         _availableTroops = availableTroops is null
             ? new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase)
             : new Dictionary<string, long>(availableTroops, StringComparer.OrdinalIgnoreCase);
         _rallyPointLevel = rallyPointLevel;
+        _villages = villages ?? [];
+        _activeVillage = activeVillage;
+        VillageComboBox.ItemsSource = _villages;
+        VillageComboBox.SelectedItem = activeVillage ?? _villages.FirstOrDefault();
         ConfigureZeroDefaultTextBox(XTextBox);
         ConfigureZeroDefaultTextBox(YTextBox);
         BuildTroopGrid(FirstAttackTroopsGrid, _firstAttackInputs, isFirstAttackGrid: true);
         BuildTroopGrid(WaveTroopsGrid, _waveInputs, isFirstAttackGrid: false);
         RefreshRallyPointLevelText();
         RefreshUiState();
+        RefreshSwitchVillageState();
         Loaded += OnWindowLoaded;
     }
 
@@ -160,6 +176,18 @@ public partial class CatapultWaveWindow : Window
             grid.Children.Add(input);
             inputs[troopType] = input;
         }
+    }
+
+    private void ConfigureFirstAttackTargetPickers(string tribe)
+    {
+        var targets = BuildingCatalogService.GetCatalogForTribe(tribe)
+            .Select(building => building.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        FirstAttackTarget1ComboBox.ItemsSource = targets;
+        FirstAttackTarget2ComboBox.ItemsSource = targets;
     }
 
     #endregion
@@ -283,6 +311,32 @@ public partial class CatapultWaveWindow : Window
 
     #region UI events
 
+    private void FirstAttackTargetRandomRadioButton_Checked(object sender, RoutedEventArgs e)
+    {
+        _ = e;
+        if (sender == FirstAttackTarget1RandomRadioButton && FirstAttackTarget1ComboBox is not null)
+        {
+            FirstAttackTarget1ComboBox.SelectedItem = null;
+        }
+        else if (sender == FirstAttackTarget2RandomRadioButton && FirstAttackTarget2ComboBox is not null)
+        {
+            FirstAttackTarget2ComboBox.SelectedItem = null;
+        }
+    }
+
+    private void FirstAttackTargetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _ = e;
+        if (sender == FirstAttackTarget1ComboBox && FirstAttackTarget1ComboBox.SelectedItem is not null)
+        {
+            FirstAttackTarget1RandomRadioButton.IsChecked = false;
+        }
+        else if (sender == FirstAttackTarget2ComboBox && FirstAttackTarget2ComboBox.SelectedItem is not null)
+        {
+            FirstAttackTarget2RandomRadioButton.IsChecked = false;
+        }
+    }
+
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
         if (_isRunning)
@@ -312,6 +366,33 @@ public partial class CatapultWaveWindow : Window
 
     private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         => await AsyncUi.GuardAsync(() => RefreshButtonClickAsync(sender, e), LogUiGuardError);
+
+    private void ClearButton_Click(object sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        if (_isRunning || _isRefreshing)
+        {
+            return;
+        }
+
+        _suppressRefresh = true;
+        try
+        {
+            foreach (var input in _firstAttackInputs.Values.Concat(_waveInputs.Values))
+            {
+                input.Text = "0";
+                UpdateZeroDefaultTextBoxForeground(input);
+            }
+        }
+        finally
+        {
+            _suppressRefresh = false;
+        }
+
+        RefreshUiState();
+        SetStatus("Troop amounts reset to 0.", isAlarm: false);
+    }
 
     private async Task RefreshButtonClickAsync(object sender, RoutedEventArgs e)
     {
@@ -347,6 +428,59 @@ public partial class CatapultWaveWindow : Window
         {
             BusyOverlay.Hide();
             SetRefreshing(false);
+        }
+    }
+
+    private void VillageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        RefreshSwitchVillageState();
+    }
+
+    private async void SwitchVillageButton_Click(object sender, RoutedEventArgs e)
+        => await AsyncUi.GuardAsync(() => SwitchVillageButtonClickAsync(sender, e), LogUiGuardError);
+
+    private async Task SwitchVillageButtonClickAsync(object sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        if (_isRunning || _isRefreshing
+            || VillageComboBox.SelectedItem is not VillageSelectionItem selected
+            || IsSameVillage(selected, _activeVillage))
+        {
+            return;
+        }
+
+        if (SwitchVillageRequested is null)
+        {
+            SetStatus("Village switching is not connected.", isAlarm: true);
+            return;
+        }
+
+        SetRefreshing(true);
+        BusyOverlay.Show("Switching village", $"Switching to {selected.DisplayName}…");
+        try
+        {
+            SetStatus($"Switching to {selected.DisplayName}…", isAlarm: false);
+            var setupInfo = await SwitchVillageRequested(selected, message => SetStatus(message, isAlarm: false), _windowCts.Token);
+            _activeVillage = selected;
+            UpdateSetupInfo(setupInfo);
+            SetStatus("Village switched and troops loaded from Rally Point.", isAlarm: false);
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus("Village switch canceled.", isAlarm: true);
+        }
+        catch (Exception ex)
+        {
+            SetStatus(ex.Message, isAlarm: true);
+        }
+        finally
+        {
+            BusyOverlay.Hide();
+            SetRefreshing(false);
+            RefreshSwitchVillageState();
         }
     }
 
@@ -397,6 +531,35 @@ public partial class CatapultWaveWindow : Window
         {
             StartButton.IsEnabled = true;
         }
+    }
+
+    private void RefreshSwitchVillageState()
+    {
+        if (SwitchVillageButton is null || VillageComboBox is null)
+        {
+            return;
+        }
+
+        SwitchVillageButton.IsEnabled = !_isRunning
+            && !_isRefreshing
+            && VillageComboBox.SelectedItem is VillageSelectionItem selected
+            && !IsSameVillage(selected, _activeVillage);
+    }
+
+    private static bool IsSameVillage(VillageSelectionItem? left, VillageSelectionItem? right)
+    {
+        if (left is null || right is null)
+        {
+            return false;
+        }
+
+        if (left.CoordX is not null && left.CoordY is not null
+            && right.CoordX is not null && right.CoordY is not null)
+        {
+            return left.CoordX == right.CoordX && left.CoordY == right.CoordY;
+        }
+
+        return string.Equals(left.Url, right.Url, StringComparison.OrdinalIgnoreCase);
     }
 
     private void RefreshRallyPointLevelText()
@@ -509,6 +672,13 @@ public partial class CatapultWaveWindow : Window
             return false;
         }
 
+        if (TabOpenDelayComboBox.SelectedItem is not ComboBoxItem { Tag: string delayText } ||
+            !int.TryParse(delayText, out var tabOpenDelayMilliseconds))
+        {
+            error = "ALARM: Select a catapult tab delay.";
+            return false;
+        }
+
         if (!TryReadTroops(_firstAttackInputs, out var firstTroops, out error))
         {
             error = $"ALARM: {error}";
@@ -554,8 +724,9 @@ public partial class CatapultWaveWindow : Window
             RaidAttackRadioButton.IsChecked == true,
             firstTroops,
             waveTroops,
-            null,
-            null);
+            FirstAttackTarget1RandomRadioButton.IsChecked == true ? null : FirstAttackTarget1ComboBox.SelectedItem as string,
+            FirstAttackTarget2RandomRadioButton.IsChecked == true ? null : FirstAttackTarget2ComboBox.SelectedItem as string,
+            tabOpenDelayMilliseconds);
         return true;
     }
 
@@ -697,21 +868,35 @@ public partial class CatapultWaveWindow : Window
         StartButton.IsEnabled = !running;
         CancelButton.IsEnabled = !running;
         RefreshButton.IsEnabled = !running && !_isRefreshing;
+        ClearButton.IsEnabled = !running && !_isRefreshing;
         XTextBox.IsEnabled = !running;
         YTextBox.IsEnabled = !running;
         WaveCountTextBox.IsEnabled = !running;
         NormalAttackRadioButton.IsEnabled = !running;
         RaidAttackRadioButton.IsEnabled = !running;
+        TabOpenDelayComboBox.IsEnabled = !running;
+        FirstAttackTarget1RandomRadioButton.IsEnabled = !running;
+        FirstAttackTarget2RandomRadioButton.IsEnabled = !running;
+        FirstAttackTarget1ComboBox.IsEnabled = !running;
+        FirstAttackTarget2ComboBox.IsEnabled = !running;
         FirstAttackTroopsGrid.IsEnabled = !running;
         WaveTroopsGrid.IsEnabled = !running;
+        RefreshSwitchVillageState();
     }
 
     private void SetRefreshing(bool refreshing)
     {
         _isRefreshing = refreshing;
         RefreshButton.IsEnabled = !refreshing && !_isRunning;
+        ClearButton.IsEnabled = !refreshing && !_isRunning;
         StartButton.IsEnabled = !refreshing && !_isRunning;
         CancelButton.IsEnabled = !refreshing && !_isRunning;
+        TabOpenDelayComboBox.IsEnabled = !refreshing && !_isRunning;
+        FirstAttackTarget1RandomRadioButton.IsEnabled = !refreshing && !_isRunning;
+        FirstAttackTarget2RandomRadioButton.IsEnabled = !refreshing && !_isRunning;
+        FirstAttackTarget1ComboBox.IsEnabled = !refreshing && !_isRunning;
+        FirstAttackTarget2ComboBox.IsEnabled = !refreshing && !_isRunning;
+        RefreshSwitchVillageState();
     }
 
     private void SetStatus(string status, bool isAlarm)

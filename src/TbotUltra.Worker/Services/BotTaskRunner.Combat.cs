@@ -43,6 +43,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
+                await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken, skipFeatureRefresh: true);
                 result = await new CombatOperation(client).ReadAvailableTroopsForCatapultWavesAsync(
                     forceRefresh,
                     cancellationToken);
@@ -68,6 +69,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
+                await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken, skipFeatureRefresh: true);
                 result = await new CombatOperation(client).ReadCatapultWaveSetupInfoAsync(
                     forceRefresh,
                     cancellationToken);
@@ -93,6 +95,7 @@ public sealed partial class BotTaskRunner
             async client =>
             {
                 await client.LoginAsync(cancellationToken);
+                await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken, skipFeatureRefresh: true);
                 result = await new CombatOperation(client).StartCatapultWavesAsync(request, cancellationToken);
             });
 

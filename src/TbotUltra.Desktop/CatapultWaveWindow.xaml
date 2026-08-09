@@ -57,12 +57,28 @@
                                TextAlignment="Center" />
                 </Border>
             </StackPanel>
-            <TextBlock x:Name="RallyPointLevelTextBlock"
-                       Grid.Column="1"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource TextMutedBrush}"
-                       FontWeight="SemiBold"
-                       Text="Rallypoint level: -" />
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <ComboBox x:Name="VillageComboBox"
+                          Width="180"
+                          DisplayMemberPath="DisplayName"
+                          SelectionChanged="VillageComboBox_SelectionChanged" />
+                <Button x:Name="SwitchVillageButton"
+                        Width="110"
+                        Margin="8,0,0,0"
+                        Content="Switch village"
+                        Background="{DynamicResource SuccessBgBrush}"
+                        BorderBrush="{DynamicResource SuccessBorderBrush}"
+                        Foreground="{DynamicResource SuccessTextBrush}"
+                        Click="SwitchVillageButton_Click" />
+                <TextBlock x:Name="RallyPointLevelTextBlock"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           FontWeight="SemiBold"
+                           Margin="12,0,0,0"
+                           Text="Rallypoint level: -" />
+            </StackPanel>
         </Grid>
 
         <Border Grid.Row="1"
@@ -77,23 +93,24 @@
                     <Grid Margin="0,0,0,14">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="45" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="45" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="45" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Column="0" Text="X" VerticalAlignment="Center" Margin="0,0,8,0" />
-                        <TextBox x:Name="XTextBox" Grid.Column="1" Text="0" TextChanged="Input_TextChanged" />
+                        <TextBox x:Name="XTextBox" Grid.Column="1" Height="24" Text="0" TextChanged="Input_TextChanged" />
                         <TextBlock Grid.Column="2" Text="Y" VerticalAlignment="Center" Margin="14,0,8,0" />
-                        <TextBox x:Name="YTextBox" Grid.Column="3" Text="0" TextChanged="Input_TextChanged" />
+                        <TextBox x:Name="YTextBox" Grid.Column="3" Height="24" Text="0" TextChanged="Input_TextChanged" />
                         <TextBlock Grid.Column="4" Text="Waves" VerticalAlignment="Center" Margin="14,0,8,0" />
-                        <TextBox x:Name="WaveCountTextBox" Grid.Column="5" Text="21" TextChanged="Input_TextChanged" />
+                        <TextBox x:Name="WaveCountTextBox" Grid.Column="5" Height="24" Text="21" TextChanged="Input_TextChanged" />
                         <RadioButton x:Name="NormalAttackRadioButton"
                                      Grid.Column="6"
                                      Content="Normal"
@@ -104,9 +121,38 @@
                                      Grid.Column="7"
                                      Content="Raid"
                                      VerticalAlignment="Center" />
-                        <Button x:Name="RefreshButton"
+                        <StackPanel Grid.Column="8"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Margin="14,0,8,0">
+                            <TextBlock Text="Tab delay"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,6,0" />
+                            <ComboBox x:Name="TabOpenDelayComboBox"
+                                      Width="78"
+                                      SelectedIndex="1">
+                                <ComboBoxItem Tag="50" Content="50 ms" />
+                                <ComboBoxItem Tag="100" Content="100 ms" />
+                                <ComboBoxItem Tag="200" Content="200 ms" />
+                                <ComboBoxItem Tag="300" Content="300 ms" />
+                                <ComboBoxItem Tag="500" Content="500 ms" />
+                            </ComboBox>
+                        </StackPanel>
+                        <Button x:Name="ClearButton"
                                 Grid.Column="9"
-                                Width="100"
+                                Width="62"
+                                Height="24"
+                                Margin="0,0,6,0"
+                                Content="Clear"
+                                Background="{DynamicResource AmberBg200Brush}"
+                                BorderBrush="{DynamicResource WarningBorderBrush}"
+                                Foreground="{DynamicResource WarningText2Brush}"
+                                Click="ClearButton_Click" />
+                        <Button x:Name="RefreshButton"
+                                Grid.Column="10"
+                                Width="66"
+                                Height="24"
                                 Content="Refresh"
                                 Click="RefreshButton_Click" />
                     </Grid>
@@ -134,11 +180,29 @@
                                 <StackPanel Margin="0,10,0,0">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                                         <TextBlock Text="Target building:" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                        <RadioButton Content="Random" IsChecked="True" VerticalAlignment="Center" />
+                                        <RadioButton x:Name="FirstAttackTarget1RandomRadioButton"
+                                                     Content="Random"
+                                                     IsChecked="True"
+                                                     VerticalAlignment="Center"
+                                                     Checked="FirstAttackTargetRandomRadioButton_Checked" />
+                                        <ComboBox x:Name="FirstAttackTarget1ComboBox"
+                                                  Width="150"
+                                                  Margin="8,0,0,0"
+                                                  VerticalAlignment="Center"
+                                                  SelectionChanged="FirstAttackTargetComboBox_SelectionChanged" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Target building:" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                        <RadioButton Content="Random" IsChecked="True" VerticalAlignment="Center" />
+                                        <RadioButton x:Name="FirstAttackTarget2RandomRadioButton"
+                                                     Content="Random"
+                                                     IsChecked="True"
+                                                     VerticalAlignment="Center"
+                                                     Checked="FirstAttackTargetRandomRadioButton_Checked" />
+                                        <ComboBox x:Name="FirstAttackTarget2ComboBox"
+                                                  Width="150"
+                                                  Margin="8,0,0,0"
+                                                  VerticalAlignment="Center"
+                                                  SelectionChanged="FirstAttackTargetComboBox_SelectionChanged" />
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>
@@ -193,9 +257,9 @@
             <Button x:Name="StartButton"
                     Width="100"
                     Margin="0,0,8,0"
-                    Background="{DynamicResource PrimaryButtonBrush}"
-                    BorderBrush="{DynamicResource PrimaryButtonBrush}"
-                    Foreground="{DynamicResource TooltipForegroundBrush}"
+                    Background="{DynamicResource SuccessBgBrush}"
+                    BorderBrush="{DynamicResource SuccessBorderBrush}"
+                    Foreground="{DynamicResource SuccessTextBrush}"
                     FontWeight="SemiBold"
                     Content="Start"
                     Click="StartButton_Click" />

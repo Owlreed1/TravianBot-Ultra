@@ -55,6 +55,18 @@ public sealed partial class TravianClient
                       || lower.includes(`"${token}"`);
                   };
 
+                  // Official Travian's Send Troops form scopes every available amount to its troop
+                  // cell: table#troops input[name="troop[tN]"] / <a>count</a>. Read this exact
+                  // contract first so another form on the page cannot supply a stale tN value.
+                  const officialInput = document.querySelector(`#troops input[name="troop[${fieldToken}]"]`);
+                  if (officialInput) {
+                    const cell = officialInput.closest('td');
+                    const amountLink = cell?.querySelector('a[onclick]');
+                    const parsed = parseAmount(amountLink?.textContent || '');
+                    if (parsed !== null) return parsed;
+                    if (officialInput.disabled || officialInput.getAttribute('disabled') !== null) return 0;
+                  }
+
                   const anchors = Array.from(document.querySelectorAll('a[onclick], button[onclick], div[onclick]'));
                   for (const anchor of anchors) {
                     const onclick = anchor.getAttribute('onclick') || '';

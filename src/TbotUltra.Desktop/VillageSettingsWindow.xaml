@@ -35,7 +35,9 @@
                   HeadersVisibility="Column"
                   SelectionMode="Single">
             <DataGrid.Resources>
-                <Style x:Key="CheckAllButtonStyle" TargetType="Button">
+                <Style x:Key="CheckAllButtonStyle"
+                       TargetType="Button"
+                       BasedOn="{StaticResource {x:Type Button}}">
                     <Setter Property="Height" Value="20" />
                     <Setter Property="MinHeight" Value="0" />
                     <Setter Property="MinWidth" Value="0" />

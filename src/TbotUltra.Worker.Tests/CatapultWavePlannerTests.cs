@@ -76,6 +76,43 @@ public sealed class CatapultWavePlannerTests
         Assert.Contains("Wave attack", exception.Message);
     }
 
+    [Theory]
+    [InlineData(50)]
+    [InlineData(100)]
+    [InlineData(200)]
+    [InlineData(300)]
+    [InlineData(500)]
+    public void BuildPlan_AllowsConfiguredCatapultTabDelays(int tabDelayMilliseconds)
+    {
+        var request = Request(
+            waveCount: 1,
+            firstTroops: new Dictionary<string, int> { ["Clubswinger"] = 100 },
+            waveTroops: new Dictionary<string, int> { ["Catapult"] = 1 }) with
+        {
+            TabOpenDelayMilliseconds = tabDelayMilliseconds,
+        };
+
+        var plan = CatapultWavePlanner.BuildPlan(request);
+
+        Assert.Equal(2, plan.Attacks.Count);
+    }
+
+    [Fact]
+    public void BuildPlan_RejectsUnknownCatapultTabDelay()
+    {
+        var request = Request(
+            waveCount: 1,
+            firstTroops: new Dictionary<string, int> { ["Clubswinger"] = 100 },
+            waveTroops: new Dictionary<string, int> { ["Catapult"] = 1 }) with
+        {
+            TabOpenDelayMilliseconds = 125,
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => CatapultWavePlanner.BuildPlan(request));
+
+        Assert.Contains("tab delay", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void ValidateAvailability_UsesFirstPlusWaveTimesWaveCount()
     {

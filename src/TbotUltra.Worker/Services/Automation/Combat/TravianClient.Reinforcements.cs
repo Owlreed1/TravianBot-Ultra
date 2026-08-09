@@ -382,18 +382,12 @@ public sealed partial class TravianClient
         return await _page.EvaluateAsync<bool>(
             """
             () => {
-              const normalize = (value) => (value || '').replace(/\s+/g, ' ').trim().toLowerCase();
-              const radioButtons = Array.from(document.querySelectorAll('input[type="radio"][name="eventType"]'));
-              const radio = radioButtons.find(node => {
-                const value = (node.getAttribute('value') || '').trim();
-                const label = normalize(node.parentElement?.textContent || node.closest('label')?.textContent || '');
-                return value === '5' || label.includes('reinforcement') || label.includes('support');
-              });
+              const radio = document.querySelector('input[type="radio"][name="eventType"][value="5"]');
               if (!radio) return false;
               radio.checked = true;
               radio.dispatchEvent(new Event('input', { bubbles: true }));
               radio.dispatchEvent(new Event('change', { bubbles: true }));
-              return true;
+              return radio.checked;
             }
             """);
     }

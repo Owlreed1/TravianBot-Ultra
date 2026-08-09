@@ -109,7 +109,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   timer, while disabling a scheduled sleep resumes the captured automation state.
 - Known queue deadlines are authoritative and may not be shortened by pacing.
 - Action pacing is mandatory. Persisted configuration and incoming payloads may change its delay ranges but may
-  not disable it.
+  not disable it. The manual Catapult wave tab burst is the only exception: it uses only its explicitly selected
+  50–500 ms tab delay between clicks and does not apply general human/action pacing while filling its form.
 - Proxy settings are account-scoped. Browser, HTTP client, tests, and bonus video use the same effective route.
   Never log credentials or place them in user-visible URLs.
 - Retry only transient failures with bounded attempts. Apply configured pacing; do not add unbounded sleeps.

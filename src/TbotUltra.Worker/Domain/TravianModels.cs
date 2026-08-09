@@ -414,7 +414,8 @@ public sealed record CatapultWaveRequest(
     IReadOnlyDictionary<string, int> FirstAttackTroops,
     IReadOnlyDictionary<string, int> WaveTroops,
     string? Target1,
-    string? Target2);
+    string? Target2,
+    int TabOpenDelayMilliseconds = 100);
 
 public sealed record CatapultWaveSetupInfo(
     IReadOnlyDictionary<string, long> AvailableTroops,

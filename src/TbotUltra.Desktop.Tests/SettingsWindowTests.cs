@@ -1,5 +1,7 @@
 using System.Text.Json.Nodes;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Services;
 using Xunit;
@@ -66,6 +68,161 @@ public sealed class SettingsWindowTests : IDisposable
             Assert.NotNull(window.FindName("AllowGoldSpendingCheckBox"));
             window.Close();
         });
+    }
+
+    [Fact]
+    public void OpeningWithPersistedRiskyValues_DoesNotShowUserConfirmationDialogs()
+    {
+        _wpf.Run(() =>
+        {
+            var store = CreateStore(new JsonObject
+            {
+                [BotOptionPayloadKeys.DetailedBrowserLoggingEnabled] = true,
+                [BotOptionPayloadKeys.SessionPacingDailyMaxHours] = 14,
+            });
+            var shownTitles = new List<string>();
+            using var dialogCloser = CaptureDialogs(shownTitles);
+            var window = new SettingsWindow(store);
+            try
+            {
+                ShowWindowForTest(window);
+                DrainDispatcher();
+
+                Assert.Empty(shownTitles);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void OpeningWithPersistedRiskyValues_DoesNotShowDelayedConfirmationDialogs()
+    {
+        _wpf.Run(() =>
+        {
+            var store = CreateStore(new JsonObject
+            {
+                [BotOptionPayloadKeys.DetailedBrowserLoggingEnabled] = true,
+                [BotOptionPayloadKeys.SessionPacingDailyMaxHours] = 14,
+            });
+            var shownTitles = new List<string>();
+            using var dialogCloser = CaptureDialogs(shownTitles);
+            var window = new SettingsWindow(store);
+            try
+            {
+                ShowWindowForTest(window);
+                PumpDispatcherFor(TimeSpan.FromMilliseconds(250));
+
+                Assert.Empty(shownTitles);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void UserChangesToRiskyValues_ShowTheirRespectiveConfirmationDialogs()
+    {
+        _wpf.Run(() =>
+        {
+            var store = CreateStore(new JsonObject
+            {
+                [BotOptionPayloadKeys.DetailedBrowserLoggingEnabled] = false,
+                [BotOptionPayloadKeys.SessionPacingDailyMaxHours] = 1,
+            });
+            var shownTitles = new List<string>();
+            using var dialogCloser = CaptureDialogs(shownTitles);
+            var window = new SettingsWindow(store);
+            try
+            {
+                ShowWindowForTest(window);
+                DrainDispatcher();
+                Assert.Empty(shownTitles);
+
+                var dailyMaxHours = Assert.IsType<ComboBox>(window.FindName("SessionDailyMaxHoursComboBox"));
+                dailyMaxHours.SelectedItem = dailyMaxHours.Items
+                    .OfType<ComboBoxItem>()
+                    .Single(item => Equals(item.Tag, "14"));
+                DrainDispatcher();
+
+                dailyMaxHours.SelectedItem = dailyMaxHours.Items
+                    .OfType<ComboBoxItem>()
+                    .Single(item => Equals(item.Tag, "0"));
+                DrainDispatcher();
+
+                Assert.IsType<CheckBox>(window.FindName("DetailedBrowserLoggingCheckBox")).IsChecked = true;
+                DrainDispatcher();
+
+                Assert.Equal(2, shownTitles.Count(title => title == "Daily runtime warning"));
+                Assert.Contains("Enable detailed browser logging?", shownTitles);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    private BotConfigStore CreateStore(JsonObject config)
+    {
+        Directory.CreateDirectory(_root);
+        var configPath = Path.Combine(_root, "bot.json");
+        var store = new BotConfigStore(configPath, _root, () => string.Empty);
+        store.Save(config);
+        return store;
+    }
+
+    private static IDisposable CaptureDialogs(ICollection<string> shownTitles)
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
+        timer.Tick += (_, _) =>
+        {
+            foreach (var dialog in Application.Current.Windows.OfType<AppDialog>().ToList())
+            {
+                shownTitles.Add(dialog.Title);
+                dialog.Close();
+            }
+        };
+        timer.Start();
+        return new DisposableAction(timer.Stop);
+    }
+
+    private static void DrainDispatcher()
+    {
+        var frame = new DispatcherFrame();
+        Dispatcher.CurrentDispatcher.BeginInvoke(
+            DispatcherPriority.ApplicationIdle,
+            new Action(() => frame.Continue = false));
+        Dispatcher.PushFrame(frame);
+    }
+
+    private static void ShowWindowForTest(Window window)
+    {
+        window.ShowInTaskbar = false;
+        window.Opacity = 0;
+        window.Show();
+    }
+
+    private static void PumpDispatcherFor(TimeSpan duration)
+    {
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer { Interval = duration };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            frame.Continue = false;
+        };
+        timer.Start();
+        Dispatcher.PushFrame(frame);
+    }
+
+    private sealed class DisposableAction(Action dispose) : IDisposable
+    {
+        public void Dispose() => dispose();
     }
 
     public void Dispose()

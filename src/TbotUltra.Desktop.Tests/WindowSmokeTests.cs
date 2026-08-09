@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Desktop.Views;
@@ -179,6 +180,75 @@ public sealed class WindowSmokeTests
     }
 
     [Fact]
+    public void CatapultClearButton_ResetsTroopAmountsToZero()
+    {
+        _wpf.Run(() =>
+        {
+            var window = new CatapultWaveWindow(
+                "Romans",
+                new Dictionary<string, long> { ["Legionnaire"] = 100 });
+            try
+            {
+                var firstAttackGrid = Assert.IsType<Grid>(window.FindName("FirstAttackTroopsGrid"));
+                var wavesGrid = Assert.IsType<Grid>(window.FindName("WaveTroopsGrid"));
+                AssertSoftButtonColors(Assert.IsType<Button>(window.FindName("SwitchVillageButton")), "SuccessBgBrush", "SuccessBorderBrush", "SuccessTextBrush");
+                AssertSoftButtonColors(Assert.IsType<Button>(window.FindName("StartButton")), "SuccessBgBrush", "SuccessBorderBrush", "SuccessTextBrush");
+                AssertSoftButtonColors(Assert.IsType<Button>(window.FindName("ClearButton")), "AmberBg200Brush", "WarningBorderBrush", "WarningText2Brush");
+                var tabDelay = Assert.IsType<ComboBox>(window.FindName("TabOpenDelayComboBox"));
+                Assert.Equal(["50 ms", "100 ms", "200 ms", "300 ms", "500 ms"], tabDelay.Items.OfType<ComboBoxItem>().Select(item => item.Content));
+                Assert.Equal("100 ms", Assert.IsType<ComboBoxItem>(tabDelay.SelectedItem).Content);
+                var troopInputs = firstAttackGrid.Children.OfType<TextBox>()
+                    .Concat(wavesGrid.Children.OfType<TextBox>())
+                    .ToArray();
+                Assert.NotEmpty(troopInputs);
+
+                foreach (var input in troopInputs)
+                {
+                    input.Text = "17";
+                }
+
+                Assert.IsType<Button>(window.FindName("ClearButton"))
+                    .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+                Assert.All(troopInputs, input => Assert.Equal("0", input.Text));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void CatapultFirstAttackTargetPickers_UseTheCurrentTribeBuildingCatalog()
+    {
+        _wpf.Run(() =>
+        {
+            var window = new CatapultWaveWindow("Romans");
+            try
+            {
+                var firstTarget = Assert.IsType<ComboBox>(window.FindName("FirstAttackTarget1ComboBox"));
+                var secondTarget = Assert.IsType<ComboBox>(window.FindName("FirstAttackTarget2ComboBox"));
+                var firstRandom = Assert.IsType<RadioButton>(window.FindName("FirstAttackTarget1RandomRadioButton"));
+
+                Assert.Contains("Main Building", firstTarget.Items.OfType<string>());
+                Assert.Equal(firstTarget.Items.OfType<string>(), secondTarget.Items.OfType<string>());
+                Assert.True(firstRandom.IsChecked);
+
+                firstTarget.SelectedItem = "Main Building";
+                Assert.False(firstRandom.IsChecked);
+
+                firstRandom.IsChecked = true;
+                Assert.Null(firstTarget.SelectedItem);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void VillageSettingsWindow_HidesTribeColumnWhenEveryVillageSharesOneTribe()
     {
         AssertTribeColumnVisibility(
@@ -229,6 +299,13 @@ public sealed class WindowSmokeTests
                 window.Close();
             }
         });
+    }
+
+    private static void AssertSoftButtonColors(Button button, string backgroundKey, string borderKey, string foregroundKey)
+    {
+        Assert.Equal(ThemeColors.Get(backgroundKey), Assert.IsType<SolidColorBrush>(button.Background).Color);
+        Assert.Equal(ThemeColors.Get(borderKey), Assert.IsType<SolidColorBrush>(button.BorderBrush).Color);
+        Assert.Equal(ThemeColors.Get(foregroundKey), Assert.IsType<SolidColorBrush>(button.Foreground).Color);
     }
 
     private static VillageSettingsRow BuildRow(string name, string tribe) => new()

@@ -38,6 +38,7 @@ public partial class SettingsWindow : Window
     private readonly Action? _resetDailyGoldSpending;
     private readonly Action? _resetDailySilverSpending;
     private bool _suppressDetailedBrowserLoggingConfirmation;
+    private bool _suppressInitialConfirmationDialogs = true;
     private string _initialTownHallFingerprint = string.Empty;
     private readonly Func<DateTimeOffset>? _villageStatusSweepNextScanProvider;
     private readonly Func<DateTimeOffset>? _continuousKeepAliveNextReloadProvider;
@@ -112,6 +113,7 @@ public partial class SettingsWindow : Window
         UpdateNewAccountAnalysisStatus();
         SettingsCategoryTabControl.SelectedIndex = (int)initialCategory;
         _initialTownHallFingerprint = BuildTownHallFingerprint();
+        ContentRendered += (_, _) => _suppressInitialConfirmationDialogs = false;
         _villageStatusSweepTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _villageStatusSweepTimer.Tick += (_, _) =>
         {
@@ -1164,7 +1166,8 @@ public partial class SettingsWindow : Window
 
     private void DetailedBrowserLoggingCheckBox_Changed(object sender, RoutedEventArgs e)
     {
-        if (_suppressDetailedBrowserLoggingConfirmation
+        if (_suppressInitialConfirmationDialogs
+            || _suppressDetailedBrowserLoggingConfirmation
             || DetailedBrowserLoggingCheckBox.IsChecked != true)
         {
             return;
@@ -1471,7 +1474,7 @@ public partial class SettingsWindow : Window
     {
         _ = sender;
         _ = e;
-        if (!IsLoaded)
+        if (_suppressInitialConfirmationDialogs || !IsLoaded)
         {
             return;
         }

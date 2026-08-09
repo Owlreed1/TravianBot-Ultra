@@ -61,6 +61,11 @@ internal static class CatapultWavePlanner
             throw new InvalidOperationException($"Wave count cannot be greater than {CatapultWaveLimits.MaxWaveCount}.");
         }
 
+        if (request.TabOpenDelayMilliseconds is not (50 or 100 or 200 or 300 or 500))
+        {
+            throw new InvalidOperationException("Catapult tab delay must be 50, 100, 200, 300, or 500 ms.");
+        }
+
         var firstTroops = NormalizeTroopSet(request.FirstAttackTroops);
         var waveTroops = NormalizeTroopSet(request.WaveTroops);
         if (firstTroops.Count == 0)

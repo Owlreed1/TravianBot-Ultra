@@ -4,6 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using TbotUltra.Core.Configuration;
+using TbotUltra.Desktop.Models;
+using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Desktop;
 
@@ -30,52 +32,94 @@ public partial class MainWindow
         var operationSw = Stopwatch.StartNew();
         var operationToken = _loopController.StartOperation("operation");
         SetFarmingFunctionRunning(true);
+        BusyOverlay.ShowCancel = true;
+        ShowBusyOverlay("Catapult waves", "Reading troops from Rally Point...");
         try
         {
-            var options = ApplySelectedVillageToOptions(LoadBotOptions());
             await EnsureChromiumInstalledAsync();
             SetCatapultWavesStatus("Reading troops from Rally Point...");
 
-            // Open the window immediately; it shows its own busy overlay and loads the troops via
-            // InitialLoadRequested, so the popup never appears empty while the Rally Point is read.
-            var dialog = new CatapultWaveWindow(ResolveCurrentTribeForFarming())
+            var villages = (VillageComboBox.ItemsSource as IEnumerable<VillageSelectionItem> ?? [])
+                .Where(village => !string.IsNullOrWhiteSpace(village.Name) && village.Name != "-")
+                .ToList();
+            var activeVillage = VillageComboBox.SelectedItem as VillageSelectionItem
+                ?? villages.FirstOrDefault(village => string.Equals(
+                    GetVillageKey(village), _activeWorkingVillageKey, StringComparison.OrdinalIgnoreCase));
+
+            async Task<CatapultWaveSetupInfo> ReadSetupAsync(
+                BotOptions options,
+                bool forceRefresh,
+                Action<string> status,
+                CancellationToken token)
+            {
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(operationToken, token);
+                return await _botService.ReadCatapultWaveSetupInfoAsync(
+                    options,
+                    message =>
+                    {
+                        AppendLog(message);
+                        status(message);
+                    },
+                    forceRefresh,
+                    linkedCts.Token);
+            }
+
+            var initialSetupInfo = await ReadSetupAsync(
+                ApplySelectedVillageToOptions(LoadBotOptions()),
+                forceRefresh: false,
+                status => BusyOverlay.Text = status,
+                operationToken);
+            SetCatapultWavesStatus("Troops loaded from Rally Point.");
+            HideBusyOverlay();
+
+            var dialog = new CatapultWaveWindow(
+                ResolveCurrentTribeForFarming(),
+                availableTroops: initialSetupInfo.AvailableTroops,
+                rallyPointLevel: initialSetupInfo.RallyPointLevel,
+                villages: villages,
+                activeVillage: activeVillage)
             {
                 Owner = this,
-                InitialLoadRequested = async (status, token) =>
-                {
-                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(operationToken, token);
-                    var initialSetupInfo = await _botService.ReadCatapultWaveSetupInfoAsync(
-                        options,
-                        message =>
-                        {
-                            AppendLog(message);
-                            status(message);
-                        },
-                        forceRefresh: false,
-                        linkedCts.Token);
-                    SetCatapultWavesStatus("Troops loaded from Rally Point.");
-                    return initialSetupInfo;
-                },
                 RefreshRequested = async (status, token) =>
                 {
-                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(operationToken, token);
                     status("Refreshing troops from Rally Point...");
                     SetCatapultWavesStatus("Refreshing troops from Rally Point...");
-                    var refreshedSetupInfo = await _botService.ReadCatapultWaveSetupInfoAsync(
-                        options,
-                        message =>
-                        {
-                            AppendLog(message);
-                            status(message);
-                        },
+                    var refreshedSetupInfo = await ReadSetupAsync(
+                        ApplySelectedVillageToOptions(LoadBotOptions()),
                         forceRefresh: true,
-                        linkedCts.Token);
+                        status,
+                        token);
                     SetCatapultWavesStatus("Troops refreshed from Rally Point.");
                     return refreshedSetupInfo;
+                },
+                SwitchVillageRequested = async (selected, status, token) =>
+                {
+                    VillageComboBox.SelectedItem = selected;
+                    status($"Switching to {selected.DisplayName}…");
+                    var options = BotOptionsPayloadApplier.Apply(LoadBotOptions(), BuildVillageRuntimePayload(selected));
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(operationToken, token);
+                    var villageStatus = await ReadVillageStatusWithRetryAsync(
+                        options,
+                        linkedCts.Token,
+                        resourceOnly: false,
+                        forceCurrentVillage: true);
+                    var expectedVillageKey = GetVillageKey(selected);
+                    var actualVillageKey = ResolveStatusVillageKey(villageStatus);
+                    if (!string.Equals(actualVillageKey, expectedVillageKey, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException(
+                            $"Browser stayed on '{villageStatus.ActiveVillage}' instead of '{selected.DisplayName}'.");
+                    }
+
+                    SetActiveWorkingVillageFromStatus(villageStatus);
+                    CacheVillageStatus(villageStatus);
+                    status("Opening Send Troops and reading troops…");
+                    return await ReadSetupAsync(options, forceRefresh: true, status, token);
                 },
                 StartRequested = async (request, status, token) =>
                 {
                     using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(operationToken, token);
+                    var options = ApplySelectedVillageToOptions(LoadBotOptions());
                     status("Preparing catapult waves...");
                     SetCatapultWavesStatus("Preparing catapult waves...");
                     var result = await _botService.StartCatapultWavesAsync(
@@ -116,6 +160,8 @@ public partial class MainWindow
         }
         finally
         {
+            HideBusyOverlay();
+            BusyOverlay.ShowCancel = false;
             SetFarmingFunctionRunning(false);
             DisposeOperationCts();
         }

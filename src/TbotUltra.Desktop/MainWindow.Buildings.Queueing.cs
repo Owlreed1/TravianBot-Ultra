@@ -792,6 +792,7 @@ public partial class MainWindow
             }
 
             if (IsDemolishQueueItemForSelectedVillage(item)
+                && DemolitionDisplayState.IsTracked(item)
                 && item.Payload.TryGetValue(BotOptionPayloadKeys.TargetBuildingSlotOrName, out var demolishSlotText)
                 && int.TryParse(demolishSlotText, out var demolishSlotId))
             {
