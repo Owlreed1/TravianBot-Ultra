@@ -13,6 +13,9 @@ public partial class MainWindow
 {
     private readonly Dictionary<string, double> _queueEstimateSecondsByVillage =
         new(StringComparer.OrdinalIgnoreCase);
+    // The Queue tab is the authoritative estimate projection. Village Settings reads these same rows
+    // so its per-village totals cannot drift from the Queue tab after a cache or selection change.
+    private readonly Dictionary<Guid, QueueItemRow> _queueEstimateRowsById = [];
 
     private string BuildQueueDisplayName(QueueItem item)
     {
@@ -63,6 +66,11 @@ public partial class MainWindow
 
             _queueServerTimeOffset = ResolveQueueServerTimeOffset();
             var rows = BuildQueueEstimateRows(ordered);
+            _queueEstimateRowsById.Clear();
+            foreach (var row in rows)
+            {
+                _queueEstimateRowsById[row.Id] = row;
+            }
             var activeRows = rows
                 .Where(row =>
                     row.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused
@@ -188,6 +196,25 @@ public partial class MainWindow
                 ApplyDashboardQueueTooltip(village);
             }
         }
+
+        UpdateBuildingsQueueDuration();
+    }
+
+    private void UpdateBuildingsQueueDuration()
+    {
+        var villageKey = GetSelectedVillageKey()
+            ?? NormalizeVillageName(GetSelectedVillageName());
+        if (villageKey is not null
+            && _queueEstimateSecondsByVillage.TryGetValue(villageKey, out var seconds)
+            && seconds > 0)
+        {
+            _buildingsViewModel.ApplyQueueDuration(
+                FormatBuildDuration(seconds),
+                FormatBuildDuration(seconds * 0.75));
+            return;
+        }
+
+        _buildingsViewModel.ApplyQueueDuration("0h", "0h");
     }
 
     private void ApplyDashboardQueueTooltip(VillageSelectionItem village)

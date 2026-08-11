@@ -628,6 +628,7 @@ public partial class MainWindow : Window
         _troopTrainingViewModel.CheckCelebrationRequested += () => _ = RunTroopTrainingStatusRefreshAsync(OnCheckCelebrationClickedAsync);
         _buildingsViewModel.LoadRequested += () => _ = GuardUiAsync(OnLoadBuildingsClicked);
         _buildingsViewModel.UpgradeAllToMaxRequested += OnUpgradeAllBuildingsToMaxClicked;
+        _buildingsViewModel.OpenQueueRequested += OpenQueueFromBuildings;
         _buildingsViewModel.TemplatesRequested += OnBuildingTemplatesClicked;
         _buildingsViewModel.ShowSlotsRequested += OnShowBuildingSlotsClicked;
         _buildingsViewModel.DemolishOverviewRequested += OnDemolishOverviewClicked;

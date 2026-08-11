@@ -79,6 +79,15 @@ public partial class MainWindow
         UpdateSidebarSelection(button);
     }
 
+    private void OpenQueueFromBuildings()
+    {
+        MainTabControl.SelectedItem = QueueTabItem;
+        UpdateBuildQueueStatusText();
+        RefreshTravianBuildQueueUi();
+        RefreshTravianSmithyQueueUi();
+        UpdateSidebarSelection(QueueNavButton);
+    }
+
     private void UpdateSidebarSelection(Button selectedButton)
     {
         var navButtons = new[]

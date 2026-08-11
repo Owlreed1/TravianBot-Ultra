@@ -10,6 +10,31 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class BuildingsViewModelTests
 {
     [Fact]
+    public void ApplyQueueDuration_UpdatesNormalAndConstructFasterTimes()
+    {
+        var vm = new BuildingsViewModel();
+
+        vm.ApplyQueueDuration("5d 11h", "4d 2h");
+
+        Assert.Equal("5d 11h", vm.QueueTimeText);
+        Assert.Equal("4d 2h", vm.ConstructFasterQueueTimeText);
+    }
+
+    [Fact]
+    public void QueueDuration_DefaultsToZeroAndOpenCommandForwardsRequest()
+    {
+        var vm = new BuildingsViewModel();
+        var requested = false;
+        vm.OpenQueueRequested += () => requested = true;
+
+        vm.OpenQueueCommand.Execute(null);
+
+        Assert.Equal("0h", vm.QueueTimeText);
+        Assert.Equal("0h", vm.ConstructFasterQueueTimeText);
+        Assert.True(requested);
+    }
+
+    [Fact]
     public void QueueInteractionState_BlocksRapidDuplicateRequestsAndCanBeReset()
     {
         var vm = new BuildingsViewModel();

@@ -33,6 +33,7 @@ public partial class MainWindow
     private bool _showFarmListLastSentTimer = FarmingDefaults.ShowLastSentTimer;
     private bool _farmListLastSentLimitEnabled = FarmingDefaults.LastSentLimitEnabled;
     private int _farmListLastSentLimitHours = FarmingDefaults.DefaultLastSentLimitHours;
+    private bool _farmLossDestinationSelectionInProgress;
 
     // Farm lists whose last analysis read fewer target coordinates than the list claims to hold (e.g. an
     // expansion that did not finish). Their farms can be missed by the "don't add duplicates" check, so the
@@ -1458,12 +1459,7 @@ public partial class MainWindow
 
     private void SelectChangedFarmLossDestination(FarmLossDestinationChange change)
     {
-        if (FarmLossDestinationComboBox is null)
-        {
-            return;
-        }
-
-        var options = (FarmLossDestinationComboBox.ItemsSource as IEnumerable<FarmLossDestinationOption> ?? [])
+        var options = _farmListsViewModel.LossDestinations
             .Where(option => !string.Equals(option.ListId, change.ListId, StringComparison.OrdinalIgnoreCase))
             .ToList();
         var selected = new FarmLossDestinationOption(change.ListId, change.ListName, change.VillageName, 0, 100);
@@ -1472,10 +1468,8 @@ public partial class MainWindow
         _suppressFarmingSettingsConfigWrite = true;
         try
         {
-            FarmLossDestinationComboBox.ItemsSource = options;
-            FarmLossDestinationComboBox.SelectedItem = selected;
-            MoveFarmLossesCheckBox.IsChecked = true;
-            SyncFarmLossMoveControls();
+            _farmListsViewModel.ReplaceLossDestinations(options, selected);
+            _farmListsViewModel.MoveLosses = true;
         }
         finally
         {
@@ -1511,27 +1505,8 @@ public partial class MainWindow
         }
     }
 
-    private void SyncFarmLossMoveControls()
-    {
-        var deactivationEnabled = DeactivateFarmLossesCheckBox?.IsChecked == true;
-        if (MoveFarmLossesCheckBox is not null)
-        {
-            MoveFarmLossesCheckBox.IsEnabled = deactivationEnabled;
-        }
-
-        if (FarmLossDestinationComboBox is not null)
-        {
-            FarmLossDestinationComboBox.IsEnabled = deactivationEnabled;
-        }
-    }
-
     private void RefreshFarmLossDestinationOptions(BotOptions? loadedOptions = null)
     {
-        if (FarmLossDestinationComboBox is null)
-        {
-            return;
-        }
-
         loadedOptions ??= LoadBotOptions();
         var options = _farmLists
             .Where(IsRealFarmListRow)
@@ -1562,98 +1537,170 @@ public partial class MainWindow
             options.Add(selected);
         }
 
-        FarmLossDestinationComboBox.ItemsSource = options;
-        FarmLossDestinationComboBox.SelectedItem = selected;
+        _farmListsViewModel.ReplaceLossDestinations(options, selected);
     }
-
-    private async void MoveFarmLossesCheckBox_Checked(object sender, RoutedEventArgs e)
-        => await GuardUiAsync(EnsureFarmLossDestinationSelectedAsync);
 
     private async Task EnsureFarmLossDestinationSelectedAsync()
     {
-        if (_suppressFarmingSettingsConfigWrite || MoveFarmLossesCheckBox?.IsChecked != true)
+        if (_suppressFarmingSettingsConfigWrite
+            || !_farmListsViewModel.MoveLosses
+            || _farmLossDestinationSelectionInProgress)
         {
             return;
         }
 
-        if (DeactivateFarmLossesCheckBox?.IsChecked != true)
+        if (!_farmListsViewModel.DeactivateLosses)
         {
-            MoveFarmLossesCheckBox.IsChecked = false;
+            _farmListsViewModel.MoveLosses = false;
             return;
         }
 
-        // The holding-list picker must expose every existing farmlist, including lists owned by other
-        // villages. A restored snapshot is intentionally not considered fresh, so analyze the Official
-        // farm page once before offering to create a new holding list.
-        if (!CanReuseRecentFarmListAnalysis(_lastFarmListsAnalysisAt, DateTimeOffset.UtcNow))
+        // A configured destination remains usable even when it is represented by the "Missing" placeholder.
+        // The Worker owns the overnight self-heal and recreates that list by its persisted base name.
+        if (_farmListsViewModel.SelectedLossDestination is not null)
         {
-            if (BlockIfSessionSleeping("Analyze farmlists"))
+            return;
+        }
+
+        if (BlockIfSessionSleeping("Choose loss farmlist"))
+        {
+            _farmListsViewModel.MoveLosses = false;
+            return;
+        }
+
+        var resumeContinuous = IsContinuousLoopRunning() || _startContinuousLoopAfterQueueStop;
+        var resumeQueue = !resumeContinuous && _autoQueueRunning;
+        var operationToken = _loopController.StartOperation("loss-farmlist-destination");
+        _farmLossDestinationSelectionInProgress = true;
+        BeginManualFunctionPacingPause();
+        BusyOverlay.ShowCancel = true;
+        ShowBusyOverlay("Choose loss farmlist", "Pausing automation after the current action...");
+        try
+        {
+            await PauseAutomationForFarmLossDestinationAsync(
+                resumeContinuous || resumeQueue,
+                operationToken);
+
+            BusyOverlay.Text = "Reading all existing farmlists...";
+            var options = ApplySelectedVillageToOptions(LoadBotOptions());
+            await EnsureChromiumInstalledAsync();
+            if (!await RefreshFarmListsFromServerAsync(options, operationToken))
             {
-                MoveFarmLossesCheckBox.IsChecked = false;
+                throw new InvalidOperationException("Gold Club is not active, so existing farmlists could not be loaded.");
+            }
+
+            AppendLog("[farm-list] read all existing farmlists before choosing a loss destination.");
+            HideBusyOverlay();
+
+            var existingNames = _farmLists.Where(IsRealFarmListRow).Select(row => row.Name).ToList();
+            var suggestedName = FarmLossListNaming.NextAvailable("Yellow farms", existingNames);
+            var existingDestinations = _farmListsViewModel.LossDestinations.ToList();
+            var dialog = new CreateLossFarmListWindow(suggestedName, existingDestinations) { Owner = this };
+            if (dialog.ShowDialog() != true)
+            {
+                _farmListsViewModel.MoveLosses = false;
+                AppendLog("[farm-list] loss destination selection canceled.");
                 return;
             }
 
-            BeginManualFunctionPacingPause();
-            try
+            if (dialog.SelectedExistingDestination is { } selectedDestination)
             {
-                ShowBusyOverlay("Analyze farmlists", "Reading all existing farmlists...");
-                var analysisOptions = ApplySelectedVillageToOptions(LoadBotOptions());
-                await EnsureChromiumInstalledAsync();
-                if (!await RefreshFarmListsFromServerAsync(analysisOptions, _loopController.AcquireSessionScopeToken()))
-                {
-                    MoveFarmLossesCheckBox.IsChecked = false;
-                    return;
-                }
-
-                AppendLog("[farm-list] analyzed all existing farmlists before choosing a loss destination.");
-            }
-            catch (OperationCanceledException)
-            {
-                MoveFarmLossesCheckBox.IsChecked = false;
-                AppendLog("[farm-list] loss destination analysis canceled.");
+                _farmListsViewModel.SelectedLossDestination = existingDestinations.FirstOrDefault(option =>
+                    string.Equals(option.ListId, selectedDestination.ListId, StringComparison.OrdinalIgnoreCase))
+                    ?? selectedDestination;
+                AppendLog($"[farm-list] selected '{selectedDestination.Name}' as the loss destination.");
                 return;
             }
-            catch (Exception ex)
-            {
-                MoveFarmLossesCheckBox.IsChecked = false;
-                AppendLog($"ALARM: Could not analyze farmlists for the loss destination picker: {ex.Message}");
-                AppDialog.Show(this, "Could not load existing farmlists. Try again before creating a new destination list.", "Analyze farmlists", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            finally
-            {
-                HideBusyOverlay();
-                EndManualFunctionPacingPause();
-            }
-        }
 
-        if (FarmLossDestinationComboBox?.SelectedItem is FarmLossDestinationOption)
+            await CreateAndSelectFarmLossDestinationAsync(options, dialog.ListName, operationToken);
+        }
+        catch (OperationCanceledException)
         {
-            FarmingSettings_Changed(MoveFarmLossesCheckBox, new RoutedEventArgs());
+            _farmListsViewModel.MoveLosses = false;
+            AppendLog("[farm-list] loss destination setup canceled.");
+        }
+        catch (Exception ex)
+        {
+            _farmListsViewModel.MoveLosses = false;
+            HideBusyOverlay();
+            AppendLog($"ALARM: Could not configure the loss farmlist: {ex.Message}");
+            AppDialog.Show(this, ex.Message, "Choose loss farmlist", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            HideBusyOverlay();
+            EndManualFunctionPacingPause();
+            DisposeOperationCts();
+            _farmLossDestinationSelectionInProgress = false;
+            await ResumeAutomationAfterFarmLossDestinationAsync(resumeContinuous, resumeQueue);
+        }
+    }
+
+    private async Task PauseAutomationForFarmLossDestinationAsync(
+        bool automationWasRunning,
+        CancellationToken cancellationToken)
+    {
+        if (!automationWasRunning)
+        {
+            AppendLog("[farm-list] bot already paused; starting loss destination setup.");
             return;
         }
 
-        var existingNames = _farmLists.Where(IsRealFarmListRow).Select(row => row.Name).ToList();
-        var suggestedName = FarmLossListNaming.NextAvailable("Yellow farms", existingNames);
-        var existingDestinations = (FarmLossDestinationComboBox?.ItemsSource as IEnumerable<FarmLossDestinationOption> ?? [])
-            .ToList();
-        var dialog = new CreateLossFarmListWindow(suggestedName, existingDestinations) { Owner = this };
-        if (dialog.ShowDialog() != true)
+        _startContinuousLoopAfterQueueStop = false;
+        _restartContinuousLoopAfterStop = false;
+        _loopController.RequestLoopStop();
+        _loopController.RequestQueueStop();
+        UpdateExecutionStateIndicator();
+        AppendLog("[farm-list] pause requested; waiting for the current bot action to finish.");
+
+        while (_autoQueueRunning || IsContinuousLoopRunning() || _uiBusy)
         {
-            MoveFarmLossesCheckBox.IsChecked = false;
+            cancellationToken.ThrowIfCancellationRequested();
+            await Task.Delay(Random.Shared.Next(150, 350), cancellationToken);
+        }
+
+        // Auto-queue clears its running flag immediately before releasing its execution gate.
+        // Give that finally block one UI-sized beat so a resume cannot race the old gate lease.
+        await Task.Delay(100, cancellationToken);
+        AppendLog("[farm-list] automation paused; loss destination setup has priority.");
+    }
+
+    private async Task ResumeAutomationAfterFarmLossDestinationAsync(
+        bool resumeContinuous,
+        bool resumeQueue)
+    {
+        if (!resumeContinuous && !resumeQueue)
+        {
             return;
         }
 
-        if (dialog.SelectedExistingDestination is { } selectedDestination)
+        _loopController.ClearLoopStopRequest();
+        _loopController.ClearQueueStopRequest();
+        if (_loopController.IsClosing || !_isLoggedIn || IsSessionSleeping || IsFreezeActive)
         {
-            FarmLossDestinationComboBox!.SelectedItem = existingDestinations.FirstOrDefault(option =>
-                string.Equals(option.ListId, selectedDestination.ListId, StringComparison.OrdinalIgnoreCase))
-                ?? selectedDestination;
-            FarmingSettings_Changed(MoveFarmLossesCheckBox, new RoutedEventArgs());
+            AppendLog("[farm-list] automation was not resumed because the session is unavailable.");
             return;
         }
 
-        var options = ApplySelectedVillageToOptions(LoadBotOptions());
+        if (resumeContinuous && !IsContinuousLoopRunning())
+        {
+            AppendLog("[farm-list] resuming continuous loop after loss destination setup.");
+            StartContinuousLoopRunner();
+            return;
+        }
+
+        if (resumeQueue && !_autoQueueRunning)
+        {
+            AppendLog("[farm-list] resuming queue auto-run after loss destination setup.");
+            await TriggerQueueAutoRunAsync();
+        }
+    }
+
+    private async Task CreateAndSelectFarmLossDestinationAsync(
+        BotOptions options,
+        string listName,
+        CancellationToken cancellationToken)
+    {
         var villages = GetFarmListCreationVillages();
         var village = villages.FirstOrDefault(item =>
                 !string.IsNullOrWhiteSpace(options.TargetVillageUrl)
@@ -1665,92 +1712,66 @@ public partial class MainWindow
             ?? villages.FirstOrDefault();
         if (village is null)
         {
-            MoveFarmLossesCheckBox.IsChecked = false;
-            AppDialog.Show(this, "Load at least one village before creating a loss farmlist.", "Create loss farmlist", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            throw new InvalidOperationException("Load at least one village before creating a loss farmlist.");
         }
 
         var tribe = TroopCatalog.IsKnownTribe(village.Tribe) ? village.Tribe : ResolveCurrentTribeForFarming();
         var troopType = TroopCatalog.ResolveTroopTypesForTribe(tribe).FirstOrDefault();
         if (string.IsNullOrWhiteSpace(troopType))
         {
-            MoveFarmLossesCheckBox.IsChecked = false;
-            AppDialog.Show(this, "Could not resolve a default troop type for the selected village.", "Create loss farmlist", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            throw new InvalidOperationException("Could not resolve a default troop type for the selected village.");
         }
 
         var villageIdMatch = Regex.Match(village.Url ?? string.Empty, @"[?&]newdid=(\d+)", RegexOptions.IgnoreCase);
         var request = new FarmListCreateRequest(
-            [dialog.ListName],
+            [listName],
             village.Name,
             villageIdMatch.Success ? villageIdMatch.Groups[1].Value : null,
             troopType,
             1);
 
-        try
+        BusyOverlay.ShowCancel = true;
+        ShowBusyOverlay("Creating loss farmlist", $"Creating '{listName}'...");
+        await EnsureChromiumInstalledAsync();
+        var createResult = await _farmingPanelService.CreateListsAsync(
+            options,
+            request,
+            AppendLog,
+            null,
+            cancellationToken);
+        if (createResult.CreatedCount != 1
+            || !createResult.CreatedNames.Contains(listName, StringComparer.OrdinalIgnoreCase))
         {
-            ShowBusyOverlay("Creating loss farmlist", $"Creating '{dialog.ListName}'...");
-            await EnsureChromiumInstalledAsync();
-            var createResult = await _farmingPanelService.CreateListsAsync(
-                options,
-                request,
-                AppendLog,
-                null,
-                _loopController.AcquireSessionScopeToken());
-            if (createResult.CreatedCount != 1
-                || !createResult.CreatedNames.Contains(dialog.ListName, StringComparer.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Travian did not confirm creation of farmlist '{listName}'.");
+        }
+
+        await RefreshFarmListsFromServerAsync(options, cancellationToken);
+        var created = _farmListsViewModel.LossDestinations
+            .FirstOrDefault(item => string.Equals(item.Name, listName, StringComparison.OrdinalIgnoreCase));
+        if (created is null)
+        {
+            // The panel limits displayed rows, so verify the complete overview before reporting failure.
+            var verifiedLists = await _farmingPanelService.ReadOverviewAsync(options, AppendLog, cancellationToken);
+            var verified = verifiedLists.FirstOrDefault(item =>
+                string.Equals(item.Name, listName, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.VillageName, village.Name, StringComparison.OrdinalIgnoreCase));
+            if (verified is null || string.IsNullOrWhiteSpace(verified.ListId))
             {
-                throw new InvalidOperationException($"Travian did not confirm creation of farmlist '{dialog.ListName}'.");
+                throw new InvalidOperationException($"Created farmlist '{listName}' could not be verified after refresh.");
             }
 
-            await RefreshFarmListsFromServerAsync(options, _loopController.AcquireSessionScopeToken());
-            var destinationOptions = (FarmLossDestinationComboBox!.ItemsSource as IEnumerable<FarmLossDestinationOption> ?? [])
-                .ToList();
-            var created = destinationOptions
-                .FirstOrDefault(item => string.Equals(item.Name, dialog.ListName, StringComparison.OrdinalIgnoreCase));
-            if (created is null)
-            {
-                // The panel intentionally limits displayed rows, but a holding list created beyond that
-                // limit is still valid. Read the complete overview to obtain its stable lid, then add
-                // just this destination to the picker instead of reporting a false creation failure.
-                var verifiedLists = await _farmingPanelService.ReadOverviewAsync(
-                    options,
-                    AppendLog,
-                    _loopController.AcquireSessionScopeToken());
-                var verified = verifiedLists.FirstOrDefault(item =>
-                    string.Equals(item.Name, dialog.ListName, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(item.VillageName, village.Name, StringComparison.OrdinalIgnoreCase));
-                if (verified is null || string.IsNullOrWhiteSpace(verified.ListId))
-                {
-                    throw new InvalidOperationException($"Created farmlist '{dialog.ListName}' could not be verified after refresh.");
-                }
+            created = new FarmLossDestinationOption(
+                verified.ListId.Trim(),
+                verified.Name.Trim(),
+                verified.VillageName?.Trim() ?? village.Name,
+                Math.Max(0, verified.TotalFarmCount),
+                verified.Capacity is > 0 ? verified.Capacity.Value : 100);
+            _farmListsViewModel.LossDestinations.Add(created);
+        }
 
-                created = new FarmLossDestinationOption(
-                    verified.ListId.Trim(),
-                    verified.Name.Trim(),
-                    verified.VillageName?.Trim() ?? village.Name,
-                    Math.Max(0, verified.TotalFarmCount),
-                    verified.Capacity is > 0 ? verified.Capacity.Value : 100);
-                destinationOptions.Add(created);
-                FarmLossDestinationComboBox.ItemsSource = destinationOptions;
-            }
-
-            FarmLossDestinationComboBox.SelectedItem = created;
-            var config = _botConfigStore.Load();
-            config[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] = dialog.ListName;
-            _botConfigStore.Save(config);
-            FarmingSettings_Changed(MoveFarmLossesCheckBox, new RoutedEventArgs());
-        }
-        catch (Exception ex)
-        {
-            MoveFarmLossesCheckBox.IsChecked = false;
-            AppendLog($"ALARM: Could not create loss farmlist: {ex.Message}");
-            AppDialog.Show(this, ex.Message, "Create loss farmlist", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-        finally
-        {
-            HideBusyOverlay();
-        }
+        _farmingPanelService.SaveDestinationBaseName(listName);
+        _farmListsViewModel.SelectedLossDestination = created;
+        AppendLog($"[farm-list] created and selected '{created.Name}' as the loss destination.");
     }
 
     private void SelectFarmDispatchDelayMinMinutes(int minutes)

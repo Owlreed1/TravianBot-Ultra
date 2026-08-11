@@ -149,6 +149,32 @@
                         BorderBrush="{DynamicResource WarningBorderBrush}"
                         ToolTip="Queues upgrades for all buildings until each one reaches its maximum level."
                         Command="{Binding UpgradeAllToMaxCommand}" />
+                <Button Height="28"
+                        Margin="8,0,0,0"
+                        Padding="9,0"
+                        Background="{DynamicResource SurfaceAltBrush}"
+                        Foreground="{DynamicResource TextPrimaryBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        Command="{Binding OpenQueueCommand}"
+                        ToolTip="Open the selected village's queue. The time in parentheses includes the 25% construct-faster bonus.">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Queue: "
+                                   Foreground="{DynamicResource TextSubtleBrush}"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding QueueTimeText}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text=" ("
+                                   Foreground="{DynamicResource ConstructFasterTextBrush}"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding ConstructFasterQueueTimeText}"
+                                   Foreground="{DynamicResource ConstructFasterTextBrush}"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text=")"
+                                   Foreground="{DynamicResource ConstructFasterTextBrush}"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
 
             <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">

@@ -81,8 +81,12 @@ public partial class MainWindow
     private Dictionary<string, double> BuildConstructionQueueSecondsByVillage(IReadOnlyList<PipelineTaskSource> tasks)
     {
         var secondsByVillage = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-        var rowsById = BuildQueueEstimateRows(tasks.Select(source => source.Item).ToList())
-            .ToDictionary(row => row.Id);
+        // Reuse the exact rows currently rendered by the Queue tab. Rebuilding estimates here can use a
+        // different village cache snapshot than the tab and produce a different total for the same queue.
+        var rowsById = tasks.All(source => _queueEstimateRowsById.ContainsKey(source.Item.Id))
+            ? _queueEstimateRowsById
+            : BuildQueueEstimateRows(tasks.Select(source => source.Item).ToList())
+                .ToDictionary(row => row.Id);
         foreach (var source in tasks)
         {
             if (!rowsById.TryGetValue(source.Item.Id, out var row)

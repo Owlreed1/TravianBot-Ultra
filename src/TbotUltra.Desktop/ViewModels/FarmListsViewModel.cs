@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Input;
 using TbotUltra.Desktop.Common;
@@ -194,6 +195,24 @@ public sealed class FarmListsViewModel : BaseViewModel
                 OnSettingsChanged();
             }
         }
+    }
+
+    /// <summary>
+    /// Replaces server-derived destination options without treating the refresh as a user setting change.
+    /// The collection instance remains stable for the panel binding.
+    /// </summary>
+    public void ReplaceLossDestinations(
+        IEnumerable<FarmLossDestinationOption> destinations,
+        FarmLossDestinationOption? selectedDestination)
+    {
+        using var suppress = SuppressSettingsNotifications();
+        LossDestinations.Clear();
+        foreach (var destination in destinations)
+        {
+            LossDestinations.Add(destination);
+        }
+
+        SelectedLossDestination = selectedDestination;
     }
 
     public void LoadSettings(

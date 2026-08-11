@@ -169,4 +169,49 @@ public sealed class FarmListsViewModelTests
         Assert.True(vm.SendAllLists);
         Assert.Equal("10", vm.DispatchDelayMinMinutes);
     }
+
+    [Fact]
+    public void MoveLosses_UserEnableRequestsDestinationSetup_InitialLoadDoesNot()
+    {
+        var vm = new FarmListsViewModel();
+        var requests = 0;
+        vm.MoveLossesEnabledRequested += () => requests++;
+
+        vm.LoadSettings(
+            sendAllLists: false,
+            dispatchDelayMinMinutes: 15,
+            dispatchDelayMaxMinutes: 30,
+            deactivateLosses: true,
+            deactivateOasisLosses: false,
+            moveLosses: true);
+
+        Assert.Equal(0, requests);
+
+        vm.MoveLosses = false;
+        vm.MoveLosses = true;
+
+        Assert.Equal(1, requests);
+    }
+
+    [Fact]
+    public void ReplaceLossDestinations_KeepsCollectionBindingStable_WithoutSavingSettings()
+    {
+        var vm = new FarmListsViewModel();
+        var collection = vm.LossDestinations;
+        var changes = 0;
+        vm.SettingsChanged += () => changes++;
+        var selected = new FarmLossDestinationOption("42", "yellow", "Capital", 3, 100);
+
+        vm.ReplaceLossDestinations(
+            [
+                new FarmLossDestinationOption("41", "raiders", "Capital", 10, 100),
+                selected,
+            ],
+            selected);
+
+        Assert.Same(collection, vm.LossDestinations);
+        Assert.Equal(2, vm.LossDestinations.Count);
+        Assert.Same(selected, vm.SelectedLossDestination);
+        Assert.Equal(0, changes);
+    }
 }

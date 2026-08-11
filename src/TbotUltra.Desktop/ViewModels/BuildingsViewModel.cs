@@ -19,6 +19,7 @@ public sealed class BuildingsViewModel : BaseViewModel
 {
     private readonly RelayCommand _loadCommand;
     private readonly RelayCommand _upgradeAllToMaxCommand;
+    private readonly RelayCommand _openQueueCommand;
     private readonly RelayCommand _templatesCommand;
     private readonly RelayCommand _showSlotsCommand;
     private readonly RelayCommand _demolishOverviewCommand;
@@ -29,11 +30,14 @@ public sealed class BuildingsViewModel : BaseViewModel
     private readonly Dictionary<int, (string Name, int Gid, DateTimeOffset At)> _lastQueuedConstructBySlot = new();
     private string _demolishStatusText = "No demolition queued for this village.";
     private bool _demolishStatusHasTimer;
+    private string _queueTimeText = "0h";
+    private string _constructFasterQueueTimeText = "0h";
 
     public BuildingsViewModel()
     {
         _loadCommand = new RelayCommand(() => LoadRequested?.Invoke());
         _upgradeAllToMaxCommand = new RelayCommand(() => UpgradeAllToMaxRequested?.Invoke());
+        _openQueueCommand = new RelayCommand(() => OpenQueueRequested?.Invoke());
         _templatesCommand = new RelayCommand(() => TemplatesRequested?.Invoke());
         _showSlotsCommand = new RelayCommand(() => ShowSlotsRequested?.Invoke());
         _demolishOverviewCommand = new RelayCommand(() => DemolishOverviewRequested?.Invoke());
@@ -43,6 +47,7 @@ public sealed class BuildingsViewModel : BaseViewModel
 
     public ICommand LoadCommand => _loadCommand;
     public ICommand UpgradeAllToMaxCommand => _upgradeAllToMaxCommand;
+    public ICommand OpenQueueCommand => _openQueueCommand;
     public ICommand TemplatesCommand => _templatesCommand;
     public ICommand ShowSlotsCommand => _showSlotsCommand;
     public ICommand DemolishOverviewCommand => _demolishOverviewCommand;
@@ -51,6 +56,7 @@ public sealed class BuildingsViewModel : BaseViewModel
 
     public event Action? LoadRequested;
     public event Action? UpgradeAllToMaxRequested;
+    public event Action? OpenQueueRequested;
     public event Action? TemplatesRequested;
     public event Action? ShowSlotsRequested;
     public event Action? DemolishOverviewRequested;
@@ -67,6 +73,24 @@ public sealed class BuildingsViewModel : BaseViewModel
     {
         get => _demolishStatusHasTimer;
         set => SetProperty(ref _demolishStatusHasTimer, value);
+    }
+
+    public string QueueTimeText
+    {
+        get => _queueTimeText;
+        private set => SetProperty(ref _queueTimeText, value);
+    }
+
+    public string ConstructFasterQueueTimeText
+    {
+        get => _constructFasterQueueTimeText;
+        private set => SetProperty(ref _constructFasterQueueTimeText, value);
+    }
+
+    public void ApplyQueueDuration(string normalTime, string constructFasterTime)
+    {
+        QueueTimeText = normalTime;
+        ConstructFasterQueueTimeText = constructFasterTime;
     }
 
     /// <summary>
