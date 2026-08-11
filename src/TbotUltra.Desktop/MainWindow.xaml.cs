@@ -459,6 +459,7 @@ public partial class MainWindow : Window
         _troopTrainingPanelService = new TroopTrainingPanelService(new DesktopTroopTrainingPanelClient(_botService), _botConfigStore, _projectRoot);
         _queuePanelService = new QueuePanelService(new DesktopQueuePanelClient(_botService));
         _botService.FarmLossDestinationChanged += OnFarmLossDestinationChanged;
+        _botService.ActiveVillageVerified += OnActiveVillageVerified;
         _travianQueueViewModel.RemoveRequested += QueueRemoveSelected;
         _travianQueueViewModel.RestoreRequested += RestoreRemovedQueueItems;
         _travianQueueViewModel.MoveUpRequested += MoveSelectedQueueItemUp;

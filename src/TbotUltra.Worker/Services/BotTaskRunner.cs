@@ -101,6 +101,7 @@ public sealed partial class BotTaskRunner
     public Func<LobbyWorldSelectionRequest, CancellationToken, Task<string?>>? LobbyWorldSelectionRequested { get; set; }
     public Func<LobbyWorldServerResolution, CancellationToken, Task>? LobbyWorldServerResolved { get; set; }
     public event Action<FarmLossDestinationChange>? FarmLossDestinationChanged;
+    public event Action<VerifiedActiveVillage>? ActiveVillageVerified;
 
     private void RaiseFarmLossDestinationChanged(FarmLossDestinationChange change)
         => FarmLossDestinationChanged?.Invoke(change);
@@ -670,6 +671,7 @@ public sealed partial class BotTaskRunner
             callbacks: new TravianClientCallbacks
             {
                 StatusCallback = log,
+                ActiveVillageVerified = village => ActiveVillageVerified?.Invoke(village),
                 SetConsentDomainsAllowed = setConsentDomainsAllowed,
                 CleanupAfterBonusVideoAsync = cleanupAfterBonusVideoAsync,
                 RunInIsolatedBonusVideoBrowserAsync = runInIsolatedBonusVideoBrowserAsync,

@@ -1406,19 +1406,22 @@ public partial class MainWindow
         }
     }
 
-    // preview=true makes this a pure read-only prediction of the NEXT item the live loop would pick, with
-    // ALL side effects suppressed (no queue mutation, no rotation-key advance, no logging, no dedup-state
-    // writes). Used by the top-bar "Next task" display so it mirrors the real selector exactly without
-    // affecting scheduling. preview=false is the live loop path and behaves exactly as before.
-    private QueueItem? SelectNextQueueItemForContinuousLoop(bool preview = false)
+    // preview=true makes this a time-controlled, read-only prediction of the NEXT item the live loop would
+    // pick, with ALL side effects suppressed (no queue mutation, rotation-key advance, logging, or dedup-state
+    // writes). The dashboard and wake calculator use it so their forecast mirrors the live selector.
+    private QueueItem? SelectNextQueueItemForContinuousLoop(
+        bool preview = false,
+        DateTimeOffset? evaluationTimeUtc = null,
+        string? villageKeyFilter = null,
+        IReadOnlyList<QueueItem>? queueItemsOverride = null)
     {
         var options = LoadBotOptions();
         if (!preview)
         {
             RemoveDisabledAutoCollectUtilityItems(options);
         }
-        var queueItems = _botService.GetQueueItemsForDisplay();
-        var now = DateTimeOffset.UtcNow;
+        var queueItems = queueItemsOverride ?? _botService.GetQueueItemsForDisplay();
+        var now = evaluationTimeUtc ?? DateTimeOffset.UtcNow;
         var selectionCandidates = queueItems
             .Select(item => new ContinuousLoopSelectionCandidate(
                 item,
@@ -1426,6 +1429,11 @@ public partial class MainWindow
                 IsQueueItemAllowedByAutomationSettings(item),
                 ContinuousLoopSelector.IsUtilityTask(item.TaskName)
                     && IsAutoCollectUtilityTaskEnabledNow(item.TaskName, options)))
+            .Where(candidate => string.IsNullOrWhiteSpace(villageKeyFilter)
+                || string.Equals(
+                    candidate.VillageKey,
+                    villageKeyFilter,
+                    StringComparison.OrdinalIgnoreCase))
             .ToList();
         var villageKeysByItemId = selectionCandidates
             .ToDictionary(candidate => candidate.Item.Id, candidate => candidate.VillageKey);
@@ -1623,6 +1631,68 @@ public partial class MainWindow
                 $"no-selected:{orderedGroups.Count}:{BuildLoopPickSkipKey(lastSkipReason)}");
         }
         return null;
+    }
+
+    private ContinuousLoopForecast ResolveNextContinuousLoopForecast(
+        DateTimeOffset now,
+        string? villageKeyFilter = null)
+    {
+        var queueItems = GetQueueSnapshotForUi();
+        var scopedItems = queueItems
+            .Where(item => string.IsNullOrWhiteSpace(villageKeyFilter)
+                || string.Equals(
+                    GetQueueItemVillageKey(item),
+                    villageKeyFilter,
+                    StringComparison.OrdinalIgnoreCase))
+            .Where(item => item.Status == QueueStatus.Running
+                || IsQueueItemAllowedByAutomationSettings(item))
+            .ToList();
+        var pending = scopedItems
+            .Where(item => item.Status == QueueStatus.Pending)
+            .ToList();
+        var candidateDeadlines = pending
+            .Where(item => item.NextAttemptAt > now)
+            .Select(item => item.NextAttemptAt)
+            .ToHashSet();
+        foreach (var item in pending.Where(item => item.Group == QueueGroup.Construction))
+        {
+            var status = ResolveBuildingStatusForQueueItem(item);
+            if (status is null)
+            {
+                continue;
+            }
+
+            var queueDelay = ConstructionQueueState.ResolveQueueFullRetryDelay(
+                status,
+                _travianPlusActive,
+                item,
+                now);
+            if (queueDelay is { } delay && delay > TimeSpan.Zero)
+            {
+                candidateDeadlines.Add(now + delay);
+            }
+            if (TryResolveConstructActivePrerequisiteDelay(item, now, out var dependencyDelay)
+                && dependencyDelay.Delay > TimeSpan.Zero)
+            {
+                candidateDeadlines.Add(now + dependencyDelay.Delay);
+            }
+        }
+
+        return ContinuousLoopForecastPlanner.Resolve(
+            scopedItems,
+            now,
+            candidateDeadlines,
+            evaluationTime => SelectNextQueueItemForContinuousLoop(
+                preview: true,
+                evaluationTimeUtc: evaluationTime,
+                villageKeyFilter: villageKeyFilter,
+                queueItemsOverride: queueItems),
+            selected => selected.Group != QueueGroup.Construction
+                || ConstructionQueueState.ResolveAvailabilityForItem(
+                    ResolveBuildingStatusForQueueItem(selected),
+                    _travianPlusActive,
+                    selected,
+                    now) != ConstructionQueueAvailability.Unknown);
     }
 
     // Whether a queue item's automation group is enabled for ITS OWN village. Lets a group turned off on
@@ -2472,7 +2542,25 @@ public partial class MainWindow
             DateTimeOffset? nextVillageScanUtc = options.VillageStatusSweepEnabled
                 ? GetVillageStatusSweepNextScanUtc()
                 : null;
-            return ResolveContinuousLoopWaitDelay(now, nextQueueDeadline, nextVillageScanUtc);
+            var forecast = ResolveNextContinuousLoopForecast(now);
+            var nextConstructionAvailabilityUtc = forecast.Item?.Group == QueueGroup.Construction
+                && forecast.State == ContinuousLoopForecastState.Waiting
+                ? forecast.ReadyAtUtc
+                : null;
+            if (nextConstructionAvailabilityUtc is DateTimeOffset constructionDeadline
+                && (nextQueueDeadline is null || constructionDeadline < nextQueueDeadline.Value))
+            {
+                AppendLoopPickVerbose(
+                    $"[loop-pick:verbose] next wake follows humanized construction availability at "
+                        + $"'{FormatQueueServerTime(constructionDeadline)}' "
+                        + $"for {forecast.Item?.DisplayName ?? forecast.Item?.TaskName}",
+                    $"construction-wake:{forecast.Item?.Id}:{constructionDeadline.UtcTicks}");
+            }
+            return ResolveContinuousLoopWaitDelay(
+                now,
+                nextQueueDeadline,
+                nextConstructionAvailabilityUtc,
+                nextVillageScanUtc);
         }
         catch
         {
@@ -2483,9 +2571,15 @@ public partial class MainWindow
     internal static TimeSpan? ResolveContinuousLoopWaitDelay(
         DateTimeOffset now,
         DateTimeOffset? nextQueueDeadline,
+        DateTimeOffset? nextConstructionAvailabilityUtc,
         DateTimeOffset? nextVillageScanUtc)
     {
         var nextDeadline = nextQueueDeadline;
+        if (nextConstructionAvailabilityUtc is DateTimeOffset constructionDeadline
+            && (nextDeadline is null || constructionDeadline < nextDeadline.Value))
+        {
+            nextDeadline = constructionDeadline;
+        }
         if (nextVillageScanUtc is DateTimeOffset villageScanDeadline
             && (villageScanDeadline == DateTimeOffset.MinValue || villageScanDeadline <= now))
         {

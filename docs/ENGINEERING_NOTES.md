@@ -414,6 +414,13 @@ Published artifacts belong under `artifacts/`, never beside source files.
   See [bonus-video ADR](adr/2026-07-18-bonus-video.md).
 - Diagnostics use shared busy/cancel behavior, sanitize settings/logs/paths/URLs/auth/proxy data, and never present
   partial output as a successful archive. Screenshots may contain visible game data.
+- The Dashboard active-village border represents verified live browser state only. Queue selection/Running state
+  must never pre-mark a task's target village; update it only after a successful browser village verification.
+- Construction timers shown in the village overview are Travian's raw slot finishes. Scheduling, loop wake-up,
+  and `Next task` use the effective availability time: raw finish plus the already persisted construction-humanize
+  delay (and existing race buffer). Forecasts must reuse the live selector without mutating queue, rotation, or
+  pacing state; normal construction navigation must not start exactly when the raw timer expires. Login-fill and
+  pre-sleep-fill keep their explicit early-fill exceptions.
 
 ## Target architecture
 

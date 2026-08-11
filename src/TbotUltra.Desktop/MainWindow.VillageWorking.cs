@@ -1160,6 +1160,14 @@ public partial class MainWindow
         SetActiveWorkingVillage(key, status.ActiveVillage);
     }
 
+    private void OnActiveVillageVerified(VerifiedActiveVillage village)
+    {
+        var key = village.CoordX.HasValue && village.CoordY.HasValue
+            ? VillageKey.FromCoords(village.CoordX.Value, village.CoordY.Value)
+            : null;
+        RunOrPostToUi(() => SetActiveWorkingVillage(key, village.Name));
+    }
+
     private string? ResolveVillageKeyByName(string? villageName)
     {
         if (string.IsNullOrWhiteSpace(villageName))
@@ -1182,27 +1190,6 @@ public partial class MainWindow
             .Take(2)
             .ToList();
         return matches is { Count: 1 } ? GetVillageKey(matches[0]) : null;
-    }
-
-    // Called when a queue item begins executing so the "active village" border follows the bot as it
-    // rotates between villages. Village-less (global) tasks leave the indicator unchanged.
-    private void MarkActiveWorkingVillageFromQueueItem(QueueItem item)
-    {
-        var key = GetQueueItemVillageKey(item);
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            return;
-        }
-
-        var name = GetQueueItemVillageName(item);
-        if (Dispatcher.CheckAccess())
-        {
-            SetActiveWorkingVillage(key, name);
-        }
-        else
-        {
-            _ = Dispatcher.BeginInvoke(() => SetActiveWorkingVillage(key, name));
-        }
     }
 
     private void ApplyActiveVillageHighlight()

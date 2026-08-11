@@ -12,13 +12,9 @@ public sealed class DashboardProjectionServiceTests
     public void ProjectNextTask_PrefersRunningItemOverPreview()
     {
         var running = new QueueItem { TaskName = "build_troops", Status = QueueStatus.Running };
-        var preview = new QueueItem { TaskName = "send_farmlists" };
-
         var result = new DashboardProjectionService().ProjectNextTask(new DashboardNextTaskRequest(
             IsLoggedIn: true,
-            QueueItems: [running],
-            EligibleDeferredItems: [],
-            PreviewNextTask: preview,
+            Forecast: new ContinuousLoopForecast(ContinuousLoopForecastState.Running, running),
             NowUtc: DateTimeOffset.UtcNow));
 
         Assert.Equal(DashboardNextTaskState.Running, result.State);
@@ -26,22 +22,34 @@ public sealed class DashboardProjectionServiceTests
     }
 
     [Fact]
-    public void ProjectNextTask_UsesEarliestEligibleDeferredItem()
+    public void ProjectNextTask_UsesForecastedEffectiveDeadline()
     {
         var now = DateTimeOffset.UtcNow;
-        var later = new QueueItem { TaskName = "later", NextAttemptAt = now.AddMinutes(2) };
-        var sooner = new QueueItem { TaskName = "sooner", NextAttemptAt = now.AddSeconds(30) };
+        var h02 = new QueueItem { TaskName = "construct_building" };
 
         var result = new DashboardProjectionService().ProjectNextTask(new DashboardNextTaskRequest(
             IsLoggedIn: true,
-            QueueItems: [later, sooner],
-            EligibleDeferredItems: [later, sooner],
-            PreviewNextTask: null,
+            Forecast: new ContinuousLoopForecast(
+                ContinuousLoopForecastState.Waiting,
+                h02,
+                now.AddMinutes(2).AddSeconds(40)),
             NowUtc: now));
 
         Assert.Equal(DashboardNextTaskState.Waiting, result.State);
-        Assert.Same(sooner, result.QueueItem);
-        Assert.Equal(TimeSpan.FromSeconds(30), result.Remaining);
+        Assert.Same(h02, result.QueueItem);
+        Assert.Equal(TimeSpan.FromMinutes(2).Add(TimeSpan.FromSeconds(40)), result.Remaining);
+    }
+
+    [Fact]
+    public void ProjectNextTask_ReportsRefreshInsteadOfMisleadingFallback()
+    {
+        var result = new DashboardProjectionService().ProjectNextTask(new DashboardNextTaskRequest(
+            IsLoggedIn: true,
+            Forecast: new ContinuousLoopForecast(ContinuousLoopForecastState.WaitingForRefresh, null),
+            NowUtc: DateTimeOffset.UtcNow));
+
+        Assert.Equal(DashboardNextTaskState.WaitingForRefresh, result.State);
+        Assert.Null(result.QueueItem);
     }
 
     [Fact]

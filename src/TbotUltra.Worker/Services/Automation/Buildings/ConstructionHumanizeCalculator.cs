@@ -61,13 +61,26 @@ internal static class ConstructionHumanizeCalculator
             return ConstructionHumanizeDecision.None;
         }
 
-        // A full Plus queue has at least two active constructions. The humanized delay belongs
-        // while the first construction is still running, not after it has freed a slot. Retrying
-        // at that first completion keeps the new slot occupied without changing the configured
-        // 5-20% humanization interval.
+        // A full Plus queue has at least two active constructions. Once the first one finishes,
+        // another construction is still running and becomes the reference for the configured
+        // percentage delay. Persist finish + delay so neither Desktop nor Worker navigates at the
+        // exact server timer boundary.
         if (relevantRemainingSeconds.Count(seconds => seconds > 0) > 1)
         {
-            var referenceSeconds = slotFreeWaitSeconds;
+            var referenceSeconds = relevantRemainingSeconds
+                .Where(seconds => seconds > slotFreeWaitSeconds)
+                .Select(seconds => seconds - slotFreeWaitSeconds)
+                .DefaultIfEmpty(0)
+                .Min();
+            if (referenceSeconds <= 0)
+            {
+                var fallbackMinutes = randomInRange(noPlusMinMinutes, noPlusMaxMinutes);
+                return new ConstructionHumanizeDecision(
+                    slotFreeWaitSeconds + (int)Math.Ceiling(fallbackMinutes * 60.0),
+                    fallbackMinutes * 60.0,
+                    $"after slot opens, no continuing Plus build; {fallbackMinutes:F1}m");
+            }
+
             var delaySeconds = CalculateBoundedQueueDelaySeconds(
                 referenceSeconds,
                 queuePercentMin,
@@ -76,9 +89,9 @@ internal static class ConstructionHumanizeCalculator
                 randomInRange);
             var percent = referenceSeconds > 0 ? delaySeconds / referenceSeconds : 0;
             return new ConstructionHumanizeDecision(
-                slotFreeWaitSeconds,
+                slotFreeWaitSeconds + (int)Math.Ceiling(delaySeconds),
                 delaySeconds,
-                $"before slot opens, percent {percent * 100:F0}% of {referenceSeconds}s remaining");
+                $"after slot opens, percent {percent * 100:F0}% of {referenceSeconds}s remaining");
         }
 
         var minutes = randomInRange(noPlusMinMinutes, noPlusMaxMinutes);

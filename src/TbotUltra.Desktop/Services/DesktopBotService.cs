@@ -26,6 +26,12 @@ public sealed class DesktopBotService : IDesktopBotService
         remove => _taskRunner.FarmLossDestinationChanged -= value;
     }
 
+    public event Action<VerifiedActiveVillage>? ActiveVillageVerified
+    {
+        add => _taskRunner.ActiveVillageVerified += value;
+        remove => _taskRunner.ActiveVillageVerified -= value;
+    }
+
     public QueueItem Enqueue(string taskName, Dictionary<string, string>? payload, int priority, int maxRetries)
     {
         return _queueStore.Add(taskName, payload, priority, maxRetries);

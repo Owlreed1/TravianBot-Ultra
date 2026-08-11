@@ -78,6 +78,7 @@ public sealed partial class TravianClient
                 Notify($"[village-switch] already on '{villageName}' — no navigation needed");
             }
 
+            NotifyVerifiedActiveVillage(activeVillageBeforeSwitch, requestedCoords);
             return;
         }
 
@@ -264,11 +265,21 @@ public sealed partial class TravianClient
             Notify($"[village-switch] navigation completed but active village still reads '{activeVillageAfterSwitch ?? "(unknown)"}'");
         }
 
+        NotifyVerifiedActiveVillage(activeVillageAfterSwitch, requestedCoords);
+
         if (!skipFeatureRefresh)
         {
             // Re-emit account signals so UI refreshes after a village switch (Plus/Gold can be unchanged but UI may not have them yet).
             await RefreshAccountFeatureSignalsAsync(cancellationToken);
         }
+    }
+
+    private void NotifyVerifiedActiveVillage(string? villageName, (int? X, int? Y) coordinates)
+    {
+        _activeVillageVerified?.Invoke(new VerifiedActiveVillage(
+            villageName,
+            coordinates.X,
+            coordinates.Y));
     }
 
     internal static bool IsAcceptedVillageSwitchNameForTests(string? activeVillageName, string? requestedVillageName, string? resolvedVillageName)

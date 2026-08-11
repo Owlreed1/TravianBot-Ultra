@@ -24,14 +24,14 @@ public sealed class ConstructionHumanizeCalculatorTests
     }
 
     [Fact]
-    public void CalculateAfterFullQueue_ConsumesPlusDelayBeforeFirstSlotOpens()
+    public void CalculateAfterFullQueue_AddsPlusDelayAfterFirstSlotOpens()
     {
         var result = ConstructionHumanizeCalculator.CalculateAfterFullQueue(
             [100, 500], 100, 5, 20, 25, 1, 3, (_, _) => 10);
 
-        Assert.Equal(100, result.QueueRetrySeconds);
-        Assert.Equal(10, result.HumanizeDelaySeconds);
-        Assert.Equal("before slot opens, percent 10% of 100s remaining", result.Reason);
+        Assert.Equal(140, result.QueueRetrySeconds);
+        Assert.Equal(40, result.HumanizeDelaySeconds);
+        Assert.Equal("after slot opens, percent 10% of 400s remaining", result.Reason);
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public sealed class ConstructionHumanizeCalculatorTests
         var result = ConstructionHumanizeCalculator.CalculateAfterFullQueue(
             [1_000, 10_100], 1_000, 5, 20, 2, 1, 3, (_, _) => 20);
 
-        Assert.Equal(1_000, result.QueueRetrySeconds);
+        Assert.Equal(1_120, result.QueueRetrySeconds);
         Assert.Equal(120, result.HumanizeDelaySeconds);
     }
 
@@ -75,8 +75,8 @@ public sealed class ConstructionHumanizeCalculatorTests
         var result = ConstructionHumanizeCalculator.CalculateAfterFullQueue(
             [900, 100, 500], 100, 5, 20, 25, 1, 3, (_, _) => 10);
 
-        Assert.Equal(100, result.QueueRetrySeconds);
-        Assert.Equal(10, result.HumanizeDelaySeconds);
+        Assert.Equal(140, result.QueueRetrySeconds);
+        Assert.Equal(40, result.HumanizeDelaySeconds);
     }
 
     [Fact]

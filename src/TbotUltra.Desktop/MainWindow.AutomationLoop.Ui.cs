@@ -190,34 +190,26 @@ public partial class MainWindow
             return "Idle";
         }
 
-        IReadOnlyList<QueueItem> items;
+        var now = DateTimeOffset.UtcNow;
+        DashboardNextTaskProjection projection;
         try
         {
-            items = GetQueueSnapshotForUi();
+            projection = _dashboardProjectionService.ProjectNextTask(new DashboardNextTaskRequest(
+                IsLoggedIn: true,
+                Forecast: ResolveNextContinuousLoopForecast(now),
+                NowUtc: now));
         }
         catch
         {
             return "-";
         }
 
-        var now = DateTimeOffset.UtcNow;
-        var eligibleDeferredItems = items
-            .Where(item => item.Status == QueueStatus.Pending && item.NextAttemptAt > now)
-            .Where(IsQueueItemVillageEnabled)
-            .Where(IsQueueItemGroupEnabledForItsVillage)
-            .ToList();
-        var projection = _dashboardProjectionService.ProjectNextTask(new DashboardNextTaskRequest(
-            IsLoggedIn: true,
-            QueueItems: items,
-            EligibleDeferredItems: eligibleDeferredItems,
-            PreviewNextTask: SelectNextQueueItemForContinuousLoop(preview: true),
-            NowUtc: now));
-
         return projection.State switch
         {
             DashboardNextTaskState.Running => $"Running: {DescribeNextTask(projection.QueueItem!)}",
             DashboardNextTaskState.Next => $"Next: {DescribeNextTask(projection.QueueItem!)}",
             DashboardNextTaskState.Waiting => $"Waiting {FormatNextTaskCountdown(projection.Remaining ?? TimeSpan.Zero)}: {DescribeNextTask(projection.QueueItem!)}",
+            DashboardNextTaskState.WaitingForRefresh => "Waiting for refresh",
             DashboardNextTaskState.NothingQueued => "Nothing queued",
             _ => "Idle",
         };

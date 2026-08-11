@@ -756,7 +756,7 @@
                                         <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2">
                                             <TextBlock Text="Queue delay (%)" VerticalAlignment="Center" />
                                             <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                            ToolTip="When a build is already running and Plus allows another build to be queued, wait a random percentage of the running build's remaining time. Max delay is still respected." />
+                                                            ToolTip="When a full Plus queue opens, wait a random percentage of the construction that is still running after the slot opens. The delay starts after the first build finishes, and Max delay is still respected." />
                                         </StackPanel>
                                         <TextBox x:Name="ConstructionHumanizeQueuePercentMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Construction.QueuePercentMin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <TextBox x:Name="ConstructionHumanizeQueuePercentMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2" Text="{Binding SettingsVm.Construction.QueuePercentMax, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />

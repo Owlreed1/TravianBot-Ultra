@@ -6,7 +6,7 @@ namespace TbotUltra.Desktop.Services;
 /// Produces the read-only state for the Dashboard's next-task indicator.
 /// It never reads storage, navigates, or changes queue state.
 /// </summary>
-public sealed class DashboardProjectionService
+internal sealed class DashboardProjectionService
 {
     public DashboardNextTaskProjection ProjectNextTask(DashboardNextTaskRequest request)
     {
@@ -15,50 +15,45 @@ public sealed class DashboardProjectionService
             return new DashboardNextTaskProjection(DashboardNextTaskState.Idle, null, null);
         }
 
-        var running = request.QueueItems.FirstOrDefault(item => item.Status == QueueStatus.Running);
-        if (running is not null)
+        return request.Forecast.State switch
         {
-            return new DashboardNextTaskProjection(DashboardNextTaskState.Running, running, null);
-        }
-
-        if (request.PreviewNextTask is not null)
-        {
-            return new DashboardNextTaskProjection(DashboardNextTaskState.Next, request.PreviewNextTask, null);
-        }
-
-        var waiting = request.EligibleDeferredItems
-            .Where(item => item.NextAttemptAt > request.NowUtc)
-            .OrderBy(item => item.NextAttemptAt)
-            .FirstOrDefault();
-        if (waiting is not null)
-        {
-            return new DashboardNextTaskProjection(
+            ContinuousLoopForecastState.Running => new DashboardNextTaskProjection(
+                DashboardNextTaskState.Running,
+                request.Forecast.Item,
+                null),
+            ContinuousLoopForecastState.Ready => new DashboardNextTaskProjection(
+                DashboardNextTaskState.Next,
+                request.Forecast.Item,
+                null),
+            ContinuousLoopForecastState.Waiting => new DashboardNextTaskProjection(
                 DashboardNextTaskState.Waiting,
-                waiting,
-                waiting.NextAttemptAt - request.NowUtc);
-        }
-
-        return new DashboardNextTaskProjection(DashboardNextTaskState.NothingQueued, null, null);
+                request.Forecast.Item,
+                request.Forecast.ReadyAtUtc - request.NowUtc),
+            ContinuousLoopForecastState.WaitingForRefresh => new DashboardNextTaskProjection(
+                DashboardNextTaskState.WaitingForRefresh,
+                null,
+                null),
+            _ => new DashboardNextTaskProjection(DashboardNextTaskState.NothingQueued, null, null),
+        };
     }
 }
 
-public sealed record DashboardNextTaskRequest(
+internal sealed record DashboardNextTaskRequest(
     bool IsLoggedIn,
-    IReadOnlyList<QueueItem> QueueItems,
-    IReadOnlyList<QueueItem> EligibleDeferredItems,
-    QueueItem? PreviewNextTask,
+    ContinuousLoopForecast Forecast,
     DateTimeOffset NowUtc);
 
-public sealed record DashboardNextTaskProjection(
+internal sealed record DashboardNextTaskProjection(
     DashboardNextTaskState State,
     QueueItem? QueueItem,
     TimeSpan? Remaining);
 
-public enum DashboardNextTaskState
+internal enum DashboardNextTaskState
 {
     Idle,
     Running,
     Next,
     Waiting,
+    WaitingForRefresh,
     NothingQueued,
 }

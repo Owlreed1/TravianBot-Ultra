@@ -432,10 +432,9 @@ public sealed partial class TravianClient
             .Min();
 
         // Schedule the humanized start from the same authoritative snapshot that proved the slot is
-        // full. With two queued constructions we already know both absolute finishes, so waiting until
-        // the first finishes merely to navigate back and calculate a percentage of the second is wasteful.
-        // Persisting the combined wait in the session also makes the later retry proceed without
-        // recomputing a new random delay.
+        // full. The first finish opens the slot; the persisted extra delay is based on the construction
+        // that continues running after that point. This avoids both an exact-timer navigation and a new
+        // random delay when the task is retried.
         var humanizedWait = TryScheduleHumanizedStartAfterFullQueue(
             kind,
             slotId,

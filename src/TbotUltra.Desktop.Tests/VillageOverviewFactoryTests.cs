@@ -314,6 +314,54 @@ public sealed class VillageOverviewFactoryTests
     }
 
     [Fact]
+    public void Create_UsesEffectiveForecastForVillageNextTask()
+    {
+        var now = new DateTimeOffset(2026, 8, 11, 17, 15, 40, TimeSpan.Zero);
+        var task = Task("Construct Warehouse", QueueGroup.Construction, "H02", now);
+        var readyAt = now.AddMinutes(2).AddSeconds(40);
+
+        var row = Assert.Single(VillageOverviewFactory.Create(
+            [Village("H02", "H02")],
+            [task],
+            [QueueGroup.Construction],
+            null,
+            task.Item,
+            now,
+            value => value.ToString("HH:mm:ss"),
+            forecastsByVillage: new Dictionary<string, ContinuousLoopForecast>
+            {
+                ["H02"] = new(
+                    ContinuousLoopForecastState.Waiting,
+                    task.Item,
+                    readyAt),
+            }).Villages);
+
+        Assert.Equal("Next in 02:40: Construct Warehouse", row.NextTask);
+    }
+
+    [Fact]
+    public void Create_ShowsWaitingForRefreshInsteadOfAnotherVillageFallback()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var task = Task("Construct Warehouse", QueueGroup.Construction, "H02", now);
+
+        var row = Assert.Single(VillageOverviewFactory.Create(
+            [Village("H02", "H02")],
+            [task],
+            [QueueGroup.Construction],
+            null,
+            null,
+            now,
+            value => value.ToString("HH:mm:ss"),
+            forecastsByVillage: new Dictionary<string, ContinuousLoopForecast>
+            {
+                ["H02"] = new(ContinuousLoopForecastState.WaitingForRefresh, null),
+            }).Villages);
+
+        Assert.Equal("Waiting for refresh", row.NextTask);
+    }
+
+    [Fact]
     public void Create_AttributesTaskByNameWhenKeyMatchesNoVillage()
     {
         var now = new DateTimeOffset(2026, 7, 17, 16, 0, 0, TimeSpan.Zero);

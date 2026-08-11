@@ -23,7 +23,8 @@ internal static class VillageOverviewFactory
         Func<DateTimeOffset, string> finishTimeFormatter,
         IReadOnlyDictionary<QueueGroup, string?>? rotationVillageKeys = null,
         IReadOnlyDictionary<string, double>? constructionQueueSecondsByVillage = null,
-        Func<double, string>? durationFormatter = null)
+        Func<double, string>? durationFormatter = null,
+        IReadOnlyDictionary<string, ContinuousLoopForecast>? forecastsByVillage = null)
     {
         var taskSnapshot = tasks
             .Where(source => source.Item is not null)
@@ -49,7 +50,8 @@ internal static class VillageOverviewFactory
                 nowUtc,
                 finishTimeFormatter,
                 constructionQueueSecondsByVillage,
-                durationFormatter))
+                durationFormatter,
+                forecastsByVillage?.GetValueOrDefault(village.VillageKey)))
             .ToList();
 
         return new VillageOverviewSnapshot(
@@ -334,7 +336,8 @@ internal static class VillageOverviewFactory
         DateTimeOffset nowUtc,
         Func<DateTimeOffset, string> finishTimeFormatter,
         IReadOnlyDictionary<string, double>? constructionQueueSecondsByVillage,
-        Func<double, string>? durationFormatter)
+        Func<double, string>? durationFormatter,
+        ContinuousLoopForecast? forecast)
     {
         var constructionEnabled = IsGroupEnabled(village, QueueGroup.Construction);
         var smithyEnabled = IsGroupEnabled(village, QueueGroup.Troops);
@@ -347,7 +350,7 @@ internal static class VillageOverviewFactory
         return new VillageOverviewRow(
             village.Name,
             village.Population,
-            ResolveNextTask(village, villageTasks, orderedGroups, exactNext, nowUtc),
+            ResolveNextTask(village, villageTasks, orderedGroups, exactNext, forecast, nowUtc),
             ResolveConstructionQueue(village, constructionQueueSecondsByVillage, durationFormatter),
             ResolveConstruction(village.Status, village.Tribe, villageTasks, constructionEnabled, nowUtc, finishTimeFormatter),
             ResolveSmithy(village.Status, villageTasks, smithyEnabled, nowUtc, finishTimeFormatter),
@@ -365,6 +368,7 @@ internal static class VillageOverviewFactory
         IReadOnlyList<PipelineTaskSource> villageTasks,
         IReadOnlyList<QueueGroup> orderedGroups,
         QueueItem? exactNext,
+        ContinuousLoopForecast? forecast,
         DateTimeOffset nowUtc)
     {
         if (!village.IsEnabled)
@@ -383,7 +387,31 @@ internal static class VillageOverviewFactory
             : villageTasks.FirstOrDefault(source => source.Item.Id == exactNext.Id);
         if (exact is not null)
         {
+            if (forecast?.State == ContinuousLoopForecastState.Waiting
+                && forecast.ReadyAtUtc is DateTimeOffset readyAt)
+            {
+                return $"Next in {FormatCountdown(readyAt - nowUtc)}: {exact.DisplayName}";
+            }
+
             return $"Next: {exact.DisplayName}";
+        }
+
+        if (forecast is not null)
+        {
+            var projected = forecast.Item is null
+                ? null
+                : villageTasks.FirstOrDefault(source => source.Item.Id == forecast.Item.Id);
+            return forecast.State switch
+            {
+                ContinuousLoopForecastState.Running when projected is not null => $"Running: {projected.DisplayName}",
+                ContinuousLoopForecastState.Ready when projected is not null => $"Ready: {projected.DisplayName}",
+                ContinuousLoopForecastState.Waiting when projected is not null
+                    && forecast.ReadyAtUtc is DateTimeOffset readyAt =>
+                    $"Waiting {FormatCountdown(readyAt - nowUtc)}: {projected.DisplayName}",
+                ContinuousLoopForecastState.WaitingForRefresh => "Waiting for refresh",
+                ContinuousLoopForecastState.NothingQueued => "Nothing queued",
+                _ => "Waiting for refresh",
+            };
         }
 
         var orderedHeads = EnumerateGroups(orderedGroups, villageTasks)

@@ -943,7 +943,12 @@ public partial class MainWindow
                 allowed);
         }).ToList();
 
-        var exactNext = SelectNextQueueItemForContinuousLoop(preview: true);
+        var globalForecast = ResolveNextContinuousLoopForecast(nowUtc);
+        var exactNext = globalForecast.Item;
+        var forecastsByVillage = villages.ToDictionary(
+            village => village.VillageKey,
+            village => ResolveNextContinuousLoopForecast(nowUtc, village.VillageKey),
+            StringComparer.OrdinalIgnoreCase);
         var rotationKeys = QueueGroupCatalog.AllGroups.ToDictionary(
             group => group,
             group => group == QueueGroup.Construction
@@ -960,7 +965,8 @@ public partial class MainWindow
             FormatQueueFinishTime,
             rotationKeys,
             BuildConstructionQueueSecondsByVillage(tasks),
-            FormatBuildDuration);
+            FormatBuildDuration,
+            forecastsByVillage);
 
         LogOverviewAttributionDiagnostics(villages, snapshot, attributionMisses, attributedPendingByKey);
         return snapshot;

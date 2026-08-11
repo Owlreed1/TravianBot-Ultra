@@ -17,6 +17,9 @@ public sealed record TravianClientCallbacks
     /// <summary>Receives human-readable status/log lines from the client.</summary>
     public Action<string>? StatusCallback { get; init; }
 
+    /// <summary>Notifies the host after the browser's active village has been verified.</summary>
+    public Action<VerifiedActiveVillage>? ActiveVillageVerified { get; init; }
+
     /// <summary>
     /// Flips the browser session's consentmanager route block on/off. Used only by the bonus-video
     /// flow, which needs GDPR/TCF consent while the rest of the session keeps it blocked.
