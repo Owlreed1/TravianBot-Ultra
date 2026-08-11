@@ -431,6 +431,22 @@
                                         <TextBox x:Name="CollectStepDelayMinTextBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,2,6,2" Text="{Binding SettingsVm.Pacing.CollectStepDelayMinSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <TextBox x:Name="CollectStepDelayMaxTextBox" Grid.Row="1" Grid.Column="2" Height="24" Margin="0,2,0,2" Text="{Binding SettingsVm.Pacing.CollectStepDelayMaxSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </Grid>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                        <TextBlock Text="Short village wait" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                        <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                        ToolTip="Maximum time to stay in the current village for a task that will soon be ready. This wait is used only when no task in another village is already ready." />
+                                        <ComboBox x:Name="ShortVillageDeferComboBox"
+                                                  Width="90"
+                                                  Height="24"
+                                                  Margin="10,0,0,0"
+                                                  SelectedValuePath="Tag"
+                                                  SelectedValue="{Binding SettingsVm.Pacing.ShortVillageDeferSeconds, Mode=TwoWay}">
+                                            <ComboBoxItem Content="20 s" Tag="20" />
+                                            <ComboBoxItem Content="60 s" Tag="60" />
+                                            <ComboBoxItem Content="90 s" Tag="90" />
+                                        </ComboBox>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
 

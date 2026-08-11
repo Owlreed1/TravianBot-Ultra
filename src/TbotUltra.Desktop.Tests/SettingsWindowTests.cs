@@ -71,6 +71,33 @@ public sealed class SettingsWindowTests : IDisposable
     }
 
     [Fact]
+    public void PacingCategory_LoadsShortVillageWaitDropdown()
+    {
+        _wpf.Run(() =>
+        {
+            var store = CreateStore(new JsonObject
+            {
+                [BotOptionPayloadKeys.ShortVillageDeferSeconds] = 90,
+            });
+            var window = new SettingsWindow(store, initialCategory: SettingsCategory.Pacing);
+            try
+            {
+                var comboBox = Assert.IsType<ComboBox>(window.FindName("ShortVillageDeferComboBox"));
+
+                Assert.Equal(90, window.SettingsVm.Pacing.ShortVillageDeferSeconds);
+                Assert.Equal(["20 s", "60 s", "90 s"], comboBox.Items
+                    .OfType<ComboBoxItem>()
+                    .Select(item => item.Content?.ToString() ?? string.Empty)
+                    .ToArray());
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void OpeningWithPersistedRiskyValues_DoesNotShowUserConfirmationDialogs()
     {
         _wpf.Run(() =>

@@ -11,7 +11,8 @@ internal sealed record ActionPacingPayloadValues(
     double LoopMinSeconds,
     double LoopMaxSeconds,
     double FarmListStepMinSeconds,
-    double FarmListStepMaxSeconds);
+    double FarmListStepMaxSeconds,
+    int ShortVillageDeferSeconds);
 
 /// <summary>
 /// Applies action-pacing payload keys without owning unrelated bot options.
@@ -33,7 +34,8 @@ internal static class ActionPacingPayloadApplier
             source.ActionPacingLoopMinSeconds,
             source.ActionPacingLoopMaxSeconds,
             source.FarmListStepDelayMinSeconds,
-            source.FarmListStepDelayMaxSeconds);
+            source.FarmListStepDelayMaxSeconds,
+            PacingDefaults.NormalizeShortVillageDeferSeconds(source.ShortVillageDeferSeconds));
 
         if (payload is null)
         {
@@ -92,6 +94,14 @@ internal static class ActionPacingPayloadApplier
             else if (TryReadDelay(key, value, BotOptionPayloadKeys.FarmListStepDelayMaxSeconds, out var farmMax))
             {
                 result = result with { FarmListStepMaxSeconds = farmMax };
+            }
+            else if (key.Equals(BotOptionPayloadKeys.ShortVillageDeferSeconds, StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(value, out var shortVillageDeferSeconds))
+            {
+                result = result with
+                {
+                    ShortVillageDeferSeconds = PacingDefaults.NormalizeShortVillageDeferSeconds(shortVillageDeferSeconds),
+                };
             }
         }
 

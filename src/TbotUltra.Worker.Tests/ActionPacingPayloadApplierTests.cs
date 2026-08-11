@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using TbotUltra.Core.Configuration;
 using Xunit;
 
@@ -5,6 +6,30 @@ namespace TbotUltra.Worker.Tests;
 
 public sealed class ActionPacingPayloadApplierTests
 {
+    [Theory]
+    [InlineData(null, 60)]
+    [InlineData("20", 20)]
+    [InlineData("60", 60)]
+    [InlineData("90", 90)]
+    [InlineData("45", 60)]
+    public void FromConfiguration_NormalizesShortVillageDeferSeconds(string? configured, int expected)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["server_name"] = "srv",
+            ["base_url"] = "https://example.com",
+        };
+        if (configured is not null)
+        {
+            values[BotOptionPayloadKeys.ShortVillageDeferSeconds] = configured;
+        }
+
+        var options = BotOptionsFactory.FromConfiguration(
+            new ConfigurationBuilder().AddInMemoryCollection(values).Build());
+
+        Assert.Equal(expected, options.ShortVillageDeferSeconds);
+    }
+
     [Fact]
     public void Apply_MapsEveryActionPacingPayloadKey()
     {
@@ -22,6 +47,7 @@ public sealed class ActionPacingPayloadApplierTests
             [BotOptionPayloadKeys.ActionPacingLoopMaxSeconds] = "8",
             [BotOptionPayloadKeys.FarmListStepDelayMinSeconds] = "9",
             [BotOptionPayloadKeys.FarmListStepDelayMaxSeconds] = "10",
+            [BotOptionPayloadKeys.ShortVillageDeferSeconds] = "90",
         };
 
         var result = BotOptionsPayloadApplier.Apply(source, payload);
@@ -37,6 +63,7 @@ public sealed class ActionPacingPayloadApplierTests
         Assert.Equal(8, result.ActionPacingLoopMaxSeconds);
         Assert.Equal(9, result.FarmListStepDelayMinSeconds);
         Assert.Equal(10, result.FarmListStepDelayMaxSeconds);
+        Assert.Equal(90, result.ShortVillageDeferSeconds);
     }
 
     [Fact]
@@ -54,6 +81,7 @@ public sealed class ActionPacingPayloadApplierTests
             [BotOptionPayloadKeys.ActionPacingTaskMinSeconds] = " ",
             [BotOptionPayloadKeys.ActionPacingTaskMaxSeconds] = "5000",
             [BotOptionPayloadKeys.ActionPacingClickMinSeconds] = "-1",
+            [BotOptionPayloadKeys.ShortVillageDeferSeconds] = "45",
         };
 
         var result = BotOptionsPayloadApplier.Apply(source, payload);
@@ -62,5 +90,6 @@ public sealed class ActionPacingPayloadApplierTests
         Assert.Equal(12, result.ActionPacingTaskMinSeconds);
         Assert.Equal(3600, result.ActionPacingTaskMaxSeconds);
         Assert.Equal(0, result.ActionPacingClickMinSeconds);
+        Assert.Equal(60, result.ShortVillageDeferSeconds);
     }
 }

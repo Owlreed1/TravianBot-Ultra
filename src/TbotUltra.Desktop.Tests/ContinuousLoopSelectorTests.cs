@@ -316,9 +316,16 @@ public sealed class ContinuousLoopSelectorTests
     }
 
     [Theory]
-    [InlineData(90, true)]
-    [InlineData(91, false)]
-    public void ResolveShortVillageHoldUntil_OnlyHoldsActiveVillageForShortDefer(
+    [InlineData(20, 20, true)]
+    [InlineData(20, 21, false)]
+    [InlineData(60, 60, true)]
+    [InlineData(60, 61, false)]
+    [InlineData(90, 90, true)]
+    [InlineData(90, 91, false)]
+    [InlineData(15, 60, true)]
+    [InlineData(15, 61, false)]
+    public void ResolveShortVillageHoldUntil_UsesConfiguredNormalizedThreshold(
+        int configuredSeconds,
         int secondsUntilReady,
         bool expectedHold)
     {
@@ -328,7 +335,8 @@ public sealed class ContinuousLoopSelectorTests
         var result = ContinuousLoopSelector.ResolveShortVillageHoldUntil(
             [Candidate(activeDeferred, "a"), Candidate(otherDeferred, "b")],
             "a",
-            Now);
+            Now,
+            configuredSeconds);
 
         Assert.Equal(expectedHold, result is not null);
     }

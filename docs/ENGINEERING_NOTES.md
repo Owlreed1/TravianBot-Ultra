@@ -105,6 +105,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Entering sleep closes the active browser session, including planned sleep entered before login.
 - Continuous-loop wake requests from saved settings or newly enabled automation must also end an active idle break;
   humanized idle pacing must not delay newly requested work.
+- A ready enabled task always wins over holding the current village for an imminent deferred task. The account-scoped
+  Pacing setting `short_village_defer_seconds` may be 20, 60, or 90 seconds (default 60) and applies only when no task
+  is ready in any village; changing it while the continuous loop runs requests a wake at the next safe boundary.
 - Applying Session pacing settings while automation is active must take effect immediately: enabling starts its run
   timer, while disabling a scheduled sleep resumes the captured automation state.
 - Known queue deadlines are authoritative and may not be shortened by pacing.

@@ -1502,22 +1502,6 @@ public partial class MainWindow
                 }
             }
 
-            var holdUntil = ContinuousLoopSelector.ResolveShortVillageHoldUntil(
-                selectionCandidates,
-                _activeWorkingVillageKey,
-                now);
-            if (holdUntil is not null)
-            {
-                if (!preview)
-                {
-                    AppendLoopPickVerbose(
-                        $"[loop-pick:verbose] holding current village for short defer until "
-                        + $"'{FormatQueueServerTime(holdUntil.Value)}'",
-                        $"short-village-hold:{_activeWorkingVillageKey}:{holdUntil.Value.UtcTicks}");
-                }
-
-                return null;
-            }
         }
 
         string? lastSkipReason = null;
@@ -1601,6 +1585,36 @@ public partial class MainWindow
             }
         }
 
+        // A ready task always wins over a short wait in the current village. This includes utility
+        // work that was not preferred earlier only because another ready task still existed there.
+        var readyUtilityItem = utilitySelection.ReadyItems.FirstOrDefault();
+        if (readyUtilityItem is not null)
+        {
+            return readyUtilityItem;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_activeWorkingVillageKey))
+        {
+            var holdUntil = ContinuousLoopSelector.ResolveShortVillageHoldUntil(
+                selectionCandidates,
+                _activeWorkingVillageKey,
+                now,
+                options.ShortVillageDeferSeconds);
+            if (holdUntil is not null)
+            {
+                if (!preview)
+                {
+                    AppendLoopPickVerbose(
+                        $"[loop-pick:verbose] holding current village for short defer until "
+                        + $"'{FormatQueueServerTime(holdUntil.Value)}' "
+                        + $"(limit={options.ShortVillageDeferSeconds}s)",
+                        $"short-village-hold:{_activeWorkingVillageKey}:{holdUntil.Value.UtcTicks}:{options.ShortVillageDeferSeconds}");
+                }
+
+                return null;
+            }
+        }
+
         if (!preview)
         {
             AppendLoopPickVerbose(
@@ -1608,9 +1622,7 @@ public partial class MainWindow
                     + (lastSkipReason is null ? string.Empty : $" — last reason: {lastSkipReason}"),
                 $"no-selected:{orderedGroups.Count}:{BuildLoopPickSkipKey(lastSkipReason)}");
         }
-        // Collect rewards in the village where the signal was observed. If another village still had
-        // ready work, the utility item waited above; switch only after the current work is exhausted.
-        return utilitySelection.ReadyItems.FirstOrDefault();
+        return null;
     }
 
     // Whether a queue item's automation group is enabled for ITS OWN village. Lets a group turned off on

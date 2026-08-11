@@ -42,7 +42,6 @@ internal sealed record ContinuousLoopGroupSelectionResult(
 /// </summary>
 internal static class ContinuousLoopSelector
 {
-    internal static readonly TimeSpan ShortVillageDeferThreshold = TimeSpan.FromSeconds(90);
     internal static readonly TimeSpan KeepAliveImminentWorkThreshold = TimeSpan.FromSeconds(60);
 
     internal static ContinuousLoopUtilitySelectionResult SelectUtility(
@@ -210,13 +209,16 @@ internal static class ContinuousLoopSelector
     internal static DateTimeOffset? ResolveShortVillageHoldUntil(
         IEnumerable<ContinuousLoopSelectionCandidate> candidates,
         string? activeVillageKey,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        int shortVillageDeferSeconds)
     {
         if (string.IsNullOrWhiteSpace(activeVillageKey))
         {
             return null;
         }
 
+        var threshold = TimeSpan.FromSeconds(
+            PacingDefaults.NormalizeShortVillageDeferSeconds(shortVillageDeferSeconds));
         var holdUntil = candidates
             .Where(candidate =>
                 candidate.IsAllowedByAutomationSettings
@@ -226,7 +228,7 @@ internal static class ContinuousLoopSelector
                 && candidate.Item.Group != QueueGroup.Demolish
                 && candidate.Item.Status == QueueStatus.Pending
                 && candidate.Item.NextAttemptAt > now
-                && candidate.Item.NextAttemptAt <= now.Add(ShortVillageDeferThreshold)
+                && candidate.Item.NextAttemptAt <= now.Add(threshold)
                 && string.Equals(candidate.VillageKey, activeVillageKey, StringComparison.OrdinalIgnoreCase))
             .Select(candidate => (DateTimeOffset?)candidate.Item.NextAttemptAt)
             .Min();

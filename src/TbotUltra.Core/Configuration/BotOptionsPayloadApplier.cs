@@ -172,6 +172,7 @@ public static class BotOptionsPayloadApplier
         var actionPacingLoopMaxSeconds = actionPacing.LoopMaxSeconds;
         var farmListStepDelayMinSeconds = actionPacing.FarmListStepMinSeconds;
         var farmListStepDelayMaxSeconds = actionPacing.FarmListStepMaxSeconds;
+        var shortVillageDeferSeconds = actionPacing.ShortVillageDeferSeconds;
 
         // BotOptions is a record: `with` carries every unlisted property straight from
         // source, so we only name the fields the payload appliers actually changed. The
@@ -293,6 +294,7 @@ public static class BotOptionsPayloadApplier
             ActionPacingLoopMaxSeconds = actionPacingLoopMaxSeconds,
             FarmListStepDelayMinSeconds = farmListStepDelayMinSeconds,
             FarmListStepDelayMaxSeconds = Math.Max(farmListStepDelayMinSeconds, farmListStepDelayMaxSeconds),
+            ShortVillageDeferSeconds = shortVillageDeferSeconds,
             ConstructionPreSleepFill = construction.ConstructionPreSleepFill,
             ConstructionLoginFill = construction.ConstructionLoginFill,
             ConstructionLoginFillExpiresAtUnixSeconds = construction.ConstructionLoginFillExpiresAtUnixSeconds,

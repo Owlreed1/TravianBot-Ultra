@@ -388,6 +388,9 @@ public sealed record BotOptions
     [ConfigurationKeyName(BotOptionPayloadKeys.ActionPacingLoopMaxSeconds)]
     public double ActionPacingLoopMaxSeconds { get; init; } = PacingDefaults.ActionPacingLoopMaxSeconds;
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.ShortVillageDeferSeconds)]
+    public int ShortVillageDeferSeconds { get; init; } = PacingDefaults.ShortVillageDeferSeconds;
+
     [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousKeepAliveEnabled)]
     public bool ContinuousKeepAliveEnabled { get; init; } = PacingDefaults.ContinuousKeepAliveEnabled;
 

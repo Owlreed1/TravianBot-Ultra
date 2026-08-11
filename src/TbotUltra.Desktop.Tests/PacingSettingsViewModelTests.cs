@@ -14,6 +14,7 @@ public sealed class PacingSettingsViewModelTests
             TaskMaxSeconds = "10",
             FarmListStepDelayMinSeconds = "11",
             FarmListStepDelayMaxSeconds = "12",
+            ShortVillageDeferSeconds = 90,
         };
 
         vm.ResetDefaults();
@@ -22,6 +23,19 @@ public sealed class PacingSettingsViewModelTests
         Assert.Equal("2", vm.TaskMaxSeconds);
         Assert.Equal("1", vm.FarmListStepDelayMinSeconds);
         Assert.Equal("4", vm.FarmListStepDelayMaxSeconds);
+        Assert.Equal(60, vm.ShortVillageDeferSeconds);
+    }
+
+    [Theory]
+    [InlineData(20, 20)]
+    [InlineData(60, 60)]
+    [InlineData(90, 90)]
+    [InlineData(45, 60)]
+    public void ShortVillageDeferSeconds_AllowsOnlyDropdownChoices(int value, int expected)
+    {
+        var vm = new PacingSettingsViewModel { ShortVillageDeferSeconds = value };
+
+        Assert.Equal(expected, vm.ShortVillageDeferSeconds);
     }
 
     [Fact]

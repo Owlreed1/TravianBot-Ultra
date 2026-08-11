@@ -25,6 +25,8 @@ public static class PacingDefaults
     public const double ActionPacingClickMaxSeconds = 1.5;
     public const double ActionPacingLoopMinSeconds = 4.0;
     public const double ActionPacingLoopMaxSeconds = 25.0;
+    public const int ShortVillageDeferSeconds = 60;
+    public static IReadOnlyList<int> ShortVillageDeferChoicesSeconds { get; } = [20, 60, 90];
     public const bool ContinuousKeepAliveEnabled = true;
     public const int ContinuousKeepAliveMinMinutes = 4;
     public const int ContinuousKeepAliveMaxMinutes = 15;
@@ -81,6 +83,9 @@ public static class PacingDefaults
     public const double ConstructionHumanizeNoPlusMinMinutes = 0.5;
     public const double ConstructionHumanizeNoPlusMaxMinutes = 3.0;
     public const int ConstructionLoginFillWindowMinutes = 15;
+
+    public static int NormalizeShortVillageDeferSeconds(int value)
+        => ShortVillageDeferChoicesSeconds.Contains(value) ? value : ShortVillageDeferSeconds;
 
     // Pre-sleep fill (part of the construction start delay feature): shortly before a session-pacing
     // sleep, pull humanize-deferred construction starts forward so every build slot that CAN be

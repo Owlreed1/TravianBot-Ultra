@@ -182,6 +182,8 @@ public static class BotOptionsFactory
             ActionPacingClickMaxSeconds = ClampDelaySeconds(configuration.GetValue(BotOptionPayloadKeys.ActionPacingClickMaxSeconds, actionPacingDefaults.ClickMaxSeconds)),
             ActionPacingLoopMinSeconds = ClampDelaySeconds(configuration.GetValue(BotOptionPayloadKeys.ActionPacingLoopMinSeconds, actionPacingDefaults.LoopMinSeconds)),
             ActionPacingLoopMaxSeconds = ClampDelaySeconds(configuration.GetValue(BotOptionPayloadKeys.ActionPacingLoopMaxSeconds, actionPacingDefaults.LoopMaxSeconds)),
+            ShortVillageDeferSeconds = PacingDefaults.NormalizeShortVillageDeferSeconds(
+                configuration.GetValue(BotOptionPayloadKeys.ShortVillageDeferSeconds, PacingDefaults.ShortVillageDeferSeconds)),
             ContinuousKeepAliveEnabled = configuration.GetValue(BotOptionPayloadKeys.ContinuousKeepAliveEnabled, PacingDefaults.ContinuousKeepAliveEnabled),
             ContinuousKeepAliveMinMinutes = Math.Clamp(configuration.GetValue(BotOptionPayloadKeys.ContinuousKeepAliveMinMinutes, PacingDefaults.ContinuousKeepAliveMinMinutes), 1, 1440),
             ContinuousKeepAliveMaxMinutes = Math.Clamp(configuration.GetValue(BotOptionPayloadKeys.ContinuousKeepAliveMaxMinutes, PacingDefaults.ContinuousKeepAliveMaxMinutes), 1, 1440),

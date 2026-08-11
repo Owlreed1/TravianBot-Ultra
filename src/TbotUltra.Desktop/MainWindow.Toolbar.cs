@@ -227,6 +227,14 @@ public partial class MainWindow
         if (saved)
         {
             ResetChangedRestartDelayTasks(optionsBeforeSettings, optionsAfterSettings);
+            if (optionsAfterSettings.ShortVillageDeferSeconds != optionsBeforeSettings.ShortVillageDeferSeconds
+                && IsContinuousLoopRunning())
+            {
+                Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+                AppendLog(
+                    $"[pacing] Short village wait changed to {optionsAfterSettings.ShortVillageDeferSeconds}s; "
+                    + "continuous loop wake requested.");
+            }
             if (window.TownHallSettingsChanged)
             {
                 PersistTownHallSettings(window.TownHallResults, villageSettingsRows);
