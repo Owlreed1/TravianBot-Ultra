@@ -1951,7 +1951,7 @@ public partial class MainWindow
         return QueueVillageRotation.SelectByVillageRotation(
             items,
             GetQueueItemVillageKey,
-            villageItems => SelectNextConstructionQueueItem(villageItems, now, out _),
+            villageItems => SelectNextConstructionQueueItem(villageItems, now, out _, preview: true),
             ref rotationKey) is not null;
     }
 
@@ -2002,6 +2002,12 @@ public partial class MainWindow
             return null;
         }
 
+        if (!preview && TryPrepareConstructionStartDelay(selection.Item, now, out var humanizeSkipReason))
+        {
+            skipReason = humanizeSkipReason;
+            return null;
+        }
+
         if (selection.ForcedLiveValidation && !preview)
         {
             var villageName = NormalizeVillageName(GetQueueItemVillageName(selection.Item)) ?? "-";
@@ -2018,6 +2024,52 @@ public partial class MainWindow
         }
 
         return selection.Item;
+    }
+
+    private bool TryPrepareConstructionStartDelay(
+        QueueItem item,
+        DateTimeOffset now,
+        out string skipReason)
+    {
+        skipReason = string.Empty;
+        var decision = ConstructionStartDelayPlanner.Resolve(
+            item,
+            ResolveBuildingStatusForQueueItem(item),
+            _travianPlusActive,
+            LoadBotOptions(),
+            now,
+            (minimum, maximum) => minimum + Random.Shared.NextDouble() * (maximum - minimum));
+        if (decision is null)
+        {
+            return false;
+        }
+
+        var payload = new Dictionary<string, string>(item.Payload, StringComparer.OrdinalIgnoreCase)
+        {
+            [BotOptionPayloadKeys.UpgradeDeferReason] = BotOptionPayloadKeys.UpgradeDeferReasonHumanize,
+            [BotOptionPayloadKeys.UpgradeDeferClassificationVersion] =
+                ConstructionQueueState.CurrentDeferClassificationVersion,
+            [BotOptionPayloadKeys.QueueHumanizeExtraSeconds] = decision.DelaySeconds.ToString(),
+            [BotOptionPayloadKeys.ConstructionHumanizePreNavigationDelaySatisfied] = "true",
+        };
+        if (!_botService.UpdateDeferredQueueItem(item.Id, payload, TimeSpan.FromSeconds(decision.DelaySeconds)))
+        {
+            AppendLog($"[construction-timing] could not persist pre-navigation delay id={item.Id} task='{item.TaskName}'.");
+            return false;
+        }
+
+        item.Payload = payload;
+        item.NextAttemptAt = decision.ReadyAtUtc;
+        var villageName = NormalizeVillageName(GetQueueItemVillageName(item)) ?? "-";
+        AppendLog(
+            $"[construction-timing] village='{villageName}' task='{item.TaskName}' trigger=normal " +
+            $"observedAt='{now:O}' referenceFinishAt='{decision.ReferenceFinishUtc:O}' " +
+            $"humanDelaySeconds={decision.DelaySeconds} effectiveReadyAt='{decision.ReadyAtUtc:O}' " +
+            $"navigation=pending reason='{decision.Reason}'.");
+        skipReason =
+            $"group=Construction task='{item.TaskName}' waiting for persisted pre-navigation human delay";
+        RequestQueueUiRefresh(item.Id);
+        return true;
     }
 
     private bool TryDeferConstructUntilActivePrerequisiteFinishes(

@@ -232,6 +232,7 @@ public static class BotOptionsFactory
             ConstructionPreSleepFill = configuration.GetValue(BotOptionPayloadKeys.ConstructionPreSleepFill, false),
             ConstructionLoginFill = configuration.GetValue(BotOptionPayloadKeys.ConstructionLoginFill, false),
             ConstructionLoginFillExpiresAtUnixSeconds = configuration.GetValue<long?>(BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds),
+            ConstructionHumanizePreNavigationDelaySatisfied = configuration.GetValue(BotOptionPayloadKeys.ConstructionHumanizePreNavigationDelaySatisfied, false),
             TargetVillageName = configuration[BotOptionPayloadKeys.TargetVillageName] ?? string.Empty,
             TargetVillageUrl = configuration[BotOptionPayloadKeys.TargetVillageUrl] ?? string.Empty,
             TargetVillageKey = configuration[BotOptionPayloadKeys.TargetVillageKey] ?? string.Empty,

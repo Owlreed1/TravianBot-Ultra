@@ -381,12 +381,13 @@ Published artifacts belong under `artifacts/`, never beside source files.
   attributes, and new-village startup until all three succeed; legacy account snapshots are already initialized.
 - Browser activity statistics are account-scoped: lifetime counters persist; session counters do not.
 - Farm-list exact timers get a 5-15s render margin; unreadable disabled timers use an estimated 60s wait.
-- Farm lists are always sent ONE AT A TIME via `SendFarmListsSequentiallyAsync`: click each list's Start,
+- "Send toggled lists" sends selected farm lists ONE AT A TIME via `SendFarmListsSequentiallyAsync`: click each list's Start,
   then wait for that list's `.farmListStatus` "N/M being raided" numerator to rise (or its Start to disable)
-  before the next click — never the single "start all" button (a list can silently fail with no feedback).
+  before the next individual click so a failed list is detected before advancing.
   The wait between clicks is the "Send farmlists" action pacing (`FarmListStepDelayMin/MaxSeconds`, default
-  1-4s, on the Settings pacing tab). "Send toggled lists" mode sends every selected list each round;
-  "Send all lists" sends every list; `ContinuousFarmDispatchDelay` (minutes) is the gap between whole rounds,
+  1-4s, on the Settings pacing tab). "Send all lists" instead performs one click on Travian's
+  `button.startAllFarmLists` control, using the established real-click-with-JS-fallback flow.
+  `ContinuousFarmDispatchDelay` (minutes) is the gap between whole rounds,
   not between individual lists.
 - Farm-list rows dedupe/merge by stable `lid` (data-list), never by display name — two villages can hold
   same-named lists that a name key would collapse into one row/group. Rows are grouped in the UI by the owning
@@ -424,10 +425,12 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Construction timers shown in the village overview are Travian's raw slot finishes. Scheduling, loop wake-up,
   and `Next task` use the effective availability time: raw finish plus the already persisted construction-humanize
   delay (and existing race buffer). Forecasts must reuse the live selector without mutating queue, rotation, or
-  pacing state; normal construction navigation must not start exactly when the raw timer expires. Login-fill and
-  pre-sleep-fill keep their explicit early-fill exceptions. A login village-status round may immediately fill a
-  live-verified free slot while it is already visiting that village, but login preparation must preserve any
-  persisted queue-humanize extra for a full slot so its later navigation still waits for the effective deadline.
+  pacing state; normal construction navigation must not start exactly when the raw timer expires. Select and persist
+  the normal construction delay before navigating to the task village; the worker then consumes that one-shot decision
+  without randomizing again. Login-fill and pre-sleep-fill keep their explicit early-fill exceptions. Login never
+  forces or reschedules a Village scan: it may fill only the live-verified browser village, while an independently due
+  scan may fill free slots as it naturally visits each village. Full slots retain their persisted queue-humanize extra
+  so later navigation still waits for the effective deadline.
 
 ## Target architecture
 

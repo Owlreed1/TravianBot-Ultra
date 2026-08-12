@@ -222,6 +222,7 @@ public static class ConstructionQueueState
         var changed = payload.Remove(BotOptionPayloadKeys.ConstructionLoginFill);
         changed |= payload.Remove(BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds);
         changed |= payload.Remove(BotOptionPayloadKeys.ConstructionPreSleepFill);
+        changed |= payload.Remove(BotOptionPayloadKeys.ConstructionHumanizePreNavigationDelaySatisfied);
 
         var extraSeconds = ResolveQueueHumanizeExtraSeconds(item);
         changed |= payload.Remove(BotOptionPayloadKeys.QueueHumanizeExtraSeconds);

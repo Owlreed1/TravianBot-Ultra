@@ -593,7 +593,8 @@ public partial class MainWindow
     private static bool IsTransientPageReadFailure(Exception ex)
     {
         return IsTransientConnectionFailure(ex)
-            || BrowserFailureClassifier.IsTargetCrash(ex);
+            || BrowserFailureClassifier.IsTargetCrash(ex)
+            || BrowserFailureClassifier.IsTransientNavigation(ex);
     }
 
     internal static bool IsTransientConnectionFailure(Exception ex)

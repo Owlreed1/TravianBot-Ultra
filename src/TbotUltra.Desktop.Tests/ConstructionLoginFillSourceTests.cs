@@ -6,6 +6,37 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class ConstructionLoginFillSourceTests
 {
     [Fact]
+    public void LoginFlow_PreparesOnlyTheLiveVerifiedBrowserVillage()
+    {
+        var projectRoot = ProjectRootLocator.FindProjectRoot();
+        var source = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "src",
+            "TbotUltra.Desktop",
+            "MainWindow.Session.cs"));
+
+        Assert.DoesNotContain("PrepareConstructionLoginFill();", source, StringComparison.Ordinal);
+        Assert.Equal(
+            2,
+            source.Split("PrepareConstructionLoginFillForActiveVerifiedVillage();", StringSplitOptions.None).Length - 1);
+    }
+
+    [Fact]
+    public void ActiveVillageLoginFill_RequiresLiveAvailableSlotAndResetsOldScope()
+    {
+        var projectRoot = ProjectRootLocator.FindProjectRoot();
+        var source = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "src",
+            "TbotUltra.Desktop",
+            "MainWindow.DeferredRefresh.cs"));
+
+        Assert.Contains("private void PrepareConstructionLoginFillForActiveVerifiedVillage()", source, StringComparison.Ordinal);
+        Assert.Contains("ClearConstructionLoginFillScope(\"login\")", source, StringComparison.Ordinal);
+        Assert.Contains("ConstructionQueueAvailability.Available", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PrepareLoginFill_PreservesPersistedQueueHumanizeExtra()
     {
         var projectRoot = ProjectRootLocator.FindProjectRoot();

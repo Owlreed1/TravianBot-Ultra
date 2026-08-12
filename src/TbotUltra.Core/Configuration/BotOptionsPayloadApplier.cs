@@ -298,6 +298,7 @@ public static class BotOptionsPayloadApplier
             ConstructionPreSleepFill = construction.ConstructionPreSleepFill,
             ConstructionLoginFill = construction.ConstructionLoginFill,
             ConstructionLoginFillExpiresAtUnixSeconds = construction.ConstructionLoginFillExpiresAtUnixSeconds,
+            ConstructionHumanizePreNavigationDelaySatisfied = construction.ConstructionHumanizePreNavigationDelaySatisfied,
             TargetVillageName = targetVillageName,
             TargetVillageUrl = targetVillageUrl,
             TargetVillageKey = targetVillageKey,

@@ -657,6 +657,12 @@ public sealed partial class TravianClient
             return (false, null);
         }
 
+        if (_config.ConstructionHumanizePreNavigationDelaySatisfied)
+        {
+            Notify("[construction-humanize] persisted pre-navigation delay already satisfied; continuing with live slot validation.");
+            return (true, null);
+        }
+
         var villageToken = await ResolveConstructionHumanizeVillageTokenAsync(cancellationToken);
         var slotKey = $"{villageToken}:{kind}:{slotId}";
         var loginFillActive = ConstructionLoginFillPolicy.IsActive(

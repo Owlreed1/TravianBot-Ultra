@@ -126,6 +126,8 @@ public partial class MainWindow
             payload.Remove(BotOptionPayloadKeys.ConstructionPreSleepFill);
             payload.Remove(BotOptionPayloadKeys.ConstructionLoginFill);
             payload.Remove(BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds);
+            payload.Remove(BotOptionPayloadKeys.ConstructionHumanizePreNavigationDelaySatisfied);
+            payload.Remove(BotOptionPayloadKeys.QueueHumanizeExtraSeconds);
 
             if (!_botService.MarkQueueItemDeferred(item.Id, delay))
             {
@@ -147,6 +149,8 @@ public partial class MainWindow
                         BotOptionPayloadKeys.ConstructionPreSleepFill,
                         BotOptionPayloadKeys.ConstructionLoginFill,
                         BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds,
+                        BotOptionPayloadKeys.ConstructionHumanizePreNavigationDelaySatisfied,
+                        BotOptionPayloadKeys.QueueHumanizeExtraSeconds,
                     ]))
             {
                 item.Payload = payload;
@@ -285,6 +289,8 @@ public partial class MainWindow
         parentPayload.Remove(BotOptionPayloadKeys.ConstructionPreSleepFill);
         parentPayload.Remove(BotOptionPayloadKeys.ConstructionLoginFill);
         parentPayload.Remove(BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds);
+        parentPayload.Remove(BotOptionPayloadKeys.ConstructionHumanizePreNavigationDelaySatisfied);
+        parentPayload.Remove(BotOptionPayloadKeys.QueueHumanizeExtraSeconds);
 
         var parentDelay = guardResult.Delay ?? TimeSpan.FromSeconds(60);
         if (!_botService.MarkQueueItemDeferred(item.Id, parentDelay))
@@ -307,6 +313,8 @@ public partial class MainWindow
                     BotOptionPayloadKeys.ConstructionPreSleepFill,
                     BotOptionPayloadKeys.ConstructionLoginFill,
                     BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds,
+                    BotOptionPayloadKeys.ConstructionHumanizePreNavigationDelaySatisfied,
+                    BotOptionPayloadKeys.QueueHumanizeExtraSeconds,
                 ]))
         {
             item.Payload = parentPayload;
@@ -1145,6 +1153,28 @@ public partial class MainWindow
                 ApplyTownHallCelebrationDeferSignal(item, ex.Message, queueWaitDelay);
             }
 
+            if (IsConstructionQueueTask(item.TaskName)
+                && ConstructionQueueState.IsQueueOccupancyDeferMessage(ex.Message)
+                && TryExtractPayloadInt(
+                    ex.Message,
+                    BotOptionPayloadKeys.QueueHumanizeExtraSeconds,
+                    out var queueHumanizeExtraSeconds))
+            {
+                var observedAt = DateTimeOffset.UtcNow;
+                var effectiveReadyAt = observedAt + queueWaitDelay;
+                var rawSlotFinishAt = effectiveReadyAt.AddSeconds(-queueHumanizeExtraSeconds);
+                var trigger = item.Payload.ContainsKey(BotOptionPayloadKeys.ConstructionPreSleepFill)
+                    ? "pre-sleep"
+                    : item.Payload.ContainsKey(BotOptionPayloadKeys.ConstructionLoginFill)
+                        ? "login"
+                        : "normal";
+                AppendLog(
+                    $"[construction-timing] village='{GetQueueItemVillageName(item) ?? "-"}' " +
+                    $"task='{item.TaskName}' trigger={trigger} observedAt='{observedAt:O}' " +
+                    $"rawSlotFinishAt='{rawSlotFinishAt:O}' humanDelaySeconds={queueHumanizeExtraSeconds} " +
+                    $"effectiveReadyAt='{effectiveReadyAt:O}' navigation=completed.");
+            }
+
             var deferred = _botService.MarkQueueItemDeferred(item.Id, queueWaitDelay);
             if (deferred)
             {
@@ -1188,6 +1218,14 @@ public partial class MainWindow
                     // The pre-sleep fill flag is valid for exactly one execution attempt — this attempt
                     // just ran, so drop it. The sweep re-flags the item if it defers into the window again.
                     updatedPayload.Remove(BotOptionPayloadKeys.ConstructionPreSleepFill);
+                    updatedPayload.Remove(BotOptionPayloadKeys.ConstructionHumanizePreNavigationDelaySatisfied);
+                    if (!TryExtractPayloadInt(
+                            ex.Message,
+                            BotOptionPayloadKeys.QueueHumanizeExtraSeconds,
+                            out _))
+                    {
+                        updatedPayload.Remove(BotOptionPayloadKeys.QueueHumanizeExtraSeconds);
+                    }
                     // The immediate-fill override stays meaningful only while a construction was started
                     // or its own Travian category is full. Resource/requirement/storage/retry waits are
                     // a real unstarted head and end the burst for later rows too.

@@ -141,7 +141,7 @@ public partial class MainWindow
                 }
 
                 _browserSessionLikelyOpen = true;
-                PrepareConstructionLoginFill();
+                PrepareConstructionLoginFillForActiveVerifiedVillage();
                 NotifySessionPacingOnlineStarted();
                 CompleteOperation(operationId, operationSw, "Login completed (quick re-login).");
                 return;
@@ -283,7 +283,7 @@ public partial class MainWindow
             }
 
             _browserSessionLikelyOpen = true;
-            PrepareConstructionLoginFill();
+            PrepareConstructionLoginFillForActiveVerifiedVillage();
             NotifySessionPacingOnlineStarted();
             // Anchor for the quick re-login window: only a COMPLETED full stack counts.
             PersistLastFullPostLoginTimestamp();

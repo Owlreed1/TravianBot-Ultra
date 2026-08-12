@@ -103,6 +103,20 @@ public sealed class VillageStatusSweepSourceTests
     }
 
     [Fact]
+    public void Login_DoesNotResetOrForceAFreshVillageScanDeadline()
+    {
+        var projectRoot = ProjectRootLocator.FindProjectRoot();
+        var source = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "src",
+            "TbotUltra.Desktop",
+            "MainWindow.Session.cs"));
+
+        Assert.DoesNotContain("ResetVillageStatusSweepSchedule();", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("_villageStatusSweepForceRequested", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DorfTooltips_DescribeTheirActualScanResponsibilities()
     {
         var projectRoot = ProjectRootLocator.FindProjectRoot();

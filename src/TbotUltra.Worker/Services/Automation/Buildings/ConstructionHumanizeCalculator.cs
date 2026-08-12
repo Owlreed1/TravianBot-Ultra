@@ -1,6 +1,6 @@
 namespace TbotUltra.Worker.Services;
 
-internal sealed record ConstructionHumanizeDecision(
+public sealed record ConstructionHumanizeDecision(
     int QueueRetrySeconds,
     double HumanizeDelaySeconds,
     string Reason)
@@ -13,9 +13,9 @@ internal sealed record ConstructionHumanizeDecision(
 /// <see cref="TravianClient"/>; random selection is injected so production behavior and tests use
 /// the same branch logic without coupling this calculator to global RNG state.
 /// </summary>
-internal static class ConstructionHumanizeCalculator
+public static class ConstructionHumanizeCalculator
 {
-    internal static double CalculateBoundedQueueDelaySeconds(
+    public static double CalculateBoundedQueueDelaySeconds(
         int referenceSeconds,
         double queuePercentMin,
         double queuePercentMax,

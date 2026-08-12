@@ -331,17 +331,73 @@ public partial class MainWindow
     // one attempt to fill available Travian slots immediately. A confirmed empty overview also
     // revalidates the first stale page-timer resource head once; other resource, prerequisite and
     // storage waits keep their authoritative deadlines.
+    private void PrepareConstructionLoginFillForActiveVerifiedVillage()
+    {
+        ClearConstructionLoginFillScope("login");
+        if (string.IsNullOrWhiteSpace(_activeWorkingVillageKey)
+            || !_villageStatusCache.TryGetByKey(_activeWorkingVillageKey, out var status)
+            || !string.Equals(
+                ResolveStatusVillageKey(status),
+                _activeWorkingVillageKey,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            AppendLog("[construction-login-fill] skipped: the browser village has no live verified construction status.");
+            return;
+        }
+
+        PrepareConstructionLoginFill(
+            "login",
+            _activeWorkingVillageName,
+            _activeWorkingVillageKey,
+            verifiedStatus: status);
+    }
+
+    private void ClearConstructionLoginFillScope(string source)
+    {
+        var cleared = 0;
+        foreach (var item in _botService.GetQueueItemsForDisplay()
+                     .Where(item => item.Status == QueueStatus.Pending)
+                     .Where(item => IsConstructionQueueTask(item.TaskName))
+                     .Where(item => item.Payload.ContainsKey(BotOptionPayloadKeys.ConstructionLoginFill)))
+        {
+            if (_botService.PatchDeferredQueueItem(
+                    item.Id,
+                    null,
+                    [
+                        BotOptionPayloadKeys.ConstructionLoginFill,
+                        BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds,
+                    ]))
+            {
+                item.Payload.Remove(BotOptionPayloadKeys.ConstructionLoginFill);
+                item.Payload.Remove(BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds);
+                cleared++;
+            }
+        }
+
+        if (cleared > 0)
+        {
+            AppendLog($"[construction-{source}-fill] cleared {cleared} stale login-fill row(s) before scoping the new visit.");
+        }
+    }
+
     private void PrepareConstructionLoginFill(
         string source = "login",
         string? villageName = null,
         string? villageKey = null,
-        bool releaseResourceHeadForConfirmedEmptyQueue = false)
+        bool releaseResourceHeadForConfirmedEmptyQueue = false,
+        VillageStatus? verifiedStatus = null)
     {
         var now = DateTimeOffset.UtcNow;
         var pendingItems = _botService.GetQueueItemsForDisplay()
             .Where(item => item.Status == QueueStatus.Pending)
             .Where(item => IsConstructionQueueTask(item.TaskName))
             .Where(item => string.IsNullOrWhiteSpace(villageName) || IsQueueItemForVillage(item, villageName, villageKey))
+            .Where(item => verifiedStatus is null
+                || ConstructionQueueState.ResolveAvailabilityForItem(
+                    verifiedStatus,
+                    _travianPlusActive,
+                    item,
+                    now) == ConstructionQueueAvailability.Available)
             .Where(IsQueueItemAllowedByAutomationSettings)
             .ToList();
         var confirmedEmptyQueueHead = releaseResourceHeadForConfirmedEmptyQueue

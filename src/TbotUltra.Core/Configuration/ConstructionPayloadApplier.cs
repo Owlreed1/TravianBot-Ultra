@@ -28,7 +28,8 @@ internal sealed record ConstructionPayloadValues(
     string UpgradeSelectorProfile,
     bool ConstructionPreSleepFill,
     bool ConstructionLoginFill,
-    long? ConstructionLoginFillExpiresAtUnixSeconds);
+    long? ConstructionLoginFillExpiresAtUnixSeconds,
+    bool ConstructionHumanizePreNavigationDelaySatisfied);
 
 internal static class ConstructionPayloadApplier
 {
@@ -62,7 +63,8 @@ internal static class ConstructionPayloadApplier
             source.UpgradeSelectorProfile,
             source.ConstructionPreSleepFill,
             source.ConstructionLoginFill,
-            source.ConstructionLoginFillExpiresAtUnixSeconds);
+            source.ConstructionLoginFillExpiresAtUnixSeconds,
+            source.ConstructionHumanizePreNavigationDelaySatisfied);
 
         if (payload is null)
             return result;
@@ -130,6 +132,8 @@ internal static class ConstructionPayloadApplier
                 result = result with { ConstructionLoginFill = loginFill };
             else if (TryReadLong(key, value, BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds, out var loginFillExpiry))
                 result = result with { ConstructionLoginFillExpiresAtUnixSeconds = loginFillExpiry };
+            else if (TryReadBool(key, value, BotOptionPayloadKeys.ConstructionHumanizePreNavigationDelaySatisfied, out var preNavigationDelaySatisfied))
+                result = result with { ConstructionHumanizePreNavigationDelaySatisfied = preNavigationDelaySatisfied };
         }
 
         return result;

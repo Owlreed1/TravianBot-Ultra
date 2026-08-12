@@ -19,7 +19,7 @@ internal sealed class ContinuousFarmingOperation(IFarmingClient client)
         {
             var lossResult = await HandleLossesIfEnabledAsync(request, log, cancellationToken);
             log("Continuous farming send-all started.");
-            var listCount = await client.SendAllFarmListsNowAsync(cancellationToken);
+            var listCount = await client.SendAllFarmListsViaStartAllButtonAsync(cancellationToken);
             log($"Continuous farming send-all completed. Lists considered={listCount}.");
             var snapshot = await client.ReadFarmListsOverviewAsync(cancellationToken);
             return ContinuousFarmingDispatchResult.ForCompletedRound(

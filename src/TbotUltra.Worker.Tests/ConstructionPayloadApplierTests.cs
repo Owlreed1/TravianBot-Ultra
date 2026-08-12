@@ -36,6 +36,7 @@ public sealed class ConstructionPayloadApplierTests
             [BotOptionPayloadKeys.UpgradeSelectorProfile] = "strict_green",
             [BotOptionPayloadKeys.ConstructionLoginFill] = "true",
             [BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds] = "1784289600",
+            [BotOptionPayloadKeys.ConstructionHumanizePreNavigationDelaySatisfied] = "true",
         };
 
         var result = BotOptionsPayloadApplier.Apply(new BotOptions(), payload);
@@ -66,5 +67,6 @@ public sealed class ConstructionPayloadApplierTests
         Assert.Equal("strict_green", result.UpgradeSelectorProfile);
         Assert.True(result.ConstructionLoginFill);
         Assert.Equal(1784289600, result.ConstructionLoginFillExpiresAtUnixSeconds);
+        Assert.True(result.ConstructionHumanizePreNavigationDelaySatisfied);
     }
 }

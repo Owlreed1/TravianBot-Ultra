@@ -81,7 +81,7 @@ public sealed class ContinuousFarmingOperationTests
             _ => { },
             CancellationToken.None);
 
-        Assert.Equal(["loss", "send-all", "read"], client.Calls);
+        Assert.Equal(["loss", "start-all", "read"], client.Calls);
         Assert.True(result.ScheduleNextRound);
         Assert.Equal("Continuous farming cooldown active.", result.WaitMessage);
     }
@@ -116,7 +116,11 @@ public sealed class ContinuousFarmingOperationTests
             return Task.FromResult(1);
         }
 
-        public Task<int> SendAllFarmListsViaStartAllButtonAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<int> SendAllFarmListsViaStartAllButtonAsync(CancellationToken cancellationToken = default)
+        {
+            Calls.Add("start-all");
+            return Task.FromResult(1);
+        }
         public Task<FarmListLossDeactivationResult> DeactivateFarmListLossTargetsAsync(bool includeUnoccupiedOasis, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<FarmListLossDeactivationResult> HandleFarmListLossTargetsAsync(FarmListLossHandlingRequest request, CancellationToken cancellationToken = default)

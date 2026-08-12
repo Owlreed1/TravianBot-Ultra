@@ -516,6 +516,10 @@ public sealed record BotOptions
     [ConfigurationKeyName(BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds)]
     public long? ConstructionLoginFillExpiresAtUnixSeconds { get; init; }
 
+    // Per-queue-item runtime flag; never stored in bot.json.
+    [ConfigurationKeyName(BotOptionPayloadKeys.ConstructionHumanizePreNavigationDelaySatisfied)]
+    public bool ConstructionHumanizePreNavigationDelaySatisfied { get; init; }
+
     [ConfigurationKeyName(BotOptionPayloadKeys.TargetVillageName)]
     public string TargetVillageName { get; init; } = string.Empty;
 
