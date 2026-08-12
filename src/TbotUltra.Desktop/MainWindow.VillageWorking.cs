@@ -1146,6 +1146,7 @@ public partial class MainWindow
         if (!string.IsNullOrWhiteSpace(resolvedKey))
         {
             _activeWorkingVillageKey = resolvedKey;
+            _villageBatchState.ObserveVerifiedVillage(resolvedKey);
         }
 
         ApplyActiveVillageHighlight();
@@ -1407,10 +1408,9 @@ public partial class MainWindow
 
         var key = GetVillageKey(selected);
 
-        // Prioritize this village in both runners so automation works there next.
-        _autoQueueRotationVillageKey = key;
-        _continuousConstructionRotationVillageKey = key;
-        SetActiveWorkingVillage(key, selected.Name);
+        // Reset the shared runtime batch. The pending switch below owns browser navigation and the
+        // verified-village callback establishes the new batch only after Travian confirms the switch.
+        _villageBatchState.Reset();
 
         if (IsExecutionActiveForVillageChange())
         {

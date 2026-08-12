@@ -398,7 +398,6 @@ public partial class MainWindow
                 [BotOptionPayloadKeys.ConstructionLoginFillExpiresAtUnixSeconds] = expiresAt.ToString(),
             };
             payload.Remove(BotOptionPayloadKeys.ConstructionPreSleepFill);
-            payload.Remove(BotOptionPayloadKeys.QueueHumanizeExtraSeconds);
 
             var valuesToSet = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -408,7 +407,6 @@ public partial class MainWindow
             string[] keysToRemove =
             [
                 BotOptionPayloadKeys.ConstructionPreSleepFill,
-                BotOptionPayloadKeys.QueueHumanizeExtraSeconds,
             ];
             var delay = isHumanizeWait || isQueueWait || releaseConfirmedEmptyQueueHead
                 ? TimeSpan.Zero

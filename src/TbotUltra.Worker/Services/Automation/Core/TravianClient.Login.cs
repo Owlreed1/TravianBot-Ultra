@@ -443,6 +443,8 @@ public sealed partial class TravianClient : ISessionClient
     private async Task<AccountAccessState?> ProbeExplicitAccountAccessStateAsync(string currentUrl)
     {
         var captchaInputPresent = await HasAnySelectorAsync(Selectors.AccountChallengeInputField);
+        var punishmentControlsPresent = await _page.Locator(Selectors.BanPunishmentControls)
+            .CountAsync() > 0;
         var pageSignal = await _page.EvaluateAsync<string>(
             """
             () => {
@@ -451,7 +453,18 @@ public sealed partial class TravianClient : ISessionClient
               return `${title}\n${text}`;
             }
             """);
-        return AccountAccessClassifier.ClassifyExplicit(currentUrl, pageSignal, captchaInputPresent);
+        return AccountAccessClassifier.ClassifyExplicit(
+            currentUrl,
+            pageSignal,
+            captchaInputPresent,
+            punishmentControlsPresent);
+    }
+
+    public async Task EnsureAccountAccessAllowedAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var explicitState = await ProbeExplicitAccountAccessStateAsync(_page.Url.ToLowerInvariant());
+        ThrowIfAccountAccessBlocked(explicitState ?? AccountAccessState.LoggedIn);
     }
 
     private async Task<bool> CanUseRecentLoginSuccessAsync(
@@ -533,14 +546,17 @@ public sealed partial class TravianClient : ISessionClient
 
     private void ThrowIfAccountAccessBlocked(AccountAccessState state)
     {
-        if (state is not (AccountAccessState.Restricted or AccountAccessState.Challenge))
+        if (state is not (AccountAccessState.Banned or AccountAccessState.Restricted or AccountAccessState.Challenge))
         {
             return;
         }
 
-        var reason = state == AccountAccessState.Restricted
-            ? "Travian displayed an explicit account restriction."
-            : "Travian displayed a security challenge that requires manual review.";
+        var reason = state switch
+        {
+            AccountAccessState.Banned => "Travian reported that this avatar is banned. No punishment or support action was selected.",
+            AccountAccessState.Restricted => "Travian displayed an explicit account restriction.",
+            _ => "Travian displayed a security challenge that requires manual review.",
+        };
         throw new AccountAccessException(_account.Name, state, reason);
     }
 

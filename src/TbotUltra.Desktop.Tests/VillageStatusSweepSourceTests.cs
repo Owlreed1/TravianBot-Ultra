@@ -74,6 +74,35 @@ public sealed class VillageStatusSweepSourceTests
     }
 
     [Fact]
+    public void LoginSweep_RefreshesWaitsBeforeExecutingReadyVillageTasks()
+    {
+        var projectRoot = ProjectRootLocator.FindProjectRoot();
+        var source = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "src",
+            "TbotUltra.Desktop",
+            "MainWindow.ContinuousLoop.cs"));
+        var methodStart = source.IndexOf(
+            "private async Task MaybeRunVillageStatusSweepAsync",
+            StringComparison.Ordinal);
+        var methodEnd = source.IndexOf(
+            "    private Task<VillageStatus> ReadVillageStatusSweepBaseStatusAsync",
+            methodStart,
+            StringComparison.Ordinal);
+
+        Assert.True(methodStart >= 0 && methodEnd > methodStart);
+        var methodBody = source[methodStart..methodEnd];
+        var refreshIndex = methodBody.IndexOf(
+            "await RefreshVillageStatusSweepDeferredWaitsAsync(status, token);",
+            StringComparison.Ordinal);
+        var executeIndex = methodBody.IndexOf(
+            "await ExecuteReadyVillageStatusSweepTasksAsync(",
+            StringComparison.Ordinal);
+
+        Assert.True(refreshIndex >= 0 && executeIndex > refreshIndex);
+    }
+
+    [Fact]
     public void DorfTooltips_DescribeTheirActualScanResponsibilities()
     {
         var projectRoot = ProjectRootLocator.FindProjectRoot();

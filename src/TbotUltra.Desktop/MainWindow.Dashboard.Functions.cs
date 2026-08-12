@@ -57,10 +57,7 @@ public partial class MainWindow
         ClearAutomationLoopCardBlocks();
         var resetCount = ResetDeferredQueueTimersForVillage(selectedVillageName, selectedVillageKey);
         PrepareConstructionLoginFill("manual-clear-timers", selectedVillageName, selectedVillageKey);
-        _continuousConstructionRotationVillageKey = selectedVillageKey;
-        SetContinuousGroupRotationVillageKey(QueueGroup.TroopTraining, selectedVillageKey);
-        SetContinuousGroupRotationVillageKey(QueueGroup.Troops, selectedVillageKey);
-        SetContinuousGroupRotationVillageKey(QueueGroup.Farming, selectedVillageKey);
+        _villageBatchState.Reset();
         if (IsContinuousLoopRunning() || _autoQueueRunning)
         {
             Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
@@ -91,10 +88,7 @@ public partial class MainWindow
 
         var resetCount = ResetAllDeferredQueueTimers();
         PrepareConstructionLoginFill("manual-clear-timers");
-        _continuousConstructionRotationVillageKey = null;
-        SetContinuousGroupRotationVillageKey(QueueGroup.TroopTraining, null);
-        SetContinuousGroupRotationVillageKey(QueueGroup.Troops, null);
-        SetContinuousGroupRotationVillageKey(QueueGroup.Farming, null);
+        _villageBatchState.Reset();
         if (IsContinuousLoopRunning() || _autoQueueRunning)
         {
             Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);

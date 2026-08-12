@@ -20,6 +20,7 @@ public sealed partial class TravianClient
         CancellationToken cancellationToken,
         string? reason = null)
     {
+        await EnsureAccountAccessAllowedAsync(cancellationToken);
         await ApplyPacingDelayAsync(
             _config.ActionPacingClickMinSeconds,
             _config.ActionPacingClickMaxSeconds,
@@ -34,6 +35,7 @@ public sealed partial class TravianClient
     // only costing a few hundred ms for short values like coordinates or troop counts.
     private async Task TypeHumanlyAsync(ILocator input, string value, CancellationToken cancellationToken)
     {
+        await EnsureAccountAccessAllowedAsync(cancellationToken);
         var field = input.ToString() ?? "unknown-input";
         using var trace = _browserTrace.BeginOperation(
             "INPUT",
@@ -184,7 +186,7 @@ public sealed partial class TravianClient
             }
 
             var explicitAccessState = await ProbeExplicitAccountAccessStateAsync(_page.Url.ToLowerInvariant());
-            if (explicitAccessState is AccountAccessState.Restricted or AccountAccessState.Challenge)
+            if (explicitAccessState is AccountAccessState.Banned or AccountAccessState.Restricted or AccountAccessState.Challenge)
             {
                 return true;
             }

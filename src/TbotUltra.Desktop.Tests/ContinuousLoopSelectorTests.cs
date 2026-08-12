@@ -188,51 +188,6 @@ public sealed class ContinuousLoopSelectorTests
     }
 
     [Fact]
-    public void SelectNonConstructionGroup_RotatesPastDeferredVillage()
-    {
-        var deferred = Item("train-a", QueueStatus.Pending, 60);
-        var ready = Item("train-b", QueueStatus.Pending, 0);
-        var villageKeys = new Dictionary<Guid, string?>
-        {
-            [deferred.Id] = "a",
-            [ready.Id] = "b",
-        };
-
-        var result = ContinuousLoopSelector.SelectNonConstructionGroup(
-            new ContinuousLoopGroupSelectionInput(
-                QueueGroup.TroopTraining,
-                [deferred, ready],
-                "a",
-                Now,
-                villageKeys));
-
-        Assert.Same(ready, result.Item);
-        Assert.Equal("b", result.RotationVillageKey);
-    }
-
-    [Fact]
-    public void SelectNonConstructionGroup_PreservesHeroAttributeException()
-    {
-        var deferredHero = Item("hero_manage", QueueStatus.Pending, 60);
-        var attributeTask = Item("spend_hero_attribute_points", QueueStatus.Pending, 0);
-        var villageKeys = new Dictionary<Guid, string?>
-        {
-            [deferredHero.Id] = null,
-            [attributeTask.Id] = null,
-        };
-
-        var result = ContinuousLoopSelector.SelectNonConstructionGroup(
-            new ContinuousLoopGroupSelectionInput(
-                QueueGroup.Hero,
-                [deferredHero, attributeTask],
-                null,
-                Now,
-                villageKeys));
-
-        Assert.Same(attributeTask, result.Item);
-    }
-
-    [Fact]
     public void SelectVillageItems_KeepsOnlyActiveVillageInSchedulerOrder()
     {
         var first = Item("first", QueueStatus.Pending, 0);

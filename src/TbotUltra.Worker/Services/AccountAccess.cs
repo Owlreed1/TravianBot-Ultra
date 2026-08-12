@@ -5,6 +5,7 @@ public enum AccountAccessState
     LoggedIn,
     LoggedOut,
     Unavailable,
+    Banned,
     Restricted,
     Challenge,
     Unknown,
@@ -25,10 +26,25 @@ public sealed class AccountAccessException : InvalidOperationException
 
 internal static class AccountAccessClassifier
 {
-    public static AccountAccessState? ClassifyExplicit(string? url, string? pageSignal, bool captchaInputPresent)
+    public static AccountAccessState? ClassifyExplicit(
+        string? url,
+        string? pageSignal,
+        bool captchaInputPresent,
+        bool punishmentControlsPresent = false)
     {
         var currentUrl = url?.ToLowerInvariant() ?? string.Empty;
         var signal = pageSignal?.ToLowerInvariant() ?? string.Empty;
+        if (currentUrl.Contains("banned", StringComparison.Ordinal)
+            || ContainsAny(signal,
+                "your avatar is now banned",
+                "your account has been banned",
+                "account is banned")
+            || (punishmentControlsPresent
+                && signal.Contains("you cannot do any actions in the game until the ban is removed", StringComparison.Ordinal)))
+        {
+            return AccountAccessState.Banned;
+        }
+
         if (captchaInputPresent
             || currentUrl.Contains("captcha", StringComparison.Ordinal)
             || currentUrl.Contains("challenge", StringComparison.Ordinal)
@@ -41,12 +57,9 @@ internal static class AccountAccessClassifier
             return AccountAccessState.Challenge;
         }
 
-        if (currentUrl.Contains("banned", StringComparison.Ordinal)
-            || currentUrl.Contains("suspended", StringComparison.Ordinal)
+        if (currentUrl.Contains("suspended", StringComparison.Ordinal)
             || currentUrl.Contains("restricted", StringComparison.Ordinal)
             || ContainsAny(signal,
-                "your account has been banned",
-                "account is banned",
                 "account has been locked",
                 "account is suspended",
                 "access to this account has been restricted"))

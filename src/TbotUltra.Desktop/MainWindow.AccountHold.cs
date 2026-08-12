@@ -30,12 +30,16 @@ public partial class MainWindow
 
     private async Task HoldAccountAutomationAsync(AccountAccessException exception)
     {
+        var existingHold = _accountAutomationHoldStore.Load(exception.AccountName);
         var hold = new AccountAutomationHold(
             exception.AccountName,
             exception.State.ToString(),
             exception.Message,
             DateTimeOffset.UtcNow);
-        _accountAutomationHoldStore.Save(hold);
+        if (existingHold is null)
+        {
+            _accountAutomationHoldStore.Save(hold);
+        }
 
         _loopController.RequestLoopStop();
         _loopController.RequestQueueStop();
@@ -51,6 +55,20 @@ public partial class MainWindow
             SetLoopIndicator(false);
             UpdateLoginButtonsVisual(false);
             RefreshAccountHoldUi();
+
+            if (existingHold is null)
+            {
+                var message = exception.State == AccountAccessState.Banned
+                    ? "Travian has banned this avatar. All automation for the account has been stopped, and no punishment or support button was clicked. Review the ban manually in the open browser."
+                    : $"Travian reported an account access problem ({exception.State}). All automation for the account has been stopped. Manual review is required.";
+                AppDialog.Show(
+                    this,
+                    message,
+                    exception.State == AccountAccessState.Banned ? "Account banned" : "Account access stopped",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error,
+                    MessageBoxResult.OK);
+            }
         });
 
         AppendLog(
@@ -93,7 +111,21 @@ public partial class MainWindow
         _loopController.ClearQueueStopRequest();
         RefreshAccountHoldUi();
         UpdateLoginButtonsVisual(false);
-        StatusTextBlock.Text = "Account re-enabled. Press Login after completing manual review.";
-        AppendLog($"Account '{accountName}' manually re-enabled. Queue and settings were kept.");
+        const string nextSteps =
+            "Account re-enabled. Click Login to verify the open Travian session, then click Start bot. "
+            + "If the account is still banned, automation will stop again.";
+        StatusTextBlock.Text = nextSteps;
+        AppendLog($"Account '{accountName}' manually re-enabled. Queue and settings were kept. Click Login, then Start bot.");
+        AppDialog.Show(
+            this,
+            "The account hold has been removed.\n\n"
+            + "1. Make sure the ban has been resolved in the open Travian browser.\n"
+            + "2. Click Login in Tbot Ultra to verify the session.\n"
+            + "3. Click Start bot when login has completed.\n\n"
+            + "If Travian still reports a ban, all automation will stop again.",
+            "Account re-enabled",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information,
+            MessageBoxResult.OK);
     }
 }

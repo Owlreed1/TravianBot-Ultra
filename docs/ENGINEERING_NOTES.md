@@ -108,6 +108,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - A ready enabled task always wins over holding the current village for an imminent deferred task. The account-scoped
   Pacing setting `short_village_defer_seconds` may be 20, 60, or 90 seconds (default 60) and applies only when no task
   is ready in any village; changing it while the continuous loop runs requests a wake at the next safe boundary.
+- Continuous Loop and Auto Queue share runtime-only village batching over the account queue: ready work is drained
+  across groups in the verified browser village before normal work elsewhere. Ready Account work or `Priority > 0`
+  may preempt; after 10 execution attempts another ready village gets a turn. Deferred/unknown work never keeps a
+  batch alive, and preview/forecast selection must not mutate the batch owner or attempt count.
 - Applying Session pacing settings while automation is active must take effect immediately: enabling starts its run
   timer, while disabling a scheduled sleep resumes the captured automation state.
 - Known queue deadlines are authoritative and may not be shortened by pacing.
@@ -174,8 +178,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Official special-server discovery routes through the active account proxy, never falls back to direct traffic when
   `NeverUseOwnIp` is enabled, isolates malformed source payloads, and uses a seven-day atomically written last-known-good
   cache when live sources are unavailable.
-- Account holds are account-specific: restriction, challenge, or repeated verified unknown state stops only that
-  account and preserves its queue/settings until manual re-enable.
+- Account holds are account-specific: a verified ban, restriction, challenge, or repeated unknown state stops only
+  that account and preserves its queue/settings until manual re-enable. A Travian punishment page is evidence only:
+  never click its Agree or Contact Support controls, and leave the browser open for manual review.
 - Detailed lifecycle, SSO, cleanup, and access rules: [browser/session ADR](adr/2026-07-18-browser-session-and-login.md).
 
 ## Feature implementation conventions
@@ -420,7 +425,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   and `Next task` use the effective availability time: raw finish plus the already persisted construction-humanize
   delay (and existing race buffer). Forecasts must reuse the live selector without mutating queue, rotation, or
   pacing state; normal construction navigation must not start exactly when the raw timer expires. Login-fill and
-  pre-sleep-fill keep their explicit early-fill exceptions.
+  pre-sleep-fill keep their explicit early-fill exceptions. A login village-status round may immediately fill a
+  live-verified free slot while it is already visiting that village, but login preparation must preserve any
+  persisted queue-humanize extra for a full slot so its later navigation still waits for the effective deadline.
 
 ## Target architecture
 

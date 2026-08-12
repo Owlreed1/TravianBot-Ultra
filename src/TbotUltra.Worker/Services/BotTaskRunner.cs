@@ -246,7 +246,9 @@ public sealed partial class BotTaskRunner
                         log($"[{taskName} STARTED] ({taskIndex}/{tasks.Count}) on '{client.AccountName}'");
                         try
                         {
+                            await client.EnsureAccountAccessAllowedAsync(cancellationToken);
                             await handler(context);
+                            await client.EnsureAccountAccessAllowedAsync(cancellationToken);
                             taskTrace.Complete("success");
                             log($"[{taskName} COMPLETED] in {taskSw.Elapsed.TotalSeconds:F1}s ({taskIndex}/{tasks.Count})");
                         }
@@ -258,18 +260,25 @@ public sealed partial class BotTaskRunner
                         }
                         catch (TaskWaitException waitEx)
                         {
+                            await client.EnsureAccountAccessAllowedAsync(cancellationToken);
                             taskTrace.Complete("deferred", $"waitSeconds={waitEx.DelaySeconds}");
                             log($"[{taskName} DEFERRED] after {taskSw.Elapsed.TotalSeconds:F1}s — wait {waitEx.DelaySeconds}s: {waitEx.Message}");
                             throw;
                         }
                         catch (TaskBlockedPermanentlyException blockedEx)
                         {
+                            await client.EnsureAccountAccessAllowedAsync(cancellationToken);
                             taskTrace.Complete("blocked", blockedEx.Message);
                             log($"[{taskName} BLOCKED] after {taskSw.Elapsed.TotalSeconds:F1}s: {blockedEx.Message}");
                             throw;
                         }
                         catch (Exception ex)
                         {
+                            if (ex is not AccountAccessException)
+                            {
+                                await client.EnsureAccountAccessAllowedAsync(cancellationToken);
+                            }
+
                             taskTrace.Complete("failed", $"{ex.GetType().Name}: {ex.Message}");
                             if (BrowserFailureClassifier.IsTargetCrash(ex))
                             {

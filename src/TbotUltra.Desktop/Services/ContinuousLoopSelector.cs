@@ -26,17 +26,6 @@ internal sealed record ContinuousLoopSelectionPlan(
     IReadOnlyList<QueueGroup> OrderedGroups,
     IReadOnlyDictionary<QueueGroup, IReadOnlyList<QueueItem>> OrderedItemsByGroup);
 
-internal sealed record ContinuousLoopGroupSelectionInput(
-    QueueGroup Group,
-    IReadOnlyList<QueueItem> OrderedItems,
-    string? RotationVillageKey,
-    DateTimeOffset Now,
-    IReadOnlyDictionary<Guid, string?> VillageKeys);
-
-internal sealed record ContinuousLoopGroupSelectionResult(
-    QueueItem? Item,
-    string? RotationVillageKey);
-
 /// <summary>
 /// Stateless selection and timing rules used by the continuous loop.
 /// </summary>
@@ -94,22 +83,10 @@ internal static class ContinuousLoopSelector
         return new ContinuousLoopSelectionPlan(orderedGroups, orderedItemsByGroup);
     }
 
-    internal static ContinuousLoopGroupSelectionResult SelectNonConstructionGroup(
-        ContinuousLoopGroupSelectionInput input)
-    {
-        var rotationVillageKey = input.RotationVillageKey;
-        var candidate = QueueVillageRotation.SelectByVillageRotation(
-            input.OrderedItems,
-            item => input.VillageKeys.TryGetValue(item.Id, out var villageKey) ? villageKey : null,
-            villageItems => input.Group == QueueGroup.Hero
-                ? SelectReadyHeroGroupItem(villageItems, input.Now)
-                : SelectReadyGroupHead(villageItems, input.Now),
-            ref rotationVillageKey);
-
-        return new ContinuousLoopGroupSelectionResult(candidate, rotationVillageKey);
-    }
-
     internal static bool IsUtilityTask(string? taskName) => IsImmediateAccountTask(taskName);
+
+    internal static bool IsUrgentItem(QueueItem item) =>
+        item.Group == QueueGroup.Account || item.Priority > 0;
 
     internal static bool IsImmediateAccountTask(string? taskName) =>
         string.Equals(taskName, "collect_tasks", StringComparison.OrdinalIgnoreCase)

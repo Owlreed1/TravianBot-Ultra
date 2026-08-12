@@ -231,7 +231,11 @@ public partial class MainWindow
                 AppendLog($"[village-scan] updated '{village.Name}'.");
 
                 await EnsureContinuousLoopRuntimeItemsAsync(options, token, village);
-                if (!await ExecuteReadyVillageStatusSweepTasksAsync(options, village, token))
+                if (!await ExecuteReadyVillageStatusSweepTasksAsync(
+                        options,
+                        village,
+                        collectionResult.Attempts,
+                        token))
                 {
                     return;
                 }
@@ -289,7 +293,7 @@ public partial class MainWindow
                 village.Url,
                 cancellationToken);
 
-    private async Task<(VillageStatus Status, bool ShouldContinue)> CollectVillageStatusSweepRewardsAsync(
+    private async Task<(VillageStatus Status, bool ShouldContinue, int Attempts)> CollectVillageStatusSweepRewardsAsync(
         BotOptions options,
         VillageSelectionItem village,
         VillageStatus status,
@@ -301,7 +305,7 @@ public partial class MainWindow
         var villageKey = _villageSettingsStore.ResolveCanonicalKey(GetVillageKey(village));
         if (string.IsNullOrWhiteSpace(villageKey))
         {
-            return (status, true);
+            return (status, true, 0);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -323,10 +327,11 @@ public partial class MainWindow
             .ReadyItems;
         if (readyItems.Count == 0)
         {
-            return (status, true);
+            return (status, true, 0);
         }
 
-        foreach (var item in readyItems)
+        var attempts = 0;
+        foreach (var item in readyItems.Take(VillageBatchState.MaxAttempts))
         {
             cancellationToken.ThrowIfCancellationRequested();
             AppendLog(
@@ -337,6 +342,8 @@ public partial class MainWindow
                 options.ActionPacingTaskMaxSeconds,
                 cancellationToken,
                 "Village scan: before reward collection");
+            RecordVillageBatchAttempt(item, "village-scan");
+            attempts++;
             if (!await ExecuteSingleQueueItemAsync(
                     item,
                     options,
@@ -344,11 +351,18 @@ public partial class MainWindow
                     QueueExecutionMode.ContinuousLoop,
                     cancellationToken))
             {
-                return (status, false);
+                return (status, false, attempts);
             }
 
             MarkContinuousBrowserActivity(options);
             await ApplyPostTaskCooldownAsync(item, options, cancellationToken);
+        }
+
+        if (readyItems.Count > attempts)
+        {
+            AppendLog(
+                $"[village-scan] village '{village.Name}' reached the "
+                + $"{VillageBatchState.MaxAttempts}-attempt limit; remaining ready rewards wait for the next pass.");
         }
 
         // Reward collection may change resources and leaves the browser on a task/dialog page.
@@ -370,7 +384,7 @@ public partial class MainWindow
             }
         });
 
-        return (status, true);
+        return (status, true, attempts);
     }
 
     private async Task<VillageStatus> RefreshVillageStatusSweepOptionalStatusesAsync(
@@ -501,6 +515,7 @@ public partial class MainWindow
     private async Task<bool> ExecuteReadyVillageStatusSweepTasksAsync(
         BotOptions options,
         VillageSelectionItem village,
+        int attemptsAlreadyMade,
         CancellationToken cancellationToken)
     {
         var villageKey = _villageSettingsStore.ResolveCanonicalKey(GetVillageKey(village));
@@ -510,7 +525,8 @@ public partial class MainWindow
         }
 
         var attemptedItemIds = new HashSet<Guid>();
-        while (true)
+        var attempts = attemptsAlreadyMade;
+        while (attempts < VillageBatchState.MaxAttempts)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var next = SelectNextQueueItemForVillageStatusSweep(villageKey, attemptedItemIds);
@@ -528,6 +544,8 @@ public partial class MainWindow
                 options.ActionPacingTaskMaxSeconds,
                 cancellationToken,
                 "Village scan: before task");
+            RecordVillageBatchAttempt(next, "village-scan");
+            attempts++;
             var shouldContinue = await ExecuteSingleQueueItemAsync(
                 next,
                 options,
@@ -542,6 +560,15 @@ public partial class MainWindow
 
             await ApplyPostTaskCooldownAsync(next, options, cancellationToken);
         }
+
+        if (SelectNextQueueItemForVillageStatusSweep(villageKey, attemptedItemIds) is not null)
+        {
+            AppendLog(
+                $"[village-scan] village '{village.Name}' reached the "
+                + $"{VillageBatchState.MaxAttempts}-attempt limit; continuing the scan round.");
+        }
+
+        return true;
     }
 
     private QueueItem? SelectNextQueueItemForVillageStatusSweep(
@@ -599,26 +626,10 @@ public partial class MainWindow
     private bool? _continuousGoldClubEnabled;
     private DateTimeOffset _lastContinuousGoldClubCheckUtc = DateTimeOffset.MinValue;
 
-    // The village the AutoQueue drain is currently working through. Rotation drains one village's ready
-    // tasks before advancing to the next; reset at the start of each run so a fresh run starts cleanly.
-    private string? _autoQueueRotationVillageKey;
-
-    // The village the continuous loop is currently draining construction for. Same rotation rule as the
-    // AutoQueue path: finish one village's construction (in strict order) before moving to the next; if
-    // the current village's next construction is deferred (e.g. waiting for resources), rotate onward so
-    // a stalled village never blocks the others. Reset when the loop starts.
-    private string? _continuousConstructionRotationVillageKey;
-
-    // Per-village rotation key for the OTHER continuous-loop groups (troop-training, smithy, and the
-    // global groups). Same drain-then-rotate rule as construction, but kept per group so each group
-    // rotates independently. Construction keeps its dedicated field above. Reset when the loop starts.
-    private readonly Dictionary<QueueGroup, string?> _continuousGroupRotationVillageKeys = new();
-
-    private string? GetContinuousGroupRotationVillageKey(QueueGroup group)
-        => _continuousGroupRotationVillageKeys.TryGetValue(group, out var key) ? key : null;
-
-    private void SetContinuousGroupRotationVillageKey(QueueGroup group, string? key)
-        => _continuousGroupRotationVillageKeys[group] = key;
+    // Continuous Loop and Auto Queue are mutually exclusive and therefore share one runtime-only batch
+    // owner. The verified browser village is drained across groups before normal work elsewhere; after
+    // ten attempts, another ready village gets a turn so a permanently hot village cannot starve it.
+    private readonly VillageBatchState _villageBatchState = new();
 
     private async Task TriggerQueueAutoRunAsync()
     {
@@ -1465,132 +1476,75 @@ public partial class MainWindow
             return null;
         }
 
-        // Finish ready work in the browser's current village before considering another village. This
-        // avoids repeated village switches when different automation groups are interleaved.
-        if (!string.IsNullOrWhiteSpace(_activeWorkingVillageKey))
+        // Account work was handled above. Explicit positive queue priority is the only other normal
+        // cross-village preemption: group order alone may choose the next batch, but never interrupts one.
+        var urgentCandidate = SelectReadyItemAcrossVillages(
+            selectionPlan,
+            villageKeysByItemId,
+            now,
+            preview: true,
+            excludedVillageKey: null,
+            urgentOnly: true);
+        if (urgentCandidate is not null)
         {
-            foreach (var group in orderedGroups)
-            {
-                var activeVillageItems = ContinuousLoopSelector.SelectVillageItems(
-                    selectionPlan.OrderedItemsByGroup[group],
-                    villageKeysByItemId,
+            if (!preview
+                && !string.Equals(
+                    GetQueueItemVillageKey(urgentCandidate),
                     _activeWorkingVillageKey,
-                    includeVillageLess: group == QueueGroup.Hero);
-                if (activeVillageItems.Count == 0)
-                {
-                    continue;
-                }
-
-                QueueItem? activeVillageCandidate;
-                if (group == QueueGroup.Construction)
-                {
-                    activeVillageCandidate = SelectNextConstructionQueueItem(
-                        activeVillageItems,
-                        now,
-                        out _,
-                        preview);
-                    if (activeVillageCandidate is not null
-                        && !IsConstructionGroupReady(
-                            allowWorkerValidationForReadyItem: true,
-                            suppressLog: preview))
-                    {
-                        activeVillageCandidate = null;
-                    }
-                }
-                else
-                {
-                    activeVillageCandidate = group == QueueGroup.Hero
-                        ? ContinuousLoopSelector.SelectReadyHeroGroupItem(activeVillageItems, now)
-                        : ContinuousLoopSelector.SelectReadyGroupHead(activeVillageItems, now);
-                }
-
-                if (activeVillageCandidate is not null)
-                {
-                    return activeVillageCandidate;
-                }
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                AppendLog(
+                    $"[village-batch] urgent preemption task='{urgentCandidate.TaskName}' "
+                    + $"priority={urgentCandidate.Priority} village='{GetQueueItemVillageName(urgentCandidate) ?? "-"}'.");
             }
 
+            return urgentCandidate;
         }
 
-        string? lastSkipReason = null;
-        foreach (var group in orderedGroups)
+        var batch = _villageBatchState.SnapshotFor(_activeWorkingVillageKey);
+        var currentVillageCandidate = string.IsNullOrWhiteSpace(batch.VillageKey)
+            ? null
+            : SelectReadyItemForVillage(
+                selectionPlan,
+                villageKeysByItemId,
+                batch.VillageKey,
+                now,
+                preview);
+        var otherVillageCandidate = SelectReadyItemAcrossVillages(
+            selectionPlan,
+            villageKeysByItemId,
+            now,
+            preview: true,
+            excludedVillageKey: batch.VillageKey,
+            urgentOnly: false);
+
+        if (VillageBatchState.ShouldKeepCurrentVillage(
+                batch,
+                currentVillageCandidate is not null,
+                otherVillageCandidate is not null))
         {
-            var orderedGroupItems = selectionPlan.OrderedItemsByGroup[group];
-            if (group == QueueGroup.Construction)
-            {
-                // Rotate construction across enabled villages: drain the current village's construction in
-                // strict order, but if its next item is deferred move on to another village rather than
-                // holding the whole group (the user's per-village rotation rule).
-                var rotationKey = _continuousConstructionRotationVillageKey;
-                string? constructionSkipReason = null;
-                var constructionCandidate = QueueVillageRotation.SelectByVillageRotation(
-                    orderedGroupItems,
-                    GetQueueItemVillageKey,
-                    villageItems => SelectNextConstructionQueueItem(villageItems, now, out _, preview),
-                    ref rotationKey);
-                if (!preview)
-                {
-                    _continuousConstructionRotationVillageKey = rotationKey;
-                }
+            return currentVillageCandidate;
+        }
 
-                if (constructionCandidate is not null)
-                {
-                    if (!IsConstructionGroupReady(allowWorkerValidationForReadyItem: true, suppressLog: preview))
-                    {
-                        lastSkipReason = $"group={group} skipped (construction group not ready)";
-                        if (!preview)
-                        {
-                            AppendLoopPickVerbose(
-                                $"[loop-pick:verbose] {lastSkipReason}",
-                                $"group:{group}:construction-not-ready");
-                        }
-
-                        continue;
-                    }
-
-                    return constructionCandidate;
-                }
-
-                lastSkipReason = constructionSkipReason ?? $"group={group} skipped (no ready construction items)";
-                if (!preview)
-                {
-                    AppendLoopPickVerbose(
-                        $"[loop-pick:verbose] {lastSkipReason}",
-                        $"group:{group}:{BuildLoopPickSkipKey(lastSkipReason)}");
-                }
-
-                continue;
-            }
-
-            // Rotate non-construction groups across villages too: troop-training/smithy/farming items are
-            // tagged per village, so a village whose head item is waiting must not block another village's
-            // ready item. For truly global/village-less groups (hero, …) all items share one village key,
-            // so this collapses to the original strict in-order head selection.
-            var groupSelection = ContinuousLoopSelector.SelectNonConstructionGroup(
-                new ContinuousLoopGroupSelectionInput(
-                    group,
-                    orderedGroupItems,
-                    GetContinuousGroupRotationVillageKey(group),
-                    now,
-                    villageKeysByItemId));
-            var candidate = groupSelection.Item;
+        if (otherVillageCandidate is not null)
+        {
             if (!preview)
             {
-                SetContinuousGroupRotationVillageKey(group, groupSelection.RotationVillageKey);
+                var reason = currentVillageCandidate is null
+                    ? "current village has no ready work"
+                    : $"reached {VillageBatchState.MaxAttempts}-attempt fairness limit";
+                AppendLog(
+                    $"[village-batch] rotate from '{_activeWorkingVillageName ?? "-"}' because {reason}; "
+                    + $"next='{GetQueueItemVillageName(otherVillageCandidate) ?? "-"}' "
+                    + $"task='{otherVillageCandidate.TaskName}'.");
             }
 
-            if (candidate is not null)
-            {
-                return candidate;
-            }
+            return otherVillageCandidate;
+        }
 
-            lastSkipReason = $"group={group} skipped (no ready item across villages)";
-            if (!preview)
-            {
-                AppendLoopPickVerbose(
-                    $"[loop-pick:verbose] {lastSkipReason}",
-                    $"group:{group}:{BuildLoopPickSkipKey(lastSkipReason)}");
-            }
+        if (currentVillageCandidate is not null)
+        {
+            return currentVillageCandidate;
         }
 
         // A ready task always wins over a short wait in the current village. This includes utility
@@ -1626,11 +1580,98 @@ public partial class MainWindow
         if (!preview)
         {
             AppendLoopPickVerbose(
-                $"[loop-pick:verbose] no item selected from {orderedGroups.Count} group(s)"
-                    + (lastSkipReason is null ? string.Empty : $" — last reason: {lastSkipReason}"),
-                $"no-selected:{orderedGroups.Count}:{BuildLoopPickSkipKey(lastSkipReason)}");
+                $"[loop-pick:verbose] no ready item selected from {orderedGroups.Count} group(s)",
+                $"no-selected:{orderedGroups.Count}");
         }
         return null;
+    }
+
+    private QueueItem? SelectReadyItemForVillage(
+        ContinuousLoopSelectionPlan selectionPlan,
+        IReadOnlyDictionary<Guid, string?> villageKeysByItemId,
+        string villageKey,
+        DateTimeOffset now,
+        bool preview)
+    {
+        foreach (var group in selectionPlan.OrderedGroups)
+        {
+            var villageItems = ContinuousLoopSelector.SelectVillageItems(
+                selectionPlan.OrderedItemsByGroup[group],
+                villageKeysByItemId,
+                villageKey,
+                includeVillageLess: group == QueueGroup.Hero);
+            var candidate = SelectReadyItemWithinGroup(group, villageItems, now, preview);
+            if (candidate is not null)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private QueueItem? SelectReadyItemAcrossVillages(
+        ContinuousLoopSelectionPlan selectionPlan,
+        IReadOnlyDictionary<Guid, string?> villageKeysByItemId,
+        DateTimeOffset now,
+        bool preview,
+        string? excludedVillageKey,
+        bool urgentOnly)
+    {
+        foreach (var group in selectionPlan.OrderedGroups)
+        {
+            var groupItems = selectionPlan.OrderedItemsByGroup[group]
+                .Where(item => !urgentOnly || ContinuousLoopSelector.IsUrgentItem(item))
+                .Where(item => string.IsNullOrWhiteSpace(excludedVillageKey)
+                    || (villageKeysByItemId.TryGetValue(item.Id, out var villageKey)
+                        && !string.IsNullOrWhiteSpace(villageKey)
+                        && !string.Equals(villageKey, excludedVillageKey, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            if (groupItems.Count == 0)
+            {
+                continue;
+            }
+
+            string? rotationVillageKey = null;
+            var candidate = QueueVillageRotation.SelectByVillageRotation(
+                groupItems,
+                item => villageKeysByItemId.TryGetValue(item.Id, out var villageKey) ? villageKey : null,
+                villageItems => SelectReadyItemWithinGroup(group, villageItems, now, preview),
+                ref rotationVillageKey);
+            if (candidate is not null)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private QueueItem? SelectReadyItemWithinGroup(
+        QueueGroup group,
+        IReadOnlyList<QueueItem> villageItems,
+        DateTimeOffset now,
+        bool preview)
+    {
+        if (villageItems.Count == 0)
+        {
+            return null;
+        }
+
+        if (group != QueueGroup.Construction)
+        {
+            return group == QueueGroup.Hero
+                ? ContinuousLoopSelector.SelectReadyHeroGroupItem(villageItems, now)
+                : ContinuousLoopSelector.SelectReadyGroupHead(villageItems, now);
+        }
+
+        var candidate = SelectNextConstructionQueueItem(villageItems, now, out _, preview);
+        return candidate is not null
+            && IsConstructionGroupReady(
+                allowWorkerValidationForReadyItem: true,
+                suppressLog: preview)
+                ? candidate
+                : null;
     }
 
     private ContinuousLoopForecast ResolveNextContinuousLoopForecast(
@@ -2062,51 +2103,6 @@ public partial class MainWindow
             : ConstructionQueueState.ResolveAvailabilityForItem(status, _travianPlusActive, item, now);
     }
 
-    private QueueItem? SelectNextQueueItemForAutoQueue(
-        DateTimeOffset now,
-        ref string? rotationVillageKey)
-    {
-        var orderedItems = _botService.GetQueueItemsForDisplay()
-            .Where(item => ConstructionQueueState.IsActiveQueueStatus(item.Status))
-            .Where(IsQueueItemAllowedByAutomationSettings)
-            .ToList();
-
-        return QueueVillageRotation.SelectByVillageRotation(
-            orderedItems,
-            GetQueueItemVillageKey,
-            villageItems =>
-            {
-                var constructionItems = villageItems
-                    .Where(item => item.Group == QueueGroup.Construction)
-                    .ToList();
-                var constructionCandidate = SelectNextConstructionQueueItem(
-                    constructionItems,
-                    now,
-                    out _);
-
-                foreach (var item in villageItems)
-                {
-                    if (item.Group == QueueGroup.Construction)
-                    {
-                        if (constructionCandidate?.Id == item.Id)
-                        {
-                            return item;
-                        }
-
-                        continue;
-                    }
-
-                    if (item.Status == QueueStatus.Pending && item.NextAttemptAt <= now)
-                    {
-                        return item;
-                    }
-                }
-
-                return null;
-            },
-            ref rotationVillageKey);
-    }
-
     private void LogConstructionQueueFullSummary(QueueItem blocker, int blockedItems, DateTimeOffset now)
     {
         var villageName = NormalizeVillageName(GetQueueItemVillageName(blocker)) ?? "-";
@@ -2382,9 +2378,8 @@ public partial class MainWindow
 
     private async Task RunContinuousLoopAsync(CancellationToken token)
     {
-        // Start a fresh construction village rotation each time the loop starts.
-        _continuousConstructionRotationVillageKey = null;
-        _continuousGroupRotationVillageKeys.Clear();
+        // Start a fresh batch each time the loop starts; the verified browser village seeds it.
+        _villageBatchState.Reset();
         // Reschedule the first idle "step away" break and idle browse relative to this run's start.
         _nextIdleBreakDueUtc = DateTimeOffset.MinValue;
         _nextIdleBrowseDueUtc = DateTimeOffset.MinValue;
@@ -2464,6 +2459,7 @@ public partial class MainWindow
                         options.ActionPacingTaskMaxSeconds,
                         token,
                         "before task");
+                    RecordVillageBatchAttempt(next, $"LOOP {tickId}");
                     var shouldContinue = await ExecuteSingleQueueItemAsync(
                         next,
                         options,
@@ -2950,8 +2946,8 @@ public partial class MainWindow
     private async Task ExecuteQueuedItemsNowAsync(CancellationToken cancellationToken)
     {
         var runId = System.Threading.Interlocked.Increment(ref _operationCounter);
-        // Each run starts a fresh village rotation so it does not resume mid-drain on a stale village.
-        _autoQueueRotationVillageKey = null;
+        // Each run starts a fresh batch so it does not resume a stale fairness counter.
+        _villageBatchState.Reset();
         LogConservativeAutomationWarnings(AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions()));
         AppendLog($"[AUTOQ {runId}] START");
         while (!cancellationToken.IsCancellationRequested)
@@ -2974,19 +2970,7 @@ public partial class MainWindow
             QueueItem? next;
             try
             {
-                // Drain one village's ready tasks before rotating to the next enabled village. Each task
-                // still switches to its own village via BotTaskRunner; rotation just keeps the runner on
-                // one village at a time instead of interleaving villages by global priority/FIFO.
-                var previousRotationKey = _autoQueueRotationVillageKey;
-                var rotationKey = _autoQueueRotationVillageKey;
-                next = SelectNextQueueItemForAutoQueue(DateTimeOffset.UtcNow, ref rotationKey);
-                _autoQueueRotationVillageKey = rotationKey;
-
-                if (next is not null && !string.Equals(previousRotationKey, rotationKey, StringComparison.OrdinalIgnoreCase))
-                {
-                    var villageLabel = GetQueueItemVillageName(next);
-                    AppendLog($"[AUTOQ {runId}] ROTATE to village '{(string.IsNullOrWhiteSpace(villageLabel) ? "-" : villageLabel)}'");
-                }
+                next = SelectNextQueueItemForContinuousLoop();
             }
             catch (Exception ex)
             {
@@ -3039,6 +3023,7 @@ public partial class MainWindow
             await EnsureChromiumInstalledAsync();
             var options = AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions());
             AppendLog($"[AUTOQ {runId}] RUN task={next.TaskName}, id={next.Id}");
+            RecordVillageBatchAttempt(next, $"AUTOQ {runId}");
             var shouldContinue = await ExecuteSingleQueueItemAsync(
                 next,
                 options,
@@ -3116,6 +3101,33 @@ public partial class MainWindow
             options.ActionPacingTaskMaxSeconds,
             cancellationToken,
             $"after state-changing task '{item.TaskName}'");
+    }
+
+    private void RecordVillageBatchAttempt(QueueItem item, string source)
+    {
+        var before = _villageBatchState.SnapshotFor(_activeWorkingVillageKey);
+        var after = _villageBatchState.RecordAttempt(
+            GetQueueItemVillageKey(item),
+            _activeWorkingVillageKey);
+        if (string.IsNullOrWhiteSpace(after.VillageKey))
+        {
+            return;
+        }
+
+        if (!string.Equals(before.VillageKey, after.VillageKey, StringComparison.OrdinalIgnoreCase)
+            || before.AttemptCount == 0)
+        {
+            AppendLog(
+                $"[village-batch] start village='{GetQueueItemVillageName(item) ?? _activeWorkingVillageName ?? "-"}' "
+                + $"key='{after.VillageKey}' source='{source}'.");
+        }
+
+        if (after.AttemptCount == VillageBatchState.MaxAttempts)
+        {
+            AppendLog(
+                $"[village-batch] fairness limit reached for key='{after.VillageKey}' after "
+                + $"{after.AttemptCount} task attempts; rotation will occur when another village is ready.");
+        }
     }
 
     private static bool IsStateChangingTask(string taskName)

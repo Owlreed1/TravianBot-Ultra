@@ -949,11 +949,10 @@ public partial class MainWindow
             village => village.VillageKey,
             village => ResolveNextContinuousLoopForecast(nowUtc, village.VillageKey),
             StringComparer.OrdinalIgnoreCase);
+        var batchVillageKey = _villageBatchState.SnapshotFor(_activeWorkingVillageKey).VillageKey;
         var rotationKeys = QueueGroupCatalog.AllGroups.ToDictionary(
             group => group,
-            group => group == QueueGroup.Construction
-                ? _continuousConstructionRotationVillageKey
-                : GetContinuousGroupRotationVillageKey(group));
+            _ => batchVillageKey);
 
         var snapshot = VillageOverviewFactory.Create(
             villages,

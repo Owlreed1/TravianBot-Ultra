@@ -107,6 +107,12 @@ public sealed partial class TravianClient
             "input[id*='verification' i]",
         };
 
+        // Official punishment page shown after a blocked game action. These controls are evidence only;
+        // automation must never click either the punishment acceptance or support action.
+        public const string BanPunishmentControls =
+            "#content.universal #sysmsg #punishmentMsgButtons button.continueButton, "
+            + "#content.universal #sysmsg #punishmentMsgButtons button.contactSupportButton";
+
         public static readonly string[] LoginButton =
         {
             "button[type='submit']",

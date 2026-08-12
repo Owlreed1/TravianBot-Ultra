@@ -1060,7 +1060,7 @@ public partial class MainWindow
             _pendingSwitchVillageName = null;
             _pendingSwitchVillageUrl = null;
         }
-        _continuousGroupRotationVillageKeys.Clear();
+        _villageBatchState.Reset();
         _defaultEnabledGroupKeys.Clear();
 
         _troopsBlockedReasonKey = null;

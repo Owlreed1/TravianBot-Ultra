@@ -6,8 +6,9 @@ namespace TbotUltra.Worker.Tests;
 public sealed class AccountAccessClassifierTests
 {
     [Theory]
-    [InlineData("https://example.test/banned", "", false, AccountAccessState.Restricted)]
-    [InlineData("https://example.test/dorf1.php", "Your account has been banned", false, AccountAccessState.Restricted)]
+    [InlineData("https://example.test/banned", "", false, AccountAccessState.Banned)]
+    [InlineData("https://example.test/dorf1.php", "Your account has been banned", false, AccountAccessState.Banned)]
+    [InlineData("https://example.test/dorf1.php", "Your avatar is now banned due to a violation of our game rules.", false, AccountAccessState.Banned)]
     [InlineData("https://example.test/challenge", "", false, AccountAccessState.Challenge)]
     [InlineData("https://example.test/login.php", "", true, AccountAccessState.Challenge)]
     public void ClassifyExplicit_DetectsRestrictionAndChallengeFixtures(
@@ -17,6 +18,20 @@ public sealed class AccountAccessClassifierTests
         AccountAccessState expected)
     {
         Assert.Equal(expected, AccountAccessClassifier.ClassifyExplicit(url, text, captcha));
+    }
+
+    [Fact]
+    public void ClassifyExplicit_DetectsPunishmentPageContract()
+    {
+        const string text = "You cannot do any actions in the game until the ban is removed.";
+
+        Assert.Equal(
+            AccountAccessState.Banned,
+            AccountAccessClassifier.ClassifyExplicit(
+                "https://example.test/dorf1.php",
+                text,
+                captchaInputPresent: false,
+                punishmentControlsPresent: true));
     }
 
     [Fact]
