@@ -42,6 +42,11 @@ public sealed class DesktopBotService : IDesktopBotService
         return _queueStore.AddBatch(requests);
     }
 
+    public IReadOnlyList<QueueItem> ReplaceActiveQueueGroup(QueueGroup group, IReadOnlyList<QueueItemCreateRequest> requests)
+    {
+        return _queueStore.ReplaceActiveGroup(group, requests);
+    }
+
     public QueueItem EnqueueRuntime(string taskName, string displayName, Dictionary<string, string>? payload, int priority, int maxRetries)
     {
         return _queueStore.AddRuntime(taskName, displayName, payload, priority, maxRetries);

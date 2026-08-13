@@ -39,6 +39,13 @@ public partial class MainWindow
         if (existingHold is null)
         {
             _accountAutomationHoldStore.Save(hold);
+            if (exception.State == AccountAccessState.Banned)
+            {
+                _banRecoveryStore.CaptureIfMissing(
+                    exception.AccountName,
+                    _villageCacheStore.Load(),
+                    _villageCacheStore.LoadUpdatedAtUtc());
+            }
         }
 
         _loopController.RequestLoopStop();
@@ -106,14 +113,19 @@ public partial class MainWindow
             return;
         }
 
+        var hold = ActiveAccountHold();
+        if (hold is not null
+            && string.Equals(hold.AccessState, AccountAccessState.Banned.ToString(), StringComparison.OrdinalIgnoreCase))
+        {
+            _banRecoveryStore.SetStage(accountName, BanRecoveryStage.ScanPending);
+        }
         _accountAutomationHoldStore.Clear(accountName);
         _loopController.ClearLoopStopRequest();
         _loopController.ClearQueueStopRequest();
         RefreshAccountHoldUi();
         UpdateLoginButtonsVisual(false);
         const string nextSteps =
-            "Account re-enabled. Click Login to verify the open Travian session, then click Start bot. "
-            + "If the account is still banned, automation will stop again.";
+            "Account re-enabled. Click Login, then Start bot. A read-only village recovery scan will run before automation starts.";
         StatusTextBlock.Text = nextSteps;
         AppendLog($"Account '{accountName}' manually re-enabled. Queue and settings were kept. Click Login, then Start bot.");
         AppDialog.Show(
@@ -121,7 +133,8 @@ public partial class MainWindow
             "The account hold has been removed.\n\n"
             + "1. Make sure the ban has been resolved in the open Travian browser.\n"
             + "2. Click Login in Tbot Ultra to verify the session.\n"
-            + "3. Click Start bot when login has completed.\n\n"
+            + "3. Click Start bot when login has completed. Tbot Ultra will scan every village before running any task.\n"
+            + "4. Review the recovery choices after the scan.\n\n"
             + "If Travian still reports a ban, all automation will stop again.",
             "Account re-enabled",
             MessageBoxButton.OK,

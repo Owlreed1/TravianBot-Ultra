@@ -105,6 +105,7 @@ public partial class MainWindow : Window
     private readonly HeroInventorySnapshotStore _heroInventorySnapshotStore;
     private readonly AccountDeletionService _accountDeletionService;
     private readonly AccountAutomationHoldStore _accountAutomationHoldStore;
+    private readonly BanRecoveryStore _banRecoveryStore;
     private readonly ServerCatalogStore _serverCatalogStore;
     private readonly IDesktopBotService _botService;
     private readonly HeroPanelService _heroPanelService;
@@ -423,6 +424,7 @@ public partial class MainWindow : Window
         _accountProvider = new EnvAccountProvider(_envPath);
         _accountStore = new EnvAccountStore(_envPath);
         _accountAutomationHoldStore = new AccountAutomationHoldStore(_projectRoot, AppendLog);
+        _banRecoveryStore = new BanRecoveryStore(_projectRoot, AppendLog);
         _botConfigStore = new BotConfigStore(_botConfigPath, _projectRoot, () => _accountStore.ActiveAccountName());
         _villageSettingsStore = new VillageSettingsStore(_projectRoot, () => _accountStore.ActiveAccountName(), AppendLog);
         _travcoListStore = new TravcoListStore(

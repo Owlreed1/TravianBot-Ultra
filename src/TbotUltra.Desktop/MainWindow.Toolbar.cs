@@ -18,7 +18,7 @@ public partial class MainWindow
     private bool _shutdownInProgress;
     private bool _shutdownCompleted;
 
-    private void StartLoopButton_Click(object sender, RoutedEventArgs e)
+    private async void StartLoopButton_Click(object sender, RoutedEventArgs e)
     {
         if (IsFreezeActive)
         {
@@ -77,6 +77,11 @@ public partial class MainWindow
         if (_loopTask is not null && !_loopTask.IsCompleted)
         {
             RequestImmediatePauseAutomation("Pause requested. Cancelling current task...");
+            return;
+        }
+
+        if (await TryRunPendingBanRecoveryAsync())
+        {
             return;
         }
 

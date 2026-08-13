@@ -60,6 +60,7 @@ public static class BotOptionPayloadKeys
     public const string AutoAddedParentId = "auto_added_parent_id";
     public const string AutoAddedRequirement = "auto_added_requirement";
     public const string AutoAddedByConstructionRequirementRepair = "construction_requirement_repair";
+    public const string AutoAddedByBanRecovery = "ban_recovery";
 
     public const string BuildingUpgradeSlotId = "building_upgrade_slot_id";
     public const string BuildingUpgradeTargetLevel = "building_upgrade_target_level";

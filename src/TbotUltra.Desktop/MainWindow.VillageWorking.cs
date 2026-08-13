@@ -811,7 +811,8 @@ public partial class MainWindow
     private void CacheVillageStatus(
         VillageStatus status,
         string? villageNameOverride = null,
-        bool triggerDeferredWaitRefresh = true)
+        bool triggerDeferredWaitRefresh = true,
+        bool readOnlyObservation = false)
     {
         var name = NormalizeVillageName(villageNameOverride) ?? NormalizeVillageName(status.ActiveVillage);
         if (name is null)
@@ -897,7 +898,7 @@ public partial class MainWindow
         // An empty queue is confirmed only by a current dorf1/dorf2 overview read. Treat that visit as
         // a human deciding to queue work now: arm the short-lived fill override for this village so all
         // available official resource/building slots start before normal construction pacing resumes.
-        if (confirmedEmptyConstructionQueue)
+        if (confirmedEmptyConstructionQueue && !readOnlyObservation)
         {
             PrepareConstructionLoginFill(
                 "empty-queue",

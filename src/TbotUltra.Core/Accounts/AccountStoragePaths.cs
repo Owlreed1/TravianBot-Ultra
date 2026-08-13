@@ -67,6 +67,11 @@ public static class AccountStoragePaths
         return Path.Combine(AccountDirectory(projectRoot, accountName), "automation_hold.json");
     }
 
+    public static string BanRecoveryPath(string projectRoot, string accountName)
+    {
+        return Path.Combine(AccountDirectory(projectRoot, accountName), "ban_recovery.json");
+    }
+
     // Per-account structured village settings (which villages are enabled for automation, plus
     // cached identity such as name/coords/capital). Kept as its own file because a per-village
     // record does not map cleanly onto the flat key/value settings.json overlay.

@@ -25,6 +25,7 @@ public sealed class VillageCacheStore
 {
     private sealed class VillageCacheFile
     {
+        public DateTimeOffset? UpdatedAtUtc { get; set; }
         public Dictionary<string, VillageStatus> Villages { get; set; } = new(System.StringComparer.OrdinalIgnoreCase);
     }
 
@@ -111,6 +112,23 @@ public sealed class VillageCacheStore
         }
     }
 
+    public DateTimeOffset? LoadUpdatedAtUtc()
+    {
+        var account = GetActiveAccountName();
+        if (string.IsNullOrWhiteSpace(account)) return null;
+        var path = AccountStoragePaths.VillageCachePath(_projectRoot, account);
+        if (!File.Exists(path)) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<VillageCacheFile>(ReadAllTextShared(path), SerializerOptions)?.UpdatedAtUtc;
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            _log?.Invoke($"[village-cache] could not read snapshot timestamp: {ex.Message}");
+            return null;
+        }
+    }
+
     /// <summary>Persists the per-village statuses for the active account (volatile values stripped).
     /// Keys are persisted as given — callers pass the canonical-keyed snapshot.</summary>
     public void Save(IReadOnlyDictionary<string, VillageStatus> villagesByKey)
@@ -121,7 +139,7 @@ public sealed class VillageCacheStore
             return;
         }
 
-        var file = new VillageCacheFile();
+        var file = new VillageCacheFile { UpdatedAtUtc = DateTimeOffset.UtcNow };
         foreach (var pair in villagesByKey)
         {
             if (!string.IsNullOrWhiteSpace(pair.Key) && pair.Value is not null)

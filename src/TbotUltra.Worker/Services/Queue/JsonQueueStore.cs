@@ -116,6 +116,37 @@ public sealed class JsonQueueStore : IQueueStore
         }
     }
 
+    public IReadOnlyList<QueueItem> ReplaceActiveGroup(QueueGroup group, IReadOnlyList<QueueItemCreateRequest> requests)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        foreach (var request in requests)
+        {
+            if (!TaskCatalog.IsAllowed(request.TaskName)
+                || QueueGroupCatalog.ResolveGroup(request.TaskName) != group)
+            {
+                throw new InvalidOperationException($"Task '{request.TaskName}' is not valid for queue group {group}.");
+            }
+            if (request.MaxRetries < 0) throw new InvalidOperationException("Max retries must be >= 0.");
+        }
+
+        lock (_sync)
+        {
+            var items = LoadMutable();
+            var created = requests.Select(request => CreateQueueItem(
+                request.TaskName,
+                null,
+                request.Payload,
+                request.Priority,
+                request.MaxRetries,
+                isRuntimeOnly: false)).ToList();
+            items.RemoveAll(item => item.Group == group
+                && item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused);
+            items.AddRange(created);
+            SaveMutable(items);
+            return created.Select(Clone).ToList();
+        }
+    }
+
     public QueueItem AddRuntime(string taskName, string displayName, Dictionary<string, string>? payload, int priority, int maxRetries)
     {
         if (string.IsNullOrWhiteSpace(taskName))

@@ -185,6 +185,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   the jittered current-page refresh must turn it into an account hold and stop the rest of that refresh tick.
   Active task page-ready and resource-retry paths must probe the same signals before waiting or reloading, so a
   punishment response cannot spend tens of seconds in missing-widget recovery before the account hold is raised.
+- A verified ban captures the last durable village structure once. After manual re-enable, the first Start bot runs
+  a full dorf1+dorf2 recovery scan in strict read-only mode before any task generation, reward collection, queue
+  reconciliation, construction-fill arming, or execution. Normal automation may resume only after the user's recovery choice.
 - Detailed lifecycle, SSO, cleanup, and access rules: [browser/session ADR](adr/2026-07-18-browser-session-and-login.md).
 
 ## Feature implementation conventions

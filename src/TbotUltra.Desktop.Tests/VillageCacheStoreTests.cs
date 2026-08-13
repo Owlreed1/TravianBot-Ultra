@@ -46,6 +46,8 @@ public sealed class VillageCacheStoreTests : IDisposable
         var loaded = CreateStore().Load();
 
         Assert.Equal(2, loaded.Count);
+        Assert.NotNull(CreateStore().LoadUpdatedAtUtc());
+        Assert.InRange(CreateStore().LoadUpdatedAtUtc()!.Value, DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddMinutes(1));
         Assert.True(loaded.ContainsKey("xy:1|2"));
         var grez = loaded["xy:1|2"];
         // Durable structure preserved.

@@ -110,6 +110,38 @@ public sealed class QueueStoreAndSchedulerTests : IDisposable
     }
 
     [Fact]
+    public void ReplaceActiveGroup_ReplacesOnlyActiveConstructionAndKeepsHistoryAndOtherGroups()
+    {
+        var store = new JsonQueueStore(_queuePath);
+        var pendingConstruction = store.Add("upgrade_building_to_level", null, 0, 3);
+        var completedConstruction = store.Add("upgrade_resource_to_level", null, 0, 3);
+        Assert.True(store.MarkRunning(completedConstruction.Id));
+        Assert.True(store.MarkSucceeded(completedConstruction.Id));
+        var farming = store.Add("send_farmlists", null, 0, 3);
+
+        var created = store.ReplaceActiveGroup(QueueGroup.Construction,
+            [new QueueItemCreateRequest("upgrade_resource_to_level", new Dictionary<string, string> { ["recovery"] = "true" }, 0, 3)]);
+
+        var items = store.GetAll();
+        Assert.DoesNotContain(items, item => item.Id == pendingConstruction.Id);
+        Assert.Contains(items, item => item.Id == completedConstruction.Id && item.Status == QueueStatus.Succeeded);
+        Assert.Contains(items, item => item.Id == farming.Id);
+        Assert.Contains(items, item => item.Id == Assert.Single(created).Id && item.Payload["recovery"] == "true");
+    }
+
+    [Fact]
+    public void ReplaceActiveGroup_ValidatesBeforeChangingQueue()
+    {
+        var store = new JsonQueueStore(_queuePath);
+        var original = store.Add("upgrade_building_to_level", null, 0, 3);
+
+        Assert.Throws<InvalidOperationException>(() => store.ReplaceActiveGroup(QueueGroup.Construction,
+            [new QueueItemCreateRequest("send_farmlists", null, 0, 3)]));
+
+        Assert.Contains(store.GetAll(), item => item.Id == original.Id);
+    }
+
+    [Fact]
     public void PauseAndResume_ChangesEligibility()
     {
         var store = new JsonQueueStore(_queuePath);

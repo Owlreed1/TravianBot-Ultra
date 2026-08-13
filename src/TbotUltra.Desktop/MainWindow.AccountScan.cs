@@ -3,7 +3,9 @@ using System.Windows;
 using System.Windows.Controls;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Models;
+using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
+using TbotUltra.Worker.Services;
 
 namespace TbotUltra.Desktop;
 
@@ -373,7 +375,8 @@ public partial class MainWindow
     private async Task<VillageStatus> ReadAccountScanVillageWithRetryAsync(
         BotOptions options,
         Village village,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool requireCompleteStructure = false)
     {
         const int maxAttempts = 3;
         Exception? lastError = null;
@@ -402,9 +405,13 @@ public partial class MainWindow
                     cancellationToken,
                     "[account-scan]");
                 var hasExpectedDorf1 = !options.VillageStatusSweepDorf1Enabled
-                    || status.ResourceFields.Count > 0;
+                    || (requireCompleteStructure
+                        ? HasCompleteResourceFieldSnapshot(status.ResourceFields)
+                        : status.ResourceFields.Count > 0);
                 var hasExpectedDorf2 = !options.VillageStatusSweepDorf2Enabled
-                    || status.Buildings.Count > 0;
+                    || (requireCompleteStructure
+                        ? BuildingUpgradeSlotRebindPlanner.HasCompleteBuildingOverview(status)
+                        : status.Buildings.Count > 0);
                 if (hasExpectedDorf1 && hasExpectedDorf2)
                 {
                     return status;
@@ -415,6 +422,12 @@ public partial class MainWindow
             }
             catch (OperationCanceledException)
             {
+                throw;
+            }
+            catch (AccountAccessException)
+            {
+                // Account access signals are terminal safety events, not transient scan failures.
+                // Let the caller establish the account hold immediately without retry navigation.
                 throw;
             }
             catch (Exception ex)
