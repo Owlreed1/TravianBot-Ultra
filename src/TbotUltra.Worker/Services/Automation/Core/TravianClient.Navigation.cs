@@ -114,6 +114,7 @@ public sealed partial class TravianClient
                     Timeout = timeoutMs,
                 }).WaitAsync(cancellationToken);
 
+                await EnsureAccountAccessAllowedAsync(cancellationToken);
                 trace.Complete("success", $"attempt={attempt}");
                 return;
             }
@@ -250,6 +251,10 @@ public sealed partial class TravianClient
             Notify($"[nav] RELOAD start target='{reason}' current='{page.Url}' pages={TryGetPageCountForDiagnostics()}");
             var response = await page.ReloadAsync(options).WaitAsync(cancellationToken);
             Notify($"[nav] RELOAD done target='{reason}' current='{page.Url}' pages={TryGetPageCountForDiagnostics()}");
+            if (ReferenceEquals(page, _page))
+            {
+                await EnsureAccountAccessAllowedAsync(cancellationToken);
+            }
             trace.Complete("success", $"httpStatus={response?.Status.ToString() ?? "-"}", page.Url);
         }
         catch (OperationCanceledException)

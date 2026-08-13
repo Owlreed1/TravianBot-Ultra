@@ -170,6 +170,8 @@ public partial class MainWindow
             return;
         }
 
+        using var roundActivity = _dashboardActivityTracker.Begin($"Village scan (0/{villages.Count})");
+
         try
         {
             // Seed all normal runtime work once before visiting the first village. Per-village generation
@@ -190,8 +192,12 @@ public partial class MainWindow
 
         AppendLog($"[village-scan] starting round for {villages.Count} village(s).");
         var inboxStatusChecked = false;
+        var villageNumber = 0;
         foreach (var village in villages)
         {
+            villageNumber++;
+            using var villageActivity = _dashboardActivityTracker.Begin(
+                $"Village scan ({villageNumber}/{villages.Count}): {village.Name}");
             token.ThrowIfCancellationRequested();
             try
             {
@@ -835,7 +841,11 @@ public partial class MainWindow
 
         if (onlyVillage is null && heroPollingEnabled && !HasActiveTask("hero_manage"))
         {
-            var adventureCount = await _botService.RefreshAdventureCountAsync(options, AppendLog, cancellationToken);
+            int? adventureCount;
+            using (_dashboardActivityTracker.Begin("Checking Hero adventures"))
+            {
+                adventureCount = await _botService.RefreshAdventureCountAsync(options, AppendLog, cancellationToken);
+            }
             await Dispatcher.InvokeAsync(() => ApplyHeroAdventureAvailability(adventureCount));
             if (adventureCount is > 0)
             {
@@ -1298,6 +1308,7 @@ public partial class MainWindow
         }
 
         var entry = pick;
+        using var activity = _dashboardActivityTracker.Begin($"Analyzing new village: {entry.Name}");
         try
         {
             AppendLog($"[new-village-runtime] Analyzing '{entry.Name}' ({entry.Key}) (dorf1/dorf2) so automation knows its layout.");
@@ -1341,6 +1352,7 @@ public partial class MainWindow
 
         try
         {
+            using var activity = _dashboardActivityTracker.Begin("Refreshing construction status");
             var status = await ReadVillageStatusWithRetryAsync(
                 options,
                 cancellationToken,
@@ -1405,6 +1417,7 @@ public partial class MainWindow
         AppendLog("Continuous farming: analyzing farmlists before runtime send.");
         try
         {
+            using var activity = _dashboardActivityTracker.Begin("Analyzing farm lists");
             await RefreshFarmListsFromServerAsync(options, cancellationToken);
         }
         catch (OperationCanceledException)
@@ -2373,6 +2386,7 @@ public partial class MainWindow
 
         try
         {
+            using var activity = _dashboardActivityTracker.Begin("Refreshing current page");
             await _botService.RefreshCurrentPageAsync(options, _ => { }, token);
             MarkNetworkConnectionHealthy();
         }
@@ -2747,7 +2761,10 @@ public partial class MainWindow
         }
 
         _lastContinuousGoldClubCheckUtc = now;
-        _continuousGoldClubEnabled = await _botService.ReadAndPersistGoldClubStatusAsync(options, AppendLog, cancellationToken);
+        using (_dashboardActivityTracker.Begin("Checking Gold Club status"))
+        {
+            _continuousGoldClubEnabled = await _botService.ReadAndPersistGoldClubStatusAsync(options, AppendLog, cancellationToken);
+        }
         return _continuousGoldClubEnabled == true;
     }
 
@@ -2918,6 +2935,7 @@ public partial class MainWindow
 
         var page = pages[Random.Shared.Next(pages.Count)];
         AppendLog($"[pacing] idle browse: viewing {page}.");
+        using var activity = _dashboardActivityTracker.Begin("Idle browsing");
         try
         {
             if (RequiresStatisticsLandingPage(page))

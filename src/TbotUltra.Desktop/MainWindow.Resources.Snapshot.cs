@@ -38,6 +38,7 @@ public partial class MainWindow
             return;
         }
 
+        using var activity = _dashboardActivityTracker.Begin("Refreshing resource production");
         try
         {
             AppendLog("[resource-production] start");
@@ -502,6 +503,7 @@ public partial class MainWindow
         }
 
         _resourceSnapshotRefreshRunning = true;
+        using var activity = _dashboardActivityTracker.Begin("Refreshing village resources");
         try
         {
             var effectiveOptions = forceCurrentVillage || currentPageOnly
@@ -699,6 +701,11 @@ public partial class MainWindow
             // instead of letting it sit on the worker session gate.
             refreshedStatus = await RefreshResourceSnapshotForUiAsync(options, _loopController.AcquireSessionScopeToken(), currentPageOnly: true);
         }
+        catch (AccountAccessException ex)
+        {
+            await HoldAccountAutomationAsync(ex);
+            return;
+        }
         catch (Exception ex)
         {
             if (ex is UnexpectedTravianLanguageException languageException)
@@ -716,6 +723,11 @@ public partial class MainWindow
             {
                 AppendLog($"Background resource refresh skipped: {ex.Message}");
             }
+        }
+
+        if (ActiveAccountHold() is not null)
+        {
+            return;
         }
 
         try
@@ -1351,6 +1363,7 @@ public partial class MainWindow
 
         bool stillReviving;
         _heroReviveCheckRunning = true;
+        using var activity = _dashboardActivityTracker.Begin("Checking Hero revival");
         try
         {
             stillReviving = await _botService.IsHeroRevivingOnCurrentPageAsync(options, AppendLog, _loopController.AcquireSessionScopeToken());
@@ -1427,6 +1440,7 @@ public partial class MainWindow
 
         var heroHome = false;
         _heroReviveCheckRunning = true;
+        using var activity = _dashboardActivityTracker.Begin("Checking Hero location");
         try
         {
             heroHome = await _botService.IsHeroHomeOnCurrentPageAsync(
@@ -1488,6 +1502,7 @@ public partial class MainWindow
         }
 
         _heroReviveCheckRunning = true;
+        using var activity = _dashboardActivityTracker.Begin("Checking Hero revival");
         try
         {
             await _botService.CheckAndReviveDeadHeroAsync(options, true, AppendLog, _loopController.AcquireSessionScopeToken());

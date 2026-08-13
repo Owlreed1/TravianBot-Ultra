@@ -204,6 +204,7 @@ public sealed partial class BotTaskRunner
             cancellationToken,
             async client =>
             {
+                await client.EnsureAccountAccessAllowedAsync(cancellationToken);
                 status = await client.ReadVillageResourceStatusAsync(
                     cancellationToken,
                     allowNavigationToResourcePage: false);

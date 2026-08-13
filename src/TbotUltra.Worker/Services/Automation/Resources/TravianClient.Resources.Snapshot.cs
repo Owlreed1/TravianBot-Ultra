@@ -361,6 +361,7 @@ public sealed partial class TravianClient
         for (var attempt = 1; attempt <= attempts; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            await EnsureAccountAccessAllowedAsync(cancellationToken);
 
             var snapshot = await _page.EvaluateAsync<ResourceSnapshotDomReadResult>(
                 """
@@ -558,6 +559,7 @@ public sealed partial class TravianClient
         for (var attempt = 1; attempt <= 4; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            await EnsureAccountAccessAllowedAsync(cancellationToken);
 
             try
             {

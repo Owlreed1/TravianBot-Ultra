@@ -568,6 +568,7 @@ public partial class MainWindow
         _smithyUpgradeStatusRefreshRunning = true;
         _backgroundTasks.Run(async cancellationToken =>
         {
+            using var activity = _dashboardActivityTracker.Begin("Refreshing Smithy status");
             try
             {
                 var options = ApplySelectedVillageToOptions(LoadBotOptions());
@@ -632,6 +633,7 @@ public partial class MainWindow
 
         try
         {
+            using var activity = _dashboardActivityTracker.Begin("Refreshing Brewery status");
             var celebrationStatus = await _troopTrainingPanelService.ReadBreweryStatusAsync(options, AppendLog, status.Buildings, cancellationToken);
             await Dispatcher.InvokeAsync(() =>
             {

@@ -30,13 +30,16 @@ internal static class AccountAccessClassifier
         string? url,
         string? pageSignal,
         bool captchaInputPresent,
-        bool punishmentControlsPresent = false)
+        bool punishmentControlsPresent = false,
+        bool banSidebarPresent = false)
     {
         var currentUrl = url?.ToLowerInvariant() ?? string.Empty;
         var signal = pageSignal?.ToLowerInvariant() ?? string.Empty;
-        if (currentUrl.Contains("banned", StringComparison.Ordinal)
+        if (banSidebarPresent
+            || currentUrl.Contains("banned", StringComparison.Ordinal)
             || ContainsAny(signal,
                 "your avatar is now banned",
+                "your avatar was banned",
                 "your account has been banned",
                 "account is banned")
             || (punishmentControlsPresent

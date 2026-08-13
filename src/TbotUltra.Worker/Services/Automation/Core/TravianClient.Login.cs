@@ -445,6 +445,8 @@ public sealed partial class TravianClient : ISessionClient
         var captchaInputPresent = await HasAnySelectorAsync(Selectors.AccountChallengeInputField);
         var punishmentControlsPresent = await _page.Locator(Selectors.BanPunishmentControls)
             .CountAsync() > 0;
+        var banSidebarPresent = await _page.Locator(Selectors.BanSidebarInfo)
+            .CountAsync() > 0;
         var pageSignal = await _page.EvaluateAsync<string>(
             """
             () => {
@@ -457,7 +459,8 @@ public sealed partial class TravianClient : ISessionClient
             currentUrl,
             pageSignal,
             captchaInputPresent,
-            punishmentControlsPresent);
+            punishmentControlsPresent,
+            banSidebarPresent);
     }
 
     public async Task EnsureAccountAccessAllowedAsync(CancellationToken cancellationToken = default)

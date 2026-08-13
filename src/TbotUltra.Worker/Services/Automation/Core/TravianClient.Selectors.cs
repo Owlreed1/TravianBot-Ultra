@@ -113,6 +113,11 @@ public sealed partial class TravianClient
             "#content.universal #sysmsg #punishmentMsgButtons button.continueButton, "
             + "#content.universal #sysmsg #punishmentMsgButtons button.contactSupportButton";
 
+        // Official sidebar infobox shown while an avatar remains banned. Require the warning and its
+        // dedicated details link together so unrelated infoType_2 warnings cannot stop automation.
+        public const string BanSidebarInfo =
+            "#sidebarBoxInfobox li.infoType_2:has(span.warning):has(a[href='/dorf1.php?action=stop'])";
+
         public static readonly string[] LoginButton =
         {
             "button[type='submit']",

@@ -15,12 +15,25 @@ internal sealed class DashboardProjectionService
             return new DashboardNextTaskProjection(DashboardNextTaskState.Idle, null, null);
         }
 
-        return request.Forecast.State switch
+        if (request.Forecast.State == ContinuousLoopForecastState.Running)
         {
-            ContinuousLoopForecastState.Running => new DashboardNextTaskProjection(
+            return new DashboardNextTaskProjection(
                 DashboardNextTaskState.Running,
                 request.Forecast.Item,
-                null),
+                null);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ActiveOperationName))
+        {
+            return new DashboardNextTaskProjection(
+                DashboardNextTaskState.RunningOperation,
+                null,
+                null,
+                request.ActiveOperationName.Trim());
+        }
+
+        return request.Forecast.State switch
+        {
             ContinuousLoopForecastState.Ready => new DashboardNextTaskProjection(
                 DashboardNextTaskState.Next,
                 request.Forecast.Item,
@@ -41,17 +54,20 @@ internal sealed class DashboardProjectionService
 internal sealed record DashboardNextTaskRequest(
     bool IsLoggedIn,
     ContinuousLoopForecast Forecast,
-    DateTimeOffset NowUtc);
+    DateTimeOffset NowUtc,
+    string? ActiveOperationName = null);
 
 internal sealed record DashboardNextTaskProjection(
     DashboardNextTaskState State,
     QueueItem? QueueItem,
-    TimeSpan? Remaining);
+    TimeSpan? Remaining,
+    string? OperationName = null);
 
 internal enum DashboardNextTaskState
 {
     Idle,
     Running,
+    RunningOperation,
     Next,
     Waiting,
     WaitingForRefresh,

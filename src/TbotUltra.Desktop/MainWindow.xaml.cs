@@ -301,6 +301,7 @@ public partial class MainWindow : Window
     private DateTimeOffset _nextIdleBrowseDueUtc = DateTimeOffset.MinValue;
     private string? _activeAutomationTaskName;
     private string? _activeFunctionDisplayName;
+    private readonly DashboardActivityTracker _dashboardActivityTracker = new();
     private string? _troopsBlockedReasonKey;
     private string? _troopsBlockedReasonText;
     private bool _troopsBlockedPreviouslyEnabled;
@@ -392,6 +393,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _dashboardActivityTracker.Changed += () => RunOrPostToUi(UpdateNextTaskUi);
         ThemeChrome.EnableEarlyDarkTitleBar(this);
         TryApplyWindowIcon();
 

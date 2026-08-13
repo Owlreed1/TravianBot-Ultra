@@ -197,16 +197,21 @@ public partial class MainWindow
             projection = _dashboardProjectionService.ProjectNextTask(new DashboardNextTaskRequest(
                 IsLoggedIn: true,
                 Forecast: ResolveNextContinuousLoopForecast(now),
-                NowUtc: now));
+                NowUtc: now,
+                ActiveOperationName: _dashboardActivityTracker.Current ?? _activeFunctionDisplayName));
         }
         catch
         {
-            return "-";
+            var activeOperationName = _dashboardActivityTracker.Current ?? _activeFunctionDisplayName;
+            return string.IsNullOrWhiteSpace(activeOperationName)
+                ? "-"
+                : $"Running: {activeOperationName}";
         }
 
         return projection.State switch
         {
             DashboardNextTaskState.Running => $"Running: {DescribeNextTask(projection.QueueItem!)}",
+            DashboardNextTaskState.RunningOperation => $"Running: {projection.OperationName}",
             DashboardNextTaskState.Next => $"Next: {DescribeNextTask(projection.QueueItem!)}",
             DashboardNextTaskState.Waiting => $"Waiting {FormatNextTaskCountdown(projection.Remaining ?? TimeSpan.Zero)}: {DescribeNextTask(projection.QueueItem!)}",
             DashboardNextTaskState.WaitingForRefresh => "Waiting for refresh",

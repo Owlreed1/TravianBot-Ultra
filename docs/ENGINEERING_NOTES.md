@@ -180,7 +180,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
   cache when live sources are unavailable.
 - Account holds are account-specific: a verified ban, restriction, challenge, or repeated unknown state stops only
   that account and preserves its queue/settings until manual re-enable. A Travian punishment page is evidence only:
-  never click its Agree or Contact Support controls, and leave the browser open for manual review.
+  never click its Agree or Contact Support controls, and leave the browser open for manual review. Treat the
+  Official sidebar ban warning plus its `/dorf1.php?action=stop` details link as an equivalent hard-stop signal;
+  the jittered current-page refresh must turn it into an account hold and stop the rest of that refresh tick.
+  Active task page-ready and resource-retry paths must probe the same signals before waiting or reloading, so a
+  punishment response cannot spend tens of seconds in missing-widget recovery before the account hold is raised.
 - Detailed lifecycle, SSO, cleanup, and access rules: [browser/session ADR](adr/2026-07-18-browser-session-and-login.md).
 
 ## Feature implementation conventions
@@ -227,6 +231,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Enumerate mutable collections through immutable snapshots when sanitizing/exporting.
 - Village Overview is read-only and uses cache/queue snapshots; opening it never navigates or scans.
 - Overview projections show only real deadlines and never mutate queue or scheduler state.
+- The Dashboard status line prioritizes a running queue item, then a scoped active browser workflow, then the
+  read-only next-task forecast. Long-running workflows such as Village scan publish nested activity so an inner
+  queue task can temporarily replace the label and the outer workflow is restored when that task completes.
 - Village Overview Farming renders only the allowed `send_farmlists` queue state: `Ready`, `Running`,
   `Blocked`, or its `NextAttemptAt` countdown. Individual farm-list raid timers belong to the Farming panel
   and must not replace the dashboard-synchronized dispatch deadline in Overview.

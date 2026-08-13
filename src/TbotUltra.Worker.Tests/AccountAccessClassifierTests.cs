@@ -35,6 +35,18 @@ public sealed class AccountAccessClassifierTests
     }
 
     [Fact]
+    public void ClassifyExplicit_DetectsBanSidebarContract()
+    {
+        Assert.Equal(
+            AccountAccessState.Banned,
+            AccountAccessClassifier.ClassifyExplicit(
+                "https://example.test/build.php?id=19",
+                "Your avatar was banned! Click here for more info",
+                captchaInputPresent: false,
+                banSidebarPresent: true));
+    }
+
+    [Fact]
     public void RegisterVerifiedState_StopsOnThirdConsecutiveUnknownOnly()
     {
         var first = AccountAccessClassifier.RegisterVerifiedState(0, AccountAccessState.Unknown);

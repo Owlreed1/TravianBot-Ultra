@@ -15,10 +15,27 @@ public sealed class DashboardProjectionServiceTests
         var result = new DashboardProjectionService().ProjectNextTask(new DashboardNextTaskRequest(
             IsLoggedIn: true,
             Forecast: new ContinuousLoopForecast(ContinuousLoopForecastState.Running, running),
-            NowUtc: DateTimeOffset.UtcNow));
+            NowUtc: DateTimeOffset.UtcNow,
+            ActiveOperationName: "Village scan"));
 
         Assert.Equal(DashboardNextTaskState.Running, result.State);
         Assert.Same(running, result.QueueItem);
+    }
+
+    [Fact]
+    public void ProjectNextTask_PrefersActiveOperationOverNextQueueItem()
+    {
+        var next = new QueueItem { TaskName = "build_troops", Status = QueueStatus.Pending };
+
+        var result = new DashboardProjectionService().ProjectNextTask(new DashboardNextTaskRequest(
+            IsLoggedIn: true,
+            Forecast: new ContinuousLoopForecast(ContinuousLoopForecastState.Ready, next),
+            NowUtc: DateTimeOffset.UtcNow,
+            ActiveOperationName: "Village scan (3/7): H03"));
+
+        Assert.Equal(DashboardNextTaskState.RunningOperation, result.State);
+        Assert.Equal("Village scan (3/7): H03", result.OperationName);
+        Assert.Null(result.QueueItem);
     }
 
     [Fact]
