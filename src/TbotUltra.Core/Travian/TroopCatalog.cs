@@ -1,5 +1,7 @@
 namespace TbotUltra.Core.Travian;
 
+public sealed record TroopTrainingCost(int Wood, int Clay, int Iron, int Crop);
+
 public static class TroopCatalog
 {
     private static readonly IReadOnlyList<string> RomanTroops = ["Legionnaire", "Praetorian", "Imperian", "Equites Legati", "Equites Imperatoris", "Equites Caesaris", "Ram", "Fire Catapult", "Senator", "Settler"];
@@ -20,6 +22,38 @@ public static class TroopCatalog
         SpartanTroops,
         FallbackTroops,
     ];
+
+    // Standard Official Travian: Legends recruitment costs. The live building page is checked
+    // against these values before submit so special-world balance changes fail visibly instead
+    // of making the pre-navigation resource gate silently inaccurate.
+    private static readonly IReadOnlyDictionary<int, TroopTrainingCost> TrainingCostsByUnitId =
+        new Dictionary<int, TroopTrainingCost>
+        {
+            [1] = new(120, 100, 150, 30), [2] = new(100, 130, 160, 70),
+            [3] = new(150, 160, 210, 80), [4] = new(140, 160, 20, 40),
+            [5] = new(550, 440, 320, 100), [6] = new(550, 640, 800, 180),
+            [7] = new(900, 360, 500, 70), [8] = new(950, 1350, 600, 90),
+            [11] = new(95, 75, 40, 40), [12] = new(145, 70, 85, 40),
+            [13] = new(130, 120, 170, 70), [14] = new(160, 100, 50, 50),
+            [15] = new(370, 270, 290, 75), [16] = new(450, 515, 480, 80),
+            [17] = new(1000, 300, 350, 70), [18] = new(900, 1200, 600, 60),
+            [21] = new(100, 130, 55, 30), [22] = new(140, 150, 185, 60),
+            [23] = new(170, 150, 20, 40), [24] = new(350, 450, 230, 60),
+            [25] = new(360, 330, 280, 120), [26] = new(500, 620, 675, 170),
+            [27] = new(950, 555, 330, 75), [28] = new(960, 1450, 630, 90),
+            [51] = new(45, 60, 30, 15), [52] = new(115, 100, 145, 60),
+            [53] = new(170, 180, 220, 80), [54] = new(170, 150, 20, 40),
+            [55] = new(360, 330, 280, 120), [56] = new(450, 560, 610, 180),
+            [57] = new(995, 575, 340, 80), [58] = new(980, 1510, 660, 100),
+            [61] = new(130, 80, 40, 40), [62] = new(140, 110, 60, 60),
+            [63] = new(170, 150, 20, 40), [64] = new(290, 370, 190, 45),
+            [65] = new(320, 350, 330, 50), [66] = new(450, 560, 610, 140),
+            [67] = new(1060, 330, 360, 70), [68] = new(950, 1280, 620, 60),
+            [71] = new(110, 185, 110, 45), [72] = new(185, 150, 35, 80),
+            [73] = new(145, 95, 245, 55), [74] = new(130, 200, 400, 70),
+            [75] = new(555, 445, 330, 120), [76] = new(660, 495, 995, 175),
+            [77] = new(1040, 350, 400, 80), [78] = new(950, 1350, 600, 100),
+        };
 
     /// <summary>
     /// True when the value maps to a specific tribe's troop list. Unknown/empty values fall back
@@ -198,6 +232,19 @@ public static class TroopCatalog
         }
 
         return null;
+    }
+
+    public static bool TryResolveTrainingCost(string? tribe, string? troopType, out TroopTrainingCost cost)
+    {
+        var unitId = ResolveTravianUnitId(tribe, troopType);
+        if (unitId.HasValue && TrainingCostsByUnitId.TryGetValue(unitId.Value, out var resolved))
+        {
+            cost = resolved;
+            return true;
+        }
+
+        cost = default!;
+        return false;
     }
 
     private static int? ResolveTribeUnitBaseId(string? tribe)

@@ -23,7 +23,11 @@ public static class TroopTrainingQuickSettings
                 options.TroopTrainingBarracksCheckWood,
                 options.TroopTrainingBarracksCheckClay,
                 options.TroopTrainingBarracksCheckIron,
-                options.TroopTrainingBarracksCheckCrop),
+                options.TroopTrainingBarracksCheckCrop)
+            {
+                MinimumTroopsEnabled = options.TroopTrainingBarracksMinimumTroopsEnabled,
+                MaximumMinimumTroops = options.TroopTrainingBarracksMaximumMinimumTroops,
+            },
             new TroopTrainingBuildingPayload(
                 options.TroopTrainingStableEnabled,
                 options.TroopTrainingStableTroopType,
@@ -38,7 +42,11 @@ public static class TroopTrainingQuickSettings
                 options.TroopTrainingStableCheckWood,
                 options.TroopTrainingStableCheckClay,
                 options.TroopTrainingStableCheckIron,
-                options.TroopTrainingStableCheckCrop),
+                options.TroopTrainingStableCheckCrop)
+            {
+                MinimumTroopsEnabled = options.TroopTrainingStableMinimumTroopsEnabled,
+                MaximumMinimumTroops = options.TroopTrainingStableMaximumMinimumTroops,
+            },
             new TroopTrainingBuildingPayload(
                 options.TroopTrainingWorkshopEnabled,
                 options.TroopTrainingWorkshopTroopType,
@@ -53,7 +61,11 @@ public static class TroopTrainingQuickSettings
                 options.TroopTrainingWorkshopCheckWood,
                 options.TroopTrainingWorkshopCheckClay,
                 options.TroopTrainingWorkshopCheckIron,
-                options.TroopTrainingWorkshopCheckCrop),
+                options.TroopTrainingWorkshopCheckCrop)
+            {
+                MinimumTroopsEnabled = options.TroopTrainingWorkshopMinimumTroopsEnabled,
+                MaximumMinimumTroops = options.TroopTrainingWorkshopMaximumMinimumTroops,
+            },
             options.TroopTrainingFallbackCooldownSeconds);
     }
 

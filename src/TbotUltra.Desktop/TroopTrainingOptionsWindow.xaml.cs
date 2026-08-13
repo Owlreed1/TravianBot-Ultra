@@ -81,6 +81,21 @@ public partial class TroopTrainingOptionsWindow : Window
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
+        var invalid = Rows
+            .SelectMany(row => row.BuildingCells.Select(building => (row, building)))
+            .FirstOrDefault(item => item.building.MinimumTroopsEnabled && !item.building.HasValidMinimumTroopRange);
+        if (invalid.building is not null)
+        {
+            AppDialog.Show(
+                this,
+                $"{invalid.row.VillageName} / {invalid.building.Title}: minimum troops must use whole numbers from 1 to 10,000 and Max must be at least Min.",
+                "Invalid troop settings",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            invalid.row.IsExpanded = true;
+            return;
+        }
+
         Results = BuildResults();
         DialogResult = true;
         Close();

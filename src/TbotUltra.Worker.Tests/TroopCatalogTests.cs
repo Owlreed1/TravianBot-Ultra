@@ -129,4 +129,49 @@ public sealed class TroopCatalogTests
         Assert.Equal(7, TroopCatalog.ResolveTroopIndex("Ram"));
         Assert.Equal(27, TroopCatalog.ResolveTravianUnitId("Gauls", "Ram"));
     }
+
+    [Theory]
+    [InlineData("Romans", "Legionnaire", 120, 100, 150, 30)]
+    [InlineData("Teutons", "Clubswinger", 95, 75, 40, 40)]
+    [InlineData("Gauls", "Trebuchet", 960, 1450, 630, 90)]
+    [InlineData("Egyptians", "Slave Militia", 45, 60, 30, 15)]
+    [InlineData("Huns", "Marauder", 450, 560, 610, 140)]
+    [InlineData("Spartans", "Hoplite", 110, 185, 110, 45)]
+    public void TryResolveTrainingCost_ReturnsOfficialCost(
+        string tribe,
+        string troopType,
+        int wood,
+        int clay,
+        int iron,
+        int crop)
+    {
+        Assert.True(TroopCatalog.TryResolveTrainingCost(tribe, troopType, out var cost));
+        Assert.Equal(new TroopTrainingCost(wood, clay, iron, crop), cost);
+    }
+
+    [Fact]
+    public void TryResolveTrainingCost_RejectsUnknownTroop()
+    {
+        Assert.False(TroopCatalog.TryResolveTrainingCost("Romans", "Unknown", out _));
+    }
+
+    [Theory]
+    [InlineData("Romans")]
+    [InlineData("Teutons")]
+    [InlineData("Gauls")]
+    [InlineData("Egyptians")]
+    [InlineData("Huns")]
+    [InlineData("Spartans")]
+    public void TryResolveTrainingCost_CoversEveryTrainableTroop(string tribe)
+    {
+        foreach (var buildingType in Enum.GetValues<TroopTrainingBuildingType>())
+        {
+            foreach (var troop in TroopCatalog.ResolveTroopTypesForTribe(tribe, buildingType))
+            {
+                Assert.True(
+                    TroopCatalog.TryResolveTrainingCost(tribe, troop, out _),
+                    $"Missing training cost for {tribe} / {troop}.");
+            }
+        }
+    }
 }

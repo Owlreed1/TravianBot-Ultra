@@ -112,8 +112,6 @@ public sealed class TroopTrainingQuickVillageRow : BaseViewModel
         TroopTrainingBuildingPayload source,
         TroopTrainingBuildingOption cell)
     {
-        // MinimumTroops is intentionally preserved from the source payload — it has no UI on
-        // either the Troops tab or this popup.
         return source with
         {
             Enabled = cell.IsEnabled,
@@ -122,6 +120,9 @@ public sealed class TroopTrainingQuickVillageRow : BaseViewModel
             AmountMode = cell.AmountMode,
             KeepResourcesPercent = cell.KeepResourcesPercent,
             RunMode = cell.RunMode,
+            MinimumTroopsEnabled = cell.MinimumTroopsEnabled,
+            MinimumTroops = cell.MinimumTroops,
+            MaximumMinimumTroops = cell.MaximumMinimumTroops,
             MinimumResourcesPercent = cell.MinimumResourcesPercent,
             TimedMinMinutes = cell.TimedMinMinutes,
             TimedMaxMinutes = cell.TimedMaxMinutes,
@@ -163,7 +164,9 @@ public sealed class TroopTrainingQuickVillageRow : BaseViewModel
         cell.AmountMode = building.AmountMode;
         cell.KeepResourcesPercent = building.KeepResourcesPercent;
         cell.RunMode = building.RunMode;
+        cell.MinimumTroopsEnabled = building.MinimumTroopsEnabled;
         cell.MinimumTroops = building.MinimumTroops;
+        cell.MaximumMinimumTroops = building.MaximumMinimumTroops;
         cell.MinimumResourcesPercent = building.MinimumResourcesPercent;
         cell.TimedMinMinutes = building.TimedMinMinutes;
         cell.TimedMaxMinutes = building.TimedMaxMinutes;

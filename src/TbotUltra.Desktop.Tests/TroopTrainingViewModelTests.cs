@@ -112,6 +112,22 @@ public sealed class TroopTrainingViewModelTests
         Assert.True(vm.CheckCelebrationCommand.CanExecute(null));
     }
 
+    [Fact]
+    public void TryValidateMinimumTroopRanges_RejectsMaxBelowMinWhenEnabled()
+    {
+        var vm = new TroopTrainingViewModel();
+        vm.Initialize();
+        vm.Buildings[0].MinimumTroopsEnabled = true;
+        vm.Buildings[0].MinimumTroops = 100;
+        vm.Buildings[0].MaximumMinimumTroops = 20;
+
+        Assert.False(vm.TryValidateMinimumTroopRanges(out var error));
+        Assert.Contains("Max must be at least Min", error);
+
+        vm.Buildings[0].MinimumTroopsEnabled = false;
+        Assert.True(vm.TryValidateMinimumTroopRanges(out _));
+    }
+
     private static TroopTrainingViewModel ReadyCelebrationViewModel()
     {
         var vm = new TroopTrainingViewModel();

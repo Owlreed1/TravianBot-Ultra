@@ -17,7 +17,10 @@ public sealed partial class TravianClient : ITrainingClient
         string AmountMode,
         int KeepResourcesPercent,
         string RunMode,
+        bool MinimumTroopsEnabled,
         int MinimumTroops,
+        int MaximumMinimumTroops,
+        int SelectedMinimumTroops,
         int MinimumResourcesPercent,
         int TimedMinMinutes,
         int TimedMaxMinutes,
@@ -212,6 +215,68 @@ public sealed partial class TravianClient : ITrainingClient
             }
         }
 
+        var minimumEligibleRequests = new List<TroopTrainingRequest>();
+        foreach (var request in requestsToScan)
+        {
+            if (!request.MinimumTroopsEnabled)
+            {
+                minimumEligibleRequests.Add(request);
+                continue;
+            }
+
+            if (!TroopCatalog.TryResolveTrainingCost(status.Tribe, request.TroopType, out var catalogCost))
+            {
+                Notify($"ALARM: Troop cost catalog is missing '{request.TroopType}' for tribe '{status.Tribe}'. Skipping {request.BuildingName} before navigation.");
+                continue;
+            }
+
+            var preNavigationAmount = TroopTrainingCalculator.CalculateTroopTrainingAmount(
+                currentResources,
+                catalogCost.Wood,
+                catalogCost.Clay,
+                catalogCost.Iron,
+                catalogCost.Crop,
+                request.AmountMode,
+                request.KeepResourcesPercent);
+            Notify($"[troops] {request.BuildingName} minimum pre-check: randomized threshold={request.SelectedMinimumTroops}, trainable={preNavigationAmount}, range={request.MinimumTroops}-{request.MaximumMinimumTroops}.");
+            if (preNavigationAmount >= request.SelectedMinimumTroops)
+            {
+                minimumEligibleRequests.Add(request);
+                continue;
+            }
+
+            if (CouldAttemptNpcTradeBeforeMinimumGate(request, currentResources, currentCapacities, status.Gold))
+            {
+                Notify($"[troops] {request.BuildingName} is below randomized minimum {request.SelectedMinimumTroops}, but eligible NPC trade requires the building page; allowing navigation.");
+                minimumEligibleRequests.Add(request);
+                continue;
+            }
+
+            var requiredResources = TroopTrainingCalculator.CalculateTroopTrainingRequiredResources(
+                catalogCost.Wood,
+                catalogCost.Clay,
+                catalogCost.Iron,
+                catalogCost.Crop,
+                request.AmountMode,
+                request.KeepResourcesPercent,
+                request.SelectedMinimumTroops);
+            var waitOutcome = BuildTroopTrainingWaitOutcome(
+                request.BuildingName,
+                request.TroopType,
+                currentResources,
+                currentProductionByHour,
+                requiredResources,
+                fallbackCooldownSeconds,
+                $"Build troops: {request.BuildingName} waiting to reach randomized minimum {request.SelectedMinimumTroops}");
+            if (waitOutcome.WaitSeconds is > 0
+                && (shortestWaitOutcome is null || waitOutcome.WaitSeconds.Value < shortestWaitOutcome.WaitSeconds))
+            {
+                shortestWaitOutcome = waitOutcome;
+            }
+        }
+
+        requestsToScan = minimumEligibleRequests;
+
         var queueStatuses = new List<TroopTrainingQueueStatus>();
         foreach (var request in requestsToScan)
         {
@@ -311,7 +376,10 @@ public sealed partial class TravianClient : ITrainingClient
                 options.TroopTrainingBarracksAmountMode,
                 options.TroopTrainingBarracksKeepResourcesPercent,
                 options.TroopTrainingBarracksRunMode,
+                options.TroopTrainingBarracksMinimumTroopsEnabled,
                 options.TroopTrainingBarracksMinimumTroops,
+                options.TroopTrainingBarracksMaximumMinimumTroops,
+                TroopTrainingCalculator.SelectRandomMinimumTroops(options.TroopTrainingBarracksMinimumTroops, options.TroopTrainingBarracksMaximumMinimumTroops),
                 options.TroopTrainingBarracksMinimumResourcesPercent,
                 options.TroopTrainingBarracksTimedMinMinutes,
                 options.TroopTrainingBarracksTimedMaxMinutes,
@@ -328,7 +396,10 @@ public sealed partial class TravianClient : ITrainingClient
                 options.TroopTrainingStableAmountMode,
                 options.TroopTrainingStableKeepResourcesPercent,
                 options.TroopTrainingStableRunMode,
+                options.TroopTrainingStableMinimumTroopsEnabled,
                 options.TroopTrainingStableMinimumTroops,
+                options.TroopTrainingStableMaximumMinimumTroops,
+                TroopTrainingCalculator.SelectRandomMinimumTroops(options.TroopTrainingStableMinimumTroops, options.TroopTrainingStableMaximumMinimumTroops),
                 options.TroopTrainingStableMinimumResourcesPercent,
                 options.TroopTrainingStableTimedMinMinutes,
                 options.TroopTrainingStableTimedMaxMinutes,
@@ -345,7 +416,10 @@ public sealed partial class TravianClient : ITrainingClient
                 options.TroopTrainingWorkshopAmountMode,
                 options.TroopTrainingWorkshopKeepResourcesPercent,
                 options.TroopTrainingWorkshopRunMode,
+                options.TroopTrainingWorkshopMinimumTroopsEnabled,
                 options.TroopTrainingWorkshopMinimumTroops,
+                options.TroopTrainingWorkshopMaximumMinimumTroops,
+                TroopTrainingCalculator.SelectRandomMinimumTroops(options.TroopTrainingWorkshopMinimumTroops, options.TroopTrainingWorkshopMaximumMinimumTroops),
                 options.TroopTrainingWorkshopMinimumResourcesPercent,
                 options.TroopTrainingWorkshopTimedMinMinutes,
                 options.TroopTrainingWorkshopTimedMaxMinutes,
@@ -354,6 +428,30 @@ public sealed partial class TravianClient : ITrainingClient
                 options.TroopTrainingWorkshopCheckIron,
                 options.TroopTrainingWorkshopCheckCrop),
         ];
+    }
+
+    private bool CouldAttemptNpcTradeBeforeMinimumGate(
+        TroopTrainingRequest request,
+        IReadOnlyDictionary<string, long> resources,
+        ResourceCapacitySnapshot capacities,
+        int? gold)
+    {
+        if (!_config.NpcTradeEnabled
+            || !_config.AllowGoldSpending
+            || gold is null
+            || gold.Value - NpcTradeGoldCost < _config.GoldLimit)
+        {
+            return false;
+        }
+
+        return ResolveNpcTradeTriggerResource(
+            resources,
+            capacities,
+            Math.Clamp(_config.NpcTradeThresholdPercent, 1, 100),
+            _config.NpcTradeAnalyzeWood,
+            _config.NpcTradeAnalyzeClay,
+            _config.NpcTradeAnalyzeIron,
+            _config.NpcTradeAnalyzeCrop) is not null;
     }
 
     private static string ResolveConfiguredTroopType(string? configuredTroopType, string? tribe, TroopTrainingBuildingType buildingType)
@@ -445,6 +543,24 @@ public sealed partial class TravianClient : ITrainingClient
             return new TroopTrainingAttemptOutcome(false, $"Skip {candidate.Request.BuildingName}: '{candidate.Request.TroopType}' is not trainable right now.");
         }
 
+        if (candidate.Request.MinimumTroopsEnabled)
+        {
+            if (!TroopCatalog.TryResolveTrainingCost(status.Tribe, candidate.Request.TroopType, out var catalogCost))
+            {
+                Notify($"ALARM: Troop cost catalog is missing '{candidate.Request.TroopType}' for tribe '{status.Tribe}'. Skipping {candidate.Request.BuildingName}.");
+                return new TroopTrainingAttemptOutcome(false, $"Skip {candidate.Request.BuildingName}: troop cost catalog entry is missing.");
+            }
+
+            if (catalogCost.Wood != buildInfo.WoodCost
+                || catalogCost.Clay != buildInfo.ClayCost
+                || catalogCost.Iron != buildInfo.IronCost
+                || catalogCost.Crop != buildInfo.CropCost)
+            {
+                Notify($"ALARM: Troop cost catalog mismatch for '{candidate.Request.TroopType}' at {candidate.Request.BuildingName}. Catalog={catalogCost.Wood}/{catalogCost.Clay}/{catalogCost.Iron}/{catalogCost.Crop}, live={buildInfo.WoodCost}/{buildInfo.ClayCost}/{buildInfo.IronCost}/{buildInfo.CropCost}. Training was skipped.");
+                return new TroopTrainingAttemptOutcome(false, $"Skip {candidate.Request.BuildingName}: troop cost catalog differs from the live server.");
+            }
+        }
+
         var liveResourceSnapshot = await ReadTroopTrainingResourceSnapshotFromCurrentPageAsync(cancellationToken);
         var mergedLiveResourceSnapshot = MergeTroopTrainingResourceSnapshot(status.ActiveVillage, liveResourceSnapshot, status);
         var parsedResources = mergedLiveResourceSnapshot.Resources;
@@ -506,6 +622,27 @@ public sealed partial class TravianClient : ITrainingClient
             "maximum",
             0);
         Notify($"[troops:verbose]live trainable amount actual={actualTrainableAmount}, maximum={maximumTrainableAmount}, mode={candidate.Request.AmountMode}, keep={candidate.Request.KeepResourcesPercent}%.");
+
+        if (candidate.Request.MinimumTroopsEnabled
+            && actualTrainableAmount < candidate.Request.SelectedMinimumTroops)
+        {
+            Notify($"[troops] {candidate.Request.BuildingName} final minimum check blocked training: randomized threshold={candidate.Request.SelectedMinimumTroops}, trainable={actualTrainableAmount}.");
+            return BuildTroopTrainingWaitOutcome(
+                candidate,
+                buildInfo,
+                parsedResources,
+                productionByHour,
+                TroopTrainingCalculator.CalculateTroopTrainingRequiredResources(
+                    buildInfo.WoodCost,
+                    buildInfo.ClayCost,
+                    buildInfo.IronCost,
+                    buildInfo.CropCost,
+                    candidate.Request.AmountMode,
+                    candidate.Request.KeepResourcesPercent,
+                    candidate.Request.SelectedMinimumTroops),
+                fallbackCooldownSeconds,
+                $"Build troops: {candidate.Request.BuildingName} waiting to reach randomized minimum {candidate.Request.SelectedMinimumTroops}");
+        }
 
         if (string.Equals(candidate.Request.RunMode, "resource_percent", StringComparison.OrdinalIgnoreCase))
         {

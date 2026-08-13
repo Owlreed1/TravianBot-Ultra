@@ -186,7 +186,9 @@ public static class BotOptionPayloadKeys
     public const string TroopTrainingBarracksAmountMode = "troop_training_barracks_amount_mode";
     public const string TroopTrainingBarracksKeepResourcesPercent = "troop_training_barracks_keep_resources_percent";
     public const string TroopTrainingBarracksRunMode = "troop_training_barracks_run_mode";
+    public const string TroopTrainingBarracksMinimumTroopsEnabled = "troop_training_barracks_minimum_troops_enabled";
     public const string TroopTrainingBarracksMinimumTroops = "troop_training_barracks_minimum_troops";
+    public const string TroopTrainingBarracksMaximumMinimumTroops = "troop_training_barracks_maximum_minimum_troops";
     public const string TroopTrainingBarracksMinimumResourcesPercent = "troop_training_barracks_minimum_resources_percent";
     public const string TroopTrainingBarracksTimedMinMinutes = "troop_training_barracks_timed_min_minutes";
     public const string TroopTrainingBarracksTimedMaxMinutes = "troop_training_barracks_timed_max_minutes";
@@ -200,7 +202,9 @@ public static class BotOptionPayloadKeys
     public const string TroopTrainingStableAmountMode = "troop_training_stable_amount_mode";
     public const string TroopTrainingStableKeepResourcesPercent = "troop_training_stable_keep_resources_percent";
     public const string TroopTrainingStableRunMode = "troop_training_stable_run_mode";
+    public const string TroopTrainingStableMinimumTroopsEnabled = "troop_training_stable_minimum_troops_enabled";
     public const string TroopTrainingStableMinimumTroops = "troop_training_stable_minimum_troops";
+    public const string TroopTrainingStableMaximumMinimumTroops = "troop_training_stable_maximum_minimum_troops";
     public const string TroopTrainingStableMinimumResourcesPercent = "troop_training_stable_minimum_resources_percent";
     public const string TroopTrainingStableTimedMinMinutes = "troop_training_stable_timed_min_minutes";
     public const string TroopTrainingStableTimedMaxMinutes = "troop_training_stable_timed_max_minutes";
@@ -214,7 +218,9 @@ public static class BotOptionPayloadKeys
     public const string TroopTrainingWorkshopAmountMode = "troop_training_workshop_amount_mode";
     public const string TroopTrainingWorkshopKeepResourcesPercent = "troop_training_workshop_keep_resources_percent";
     public const string TroopTrainingWorkshopRunMode = "troop_training_workshop_run_mode";
+    public const string TroopTrainingWorkshopMinimumTroopsEnabled = "troop_training_workshop_minimum_troops_enabled";
     public const string TroopTrainingWorkshopMinimumTroops = "troop_training_workshop_minimum_troops";
+    public const string TroopTrainingWorkshopMaximumMinimumTroops = "troop_training_workshop_maximum_minimum_troops";
     public const string TroopTrainingWorkshopMinimumResourcesPercent = "troop_training_workshop_minimum_resources_percent";
     public const string TroopTrainingWorkshopTimedMinMinutes = "troop_training_workshop_timed_min_minutes";
     public const string TroopTrainingWorkshopTimedMaxMinutes = "troop_training_workshop_timed_max_minutes";

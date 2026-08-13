@@ -94,7 +94,9 @@ public static class BotOptionsPayloadApplier
         var troopTrainingBarracksAmountMode = troopTraining.Barracks.AmountMode;
         var troopTrainingBarracksKeepResourcesPercent = troopTraining.Barracks.KeepResourcesPercent;
         var troopTrainingBarracksRunMode = troopTraining.Barracks.RunMode;
+        var troopTrainingBarracksMinimumTroopsEnabled = troopTraining.Barracks.MinimumTroopsEnabled;
         var troopTrainingBarracksMinimumTroops = troopTraining.Barracks.MinimumTroops;
+        var troopTrainingBarracksMaximumMinimumTroops = troopTraining.Barracks.MaximumMinimumTroops;
         var troopTrainingBarracksMinimumResourcesPercent = troopTraining.Barracks.MinimumResourcesPercent;
         var troopTrainingBarracksTimedMinMinutes = troopTraining.Barracks.TimedMinMinutes;
         var troopTrainingBarracksTimedMaxMinutes = troopTraining.Barracks.TimedMaxMinutes;
@@ -108,7 +110,9 @@ public static class BotOptionsPayloadApplier
         var troopTrainingStableAmountMode = troopTraining.Stable.AmountMode;
         var troopTrainingStableKeepResourcesPercent = troopTraining.Stable.KeepResourcesPercent;
         var troopTrainingStableRunMode = troopTraining.Stable.RunMode;
+        var troopTrainingStableMinimumTroopsEnabled = troopTraining.Stable.MinimumTroopsEnabled;
         var troopTrainingStableMinimumTroops = troopTraining.Stable.MinimumTroops;
+        var troopTrainingStableMaximumMinimumTroops = troopTraining.Stable.MaximumMinimumTroops;
         var troopTrainingStableMinimumResourcesPercent = troopTraining.Stable.MinimumResourcesPercent;
         var troopTrainingStableTimedMinMinutes = troopTraining.Stable.TimedMinMinutes;
         var troopTrainingStableTimedMaxMinutes = troopTraining.Stable.TimedMaxMinutes;
@@ -122,7 +126,9 @@ public static class BotOptionsPayloadApplier
         var troopTrainingWorkshopAmountMode = troopTraining.Workshop.AmountMode;
         var troopTrainingWorkshopKeepResourcesPercent = troopTraining.Workshop.KeepResourcesPercent;
         var troopTrainingWorkshopRunMode = troopTraining.Workshop.RunMode;
+        var troopTrainingWorkshopMinimumTroopsEnabled = troopTraining.Workshop.MinimumTroopsEnabled;
         var troopTrainingWorkshopMinimumTroops = troopTraining.Workshop.MinimumTroops;
+        var troopTrainingWorkshopMaximumMinimumTroops = troopTraining.Workshop.MaximumMinimumTroops;
         var troopTrainingWorkshopMinimumResourcesPercent = troopTraining.Workshop.MinimumResourcesPercent;
         var troopTrainingWorkshopTimedMinMinutes = troopTraining.Workshop.TimedMinMinutes;
         var troopTrainingWorkshopTimedMaxMinutes = troopTraining.Workshop.TimedMaxMinutes;
@@ -220,7 +226,9 @@ public static class BotOptionsPayloadApplier
             TroopTrainingBarracksAmountMode = troopTrainingBarracksAmountMode,
             TroopTrainingBarracksKeepResourcesPercent = troopTrainingBarracksKeepResourcesPercent,
             TroopTrainingBarracksRunMode = troopTrainingBarracksRunMode,
+            TroopTrainingBarracksMinimumTroopsEnabled = troopTrainingBarracksMinimumTroopsEnabled,
             TroopTrainingBarracksMinimumTroops = troopTrainingBarracksMinimumTroops,
+            TroopTrainingBarracksMaximumMinimumTroops = troopTrainingBarracksMaximumMinimumTroops,
             TroopTrainingBarracksMinimumResourcesPercent = troopTrainingBarracksMinimumResourcesPercent,
             TroopTrainingBarracksTimedMinMinutes = troopTrainingBarracksTimedMinMinutes,
             TroopTrainingBarracksTimedMaxMinutes = troopTrainingBarracksTimedMaxMinutes,
@@ -234,7 +242,9 @@ public static class BotOptionsPayloadApplier
             TroopTrainingStableAmountMode = troopTrainingStableAmountMode,
             TroopTrainingStableKeepResourcesPercent = troopTrainingStableKeepResourcesPercent,
             TroopTrainingStableRunMode = troopTrainingStableRunMode,
+            TroopTrainingStableMinimumTroopsEnabled = troopTrainingStableMinimumTroopsEnabled,
             TroopTrainingStableMinimumTroops = troopTrainingStableMinimumTroops,
+            TroopTrainingStableMaximumMinimumTroops = troopTrainingStableMaximumMinimumTroops,
             TroopTrainingStableMinimumResourcesPercent = troopTrainingStableMinimumResourcesPercent,
             TroopTrainingStableTimedMinMinutes = troopTrainingStableTimedMinMinutes,
             TroopTrainingStableTimedMaxMinutes = troopTrainingStableTimedMaxMinutes,
@@ -248,7 +258,9 @@ public static class BotOptionsPayloadApplier
             TroopTrainingWorkshopAmountMode = troopTrainingWorkshopAmountMode,
             TroopTrainingWorkshopKeepResourcesPercent = troopTrainingWorkshopKeepResourcesPercent,
             TroopTrainingWorkshopRunMode = troopTrainingWorkshopRunMode,
+            TroopTrainingWorkshopMinimumTroopsEnabled = troopTrainingWorkshopMinimumTroopsEnabled,
             TroopTrainingWorkshopMinimumTroops = troopTrainingWorkshopMinimumTroops,
+            TroopTrainingWorkshopMaximumMinimumTroops = troopTrainingWorkshopMaximumMinimumTroops,
             TroopTrainingWorkshopMinimumResourcesPercent = troopTrainingWorkshopMinimumResourcesPercent,
             TroopTrainingWorkshopTimedMinMinutes = troopTrainingWorkshopTimedMinMinutes,
             TroopTrainingWorkshopTimedMaxMinutes = troopTrainingWorkshopTimedMaxMinutes,

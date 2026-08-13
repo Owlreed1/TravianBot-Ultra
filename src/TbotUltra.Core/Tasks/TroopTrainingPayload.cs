@@ -17,7 +17,11 @@ public sealed record TroopTrainingBuildingPayload(
     bool CheckWood,
     bool CheckClay,
     bool CheckIron,
-    bool CheckCrop);
+    bool CheckCrop)
+{
+    public bool MinimumTroopsEnabled { get; init; }
+    public int MaximumMinimumTroops { get; init; } = 100;
+}
 
 public sealed record TroopTrainingPayload(
     TroopTrainingBuildingPayload Barracks,
@@ -59,7 +63,9 @@ public sealed record TroopTrainingPayload(
         result = default!;
         if (!TryReadBool(payload, keys.Enabled, false, out var enabled)
             || !TryReadInt(payload, keys.KeepResourcesPercent, 0, 0, 100, out var keepResourcesPercent)
-            || !TryReadInt(payload, keys.MinimumTroops, 0, 0, int.MaxValue, out var minimumTroops)
+            || !TryReadBool(payload, keys.MinimumTroopsEnabled, false, out var minimumTroopsEnabled)
+            || !TryReadInt(payload, keys.MinimumTroops, 20, 1, 10000, out var minimumTroops)
+            || !TryReadInt(payload, keys.MaximumMinimumTroops, 100, 1, 10000, out var maximumMinimumTroops)
             || !TryReadInt(payload, keys.MinimumResourcesPercent, 0, 0, 100, out var minimumResourcesPercent)
             || !TryReadInt(payload, keys.TimedMinMinutes, 30, 1, int.MaxValue, out var timedMinMinutes)
             || !TryReadInt(payload, keys.TimedMaxMinutes, 120, 1, int.MaxValue, out var timedMaxMinutes)
@@ -85,7 +91,11 @@ public sealed record TroopTrainingPayload(
             checkWood,
             checkClay,
             checkIron,
-            checkCrop);
+            checkCrop)
+        {
+            MinimumTroopsEnabled = minimumTroopsEnabled,
+            MaximumMinimumTroops = maximumMinimumTroops,
+        };
         return true;
     }
 
@@ -98,7 +108,9 @@ public sealed record TroopTrainingPayload(
         result[keys.AmountMode] = string.IsNullOrWhiteSpace(value.AmountMode) ? "fixed" : value.AmountMode.Trim();
         result[keys.KeepResourcesPercent] = Math.Clamp(value.KeepResourcesPercent, 0, 100).ToString();
         result[keys.RunMode] = NormalizeRunMode(value.RunMode);
-        result[keys.MinimumTroops] = Math.Max(0, value.MinimumTroops).ToString();
+        result[keys.MinimumTroopsEnabled] = value.MinimumTroopsEnabled ? "true" : "false";
+        result[keys.MinimumTroops] = Math.Clamp(value.MinimumTroops, 1, 10000).ToString();
+        result[keys.MaximumMinimumTroops] = Math.Clamp(value.MaximumMinimumTroops, 1, 10000).ToString();
         result[keys.MinimumResourcesPercent] = Math.Clamp(value.MinimumResourcesPercent, 0, 100).ToString();
         result[keys.TimedMinMinutes] = Math.Max(1, value.TimedMinMinutes).ToString();
         result[keys.TimedMaxMinutes] = Math.Max(1, value.TimedMaxMinutes).ToString();
@@ -154,7 +166,9 @@ public sealed record TroopTrainingPayload(
                 BotOptionPayloadKeys.TroopTrainingBarracksAmountMode,
                 BotOptionPayloadKeys.TroopTrainingBarracksKeepResourcesPercent,
                 BotOptionPayloadKeys.TroopTrainingBarracksRunMode,
+                BotOptionPayloadKeys.TroopTrainingBarracksMinimumTroopsEnabled,
                 BotOptionPayloadKeys.TroopTrainingBarracksMinimumTroops,
+                BotOptionPayloadKeys.TroopTrainingBarracksMaximumMinimumTroops,
                 BotOptionPayloadKeys.TroopTrainingBarracksMinimumResourcesPercent,
                 BotOptionPayloadKeys.TroopTrainingBarracksTimedMinMinutes,
                 BotOptionPayloadKeys.TroopTrainingBarracksTimedMaxMinutes,
@@ -169,7 +183,9 @@ public sealed record TroopTrainingPayload(
                 BotOptionPayloadKeys.TroopTrainingStableAmountMode,
                 BotOptionPayloadKeys.TroopTrainingStableKeepResourcesPercent,
                 BotOptionPayloadKeys.TroopTrainingStableRunMode,
+                BotOptionPayloadKeys.TroopTrainingStableMinimumTroopsEnabled,
                 BotOptionPayloadKeys.TroopTrainingStableMinimumTroops,
+                BotOptionPayloadKeys.TroopTrainingStableMaximumMinimumTroops,
                 BotOptionPayloadKeys.TroopTrainingStableMinimumResourcesPercent,
                 BotOptionPayloadKeys.TroopTrainingStableTimedMinMinutes,
                 BotOptionPayloadKeys.TroopTrainingStableTimedMaxMinutes,
@@ -184,7 +200,9 @@ public sealed record TroopTrainingPayload(
                 BotOptionPayloadKeys.TroopTrainingWorkshopAmountMode,
                 BotOptionPayloadKeys.TroopTrainingWorkshopKeepResourcesPercent,
                 BotOptionPayloadKeys.TroopTrainingWorkshopRunMode,
+                BotOptionPayloadKeys.TroopTrainingWorkshopMinimumTroopsEnabled,
                 BotOptionPayloadKeys.TroopTrainingWorkshopMinimumTroops,
+                BotOptionPayloadKeys.TroopTrainingWorkshopMaximumMinimumTroops,
                 BotOptionPayloadKeys.TroopTrainingWorkshopMinimumResourcesPercent,
                 BotOptionPayloadKeys.TroopTrainingWorkshopTimedMinMinutes,
                 BotOptionPayloadKeys.TroopTrainingWorkshopTimedMaxMinutes,
@@ -202,7 +220,9 @@ public sealed record TroopTrainingPayload(
         string AmountMode,
         string KeepResourcesPercent,
         string RunMode,
+        string MinimumTroopsEnabled,
         string MinimumTroops,
+        string MaximumMinimumTroops,
         string MinimumResourcesPercent,
         string TimedMinMinutes,
         string TimedMaxMinutes,

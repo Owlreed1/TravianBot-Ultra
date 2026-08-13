@@ -20,6 +20,9 @@ public sealed class TroopTrainingSettingsStoreTests : IDisposable
         Assert.NotNull(loaded);
         Assert.True(loaded!.Barracks.Enabled);
         Assert.Equal("Phalanx", loaded.Barracks.TroopType);
+        Assert.True(loaded.Barracks.MinimumTroopsEnabled);
+        Assert.Equal(20, loaded.Barracks.MinimumTroops);
+        Assert.Equal(100, loaded.Barracks.MaximumMinimumTroops);
         Assert.Equal(60, loaded.FallbackCooldownSeconds);
     }
 
@@ -51,7 +54,11 @@ public sealed class TroopTrainingSettingsStoreTests : IDisposable
     private static TroopTrainingPayload Make(bool barracksEnabled = false, string troop = "", int fallback = 120)
     {
         var building = new TroopTrainingBuildingPayload(
-            barracksEnabled, troop, "no_limit", "maximum", 0, "timed", 0, 0, 30, 180, true, true, true, true);
+            barracksEnabled, troop, "no_limit", "maximum", 0, "timed", 20, 0, 30, 180, true, true, true, true)
+        {
+            MinimumTroopsEnabled = true,
+            MaximumMinimumTroops = 100,
+        };
         return new TroopTrainingPayload(building, building, building, fallback);
     }
 

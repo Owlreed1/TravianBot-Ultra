@@ -218,6 +218,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Hero, Town Hall, Brewery, and Smithy restart delays are independently toggleable and enabled by default. Hero
   reuses one session deadline after returning home or discovering a new adventure. Smithy delays only after an
   occupied queue slot frees; an empty queue starts immediately and Plus slots are filled together without delay.
+- Optional per-building troop minimum ranges are village-scoped. Randomize one threshold per building/run and
+  evaluate it from the current village resource snapshot plus the Official unit-cost catalog before navigating;
+  recheck live costs and resources before submit, and alarm/skip on a catalog-to-live cost mismatch.
 - Hero HP regeneration per day is only a scheduling estimate for low-HP adventure defers. A successful current-page
   HP read is authoritative and releases the deferred Hero task immediately once the threshold is met. That release
   is centralized in the shared UI HP-read helper, so login, quick re-login, browser restart, the manual refresh

@@ -43,7 +43,9 @@ public sealed partial class TroopTrainingViewModel : BaseViewModel
         nameof(TroopTrainingBuildingOption.AmountMode),
         nameof(TroopTrainingBuildingOption.KeepResourcesPercent),
         nameof(TroopTrainingBuildingOption.RunMode),
+        nameof(TroopTrainingBuildingOption.MinimumTroopsEnabled),
         nameof(TroopTrainingBuildingOption.MinimumTroops),
+        nameof(TroopTrainingBuildingOption.MaximumMinimumTroops),
         nameof(TroopTrainingBuildingOption.MinimumResourcesPercent),
         nameof(TroopTrainingBuildingOption.TimedMinMinutes),
         nameof(TroopTrainingBuildingOption.TimedMaxMinutes),
@@ -268,7 +270,9 @@ public sealed partial class TroopTrainingViewModel : BaseViewModel
                         option.AmountMode = options.TroopTrainingBarracksAmountMode;
                         option.KeepResourcesPercent = options.TroopTrainingBarracksKeepResourcesPercent;
                         option.RunMode = options.TroopTrainingBarracksRunMode;
+                        option.MinimumTroopsEnabled = options.TroopTrainingBarracksMinimumTroopsEnabled;
                         option.MinimumTroops = options.TroopTrainingBarracksMinimumTroops;
+                        option.MaximumMinimumTroops = options.TroopTrainingBarracksMaximumMinimumTroops;
                         option.MinimumResourcesPercent = options.TroopTrainingBarracksMinimumResourcesPercent;
                         option.TimedMinMinutes = options.TroopTrainingBarracksTimedMinMinutes;
                         option.TimedMaxMinutes = options.TroopTrainingBarracksTimedMaxMinutes;
@@ -280,7 +284,9 @@ public sealed partial class TroopTrainingViewModel : BaseViewModel
                         option.AmountMode = options.TroopTrainingStableAmountMode;
                         option.KeepResourcesPercent = options.TroopTrainingStableKeepResourcesPercent;
                         option.RunMode = options.TroopTrainingStableRunMode;
+                        option.MinimumTroopsEnabled = options.TroopTrainingStableMinimumTroopsEnabled;
                         option.MinimumTroops = options.TroopTrainingStableMinimumTroops;
+                        option.MaximumMinimumTroops = options.TroopTrainingStableMaximumMinimumTroops;
                         option.MinimumResourcesPercent = options.TroopTrainingStableMinimumResourcesPercent;
                         option.TimedMinMinutes = options.TroopTrainingStableTimedMinMinutes;
                         option.TimedMaxMinutes = options.TroopTrainingStableTimedMaxMinutes;
@@ -292,7 +298,9 @@ public sealed partial class TroopTrainingViewModel : BaseViewModel
                         option.AmountMode = options.TroopTrainingWorkshopAmountMode;
                         option.KeepResourcesPercent = options.TroopTrainingWorkshopKeepResourcesPercent;
                         option.RunMode = options.TroopTrainingWorkshopRunMode;
+                        option.MinimumTroopsEnabled = options.TroopTrainingWorkshopMinimumTroopsEnabled;
                         option.MinimumTroops = options.TroopTrainingWorkshopMinimumTroops;
+                        option.MaximumMinimumTroops = options.TroopTrainingWorkshopMaximumMinimumTroops;
                         option.MinimumResourcesPercent = options.TroopTrainingWorkshopMinimumResourcesPercent;
                         option.TimedMinMinutes = options.TroopTrainingWorkshopTimedMinMinutes;
                         option.TimedMaxMinutes = options.TroopTrainingWorkshopTimedMaxMinutes;
@@ -351,7 +359,9 @@ public sealed partial class TroopTrainingViewModel : BaseViewModel
                 option.AmountMode = building.AmountMode;
                 option.KeepResourcesPercent = building.KeepResourcesPercent;
                 option.RunMode = building.RunMode;
+                option.MinimumTroopsEnabled = building.MinimumTroopsEnabled;
                 option.MinimumTroops = building.MinimumTroops;
+                option.MaximumMinimumTroops = building.MaximumMinimumTroops;
                 option.MinimumResourcesPercent = building.MinimumResourcesPercent;
                 option.TimedMinMinutes = building.TimedMinMinutes;
                 option.TimedMaxMinutes = building.TimedMaxMinutes;
@@ -394,7 +404,11 @@ public sealed partial class TroopTrainingViewModel : BaseViewModel
                 CheckWood,
                 CheckClay,
                 CheckIron,
-                CheckCrop);
+                CheckCrop)
+            {
+                MinimumTroopsEnabled = option.MinimumTroopsEnabled,
+                MaximumMinimumTroops = option.MaximumMinimumTroops,
+            };
         }
 
         return new TroopTrainingPayload(
@@ -402,6 +416,19 @@ public sealed partial class TroopTrainingViewModel : BaseViewModel
             BuildFor(TroopTrainingBuildingType.Stable),
             BuildFor(TroopTrainingBuildingType.Workshop),
             FallbackCooldownSeconds);
+    }
+
+    public bool TryValidateMinimumTroopRanges(out string error)
+    {
+        var invalid = Buildings.FirstOrDefault(option => option.MinimumTroopsEnabled && !option.HasValidMinimumTroopRange);
+        if (invalid is null)
+        {
+            error = string.Empty;
+            return true;
+        }
+
+        error = $"{invalid.Title}: minimum troops must use whole numbers from 1 to 10,000 and Max must be at least Min.";
+        return false;
     }
 
     /// <summary>

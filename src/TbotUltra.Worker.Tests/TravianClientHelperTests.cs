@@ -8,6 +8,26 @@ namespace TbotUltra.Worker.Tests;
 
 public sealed class TravianClientHelperTests
 {
+    [Fact]
+    public void SelectRandomMinimumTroops_UsesInclusiveConfiguredRange()
+    {
+        var random = new Random(1234);
+        var values = Enumerable.Range(0, 500)
+            .Select(_ => TroopTrainingCalculator.SelectRandomMinimumTroops(20, 100, random))
+            .ToList();
+
+        Assert.All(values, value => Assert.InRange(value, 20, 100));
+        Assert.Contains(20, values);
+        Assert.Contains(100, values);
+    }
+
+    [Fact]
+    public void SelectRandomMinimumTroops_NormalizesReversedAndOutOfRangeValues()
+    {
+        Assert.Equal(10000, TroopTrainingCalculator.SelectRandomMinimumTroops(20000, 5, new Random(1)));
+        Assert.Equal(1, TroopTrainingCalculator.SelectRandomMinimumTroops(-10, 0, new Random(1)));
+    }
+
     [Theory]
     [InlineData("https://server.test/dorf2.php?id=35", "/dorf2.php", true)]
     [InlineData("https://server.test/build.php?id=35&gid=13", "/build.php?id=35", true)]

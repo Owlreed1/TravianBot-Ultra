@@ -9,7 +9,8 @@ public sealed class TroopTrainingQuickSettingsTests
     private static TroopTrainingPayload BuildSourcePayload()
     {
         var barracks = new TroopTrainingBuildingPayload(
-            false, "Clubswinger", "10", "keep_resources", 25, "timed", 40, 80, 20, 40, true, true, true, true);
+            false, "Clubswinger", "10", "keep_resources", 25, "timed", 40, 80, 20, 40, true, true, true, true)
+        { MinimumTroopsEnabled = true, MaximumMinimumTroops = 90 };
         var stable = new TroopTrainingBuildingPayload(
             true, "Paladin", "20", "maximum", 0, "resource_percent", 5, 65, 30, 180, true, true, true, true);
         var workshop = new TroopTrainingBuildingPayload(
@@ -40,6 +41,9 @@ public sealed class TroopTrainingQuickSettingsTests
         row.Barracks.AmountMode = "maximum";
         row.Barracks.RunMode = "resource_percent";
         row.Barracks.MinimumResourcesPercent = 70;
+        row.Barracks.MinimumTroopsEnabled = true;
+        row.Barracks.MinimumTroops = 25;
+        row.Barracks.MaximumMinimumTroops = 75;
         row.Stable.TimedMinMinutes = 15;
         row.Stable.TimedMaxMinutes = 45;
         row.Workshop.IsEnabled = false;
@@ -55,8 +59,9 @@ public sealed class TroopTrainingQuickSettingsTests
         Assert.Equal("maximum", result.Barracks.AmountMode);
         Assert.Equal("resource_percent", result.Barracks.RunMode);
         Assert.Equal(70, result.Barracks.MinimumResourcesPercent);
-        // MinimumTroops has no UI and must be preserved from the source payload.
-        Assert.Equal(source.Barracks.MinimumTroops, result.Barracks.MinimumTroops);
+        Assert.True(result.Barracks.MinimumTroopsEnabled);
+        Assert.Equal(25, result.Barracks.MinimumTroops);
+        Assert.Equal(75, result.Barracks.MaximumMinimumTroops);
 
         Assert.Equal(15, result.Stable.TimedMinMinutes);
         Assert.Equal(45, result.Stable.TimedMaxMinutes);

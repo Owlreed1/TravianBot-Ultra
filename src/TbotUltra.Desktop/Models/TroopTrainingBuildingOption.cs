@@ -16,7 +16,11 @@ public sealed class TroopTrainingBuildingOption : INotifyPropertyChanged
     private string _amountMode = "maximum";
     private int _keepResourcesPercent = 10;
     private string _runMode = "timed";
-    private int _minimumTroops = 1;
+    private bool _minimumTroopsEnabled;
+    private int _minimumTroops = 20;
+    private int _maximumMinimumTroops = 100;
+    private bool _minimumTroopsTextValid = true;
+    private bool _maximumMinimumTroopsTextValid = true;
     private int _minimumResourcesPercent = 90;
     private int _timedMinMinutes = 30;
     private int _timedMaxMinutes = 120;
@@ -141,28 +145,90 @@ public sealed class TroopTrainingBuildingOption : INotifyPropertyChanged
         get => _minimumTroops;
         set
         {
-            var normalized = Math.Max(1, value);
+            var normalized = Math.Clamp(value, 1, 10000);
             if (_minimumTroops == normalized)
             {
                 return;
             }
 
             _minimumTroops = normalized;
+            _minimumTroopsTextValid = true;
             OnPropertyChanged();
             OnPropertyChanged(nameof(MinimumTroopsText));
+            OnPropertyChanged(nameof(HasValidMinimumTroopRange));
         }
     }
+
+    public bool MinimumTroopsEnabled
+    {
+        get => _minimumTroopsEnabled;
+        set
+        {
+            if (_minimumTroopsEnabled == value)
+            {
+                return;
+            }
+
+            _minimumTroopsEnabled = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public int MaximumMinimumTroops
+    {
+        get => _maximumMinimumTroops;
+        set
+        {
+            var normalized = Math.Clamp(value, 1, 10000);
+            if (_maximumMinimumTroops == normalized)
+            {
+                return;
+            }
+
+            _maximumMinimumTroops = normalized;
+            _maximumMinimumTroopsTextValid = true;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(MaximumMinimumTroopsText));
+            OnPropertyChanged(nameof(HasValidMinimumTroopRange));
+        }
+    }
+
+    public string MaximumMinimumTroopsText
+    {
+        get => MaximumMinimumTroops.ToString();
+        set
+        {
+            if (int.TryParse(value?.Trim(), out var parsed) && parsed is >= 1 and <= 10000)
+            {
+                _maximumMinimumTroopsTextValid = true;
+                MaximumMinimumTroops = parsed;
+                return;
+            }
+
+            _maximumMinimumTroopsTextValid = false;
+            OnPropertyChanged(nameof(HasValidMinimumTroopRange));
+        }
+    }
+
+    public bool HasValidMinimumTroopRange => _minimumTroopsTextValid
+        && _maximumMinimumTroopsTextValid
+        && MinimumTroops is >= 1 and <= 10000
+        && MaximumMinimumTroops is >= 1 and <= 10000
+        && MaximumMinimumTroops >= MinimumTroops;
 
     public string MinimumTroopsText
     {
         get => MinimumTroops.ToString();
         set
         {
-            if (!int.TryParse(value?.Trim(), out var parsed))
+            if (!int.TryParse(value?.Trim(), out var parsed) || parsed is < 1 or > 10000)
             {
+                _minimumTroopsTextValid = false;
+                OnPropertyChanged(nameof(HasValidMinimumTroopRange));
                 return;
             }
 
+            _minimumTroopsTextValid = true;
             MinimumTroops = parsed;
         }
     }

@@ -637,7 +637,9 @@ public sealed class QueueStoreAndSchedulerTests : IDisposable
             [BotOptionPayloadKeys.TroopTrainingBarracksAmountMode] = "fixed",
             [BotOptionPayloadKeys.TroopTrainingBarracksKeepResourcesPercent] = "120",
             [BotOptionPayloadKeys.TroopTrainingBarracksRunMode] = "continuous",
+            [BotOptionPayloadKeys.TroopTrainingBarracksMinimumTroopsEnabled] = "true",
             [BotOptionPayloadKeys.TroopTrainingBarracksMinimumTroops] = "10",
+            [BotOptionPayloadKeys.TroopTrainingBarracksMaximumMinimumTroops] = "25",
             [BotOptionPayloadKeys.TroopTrainingBarracksMinimumResourcesPercent] = "20",
             [BotOptionPayloadKeys.TroopTrainingBarracksCheckWood] = "true",
             [BotOptionPayloadKeys.TroopTrainingBarracksCheckClay] = "true",
@@ -652,13 +654,32 @@ public sealed class QueueStoreAndSchedulerTests : IDisposable
         Assert.Equal("Clubswinger", parsed.Barracks.TroopType);
         Assert.Equal(100, parsed.Barracks.KeepResourcesPercent);
         Assert.False(parsed.Barracks.CheckIron);
+        Assert.True(parsed.Barracks.MinimumTroopsEnabled);
+        Assert.Equal(10, parsed.Barracks.MinimumTroops);
+        Assert.Equal(25, parsed.Barracks.MaximumMinimumTroops);
         Assert.Equal(60, parsed.FallbackCooldownSeconds);
         var serialized = parsed.ToDictionary();
-        Assert.Equal(43, serialized.Count);
+        Assert.Equal(49, serialized.Count);
         Assert.Equal("true", serialized[BotOptionPayloadKeys.TroopTrainingBarracksEnabled]);
         Assert.Equal("Clubswinger", serialized[BotOptionPayloadKeys.TroopTrainingBarracksTroopType]);
         Assert.Equal("100", serialized[BotOptionPayloadKeys.TroopTrainingBarracksKeepResourcesPercent]);
+        Assert.Equal("true", serialized[BotOptionPayloadKeys.TroopTrainingBarracksMinimumTroopsEnabled]);
+        Assert.Equal("25", serialized[BotOptionPayloadKeys.TroopTrainingBarracksMaximumMinimumTroops]);
         Assert.Equal("60", serialized[BotOptionPayloadKeys.TroopTrainingFallbackCooldownSeconds]);
+    }
+
+    [Fact]
+    public void TroopTrainingPayload_MissingMinimumRangeUsesDisabledTwentyToOneHundredDefaults()
+    {
+        Assert.True(TroopTrainingPayload.TryFromDictionary(new Dictionary<string, string>(), out var parsed));
+
+        Assert.NotNull(parsed);
+        foreach (var building in new[] { parsed!.Barracks, parsed.Stable, parsed.Workshop })
+        {
+            Assert.False(building.MinimumTroopsEnabled);
+            Assert.Equal(20, building.MinimumTroops);
+            Assert.Equal(100, building.MaximumMinimumTroops);
+        }
     }
 
     [Fact]

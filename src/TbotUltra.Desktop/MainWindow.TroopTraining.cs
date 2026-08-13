@@ -991,6 +991,13 @@ public partial class MainWindow
     /// </summary>
     internal void OnTroopsSyncSettingsClicked()
     {
+        if (!_troopTrainingViewModel.TryValidateMinimumTroopRanges(out var validationError))
+        {
+            _troopTrainingViewModel.InfoText = validationError;
+            AppendLog($"Troop settings not synced: {validationError}");
+            return;
+        }
+
         var account = _accountStore.ActiveAccountName();
         if (string.IsNullOrWhiteSpace(account))
         {
@@ -1096,6 +1103,12 @@ public partial class MainWindow
     // village is selected so a stray edit before login still lands somewhere sensible.
     private void PersistTroopTrainingForSelectedVillage()
     {
+        if (!_troopTrainingViewModel.TryValidateMinimumTroopRanges(out var validationError))
+        {
+            _troopTrainingViewModel.InfoText = validationError;
+            return;
+        }
+
         var account = _accountStore.ActiveAccountName();
         var key = GetSelectedVillageKey();
         if (string.IsNullOrWhiteSpace(account) || string.IsNullOrWhiteSpace(key))
@@ -1159,6 +1172,13 @@ public partial class MainWindow
     /// </summary>
     internal void OnTroopsBuildNowClicked()
     {
+        if (!_troopTrainingViewModel.TryValidateMinimumTroopRanges(out var validationError))
+        {
+            _troopTrainingViewModel.InfoText = validationError;
+            AppendLog($"Build troops not queued: {validationError}");
+            return;
+        }
+
         var payload = _troopTrainingViewModel.BuildVillageTrainingPayload().ToDictionary();
         EnqueueQuickTask("build_troops", "Build troops", payload);
         _troopTrainingViewModel.InfoText = "Queued: build troops.";
