@@ -50,17 +50,18 @@ public sealed class TroopTrainingPayloadApplierDomainTests
     }
 
     [Theory]
-    [InlineData("9", 30)]
-    [InlineData("600", 600)]
-    public void Apply_NormalizesFallbackCooldownAndBreweryFlag(string cooldown, int expected)
+    [InlineData("9")]
+    [InlineData("600")]
+    public void Apply_PreservesGlobalFallbackCooldownAndAppliesBreweryFlag(string payloadCooldown)
     {
-        var result = BotOptionsPayloadApplier.Apply(new BotOptions(), new Dictionary<string, string>
+        var source = new BotOptions { TroopTrainingFallbackCooldownSeconds = 300 };
+        var result = BotOptionsPayloadApplier.Apply(source, new Dictionary<string, string>
         {
-            [BotOptionPayloadKeys.TroopTrainingFallbackCooldownSeconds] = cooldown,
+            [BotOptionPayloadKeys.TroopTrainingFallbackCooldownSeconds] = payloadCooldown,
             [BotOptionPayloadKeys.BreweryAutoCelebrationEnabled] = "true",
         });
 
-        Assert.Equal(expected, result.TroopTrainingFallbackCooldownSeconds);
+        Assert.Equal(300, result.TroopTrainingFallbackCooldownSeconds);
         Assert.True(result.BreweryAutoCelebrationEnabled);
     }
 

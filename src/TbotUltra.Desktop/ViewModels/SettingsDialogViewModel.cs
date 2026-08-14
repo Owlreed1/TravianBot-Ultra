@@ -35,6 +35,7 @@ public sealed class SettingsDialogViewModel : BaseViewModel
     private string _dailySilverSpendingLimitText = "10000";
     private int _dailyGoldSpent;
     private int _dailySilverSpent;
+    private int _troopTrainingFallbackCooldownSeconds = 120;
 
     public SettingsDialogViewModel(
         bool sleepNowEnabled,
@@ -82,6 +83,16 @@ public sealed class SettingsDialogViewModel : BaseViewModel
     public HeroSettingsViewModel Hero { get; } = new();
 
     public CelebrationSettingsViewModel Celebrations { get; } = new();
+
+    public int TroopTrainingFallbackCooldownSeconds
+    {
+        get => _troopTrainingFallbackCooldownSeconds;
+        set => SetProperty(ref _troopTrainingFallbackCooldownSeconds, value switch
+        {
+            10 or 30 or 60 or 120 or 300 or 600 => value,
+            _ => 30,
+        });
+    }
 
     public bool IsDirty
     {

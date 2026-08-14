@@ -271,7 +271,7 @@
                                                 BorderThickness="1"
                                                 Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibilityConverter}}">
                                             <StackPanel>
-                                                <!-- Village-level: resource checks + fallback wait -->
+                                                <!-- Village-level resource checks -->
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                                     <TextBlock Text="Check for % resources:"
                                                                Style="{StaticResource DetailLabelStyle}"
@@ -284,23 +284,8 @@
                                                               IsChecked="{Binding CheckClay, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                                     <CheckBox Content="Iron" Margin="0,0,12,0" VerticalAlignment="Center"
                                                               IsChecked="{Binding CheckIron, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                                    <CheckBox Content="Crop" Margin="0,0,24,0" VerticalAlignment="Center"
+                                                    <CheckBox Content="Crop" VerticalAlignment="Center"
                                                               IsChecked="{Binding CheckCrop, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                                    <TextBlock Text="Fallback wait:"
-                                                               Style="{StaticResource DetailLabelStyle}"
-                                                               Margin="0,0,8,0"
-                                                               ToolTipService.InitialShowDelay="100"
-                                                               ToolTip="Used when the bot cannot read an exact troop queue ETA. It waits this long before checking again." />
-                                                    <ComboBox Width="90"
-                                                              SelectedValuePath="Tag"
-                                                              SelectedValue="{Binding FallbackCooldownSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                                                        <ComboBoxItem Content="10s" Tag="10" />
-                                                        <ComboBoxItem Content="30s" Tag="30" />
-                                                        <ComboBoxItem Content="1 min" Tag="60" />
-                                                        <ComboBoxItem Content="2 min" Tag="120" />
-                                                        <ComboBoxItem Content="5 min" Tag="300" />
-                                                        <ComboBoxItem Content="10 min" Tag="600" />
-                                                    </ComboBox>
                                                 </StackPanel>
 
                                                 <!-- Per-building mini table -->

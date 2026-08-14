@@ -822,7 +822,6 @@ public partial class MainWindow : Window
         ApplyTroopTrainingTribeState(ResolveStoredTroopTrainingTribe());
         EnsureAutoCelebrationEnabledForBreweryGroup();
         _lastAutoCelebrationEnabledForChangeTracking = _troopTrainingViewModel.AutoCelebrationEnabled;
-        _troopTrainingViewModel.InfoText = "Configure troop building rules and refresh queues when needed.";
         _heroViewModel.LoadSettingsFromConfig(options);
 
         _resourcesViewModel.LoadSettingsFromConfig(options);

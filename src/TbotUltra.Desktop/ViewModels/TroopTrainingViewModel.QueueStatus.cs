@@ -90,7 +90,7 @@ public sealed partial class TroopTrainingViewModel
 
     public void ResetRuntimeState()
     {
-        InfoText = "Configure troop building rules and refresh queues when needed.";
+        InfoText = string.Empty;
         ResetQueueStatus();
         BreweryExists = false;
         AutoCelebrationCanStart = false;

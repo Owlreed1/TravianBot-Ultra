@@ -136,7 +136,8 @@ public static class BotOptionsPayloadApplier
         var troopTrainingWorkshopCheckClay = troopTraining.Workshop.CheckClay;
         var troopTrainingWorkshopCheckIron = troopTraining.Workshop.CheckIron;
         var troopTrainingWorkshopCheckCrop = troopTraining.Workshop.CheckCrop;
-        var troopTrainingFallbackCooldownSeconds = troopTraining.FallbackCooldownSeconds;
+        // This is an account-level Settings value; village task payloads must not override it.
+        var troopTrainingFallbackCooldownSeconds = source.TroopTrainingFallbackCooldownSeconds;
         var breweryAutoCelebrationEnabled = troopTraining.BreweryAutoCelebrationEnabled;
         var npcTrade = NpcTradePayloadApplier.Apply(source, payload);
         var npcTradeEnabled = npcTrade.Enabled;

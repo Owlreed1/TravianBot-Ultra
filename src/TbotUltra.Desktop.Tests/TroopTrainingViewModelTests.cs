@@ -21,7 +21,7 @@ public sealed class TroopTrainingViewModelTests
 
         vm.ResetRuntimeState();
 
-        Assert.Equal("Configure troop building rules and refresh queues when needed.", vm.InfoText);
+        Assert.Empty(vm.InfoText);
         Assert.False(vm.BreweryExists);
         Assert.Null(vm.AutoCelebrationRemainingSeconds);
         Assert.All(vm.Buildings, item =>

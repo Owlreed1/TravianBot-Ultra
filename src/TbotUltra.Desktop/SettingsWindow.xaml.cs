@@ -315,6 +315,9 @@ public partial class SettingsWindow : Window
         SettingsVm.Hero.SmithyUpgradeRestartDelay.DelayMaxMinutes = FormatDelay(ReadDouble(
             BotOptionPayloadKeys.SmithyUpgradeRestartDelayMaxMinutes,
             SmithyUpgradeRestartDelayDefaults.MaxMinutes));
+        SettingsVm.TroopTrainingFallbackCooldownSeconds = ReadInt(
+            BotOptionPayloadKeys.TroopTrainingFallbackCooldownSeconds,
+            120);
         SynchronizeHeroControls();
         SynchronizeSpendingLimitControls();
         SettingsVm.ResetChangeTracking();
@@ -531,6 +534,8 @@ public partial class SettingsWindow : Window
                 SettingsVm.Hero.SmithyUpgradeRestartDelay.ResolvedDelayMinMinutes;
             _config[BotOptionPayloadKeys.SmithyUpgradeRestartDelayMaxMinutes] =
                 SettingsVm.Hero.SmithyUpgradeRestartDelay.ResolvedDelayMaxMinutes;
+            _config[BotOptionPayloadKeys.TroopTrainingFallbackCooldownSeconds] =
+                SettingsVm.TroopTrainingFallbackCooldownSeconds;
             SaveDailyServerResetFromUi();
             SavePacingConfigFromUi();
             _config[BotOptionPayloadKeys.ConstructionStorageUpgradeLevelsAhead] =

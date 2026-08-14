@@ -52,7 +52,7 @@ public sealed partial class TroopTrainingViewModel : BaseViewModel
     ];
 
     private bool _isConfigSuppressed;
-    private string _infoText = "Configure troop building rules and refresh queues when needed.";
+    private string _infoText = string.Empty;
     private bool _checkWood = true;
     private bool _checkClay = true;
     private bool _checkIron = true;
