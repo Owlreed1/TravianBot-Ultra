@@ -193,12 +193,16 @@ public partial class MainWindow : Window
     private string? _pendingDeferredTroopTrainingRefreshSource;
     private TimeSpan _queueServerTimeOffset;
     private long _operationCounter;
-    private long _loopTickCounter;
     private readonly LoopController _loopController;
     private readonly AutomationDesk _automationDesk;
-    private long _automationBrowserGeneration;
-    private long _autoQueueRunLogId;
-    private long _continuousAutomationTickId;
+    private readonly AutomationPassRuntime _automationPassRuntime = new();
+    private readonly AutomationIdlePacing _automationIdlePacing = new();
+    private readonly AutomationNetworkBackoff _automationNetworkBackoff = new();
+    private readonly AutomationProxyRecoveryRuntime _automationProxyRecoveryRuntime = new();
+    private readonly AutomationSessionRuntime _automationSessionRuntime = new();
+    private readonly VillageStatusRoundRuntime _villageStatusRoundRuntime;
+    private readonly VillageStatusRoundCoordinator _villageStatusRoundCoordinator = new();
+    private readonly VillageStatusReactionCoordinator<VillageSelectionItem, VillageStatus> _villageStatusReactionCoordinator = new();
     private readonly BackgroundTaskTracker _backgroundTasks = new();
     private readonly SessionPacer _sessionPacer = new();
 
@@ -271,12 +275,6 @@ public partial class MainWindow : Window
     private volatile bool _uiBusy;
     private volatile bool _inboxAutoEnabled;
     private bool _loginInProgress;
-    private DateTimeOffset _lastContinuousInboxCheckUtc = DateTimeOffset.MinValue;
-    private DateTimeOffset _lastContinuousBrowserActivityUtc = DateTimeOffset.MinValue;
-    private DateTimeOffset _nextContinuousKeepAliveAtUtc = DateTimeOffset.MinValue;
-    private bool? _continuousKeepAliveEnabledLastApplied;
-    private DateTimeOffset _lastContinuousKeepAliveFailureUtc = DateTimeOffset.MinValue;
-    private string? _lastConservativeAutomationWarningSignature;
     private volatile bool _isLoggedIn;
     private volatile bool _browserSessionLikelyOpen;
     private volatile bool _travianLanguageGateActive;
@@ -301,12 +299,6 @@ public partial class MainWindow : Window
     private int _npcTradeBuildingSessionCount;
     private DateTimeOffset _lastBrowserClosedPopupAt = DateTimeOffset.MinValue;
     private DateTimeOffset _inlineWaitUntilUtc = DateTimeOffset.MinValue;
-    // When the next "step away" idle break is due. MinValue = not scheduled yet (rescheduled fresh on
-    // each continuous-loop start). See MaybeTakeIdleBreakAsync.
-    private DateTimeOffset _nextIdleBreakDueUtc = DateTimeOffset.MinValue;
-    // When the next "idle browse" (open a non-functional page) is due. Same lifecycle as the idle
-    // break. See MaybeDoIdleBrowseAsync.
-    private DateTimeOffset _nextIdleBrowseDueUtc = DateTimeOffset.MinValue;
     private string? _activeAutomationTaskName;
     private string? _activeFunctionDisplayName;
     private readonly DashboardActivityTracker _dashboardActivityTracker = new();
@@ -347,10 +339,8 @@ public partial class MainWindow : Window
     private readonly LinkedList<string> _pendingLogMessages = new();
     private readonly object _sessionLogWriteSync = new();
     private bool _logFlushQueued;
-    private bool _continuousLoopConstructionStatusNeedsSync = true;
     private bool _restartContinuousLoopAfterStop;
     private bool _startContinuousLoopAfterQueueStop;
-    private int _continuousLoopWakeRequested;
 
     /// <summary>
     /// Public accessor so the Buildings panel can bind to the buildings view
@@ -463,12 +453,18 @@ public partial class MainWindow : Window
         var queueScheduler = new PriorityFifoQueueScheduler();
         var queueExecutor = new QueueExecutor(taskRunner);
         _botService = new DesktopBotService(taskRunner, queueStore, queueScheduler, queueExecutor);
-        _automationDesk = new AutomationDesk(
-            _loopController,
-            new DelegateAutomationStatePort(
-                ReadAutomationStateAsync,
-                static (_, _, _, _) => ValueTask.CompletedTask),
-            new DelegateOfficialTravianAutomationPort(ExecuteAutomationActionAsync));
+        _villageStatusRoundRuntime = new VillageStatusRoundRuntime(
+            new FileVillageStatusRoundStatePort(_projectRoot));
+        var automationPass = new AutomationPassPort(
+            _accountStore.ActiveAccountName,
+            () => _botService.BrowserGeneration,
+            new DelegateAutomationModePassPort(
+                ReadContinuousAutomationStateAsync,
+                ExecuteContinuousAutomationActionAsync),
+            new DelegateAutomationModePassPort(
+                ReadAutoQueueAutomationStateAsync,
+                ExecuteAutoQueueAutomationActionAsync));
+        _automationDesk = new AutomationDesk(_loopController, automationPass, automationPass);
         _automationDesk.Updated += AutomationDesk_Updated;
         _heroPanelService = new HeroPanelService(new DesktopHeroPanelClient(_botService), _botConfigStore);
         _resourcesPanelService = new ResourcesPanelService(_botConfigStore, _villageSettingsStore);
@@ -1192,7 +1188,7 @@ public partial class MainWindow : Window
                 // Build/feature pages are not authoritative and must keep the sync request pending.
                 if (status.ActiveConstructionsFromOverview)
                 {
-                    _continuousLoopConstructionStatusNeedsSync = false;
+                    _automationSessionRuntime.MarkConstructionStatusSynchronized();
                 }
 
                 RefreshVillageActivityIndicatorsOnDashboard();

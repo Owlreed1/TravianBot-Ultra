@@ -456,6 +456,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   forces or reschedules a Village scan: it may fill only the live-verified browser village, while an independently due
   scan may fill free slots as it naturally visits each village. Full slots retain their persisted queue-humanize extra
   so later navigation still waits for the effective deadline.
+- An automation run captures Worker's actual `BrowserGeneration`; never mirror or synthesize that generation in
+  Desktop. Runtime-item reconciliation identifies village scope with `BotOptionPayloadKeys.TargetVillageKey` and
+  must preserve an existing pending item's authoritative `NextAttemptAt` when refreshing payload or priority.
 
 ## Target architecture
 

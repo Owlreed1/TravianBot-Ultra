@@ -9,15 +9,11 @@ namespace TbotUltra.Desktop;
 public partial class MainWindow
 {
     private const int AutomaticProxyRecoveryFailureThreshold = 3;
-    private int _automaticProxyRecoveryScheduled;
-    private int _automaticProxyRecoveryRetryAttempt;
-    private DateTimeOffset _automaticProxyRecoveryRetryAtUtc;
-
     private bool TryScheduleAutomaticProxyRecovery(BotOptions options)
     {
-        if (_consecutiveTransientConnectionFailures < AutomaticProxyRecoveryFailureThreshold
-            || DateTimeOffset.UtcNow < _automaticProxyRecoveryRetryAtUtc
-            || Interlocked.CompareExchange(ref _automaticProxyRecoveryScheduled, 1, 0) != 0)
+        if (!_automationProxyRecoveryRuntime.TryReserve(
+                _automationNetworkBackoff.ConsecutiveFailures,
+                AutomaticProxyRecoveryFailureThreshold))
         {
             return false;
         }
@@ -27,7 +23,7 @@ public partial class MainWindow
             || string.IsNullOrWhiteSpace(account.ProxyServer)
             || !ProxyParser.TryBuild(account.ProxyServer, out _, out _))
         {
-            Interlocked.Exchange(ref _automaticProxyRecoveryScheduled, 0);
+            _automationProxyRecoveryRuntime.Release();
             return false;
         }
 
@@ -167,7 +163,7 @@ public partial class MainWindow
         }
         finally
         {
-            Interlocked.Exchange(ref _automaticProxyRecoveryScheduled, 0);
+            _automationProxyRecoveryRuntime.Release();
         }
     }
 
@@ -178,28 +174,18 @@ public partial class MainWindow
             return;
         }
 
-        _automaticProxyRecoveryRetryAttempt++;
-        var retryDelay = ResolveAutomaticProxyRecoveryRetryDelay(_automaticProxyRecoveryRetryAttempt);
-        _automaticProxyRecoveryRetryAtUtc = DateTimeOffset.UtcNow + retryDelay;
-        MarkTransientNetworkUnavailable(retryDelay);
+        var retry = _automationProxyRecoveryRuntime.ScheduleRetry();
+        var retryDelay = retry.Delay;
+        _automationNetworkBackoff.MarkUnavailable(retryDelay);
         StatusTextBlock.Text = $"Connection unavailable. Retrying in {retryDelay.TotalMinutes:F0} min.";
         AppendLog(
-            $"[proxy-recovery] {reason} Retry {_automaticProxyRecoveryRetryAttempt} scheduled in "
+            $"[proxy-recovery] {reason} Retry {retry.Attempt} scheduled in "
             + $"{retryDelay.TotalMinutes:F0} min without changing the proxy or raising an alarm.");
         StartContinuousLoopRunner();
     }
 
     private void ResetAutomaticProxyRecoveryRetry()
     {
-        _automaticProxyRecoveryRetryAttempt = 0;
-        _automaticProxyRecoveryRetryAtUtc = DateTimeOffset.MinValue;
+        _automationProxyRecoveryRuntime.ResetRetry();
     }
-
-    internal static TimeSpan ResolveAutomaticProxyRecoveryRetryDelay(int attempt)
-        => attempt switch
-        {
-            <= 1 => TimeSpan.FromMinutes(2),
-            2 => TimeSpan.FromMinutes(5),
-            _ => TimeSpan.FromMinutes(10),
-        };
 }

@@ -1,0 +1,244 @@
+using TbotUltra.Desktop.Services;
+using TbotUltra.Worker.Domain;
+
+namespace TbotUltra.Desktop.Services.Orchestration;
+
+internal enum AutomationQueueSelectionReason
+{
+    Selected,
+    UrgentPreemption,
+    VillageRotationNoReadyWork,
+    VillageRotationFairness,
+    ShortVillageHold,
+    NoEnabledGroups,
+    NoReadyWork,
+}
+
+internal sealed record AutomationQueueSelectionInput(
+    IReadOnlyList<ContinuousLoopSelectionCandidate> Candidates,
+    IReadOnlyList<QueueGroup> ConfiguredGroups,
+    VillageBatchSnapshot VillageBatch,
+    string? ActiveVillageKey,
+    DateTimeOffset Now,
+    int ShortVillageDeferSeconds,
+    bool Preview);
+
+internal sealed record AutomationQueueSelectionResult(
+    QueueItem? Selected,
+    AutomationQueueSelectionReason Reason,
+    int ConsideredGroupCount,
+    DateTimeOffset? HoldUntil = null);
+
+internal static class AutomationQueueSelector
+{
+    internal static AutomationQueueSelectionResult Select(
+        AutomationQueueSelectionInput input,
+        Func<IReadOnlyList<QueueItem>, DateTimeOffset, bool, QueueItem?> selectReadyConstruction)
+    {
+        var villageKeysByItemId = input.Candidates
+            .ToDictionary(candidate => candidate.Item.Id, candidate => candidate.VillageKey);
+        var utilitySelection = ContinuousLoopSelector.SelectUtility(
+            new ContinuousLoopUtilitySelectionInput(input.Candidates, input.ActiveVillageKey, input.Now));
+        if (utilitySelection.PreferredItem is not null)
+        {
+            return new AutomationQueueSelectionResult(
+                utilitySelection.PreferredItem,
+                AutomationQueueSelectionReason.Selected,
+                0);
+        }
+
+        var selectionPlan = ContinuousLoopSelector.CreatePlan(new ContinuousLoopSelectionInput(
+            input.Candidates,
+            input.ConfiguredGroups));
+        if (selectionPlan.OrderedGroups.Count == 0)
+        {
+            return new AutomationQueueSelectionResult(
+                null,
+                AutomationQueueSelectionReason.NoEnabledGroups,
+                0);
+        }
+
+        var urgentCandidate = SelectReadyItemAcrossVillages(
+            selectionPlan,
+            villageKeysByItemId,
+            input.Now,
+            preview: true,
+            excludedVillageKey: null,
+            urgentOnly: true,
+            selectReadyConstruction);
+        if (urgentCandidate is not null)
+        {
+            return new AutomationQueueSelectionResult(
+                urgentCandidate,
+                AutomationQueueSelectionReason.UrgentPreemption,
+                selectionPlan.OrderedGroups.Count);
+        }
+
+        var currentVillageCandidate = string.IsNullOrWhiteSpace(input.VillageBatch.VillageKey)
+            ? null
+            : SelectReadyItemForVillage(
+                selectionPlan,
+                villageKeysByItemId,
+                input.VillageBatch.VillageKey,
+                input.Now,
+                input.Preview,
+                selectReadyConstruction);
+        var otherVillageCandidate = SelectReadyItemAcrossVillages(
+            selectionPlan,
+            villageKeysByItemId,
+            input.Now,
+            preview: true,
+            excludedVillageKey: input.VillageBatch.VillageKey,
+            urgentOnly: false,
+            selectReadyConstruction);
+
+        if (VillageBatchState.ShouldKeepCurrentVillage(
+                input.VillageBatch,
+                currentVillageCandidate is not null,
+                otherVillageCandidate is not null))
+        {
+            return new AutomationQueueSelectionResult(
+                currentVillageCandidate,
+                AutomationQueueSelectionReason.Selected,
+                selectionPlan.OrderedGroups.Count);
+        }
+
+        if (otherVillageCandidate is not null)
+        {
+            return new AutomationQueueSelectionResult(
+                otherVillageCandidate,
+                currentVillageCandidate is null
+                    ? AutomationQueueSelectionReason.VillageRotationNoReadyWork
+                    : AutomationQueueSelectionReason.VillageRotationFairness,
+                selectionPlan.OrderedGroups.Count);
+        }
+
+        if (currentVillageCandidate is not null)
+        {
+            return new AutomationQueueSelectionResult(
+                currentVillageCandidate,
+                AutomationQueueSelectionReason.Selected,
+                selectionPlan.OrderedGroups.Count);
+        }
+
+        var readyUtilityItem = utilitySelection.ReadyItems.FirstOrDefault();
+        if (readyUtilityItem is not null)
+        {
+            return new AutomationQueueSelectionResult(
+                readyUtilityItem,
+                AutomationQueueSelectionReason.Selected,
+                selectionPlan.OrderedGroups.Count);
+        }
+
+        var holdUntil = ContinuousLoopSelector.ResolveShortVillageHoldUntil(
+            input.Candidates,
+            input.ActiveVillageKey,
+            input.Now,
+            input.ShortVillageDeferSeconds);
+        return holdUntil is not null
+            ? new AutomationQueueSelectionResult(
+                null,
+                AutomationQueueSelectionReason.ShortVillageHold,
+                selectionPlan.OrderedGroups.Count,
+                holdUntil)
+            : new AutomationQueueSelectionResult(
+                null,
+                AutomationQueueSelectionReason.NoReadyWork,
+                selectionPlan.OrderedGroups.Count);
+    }
+
+    private static QueueItem? SelectReadyItemForVillage(
+        ContinuousLoopSelectionPlan selectionPlan,
+        IReadOnlyDictionary<Guid, string?> villageKeysByItemId,
+        string villageKey,
+        DateTimeOffset now,
+        bool preview,
+        Func<IReadOnlyList<QueueItem>, DateTimeOffset, bool, QueueItem?> selectReadyConstruction)
+    {
+        foreach (var group in selectionPlan.OrderedGroups)
+        {
+            var villageItems = ContinuousLoopSelector.SelectVillageItems(
+                selectionPlan.OrderedItemsByGroup[group],
+                villageKeysByItemId,
+                villageKey,
+                includeVillageLess: group == QueueGroup.Hero);
+            var candidate = SelectReadyItemWithinGroup(
+                group,
+                villageItems,
+                now,
+                preview,
+                selectReadyConstruction);
+            if (candidate is not null)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static QueueItem? SelectReadyItemAcrossVillages(
+        ContinuousLoopSelectionPlan selectionPlan,
+        IReadOnlyDictionary<Guid, string?> villageKeysByItemId,
+        DateTimeOffset now,
+        bool preview,
+        string? excludedVillageKey,
+        bool urgentOnly,
+        Func<IReadOnlyList<QueueItem>, DateTimeOffset, bool, QueueItem?> selectReadyConstruction)
+    {
+        foreach (var group in selectionPlan.OrderedGroups)
+        {
+            var groupItems = selectionPlan.OrderedItemsByGroup[group]
+                .Where(item => !urgentOnly || ContinuousLoopSelector.IsUrgentItem(item))
+                .Where(item => string.IsNullOrWhiteSpace(excludedVillageKey)
+                    || (villageKeysByItemId.TryGetValue(item.Id, out var villageKey)
+                        && !string.IsNullOrWhiteSpace(villageKey)
+                        && !string.Equals(villageKey, excludedVillageKey, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            if (groupItems.Count == 0)
+            {
+                continue;
+            }
+
+            string? rotationVillageKey = null;
+            var candidate = QueueVillageRotation.SelectByVillageRotation(
+                groupItems,
+                item => villageKeysByItemId.TryGetValue(item.Id, out var villageKey) ? villageKey : null,
+                villageItems => SelectReadyItemWithinGroup(
+                    group,
+                    villageItems,
+                    now,
+                    preview,
+                    selectReadyConstruction),
+                ref rotationVillageKey);
+            if (candidate is not null)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static QueueItem? SelectReadyItemWithinGroup(
+        QueueGroup group,
+        IReadOnlyList<QueueItem> villageItems,
+        DateTimeOffset now,
+        bool preview,
+        Func<IReadOnlyList<QueueItem>, DateTimeOffset, bool, QueueItem?> selectReadyConstruction)
+    {
+        if (villageItems.Count == 0)
+        {
+            return null;
+        }
+
+        if (group == QueueGroup.Construction)
+        {
+            return selectReadyConstruction(villageItems, now, preview);
+        }
+
+        return group == QueueGroup.Hero
+            ? ContinuousLoopSelector.SelectReadyHeroGroupItem(villageItems, now)
+            : ContinuousLoopSelector.SelectReadyGroupHead(villageItems, now);
+    }
+}

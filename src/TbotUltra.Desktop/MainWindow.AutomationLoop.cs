@@ -71,10 +71,9 @@ public partial class MainWindow
         }
 
         var initialOptions = LoadBotOptions();
-        _continuousLoopConstructionStatusNeedsSync = true;
-        _villageBatchState.Reset();
-        _nextIdleBreakDueUtc = DateTimeOffset.MinValue;
-        _nextIdleBrowseDueUtc = DateTimeOffset.MinValue;
+        _automationSessionRuntime.RequestConstructionStatusSync();
+        _automationPassRuntime.ResetVillageBatch();
+        _automationIdlePacing.Reset();
 
         AutomationRunContext context;
         try

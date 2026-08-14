@@ -6,6 +6,8 @@ namespace TbotUltra.Desktop.Services;
 
 public interface IDesktopBotService
 {
+    long BrowserGeneration { get; }
+
     event Action<FarmLossDestinationChange>? FarmLossDestinationChanged;
     event Action<VerifiedActiveVillage>? ActiveVillageVerified;
     QueueItem Enqueue(string taskName, Dictionary<string, string>? payload, int priority, int maxRetries);

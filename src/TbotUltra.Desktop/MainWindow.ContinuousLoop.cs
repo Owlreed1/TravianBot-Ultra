@@ -18,44 +18,15 @@ namespace TbotUltra.Desktop;
 
 public partial class MainWindow
 {
-    private DateTimeOffset _nextVillageStatusSweepUtc = DateTimeOffset.MinValue;
-    private string? _villageStatusSweepScheduleAccountName;
-    private readonly object _villageStatusSweepScheduleSync = new();
-    private int _villageStatusSweepForceRequested;
-    private int _villageStatusSweepManualRunInProgress;
-
     private DateTimeOffset GetContinuousKeepAliveNextReloadUtc()
-        => _nextContinuousKeepAliveAtUtc;
+        => _automationSessionRuntime.NextKeepAliveAtUtc;
 
     private DateTimeOffset GetVillageStatusSweepNextScanUtc()
-    {
-        lock (_villageStatusSweepScheduleSync)
-        {
-            var accountName = _accountStore.ActiveAccountName();
-            if (string.Equals(_villageStatusSweepScheduleAccountName, accountName, StringComparison.OrdinalIgnoreCase))
-            {
-                return _nextVillageStatusSweepUtc;
-            }
-
-            _villageStatusSweepScheduleAccountName = accountName;
-            _nextVillageStatusSweepUtc = VillageStatusSweepStateStore.LoadNextScanUtc(
-                _projectRoot,
-                accountName,
-                DateTimeOffset.UtcNow) ?? DateTimeOffset.MinValue;
-            return _nextVillageStatusSweepUtc;
-        }
-    }
+        => _villageStatusRoundRuntime.GetNextRoundUtc(_accountStore.ActiveAccountName());
 
     private void ResetVillageStatusSweepSchedule()
     {
-        bool cleared;
-        lock (_villageStatusSweepScheduleSync)
-        {
-            var accountName = _accountStore.ActiveAccountName();
-            _villageStatusSweepScheduleAccountName = accountName;
-            _nextVillageStatusSweepUtc = DateTimeOffset.MinValue;
-            cleared = VillageStatusSweepStateStore.Clear(_projectRoot, accountName);
-        }
+        var cleared = _villageStatusRoundRuntime.Reset(_accountStore.ActiveAccountName());
 
         if (!cleared)
         {
@@ -69,8 +40,8 @@ public partial class MainWindow
 
         if (IsContinuousLoopRunning())
         {
-            Interlocked.Exchange(ref _villageStatusSweepForceRequested, 1);
-        RequestContinuousAutomationWake();
+            _villageStatusRoundRuntime.RequestForce();
+            RequestContinuousAutomationWake();
             AppendLog("[village-scan] Scan now requested; the active loop will start it at the next safe boundary.");
             return;
         }
@@ -87,7 +58,7 @@ public partial class MainWindow
             return;
         }
 
-        if (Interlocked.CompareExchange(ref _villageStatusSweepManualRunInProgress, 1, 0) != 0)
+        if (!_villageStatusRoundRuntime.TryBeginManualRun())
         {
             return;
         }
@@ -110,35 +81,28 @@ public partial class MainWindow
         finally
         {
             _loopController.DisposeOperation();
-            Interlocked.Exchange(ref _villageStatusSweepManualRunInProgress, 0);
+            _villageStatusRoundRuntime.EndManualRun();
         }
     }
 
     private DateTimeOffset? ScheduleNextVillageStatusSweep(int minMinutes, int maxMinutes, string? accountName)
     {
-        DateTimeOffset nextScanUtc;
-        bool saved;
-        lock (_villageStatusSweepScheduleSync)
+        var result = _villageStatusRoundRuntime.ScheduleNext(
+            accountName,
+            _accountStore.ActiveAccountName(),
+            minMinutes,
+            maxMinutes);
+        if (result.AccountChanged)
         {
-            if (!string.Equals(_accountStore.ActiveAccountName(), accountName, StringComparison.OrdinalIgnoreCase))
-            {
-                return null;
-            }
-
-            nextScanUtc = DateTimeOffset.UtcNow.AddMinutes(Random.Shared.Next(minMinutes, maxMinutes + 1));
-            _nextVillageStatusSweepUtc = nextScanUtc;
-            saved = VillageStatusSweepStateStore.SaveNextScanUtc(
-                _projectRoot,
-                accountName,
-                nextScanUtc);
+            return null;
         }
 
-        if (!saved)
+        if (!result.WasPersisted)
         {
             AppendLog("[village-scan] could not persist the next-scan deadline; it may run again after restart.");
         }
 
-        return nextScanUtc;
+        return result.NextRoundUtc;
     }
 
     private async Task MaybeRunVillageStatusSweepAsync(
@@ -162,7 +126,6 @@ public partial class MainWindow
             return source.Where(v => !string.IsNullOrWhiteSpace(v.Name) && !string.Equals(v.Name, "-", StringComparison.Ordinal))
                 .GroupBy(GetVillageKey, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.First())
-                .OrderBy(_ => Random.Shared.Next())
                 .ToList();
         });
 
@@ -172,98 +135,54 @@ public partial class MainWindow
         }
 
         using var roundActivity = _dashboardActivityTracker.Begin($"Village scan (0/{villages.Count})");
-
-        try
-        {
-            // Seed all normal runtime work once before visiting the first village. Per-village generation
-            // runs again after each fresh read, but account-level preparation (for example farm-list
-            // selection) must not navigate away while a village is being reacted to.
-            await EnsureContinuousLoopRuntimeItemsAsync(options, token);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            AppendLog(
-                $"[village-scan] runtime preparation failed; existing queued work will still run: "
-                + FormatExceptionForLog(ex));
-        }
-
-        AppendLog($"[village-scan] starting round for {villages.Count} village(s).");
-        var inboxStatusChecked = false;
-        var villageNumber = 0;
-        foreach (var village in villages)
-        {
-            villageNumber++;
-            using var villageActivity = _dashboardActivityTracker.Begin(
-                $"Village scan ({villageNumber}/{villages.Count}): {village.Name}");
-            token.ThrowIfCancellationRequested();
-            try
+        var villagesByKey = villages.ToDictionary(GetVillageKey, StringComparer.OrdinalIgnoreCase);
+        var roundVillages = villages
+            .Select(village => new VillageStatusRoundVillage(
+                GetVillageKey(village),
+                village.Name,
+                village.Url))
+            .ToList();
+        var port = new DelegateVillageStatusRoundPort(
+            async cancellationToken =>
             {
-                var status = await ReadVillageStatusSweepBaseStatusAsync(options, village, token);
-                await Dispatcher.InvokeAsync(() =>
+                try
                 {
-                    CacheVillageStatus(status, village.Name, triggerDeferredWaitRefresh: false);
-                    SetActiveWorkingVillageFromStatus(status);
-                    ReconcilePendingBuildingQueueWithLiveStatus(status);
-                    SyncDashboardVillageUiFromVillages(
-                        status.Villages,
-                        status.ActiveVillage,
-                        activeVillageCoordX: status.ActiveVillageCoordX,
-                        activeVillageCoordY: status.ActiveVillageCoordY);
-                    if (IsStatusForSelectedVillage(status))
-                    {
-                        ApplyVillageStatusToUi(status);
-                    }
-                });
-                if (options.VillageStatusSweepDorf1Enabled && !inboxStatusChecked)
-                {
-                    inboxStatusChecked = true;
-                    await RefreshInboxIndicatorsForVillageStatusSweepAsync(options, token);
+                    // Seed normal runtime work once before visiting the first village. Per-village
+                    // generation runs after each fresh read, while account-level preparation must not
+                    // navigate away during a village reaction.
+                    await EnsureContinuousLoopRuntimeItemsAsync(options, cancellationToken);
                 }
-                var collectionResult = await CollectVillageStatusSweepRewardsAsync(
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    AppendLog(
+                        $"[village-scan] runtime preparation failed; existing queued work will still run: "
+                        + FormatExceptionForLog(ex));
+                }
+
+                AppendLog($"[village-scan] starting round for {villages.Count} village(s).");
+            },
+            (village, villageNumber, villageCount, inboxStatusChecked, cancellationToken) =>
+                VisitVillageStatusRoundAsync(
                     options,
-                    village,
-                    status,
-                    token);
-                if (!collectionResult.ShouldContinue)
-                {
-                    return;
-                }
-                status = collectionResult.Status;
-                status = await RefreshVillageStatusSweepOptionalStatusesAsync(options, village, status, token);
-                await RefreshVillageStatusSweepDeferredWaitsAsync(status, token);
-                AppendLog($"[village-scan] updated '{village.Name}'.");
-
-                await EnsureContinuousLoopRuntimeItemsAsync(options, token, village);
-                if (!await ExecuteReadyVillageStatusSweepTasksAsync(
-                        options,
-                        village,
-                        collectionResult.Attempts,
-                        token))
-                {
-                    return;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                AppendLog($"[village-scan] skipped '{village.Name}': {FormatExceptionForLog(ex)}");
-            }
-
-            if (!ReferenceEquals(village, villages[^1]))
-            {
-                await ActionPacer.FromOptions(options, AppendLog).DelayAsync(
+                    villagesByKey[village.Key],
+                    villageNumber,
+                    villageCount,
+                    inboxStatusChecked,
+                    cancellationToken),
+            cancellationToken => new ValueTask(
+                ActionPacer.FromOptions(options, AppendLog).DelayAsync(
                     options.VillageStatusSweepVillageMinSeconds,
                     options.VillageStatusSweepVillageMaxSeconds,
-                    token,
-                    "Village scan: next village");
-            }
+                    cancellationToken,
+                    "Village scan: next village")));
+        var roundResult = await _villageStatusRoundCoordinator.RunAsync(roundVillages, port, token);
+        if (!roundResult.Completed)
+        {
+            return;
         }
 
         var min = Math.Min(options.VillageStatusSweepRoundMinMinutes, options.VillageStatusSweepRoundMaxMinutes);
@@ -533,7 +452,7 @@ public partial class MainWindow
 
         var attemptedItemIds = new HashSet<Guid>();
         var attempts = attemptsAlreadyMade;
-        while (attempts < VillageBatchState.MaxAttempts)
+        while (_automationPassRuntime.CanAttemptVillageTask(attempts))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var next = SelectNextQueueItemForVillageStatusSweep(villageKey, attemptedItemIds);
@@ -572,7 +491,7 @@ public partial class MainWindow
         {
             AppendLog(
                 $"[village-scan] village '{village.Name}' reached the "
-                + $"{VillageBatchState.MaxAttempts}-attempt limit; continuing the scan round.");
+                + $"{_automationPassRuntime.VillageAttemptLimit}-attempt limit; continuing the scan round.");
         }
 
         return true;
@@ -625,18 +544,6 @@ public partial class MainWindow
     // "[LOOP n] idle" heartbeat is logged at most this often while nothing is ready, so the log shows the
     // loop is alive without the per-pass spine. Active passes (a PICK) and failures still log in full.
     private static readonly TimeSpan LoopIdleHeartbeatInterval = TimeSpan.FromMinutes(2);
-    private DateTimeOffset _lastLoopIdleHeartbeatUtc = DateTimeOffset.MinValue;
-    private readonly object _loopPickVerboseLogGate = new();
-    private readonly Dictionary<string, DateTimeOffset> _loopPickVerboseLogAtByKey = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, string> _constructionQueueSummaryByVillage = new(StringComparer.OrdinalIgnoreCase);
-    private string _continuousGoldClubAccount = string.Empty;
-    private bool? _continuousGoldClubEnabled;
-    private DateTimeOffset _lastContinuousGoldClubCheckUtc = DateTimeOffset.MinValue;
-
-    // Continuous Loop and Auto Queue are mutually exclusive and therefore share one runtime-only batch
-    // owner. The verified browser village is drained across groups before normal work elsewhere; after
-    // ten attempts, another ready village gets a turn so a permanently hot village cannot starve it.
-    private readonly VillageBatchState _villageBatchState = new();
 
     private async Task TriggerQueueAutoRunAsync()
     {
@@ -667,14 +574,93 @@ public partial class MainWindow
             return;
         }
 
-        _villageBatchState.Reset();
-        _autoQueueRunLogId = Interlocked.Increment(ref _operationCounter);
+        _automationPassRuntime.BeginAutoQueueRun(Interlocked.Increment(ref _operationCounter));
         LogConservativeAutomationWarnings(AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions()));
-        AppendLog($"[AUTOQ {_autoQueueRunLogId}] START");
+        AppendLog($"[AUTOQ {_automationPassRuntime.AutoQueueRunLogId}] START");
         var result = await _automationDesk.StartAsync(new AutomationStart(AutomationRunMode.AutoQueue, context));
         if (result is AutomationStartResult.Busy)
         {
             AppendLog("[automation] Auto Queue start skipped because another run owns the gate.");
+        }
+    }
+
+    private async ValueTask<VillageStatusRoundVisitResult> VisitVillageStatusRoundAsync(
+        BotOptions options,
+        VillageSelectionItem village,
+        int villageNumber,
+        int villageCount,
+        bool inboxStatusChecked,
+        CancellationToken cancellationToken)
+    {
+        using var villageActivity = _dashboardActivityTracker.Begin(
+            $"Village scan ({villageNumber}/{villageCount}): {village.Name}");
+        cancellationToken.ThrowIfCancellationRequested();
+        var inboxCheckedDuringVisit = false;
+        try
+        {
+            var port = new DelegateVillageStatusReactionPort<VillageSelectionItem, VillageStatus>(
+                (targetVillage, token) => new ValueTask<VillageStatus>(
+                    ReadVillageStatusSweepBaseStatusAsync(options, targetVillage, token)),
+                async (targetVillage, status, _) =>
+                {
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        CacheVillageStatus(status, targetVillage.Name, triggerDeferredWaitRefresh: false);
+                        SetActiveWorkingVillageFromStatus(status);
+                        ReconcilePendingBuildingQueueWithLiveStatus(status);
+                        SyncDashboardVillageUiFromVillages(
+                            status.Villages,
+                            status.ActiveVillage,
+                            activeVillageCoordX: status.ActiveVillageCoordX,
+                            activeVillageCoordY: status.ActiveVillageCoordY);
+                        if (IsStatusForSelectedVillage(status))
+                        {
+                            ApplyVillageStatusToUi(status);
+                        }
+                    });
+                },
+                async token =>
+                {
+                    inboxCheckedDuringVisit = true;
+                    await RefreshInboxIndicatorsForVillageStatusSweepAsync(options, token);
+                },
+                async (targetVillage, status, token) =>
+                {
+                    var result = await CollectVillageStatusSweepRewardsAsync(
+                        options,
+                        targetVillage,
+                        status,
+                        token);
+                    return new VillageStatusCollectionResult<VillageStatus>(
+                        result.Status,
+                        result.ShouldContinue,
+                        result.Attempts);
+                },
+                (targetVillage, status, token) => new ValueTask<VillageStatus>(
+                    RefreshVillageStatusSweepOptionalStatusesAsync(options, targetVillage, status, token)),
+                (status, token) => new ValueTask(RefreshVillageStatusSweepDeferredWaitsAsync(status, token)),
+                async (targetVillage, token) =>
+                {
+                    AppendLog($"[village-scan] updated '{targetVillage.Name}'.");
+                    await EnsureContinuousLoopRuntimeItemsAsync(options, token, targetVillage);
+                },
+                (targetVillage, attempts, token) => new ValueTask<bool>(
+                    ExecuteReadyVillageStatusSweepTasksAsync(options, targetVillage, attempts, token)));
+            return await _villageStatusReactionCoordinator.RunAsync(
+                village,
+                options.VillageStatusSweepDorf1Enabled,
+                inboxStatusChecked,
+                port,
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[village-scan] skipped '{village.Name}': {FormatExceptionForLog(ex)}");
+            return new VillageStatusRoundVisitResult(true, inboxCheckedDuringVisit);
         }
     }
 
@@ -695,24 +681,14 @@ public partial class MainWindow
         return new AutomationRunContext(
             accountKey,
             officialServerRoot,
-            Interlocked.Increment(ref _automationBrowserGeneration));
+            _botService.BrowserGeneration);
     }
 
-    private ValueTask<AutomationStateSnapshot> ReadAutomationStateAsync(
-        AutomationRunMode mode,
-        AutomationRunContext context,
-        CancellationToken cancellationToken) => mode == AutomationRunMode.ContinuousLoop
-            ? ReadContinuousAutomationStateAsync(context, cancellationToken)
-            : ReadAutoQueueAutomationStateAsync(context, cancellationToken);
-
     private async ValueTask<AutomationStateSnapshot> ReadContinuousAutomationStateAsync(
-        AutomationRunContext context,
         CancellationToken cancellationToken)
     {
-        EnsureCurrentAutomationContext(context);
         var options = AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions());
-        var tickId = Interlocked.Increment(ref _loopTickCounter);
-        _continuousAutomationTickId = tickId;
+        var tickId = _automationPassRuntime.BeginContinuousPass();
         var tickStopwatch = Stopwatch.StartNew();
         try
         {
@@ -721,7 +697,7 @@ public partial class MainWindow
                 return new AutomationStateSnapshot([], IsComplete: true);
             }
 
-            var networkBackoffRemaining = GetTransientNetworkUnavailableRemaining();
+            var networkBackoffRemaining = _automationNetworkBackoff.Remaining;
             if (networkBackoffRemaining > TimeSpan.Zero)
             {
                 AppendLog($"[LOOP {tickId}] WAIT {Math.Ceiling(networkBackoffRemaining.TotalSeconds):F0}s");
@@ -730,12 +706,11 @@ public partial class MainWindow
                     NextWakeAt: DateTimeOffset.UtcNow.Add(networkBackoffRemaining));
             }
 
-            var immediateWorkRequested = Interlocked.Exchange(ref _continuousLoopWakeRequested, 0) == 1;
+            var immediateWorkRequested = _automationPassRuntime.ConsumeImmediateWorkRequest();
             if (!immediateWorkRequested)
             {
                 await MaybeTakeIdleBreakAsync(options, cancellationToken);
-                immediateWorkRequested =
-                    Interlocked.Exchange(ref _continuousLoopWakeRequested, 0) == 1;
+                immediateWorkRequested = _automationPassRuntime.ConsumeImmediateWorkRequest();
             }
             if (!immediateWorkRequested)
             {
@@ -744,8 +719,7 @@ public partial class MainWindow
 
             await EnsureChromiumInstalledAsync();
             await HonorPendingVillageSwitchAsync(options, cancellationToken);
-            var forceVillageStatusSweep =
-                Interlocked.Exchange(ref _villageStatusSweepForceRequested, 0) == 1;
+            var forceVillageStatusSweep = _villageStatusRoundRuntime.ConsumeForceRequest();
             await MaybeRunVillageStatusSweepAsync(options, cancellationToken, forceVillageStatusSweep);
             await EnsureContinuousLoopConstructionStatusAsync(options, cancellationToken);
             await MaybeAnalyzeNewVillageDuringContinuousLoopAsync(options, cancellationToken);
@@ -758,24 +732,26 @@ public partial class MainWindow
                 AppendLog(
                     $"[LOOP {tickId}] PICK group={next.Group}, task={next.TaskName}, "
                     + $"retries={next.Retries}/{next.MaxRetries}");
-                _lastLoopIdleHeartbeatUtc = DateTimeOffset.UtcNow;
-                return new AutomationStateSnapshot([ToAutomationCandidate(next)]);
+                _automationSessionRuntime.MarkActivePass();
+                return new AutomationStateSnapshot([AutomationCandidate.FromQueueItem(next)]);
             }
 
             await MaybeKeepBrowserFreshDuringContinuousLoopAsync(options, cancellationToken);
             var waitDelay = ResolveContinuousLoopWaitDelay(options);
-            var totalSeconds = ResolveContinuousLoopWaitSeconds(waitDelay, options, networkBackoff: false);
-            if (DateTimeOffset.UtcNow - _lastLoopIdleHeartbeatUtc >= LoopIdleHeartbeatInterval)
+            var totalSeconds = AutomationDeadlinePolicy.ResolveWaitSeconds(
+                waitDelay,
+                options,
+                networkBackoff: false);
+            if (_automationSessionRuntime.ShouldPublishIdleHeartbeat(LoopIdleHeartbeatInterval))
             {
-                _lastLoopIdleHeartbeatUtc = DateTimeOffset.UtcNow;
                 AppendLog($"[LOOP {tickId}] idle — nothing ready, waiting {totalSeconds}s");
             }
             var nextWakeAt = DateTimeOffset.UtcNow.AddSeconds(totalSeconds);
             if (options.ContinuousKeepAliveEnabled
-                && _nextContinuousKeepAliveAtUtc > DateTimeOffset.UtcNow
-                && _nextContinuousKeepAliveAtUtc < nextWakeAt)
+                && _automationSessionRuntime.NextKeepAliveAtUtc > DateTimeOffset.UtcNow
+                && _automationSessionRuntime.NextKeepAliveAtUtc < nextWakeAt)
             {
-                nextWakeAt = _nextContinuousKeepAliveAtUtc;
+                nextWakeAt = _automationSessionRuntime.NextKeepAliveAtUtc;
             }
             return new AutomationStateSnapshot(
                 [],
@@ -788,30 +764,25 @@ public partial class MainWindow
         catch (AccountAccessException ex)
         {
             await HoldAccountAutomationAsync(ex);
-            return new AutomationStateSnapshot([], IsComplete: true);
+            throw;
         }
-        catch (Exception ex) when (IsTransientConnectionFailure(ex))
+        catch (Exception ex) when (AutomationNetworkBackoff.IsTransientConnectionFailure(ex))
         {
-            var retryDelay = NextTransientNavigationRetryDelay();
-            MarkTransientNetworkUnavailable(retryDelay);
             if (TryScheduleAutomaticProxyRecovery(options))
             {
                 return new AutomationStateSnapshot([], IsComplete: true);
             }
-
-            AppendLog(
-                $"[LOOP {tickId}] TRANSIENT {tickStopwatch.Elapsed.TotalSeconds:F1}s | "
-                + $"network unavailable; retry in {retryDelay.TotalSeconds:F0}s | {FormatExceptionForLog(ex)}");
-            return new AutomationStateSnapshot(
-                [],
-                NextWakeAt: DateTimeOffset.UtcNow.Add(retryDelay));
+            throw;
         }
         catch (Exception ex)
         {
             AppendLog(
                 $"[LOOP {tickId}] FAIL {tickStopwatch.Elapsed.TotalSeconds:F1}s | "
                 + FormatExceptionForLog(ex));
-            var retrySeconds = ResolveContinuousLoopWaitSeconds(null, options, networkBackoff: false);
+            var retrySeconds = AutomationDeadlinePolicy.ResolveWaitSeconds(
+                null,
+                options,
+                networkBackoff: false);
             return new AutomationStateSnapshot(
                 [],
                 NextWakeAt: DateTimeOffset.UtcNow.AddSeconds(retrySeconds));
@@ -819,10 +790,8 @@ public partial class MainWindow
     }
 
     private async ValueTask<AutomationStateSnapshot> ReadAutoQueueAutomationStateAsync(
-        AutomationRunContext context,
         CancellationToken cancellationToken)
     {
-        EnsureCurrentAutomationContext(context);
         await HonorPendingVillageSwitchAsync(
             ApplySelectedVillageToOptions(LoadBotOptions()),
             cancellationToken);
@@ -830,7 +799,7 @@ public partial class MainWindow
         var selected = SelectNextQueueItemForContinuousLoop();
         if (selected is not null)
         {
-            return new AutomationStateSnapshot([ToAutomationCandidate(selected)]);
+            return new AutomationStateSnapshot([AutomationCandidate.FromQueueItem(selected)]);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -848,37 +817,27 @@ public partial class MainWindow
 
         if (nextDeferredItem is null)
         {
-            AppendLog($"[AUTOQ {_autoQueueRunLogId}] DONE (queue empty).");
+            AppendLog($"[AUTOQ {_automationPassRuntime.AutoQueueRunLogId}] DONE (queue empty).");
             return new AutomationStateSnapshot([], IsComplete: true);
         }
 
         AppendLog(
-            $"[AUTOQ {_autoQueueRunLogId}] WAIT "
+            $"[AUTOQ {_automationPassRuntime.AutoQueueRunLogId}] WAIT "
             + $"{Math.Max(0, (nextDeferredItem.NextAttemptAt - now).TotalSeconds):F0}s "
             + $"for deferred task={nextDeferredItem.TaskName}");
-        return new AutomationStateSnapshot([ToAutomationCandidate(nextDeferredItem)]);
+        return new AutomationStateSnapshot([AutomationCandidate.FromQueueItem(nextDeferredItem)]);
     }
 
-    private ValueTask<AutomationActionOutcome> ExecuteAutomationActionAsync(
-        AutomationRunMode mode,
-        AutomationRunContext context,
-        AutomationCandidate action,
-        CancellationToken cancellationToken) => mode == AutomationRunMode.ContinuousLoop
-            ? ExecuteContinuousAutomationActionAsync(context, action, cancellationToken)
-            : ExecuteAutoQueueAutomationActionAsync(context, action, cancellationToken);
-
     private async ValueTask<AutomationActionOutcome> ExecuteContinuousAutomationActionAsync(
-        AutomationRunContext context,
         AutomationCandidate action,
         CancellationToken cancellationToken)
     {
-        EnsureCurrentAutomationContext(context);
         var item = _botService
             .GetQueueItemsForDisplay()
             .FirstOrDefault(candidate => candidate.Id == action.Id);
         if (item is null)
         {
-            AppendLog($"[LOOP {_continuousAutomationTickId}] SKIP missing queue item id={action.Id}");
+            AppendLog($"[LOOP {_automationPassRuntime.CurrentContinuousPassId}] SKIP missing queue item id={action.Id}");
             return AutomationActionOutcome.Skipped;
         }
 
@@ -893,11 +852,11 @@ public partial class MainWindow
             options.ActionPacingTaskMaxSeconds,
             cancellationToken,
             "before task");
-        RecordVillageBatchAttempt(item, $"LOOP {_continuousAutomationTickId}");
+        RecordVillageBatchAttempt(item, $"LOOP {_automationPassRuntime.CurrentContinuousPassId}");
         var shouldContinue = await ExecuteSingleQueueItemAsync(
             item,
             options,
-            $"[LOOP {_continuousAutomationTickId}]",
+            $"[LOOP {_automationPassRuntime.CurrentContinuousPassId}]",
             QueueExecutionMode.ContinuousLoop,
             cancellationToken);
         MarkContinuousBrowserActivity(options);
@@ -916,28 +875,26 @@ public partial class MainWindow
     }
 
     private async ValueTask<AutomationActionOutcome> ExecuteAutoQueueAutomationActionAsync(
-        AutomationRunContext context,
         AutomationCandidate action,
         CancellationToken cancellationToken)
     {
-        EnsureCurrentAutomationContext(context);
         var item = _botService
             .GetQueueItemsForDisplay()
             .FirstOrDefault(candidate => candidate.Id == action.Id);
         if (item is null)
         {
-            AppendLog($"[AUTOQ {_autoQueueRunLogId}] SKIP missing queue item id={action.Id}");
+            AppendLog($"[AUTOQ {_automationPassRuntime.AutoQueueRunLogId}] SKIP missing queue item id={action.Id}");
             return AutomationActionOutcome.Skipped;
         }
 
         await EnsureChromiumInstalledAsync();
         var options = AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions());
-        AppendLog($"[AUTOQ {_autoQueueRunLogId}] RUN task={item.TaskName}, id={item.Id}");
-        RecordVillageBatchAttempt(item, $"AUTOQ {_autoQueueRunLogId}");
+        AppendLog($"[AUTOQ {_automationPassRuntime.AutoQueueRunLogId}] RUN task={item.TaskName}, id={item.Id}");
+        RecordVillageBatchAttempt(item, $"AUTOQ {_automationPassRuntime.AutoQueueRunLogId}");
         var shouldContinue = await ExecuteSingleQueueItemAsync(
             item,
             options,
-            $"[AUTOQ {_autoQueueRunLogId}]",
+            $"[AUTOQ {_automationPassRuntime.AutoQueueRunLogId}]",
             QueueExecutionMode.AutoQueue,
             cancellationToken);
         if (!shouldContinue)
@@ -954,35 +911,25 @@ public partial class MainWindow
         return AutomationActionOutcome.Completed;
     }
 
-    private void EnsureCurrentAutomationContext(AutomationRunContext context)
-    {
-        if (!string.Equals(
-                context.AccountKey,
-                _accountStore.ActiveAccountName(),
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("The active account changed during the automation run.");
-        }
-
-        if (context.BrowserGeneration != Volatile.Read(ref _automationBrowserGeneration))
-        {
-            throw new InvalidOperationException("The browser generation changed during the automation run.");
-        }
-    }
-
-    private static AutomationCandidate ToAutomationCandidate(QueueItem item) => new(
-        item.Id,
-        item.TaskName,
-        item.Group,
-        item.Payload.GetValueOrDefault("villageKey"),
-        item.Priority,
-        item.NextAttemptAt);
-
     private void AutomationDesk_Updated(object? sender, AutomationUpdate update)
     {
         if (update.Event is AutomationEvent.RunStarted)
         {
             UpdateExecutionStateIndicatorOnUiThread();
+            return;
+        }
+
+        if (update.Event is AutomationEvent.RunDeferred deferredEvent)
+        {
+            AppendLog(
+                $"[automation] Run {deferredEvent.RunId.Value} deferred after "
+                + $"{deferredEvent.Failure.Kind}; retry at {deferredEvent.RetryAt:HH:mm:ss}.");
+            return;
+        }
+
+        if (update.Event is AutomationEvent.WakeAccepted wakeEvent)
+        {
+            AppendLog($"[automation] Wake requested: reason={wakeEvent.Reason}.");
             return;
         }
 
@@ -1047,25 +994,29 @@ public partial class MainWindow
             return;
         }
 
-        if (!HasQueueAutoRunEligibleWork())
+        var hasEligibleWork = HasQueueAutoRunEligibleWork();
+        if (!hasEligibleWork)
         {
             UpdateExecutionStateIndicator();
             return;
         }
 
-
-        if (_autoQueueRunning)
+        switch (AutomationEnqueuePolicy.Resolve(_automationDesk.Current, hasEligibleWork))
         {
-            _automationDesk.Wake(AutomationWakeReason.QueueChanged);
-            return;
+            case AutomationEnqueueAction.WakeAutoQueue:
+                _automationDesk.Wake(AutomationWakeReason.QueueChanged);
+                return;
+            case AutomationEnqueueAction.WakeContinuousLoop:
+                RequestContinuousAutomationWake();
+                return;
+            default:
+                return;
         }
-
-        _ = TriggerQueueAutoRunAsync();
     }
 
     private void RequestContinuousAutomationWake()
     {
-        Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        _automationPassRuntime.RequestImmediateWork();
         _automationDesk.Wake(AutomationWakeReason.QueueChanged);
     }
 
@@ -1162,14 +1113,22 @@ public partial class MainWindow
         }
 
         var queueItems = _botService.GetQueueItemsForDisplay();
-        var activeItems = queueItems
-            .Where(item => item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused)
-            .ToList();
+        var runtimeItems = new AutomationRuntimeItemReconciler(
+            queueItems,
+            key => _villageSettingsStore.ResolveCanonicalKey(key),
+            new DelegateAutomationRuntimeQueuePort(
+                spec => _botService.EnqueueRuntime(
+                    spec.TaskName,
+                    spec.DisplayName,
+                    spec.Payload,
+                    spec.Priority,
+                    spec.MaxRetries),
+                (id, payload) => _botService.UpdateDeferredQueueItem(id, payload),
+                (id, priority) => _botService.UpdatePendingQueueItem(id, payload: null, priority: priority)));
 
         bool HasActiveTask(string taskName)
         {
-            return activeItems.Any(item =>
-                string.Equals(item.TaskName, taskName, StringComparison.OrdinalIgnoreCase));
+            return runtimeItems.HasActive(taskName);
         }
 
         // Per-village variant: an item only counts as active for a village when its payload targets that
@@ -1177,10 +1136,7 @@ public partial class MainWindow
         // would fail to find its existing runtime task and enqueue a duplicate under the new name.
         bool HasActiveTaskForVillage(string taskName, VillageSelectionItem village)
         {
-            var villageKey = _villageSettingsStore.ResolveCanonicalKey(GetVillageKey(village)) ?? string.Empty;
-            return activeItems.Any(item =>
-                string.Equals(item.TaskName, taskName, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(GetQueueItemVillageKey(item) ?? string.Empty, villageKey, StringComparison.OrdinalIgnoreCase));
+            return runtimeItems.HasActiveForVillage(taskName, GetVillageKey(village));
         }
 
         var automationVillages = onlyVillage is null
@@ -1221,30 +1177,18 @@ public partial class MainWindow
                     continue;
                 }
 
-                var canonicalVillageKey = _villageSettingsStore.ResolveCanonicalKey(villageKey) ?? villageKey;
-                var existingAntiStarve = activeItems.FirstOrDefault(item =>
-                    string.Equals(item.TaskName, "anti_starve_hero_crop", StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(GetQueueItemVillageKey(item), canonicalVillageKey, StringComparison.OrdinalIgnoreCase));
-                if (existingAntiStarve is not null)
-                {
-                    if (existingAntiStarve.Status == QueueStatus.Pending
-                        && existingAntiStarve.Priority != antiStarvePriority)
-                    {
-                        _botService.UpdatePendingQueueItem(
-                            existingAntiStarve.Id,
-                            payload: null,
-                            priority: antiStarvePriority);
-                    }
-                    continue;
-                }
-
-                _botService.EnqueueRuntime(
+                var antiStarve = runtimeItems.Ensure(new AutomationRuntimeItemSpec(
                     "anti_starve_hero_crop",
                     "Anti-starve hero crop",
                     BuildVillageRuntimePayload(village),
-                    priority: antiStarvePriority,
-                    maxRetries: 0);
-                AppendLog($"[anti-starve] monitoring enabled for village='{village.Name}'.");
+                    antiStarvePriority,
+                    0,
+                    villageKey,
+                    RefreshPendingPriority: true));
+                if (antiStarve.Change == AutomationRuntimeItemChange.Added)
+                {
+                    AppendLog($"[anti-starve] monitoring enabled for village='{village.Name}'.");
+                }
             }
         }
         else
@@ -1263,7 +1207,8 @@ public partial class MainWindow
             if (adventureCount is > 0)
             {
                 var payload = BuildHeroRuntimePayload();
-                _botService.EnqueueRuntime("hero_manage", "Hero adventure", payload, priority: -50, maxRetries: 0);
+                runtimeItems.Ensure(new AutomationRuntimeItemSpec(
+                    "hero_manage", "Hero adventure", payload, -50, 0));
                 AppendLog($"Hero group: queued hero_manage because adventures available={adventureCount.Value}. priority={payload[BotOptionPayloadKeys.HeroStatPriority]}");
             }
         }
@@ -1301,7 +1246,13 @@ public partial class MainWindow
                     payload[pair.Key] = pair.Value;
                 }
 
-                _botService.EnqueueRuntime("upgrade_troops_at_smithy", "Troop upgrades", payload, priority: -50, maxRetries: 0);
+                runtimeItems.Ensure(new AutomationRuntimeItemSpec(
+                    "upgrade_troops_at_smithy",
+                    "Troop upgrades",
+                    payload,
+                    -50,
+                    0,
+                    villageKey));
             }
         }
 
@@ -1332,14 +1283,16 @@ public partial class MainWindow
                 // The runtime item can stay deferred for hours between runs. Keep its payload snapshot
                 // in sync with the village's current troop settings — otherwise edits (e.g. a new timed
                 // range) never take effect because the item is recreated only after it disappears.
-                var buildTroopsVillageKey = _villageSettingsStore.ResolveCanonicalKey(GetVillageKey(village)) ?? string.Empty;
-                var existingPending = activeItems.FirstOrDefault(existing =>
-                    string.Equals(existing.TaskName, "build_troops", StringComparison.OrdinalIgnoreCase)
-                    && existing.Status == QueueStatus.Pending
-                    && string.Equals(GetQueueItemVillageKey(existing) ?? string.Empty, buildTroopsVillageKey, StringComparison.OrdinalIgnoreCase));
-                if (existingPending is not null
-                    && !ContinuousLoopSelector.PayloadEquals(existingPending.Payload, trainingPayload)
-                    && _botService.UpdateDeferredQueueItem(existingPending.Id, trainingPayload))
+                var refresh = runtimeItems.Ensure(new AutomationRuntimeItemSpec(
+                    "build_troops",
+                    "Build troops",
+                    trainingPayload,
+                    -50,
+                    0,
+                    GetVillageKey(village),
+                    RefreshPendingPayload: true));
+                if (refresh.Change is AutomationRuntimeItemChange.PayloadUpdated
+                    or AutomationRuntimeItemChange.PayloadAndPriorityUpdated)
                 {
                     AppendLog($"[troops] refreshed deferred build_troops payload for '{village.Name}' with updated troop settings.");
                 }
@@ -1369,7 +1322,13 @@ public partial class MainWindow
                 continue;
             }
 
-            _botService.EnqueueRuntime("build_troops", "Build troops", trainingPayload, priority: -50, maxRetries: 0);
+            runtimeItems.Ensure(new AutomationRuntimeItemSpec(
+                "build_troops",
+                "Build troops",
+                trainingPayload,
+                -50,
+                0,
+                GetVillageKey(village)));
         }
 
         // Brewery celebration — capital only (the brewery exists only in the capital). The capital's
@@ -1385,7 +1344,13 @@ public partial class MainWindow
                 && IsGroupEnabledForVillage(GetVillageKey(capital), QueueGroup.BreweryCelebration)
                 && !HasActiveTaskForVillage("run_brewery_celebration", capital))
             {
-                _botService.EnqueueRuntime("run_brewery_celebration", "Auto celebration", BuildVillageRuntimePayload(capital), priority: -50, maxRetries: 0);
+                runtimeItems.Ensure(new AutomationRuntimeItemSpec(
+                    "run_brewery_celebration",
+                    "Auto celebration",
+                    BuildVillageRuntimePayload(capital),
+                    -50,
+                    0,
+                    GetVillageKey(capital)));
             }
         }
 
@@ -1410,12 +1375,13 @@ public partial class MainWindow
             {
                 var restoredPayload = BuildVillageRuntimePayload(village);
                 restoredPayload[BotOptionPayloadKeys.TownHallCelebrationMode] = remembered.Mode;
-                var restoredItem = _botService.EnqueueRuntime(
+                var restoredItem = runtimeItems.EnqueueNew(new AutomationRuntimeItemSpec(
                     "run_town_hall_celebration",
                     "Town Hall celebration",
                     restoredPayload,
-                    priority: -50,
-                    maxRetries: 0);
+                    -50,
+                    0,
+                    villageKey));
                 // The freshly enqueued item is Pending, so defer it via UpdateDeferred (Pending-based).
                 // MarkQueueItemDeferred requires Running and failed silently here, which left the restored
                 // item due immediately — the task then re-ran every loop pass (the "timer restarts at ~30s
@@ -1437,7 +1403,13 @@ public partial class MainWindow
 
             var payload = BuildVillageRuntimePayload(village);
             payload[BotOptionPayloadKeys.TownHallCelebrationMode] = mode;
-            _botService.EnqueueRuntime("run_town_hall_celebration", "Town Hall celebration", payload, priority: -50, maxRetries: 0);
+            runtimeItems.Ensure(new AutomationRuntimeItemSpec(
+                "run_town_hall_celebration",
+                "Town Hall celebration",
+                payload,
+                -50,
+                0,
+                villageKey));
         }
 
         var farmingBlockedForOtherReason = IsFarmingGroupBlocked()
@@ -1512,7 +1484,13 @@ public partial class MainWindow
                         }
 
                         var displayName = sendsAllListsAtOnce ? "Send all farmlists" : "Send selected farmlists";
-                        _botService.EnqueueRuntime("send_farmlists", displayName, payload, priority: -50, maxRetries: 0);
+                        runtimeItems.Ensure(new AutomationRuntimeItemSpec(
+                            "send_farmlists",
+                            displayName,
+                            payload,
+                            -50,
+                            0,
+                            GetVillageKey(farmingVillage)));
                         AppendLog($"Continuous farming queued for village '{farmingVillage.Name}'.");
                     }
                 }
@@ -1544,7 +1522,12 @@ public partial class MainWindow
                     SendClay: options.ResourceTransferSendClay,
                     SendIron: options.ResourceTransferSendIron,
                     SendCrop: options.ResourceTransferSendCrop).ToDictionary();
-                _botService.EnqueueRuntime("send_resources_between_villages", "Resource transfer", payload, priority: -50, maxRetries: 0);
+                runtimeItems.Ensure(new AutomationRuntimeItemSpec(
+                    "send_resources_between_villages",
+                    "Resource transfer",
+                    payload,
+                    -50,
+                    0));
             }
         }
 
@@ -1752,7 +1735,7 @@ public partial class MainWindow
 
     private async Task EnsureContinuousLoopConstructionStatusAsync(BotOptions options, CancellationToken cancellationToken)
     {
-        if (!_continuousLoopConstructionStatusNeedsSync
+        if (!_automationSessionRuntime.ConstructionStatusNeedsSync
             || !GetContinuousLoopEnabledGroupsInOrder().Contains(QueueGroup.Construction))
         {
             return;
@@ -1782,7 +1765,7 @@ public partial class MainWindow
                     PopulateBuildingsTab(status);
                 }
             });
-            _continuousLoopConstructionStatusNeedsSync = false;
+            _automationSessionRuntime.MarkConstructionStatusSynchronized();
         }
         catch (OperationCanceledException)
         {
@@ -1872,225 +1855,71 @@ public partial class MainWindow
                     villageKeyFilter,
                     StringComparison.OrdinalIgnoreCase))
             .ToList();
-        var villageKeysByItemId = selectionCandidates
-            .ToDictionary(candidate => candidate.Item.Id, candidate => candidate.VillageKey);
-        var utilitySelection = ContinuousLoopSelector.SelectUtility(
-            new ContinuousLoopUtilitySelectionInput(selectionCandidates, _activeWorkingVillageKey, now));
-        if (utilitySelection.PreferredItem is not null)
+        var batch = _automationPassRuntime.SnapshotVillageBatch(_activeWorkingVillageKey);
+        var result = AutomationQueueSelector.Select(
+            new AutomationQueueSelectionInput(
+                selectionCandidates,
+                GetContinuousLoopConsideredGroupsInOrder(),
+                batch,
+                _activeWorkingVillageKey,
+                now,
+                options.ShortVillageDeferSeconds,
+                preview),
+            SelectReadyConstructionForAutomationPass);
+        if (!preview)
         {
-            return utilitySelection.PreferredItem;
-        }
-
-        var selectionPlan = ContinuousLoopSelector.CreatePlan(new ContinuousLoopSelectionInput(
-            selectionCandidates,
-            GetContinuousLoopConsideredGroupsInOrder()));
-
-        // Consider the union of enabled runtime groups across all active villages. Persistent Queue-page
-        // work is appended below only to preserve group ordering; every item is still gated by its own
-        // village Auto toggle and per-village group toggle before it can run.
-        var orderedGroups = selectionPlan.OrderedGroups;
-
-        if (orderedGroups.Count <= 0)
-        {
-            if (!preview)
+            if (result.Reason == AutomationQueueSelectionReason.UrgentPreemption
+                && result.Selected is not null
+                && !string.Equals(
+                    GetQueueItemVillageKey(result.Selected),
+                    _activeWorkingVillageKey,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                AppendLog(
+                    $"[village-batch] urgent preemption task='{result.Selected.TaskName}' "
+                    + $"priority={result.Selected.Priority} village='{GetQueueItemVillageName(result.Selected) ?? "-"}'.");
+            }
+            else if (result.Reason is AutomationQueueSelectionReason.VillageRotationNoReadyWork
+                or AutomationQueueSelectionReason.VillageRotationFairness)
+            {
+                var reason = result.Reason == AutomationQueueSelectionReason.VillageRotationNoReadyWork
+                    ? "current village has no ready work"
+                    : $"reached {VillageBatchState.MaxAttempts}-attempt fairness limit";
+                AppendLog(
+                    $"[village-batch] rotate from '{_activeWorkingVillageName ?? "-"}' because {reason}; "
+                    + $"next='{GetQueueItemVillageName(result.Selected!) ?? "-"}' "
+                    + $"task='{result.Selected!.TaskName}'.");
+            }
+            else if (result.Reason == AutomationQueueSelectionReason.ShortVillageHold)
+            {
+                AppendLoopPickVerbose(
+                    $"[loop-pick:verbose] holding current village for short defer until "
+                    + $"'{FormatQueueServerTime(result.HoldUntil!.Value)}' "
+                    + $"(limit={options.ShortVillageDeferSeconds}s)",
+                    $"short-village-hold:{_activeWorkingVillageKey}:{result.HoldUntil.Value.UtcTicks}:{options.ShortVillageDeferSeconds}");
+            }
+            else if (result.Reason == AutomationQueueSelectionReason.NoEnabledGroups)
             {
                 AppendLoopPickVerbose(
                     "[loop-pick:verbose] no enabled groups — nothing to schedule",
                     "no-enabled-groups");
             }
-
-            return null;
-        }
-
-        // Account work was handled above. Explicit positive queue priority is the only other normal
-        // cross-village preemption: group order alone may choose the next batch, but never interrupts one.
-        var urgentCandidate = SelectReadyItemAcrossVillages(
-            selectionPlan,
-            villageKeysByItemId,
-            now,
-            preview: true,
-            excludedVillageKey: null,
-            urgentOnly: true);
-        if (urgentCandidate is not null)
-        {
-            if (!preview
-                && !string.Equals(
-                    GetQueueItemVillageKey(urgentCandidate),
-                    _activeWorkingVillageKey,
-                    StringComparison.OrdinalIgnoreCase))
+            else if (result.Reason == AutomationQueueSelectionReason.NoReadyWork)
             {
-                AppendLog(
-                    $"[village-batch] urgent preemption task='{urgentCandidate.TaskName}' "
-                    + $"priority={urgentCandidate.Priority} village='{GetQueueItemVillageName(urgentCandidate) ?? "-"}'.");
-            }
-
-            return urgentCandidate;
-        }
-
-        var batch = _villageBatchState.SnapshotFor(_activeWorkingVillageKey);
-        var currentVillageCandidate = string.IsNullOrWhiteSpace(batch.VillageKey)
-            ? null
-            : SelectReadyItemForVillage(
-                selectionPlan,
-                villageKeysByItemId,
-                batch.VillageKey,
-                now,
-                preview);
-        var otherVillageCandidate = SelectReadyItemAcrossVillages(
-            selectionPlan,
-            villageKeysByItemId,
-            now,
-            preview: true,
-            excludedVillageKey: batch.VillageKey,
-            urgentOnly: false);
-
-        if (VillageBatchState.ShouldKeepCurrentVillage(
-                batch,
-                currentVillageCandidate is not null,
-                otherVillageCandidate is not null))
-        {
-            return currentVillageCandidate;
-        }
-
-        if (otherVillageCandidate is not null)
-        {
-            if (!preview)
-            {
-                var reason = currentVillageCandidate is null
-                    ? "current village has no ready work"
-                    : $"reached {VillageBatchState.MaxAttempts}-attempt fairness limit";
-                AppendLog(
-                    $"[village-batch] rotate from '{_activeWorkingVillageName ?? "-"}' because {reason}; "
-                    + $"next='{GetQueueItemVillageName(otherVillageCandidate) ?? "-"}' "
-                    + $"task='{otherVillageCandidate.TaskName}'.");
-            }
-
-            return otherVillageCandidate;
-        }
-
-        if (currentVillageCandidate is not null)
-        {
-            return currentVillageCandidate;
-        }
-
-        // A ready task always wins over a short wait in the current village. This includes utility
-        // work that was not preferred earlier only because another ready task still existed there.
-        var readyUtilityItem = utilitySelection.ReadyItems.FirstOrDefault();
-        if (readyUtilityItem is not null)
-        {
-            return readyUtilityItem;
-        }
-
-        if (!string.IsNullOrWhiteSpace(_activeWorkingVillageKey))
-        {
-            var holdUntil = ContinuousLoopSelector.ResolveShortVillageHoldUntil(
-                selectionCandidates,
-                _activeWorkingVillageKey,
-                now,
-                options.ShortVillageDeferSeconds);
-            if (holdUntil is not null)
-            {
-                if (!preview)
-                {
-                    AppendLoopPickVerbose(
-                        $"[loop-pick:verbose] holding current village for short defer until "
-                        + $"'{FormatQueueServerTime(holdUntil.Value)}' "
-                        + $"(limit={options.ShortVillageDeferSeconds}s)",
-                        $"short-village-hold:{_activeWorkingVillageKey}:{holdUntil.Value.UtcTicks}:{options.ShortVillageDeferSeconds}");
-                }
-
-                return null;
+                AppendLoopPickVerbose(
+                    $"[loop-pick:verbose] no ready item selected from {result.ConsideredGroupCount} group(s)",
+                    $"no-selected:{result.ConsideredGroupCount}");
             }
         }
 
-        if (!preview)
-        {
-            AppendLoopPickVerbose(
-                $"[loop-pick:verbose] no ready item selected from {orderedGroups.Count} group(s)",
-                $"no-selected:{orderedGroups.Count}");
-        }
-        return null;
+        return result.Selected;
     }
 
-    private QueueItem? SelectReadyItemForVillage(
-        ContinuousLoopSelectionPlan selectionPlan,
-        IReadOnlyDictionary<Guid, string?> villageKeysByItemId,
-        string villageKey,
-        DateTimeOffset now,
-        bool preview)
-    {
-        foreach (var group in selectionPlan.OrderedGroups)
-        {
-            var villageItems = ContinuousLoopSelector.SelectVillageItems(
-                selectionPlan.OrderedItemsByGroup[group],
-                villageKeysByItemId,
-                villageKey,
-                includeVillageLess: group == QueueGroup.Hero);
-            var candidate = SelectReadyItemWithinGroup(group, villageItems, now, preview);
-            if (candidate is not null)
-            {
-                return candidate;
-            }
-        }
-
-        return null;
-    }
-
-    private QueueItem? SelectReadyItemAcrossVillages(
-        ContinuousLoopSelectionPlan selectionPlan,
-        IReadOnlyDictionary<Guid, string?> villageKeysByItemId,
-        DateTimeOffset now,
-        bool preview,
-        string? excludedVillageKey,
-        bool urgentOnly)
-    {
-        foreach (var group in selectionPlan.OrderedGroups)
-        {
-            var groupItems = selectionPlan.OrderedItemsByGroup[group]
-                .Where(item => !urgentOnly || ContinuousLoopSelector.IsUrgentItem(item))
-                .Where(item => string.IsNullOrWhiteSpace(excludedVillageKey)
-                    || (villageKeysByItemId.TryGetValue(item.Id, out var villageKey)
-                        && !string.IsNullOrWhiteSpace(villageKey)
-                        && !string.Equals(villageKey, excludedVillageKey, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-            if (groupItems.Count == 0)
-            {
-                continue;
-            }
-
-            string? rotationVillageKey = null;
-            var candidate = QueueVillageRotation.SelectByVillageRotation(
-                groupItems,
-                item => villageKeysByItemId.TryGetValue(item.Id, out var villageKey) ? villageKey : null,
-                villageItems => SelectReadyItemWithinGroup(group, villageItems, now, preview),
-                ref rotationVillageKey);
-            if (candidate is not null)
-            {
-                return candidate;
-            }
-        }
-
-        return null;
-    }
-
-    private QueueItem? SelectReadyItemWithinGroup(
-        QueueGroup group,
+    private QueueItem? SelectReadyConstructionForAutomationPass(
         IReadOnlyList<QueueItem> villageItems,
         DateTimeOffset now,
         bool preview)
     {
-        if (villageItems.Count == 0)
-        {
-            return null;
-        }
-
-        if (group != QueueGroup.Construction)
-        {
-            return group == QueueGroup.Hero
-                ? ContinuousLoopSelector.SelectReadyHeroGroupItem(villageItems, now)
-                : ContinuousLoopSelector.SelectReadyGroupHead(villageItems, now);
-        }
-
         var candidate = SelectNextConstructionQueueItem(villageItems, now, out _, preview);
         return candidate is not null
             && IsConstructionGroupReady(
@@ -2604,15 +2433,9 @@ public partial class MainWindow
         var villageKey = GetQueueItemVillageKey(blocker) ?? villageName;
         var waitSeconds = Math.Max(0, (blocker.NextAttemptAt - now).TotalSeconds);
         var state = $"{blocker.Id}:{blocker.NextAttemptAt.UtcTicks}:{blockedItems}";
-        lock (_loopPickVerboseLogGate)
+        if (!_automationSessionRuntime.TrySetConstructionSummary(villageKey, state))
         {
-            if (_constructionQueueSummaryByVillage.TryGetValue(villageKey, out var existing)
-                && string.Equals(existing, state, StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            _constructionQueueSummaryByVillage[villageKey] = state;
+            return;
         }
 
         AppendLog(
@@ -2627,10 +2450,7 @@ public partial class MainWindow
     {
         var villageName = NormalizeVillageName(GetQueueItemVillageName(item)) ?? "-";
         var villageKey = GetQueueItemVillageKey(item) ?? villageName;
-        lock (_loopPickVerboseLogGate)
-        {
-            _constructionQueueSummaryByVillage.Remove(villageKey);
-        }
+        _automationSessionRuntime.ClearConstructionSummary(villageKey);
     }
 
     private static bool HasEarlierPendingConstructForSlot(
@@ -2665,19 +2485,7 @@ public partial class MainWindow
 
     private void AppendLoopPickVerbose(string message, string key)
     {
-        var now = DateTimeOffset.UtcNow;
-        var shouldLog = false;
-        lock (_loopPickVerboseLogGate)
-        {
-            if (!_loopPickVerboseLogAtByKey.TryGetValue(key, out var lastLogAt)
-                || now - lastLogAt >= LoopPickVerboseThrottle)
-            {
-                _loopPickVerboseLogAtByKey[key] = now;
-                shouldLog = true;
-            }
-        }
-
-        if (shouldLog)
+        if (_automationSessionRuntime.ShouldPublishVerbose(key, LoopPickVerboseThrottle))
         {
             AppendLog(message);
         }
@@ -2707,13 +2515,12 @@ public partial class MainWindow
             return;
         }
 
-        var now = DateTimeOffset.UtcNow;
-        if (now - _lastContinuousInboxCheckUtc < TimeSpan.FromSeconds(ContinuousInboxCheckIntervalSeconds))
+        if (!_automationSessionRuntime.ShouldCheckInbox(
+                _inboxAutoEnabled,
+                TimeSpan.FromSeconds(ContinuousInboxCheckIntervalSeconds)))
         {
             return;
         }
-
-        _lastContinuousInboxCheckUtc = now;
 
         // Read the unread badge from the current page (cheap, no navigation) and refresh the
         // Messages/Reports indicators. force:true bypasses the busy guard in
@@ -2725,19 +2532,10 @@ public partial class MainWindow
 
     private void MarkContinuousBrowserActivity(BotOptions options)
     {
-        var now = DateTimeOffset.UtcNow;
-        _lastContinuousBrowserActivityUtc = now;
-        _continuousKeepAliveEnabledLastApplied = options.ContinuousKeepAliveEnabled;
-        _nextContinuousKeepAliveAtUtc = options.ContinuousKeepAliveEnabled
-            ? now.Add(ResolveContinuousKeepAliveDelay(options))
-            : DateTimeOffset.MinValue;
-    }
-
-    private static TimeSpan ResolveContinuousKeepAliveDelay(BotOptions options)
-    {
-        var minMinutes = Math.Clamp(options.ContinuousKeepAliveMinMinutes, 1, 1440);
-        var maxMinutes = Math.Clamp(options.ContinuousKeepAliveMaxMinutes, minMinutes, 1440);
-        return TimeSpan.FromMinutes(Random.Shared.Next(minMinutes, maxMinutes + 1));
+        _automationSessionRuntime.RecordBrowserActivity(
+            options.ContinuousKeepAliveEnabled,
+            options.ContinuousKeepAliveMinMinutes,
+            options.ContinuousKeepAliveMaxMinutes);
     }
 
     // Keep the Travian page from going stale while the loop is idle-waiting, but only when queued work is
@@ -2745,74 +2543,34 @@ public partial class MainWindow
     private async Task MaybeKeepBrowserFreshDuringContinuousLoopAsync(BotOptions options, CancellationToken token)
     {
         var now = DateTimeOffset.UtcNow;
-        if (!options.ContinuousKeepAliveEnabled)
-        {
-            _nextContinuousKeepAliveAtUtc = DateTimeOffset.MinValue;
-            _continuousKeepAliveEnabledLastApplied = false;
-            return;
-        }
-
-        if (_continuousKeepAliveEnabledLastApplied == false)
-        {
-            // Re-enabling must start a fresh full interval rather than inheriting an expired schedule
-            // and unexpectedly reloading the page immediately.
-            _continuousKeepAliveEnabledLastApplied = true;
-            _nextContinuousKeepAliveAtUtc = now.Add(ResolveContinuousKeepAliveDelay(options));
-            return;
-        }
-
-        _continuousKeepAliveEnabledLastApplied = true;
-        if (_nextContinuousKeepAliveAtUtc == DateTimeOffset.MinValue)
-        {
-            var anchor = _lastContinuousBrowserActivityUtc == DateTimeOffset.MinValue
-                ? now
-                : _lastContinuousBrowserActivityUtc;
-            _nextContinuousKeepAliveAtUtc = anchor.Add(ResolveContinuousKeepAliveDelay(options));
-        }
-
-        if (now < _nextContinuousKeepAliveAtUtc)
-        {
-            return;
-        }
-
-        if (now - _lastContinuousKeepAliveFailureUtc < TimeSpan.FromMinutes(2))
-        {
-            return;
-        }
-
-        if (IsSessionSleeping)
-        {
-            // A sleeping session must stay idle: refreshing here would log in and reload the page,
-            // waking it and breaking the sleep throttle. Mark activity so this only logs once per
-            // keep-alive interval instead of every wait tick.
-            MarkContinuousBrowserActivity(options);
-            AppendLog("[keep-alive:verbose] skipped because the session is sleeping.");
-            return;
-        }
-
-        if (_resourceSnapshotRefreshRunning)
-        {
-            MarkContinuousBrowserActivity(options);
-            AppendLog("[keep-alive:verbose] skipped because resource refresh is already reading the browser.");
-            return;
-        }
-
-        if (!HasContinuousLoopWorkDueSoon(now))
-        {
-            _nextContinuousKeepAliveAtUtc = now.Add(ResolveContinuousKeepAliveDelay(options));
-            AppendLog("[keep-alive:verbose] skipped because no continuous-loop work is due soon.");
-            return;
-        }
-
         var nextPendingAt = GetNextContinuousLoopPendingAt();
-        if (ContinuousLoopSelector.ShouldDeferKeepAliveForImminentWork(now, nextPendingAt))
+        var plan = _automationSessionRuntime.PlanKeepAlive(
+            options.ContinuousKeepAliveEnabled,
+            options.ContinuousKeepAliveMinMinutes,
+            options.ContinuousKeepAliveMaxMinutes,
+            IsSessionSleeping,
+            _resourceSnapshotRefreshRunning,
+            HasContinuousLoopWorkDueSoon(now),
+            nextPendingAt);
+        switch (plan)
         {
-            _nextContinuousKeepAliveAtUtc = nextPendingAt!.Value.AddSeconds(5);
-            AppendLog($"[keep-alive:verbose] skipped because queued work is due in {(nextPendingAt.Value - now).TotalSeconds:F0}s; task navigation will refresh the page.");
-            return;
+            case KeepAlivePlan.SkipSleeping:
+                AppendLog("[keep-alive:verbose] skipped because the session is sleeping.");
+                return;
+            case KeepAlivePlan.SkipRefreshRunning:
+                AppendLog("[keep-alive:verbose] skipped because resource refresh is already reading the browser.");
+                return;
+            case KeepAlivePlan.SkipNoWorkDueSoon:
+                AppendLog("[keep-alive:verbose] skipped because no continuous-loop work is due soon.");
+                return;
+            case KeepAlivePlan.SkipImminentWork:
+                AppendLog($"[keep-alive:verbose] skipped because queued work is due in {(nextPendingAt!.Value - now).TotalSeconds:F0}s; task navigation will refresh the page.");
+                return;
+            case KeepAlivePlan.Refresh:
+                break;
+            default:
+                return;
         }
-
-        MarkContinuousBrowserActivity(options);
 
         try
         {
@@ -2830,11 +2588,11 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _lastContinuousKeepAliveFailureUtc = DateTimeOffset.UtcNow;
+            _automationSessionRuntime.MarkKeepAliveFailure();
             if (IsTransientKeepAliveFailure(ex))
             {
-                var retryDelay = NextTransientNavigationRetryDelay();
-                MarkTransientNetworkUnavailable(retryDelay);
+                var retryDelay = _automationNetworkBackoff.NextRetryDelay();
+                _automationNetworkBackoff.MarkUnavailable(retryDelay);
                 AppendLog($"[keep-alive:verbose] refresh skipped after transient failure: {ex.Message}");
                 return;
             }
@@ -2900,7 +2658,7 @@ public partial class MainWindow
                         + $"for {forecast.Item?.DisplayName ?? forecast.Item?.TaskName}",
                     $"construction-wake:{forecast.Item?.Id}:{constructionDeadline.UtcTicks}");
             }
-            return ResolveContinuousLoopWaitDelay(
+            return AutomationDeadlinePolicy.ResolveNextDelay(
                 now,
                 nextQueueDeadline,
                 nextConstructionAvailabilityUtc,
@@ -2912,101 +2670,22 @@ public partial class MainWindow
         }
     }
 
-    internal static TimeSpan? ResolveContinuousLoopWaitDelay(
-        DateTimeOffset now,
-        DateTimeOffset? nextQueueDeadline,
-        DateTimeOffset? nextConstructionAvailabilityUtc,
-        DateTimeOffset? nextVillageScanUtc)
-    {
-        var nextDeadline = nextQueueDeadline;
-        if (nextConstructionAvailabilityUtc is DateTimeOffset constructionDeadline
-            && (nextDeadline is null || constructionDeadline < nextDeadline.Value))
-        {
-            nextDeadline = constructionDeadline;
-        }
-        if (nextVillageScanUtc is DateTimeOffset villageScanDeadline
-            && (villageScanDeadline == DateTimeOffset.MinValue || villageScanDeadline <= now))
-        {
-            return TimeSpan.FromSeconds(1);
-        }
-
-        if (nextVillageScanUtc is DateTimeOffset scheduledVillageScan
-            && (nextDeadline is null || scheduledVillageScan < nextDeadline.Value))
-        {
-            nextDeadline = scheduledVillageScan;
-        }
-
-        if (nextDeadline is null)
-        {
-            return null;
-        }
-
-        var delay = nextDeadline.Value - now;
-        return delay < TimeSpan.FromSeconds(1)
-            ? TimeSpan.FromSeconds(1)
-            : delay;
-    }
-
     private async Task<bool> ResolveContinuousGoldClubStatusAsync(BotOptions options, CancellationToken cancellationToken)
     {
         var accountName = _accountStore.ActiveAccountName();
-        if (!string.Equals(_continuousGoldClubAccount, accountName, StringComparison.OrdinalIgnoreCase))
+        var plan = _automationSessionRuntime.PlanGoldClubCheck(
+            accountName,
+            TryGetStoredGoldClubEnabled(accountName),
+            GoldClubInactiveRecheckInterval);
+        if (!plan.ShouldRefresh)
         {
-            _continuousGoldClubAccount = accountName;
-            _continuousGoldClubEnabled = TryGetStoredGoldClubEnabled(accountName);
-            _lastContinuousGoldClubCheckUtc = DateTimeOffset.MinValue;
+            return plan.Enabled;
         }
-
-        // Gold Club cannot be lost during a server. Once true, the persisted value is authoritative
-        // and the loop never logs in or writes analysis merely to reconfirm it.
-        if (_continuousGoldClubEnabled == true)
-        {
-            _continuousGoldClubEnabled = true;
-            return true;
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        if (now - _lastContinuousGoldClubCheckUtc < GoldClubInactiveRecheckInterval)
-        {
-            return false;
-        }
-
-        _lastContinuousGoldClubCheckUtc = now;
         using (_dashboardActivityTracker.Begin("Checking Gold Club status"))
         {
-            _continuousGoldClubEnabled = await _botService.ReadAndPersistGoldClubStatusAsync(options, AppendLog, cancellationToken);
+            var enabled = await _botService.ReadAndPersistGoldClubStatusAsync(options, AppendLog, cancellationToken);
+            return _automationSessionRuntime.ApplyGoldClubStatus(enabled);
         }
-        return _continuousGoldClubEnabled == true;
-    }
-
-    internal static int ResolveContinuousLoopWaitSeconds(
-        TimeSpan? waitDelay,
-        BotOptions options,
-        bool networkBackoff)
-    {
-        var totalSeconds = waitDelay is null
-            ? Math.Max(1, options.LoopIntervalSeconds)
-            : Math.Max(1, (int)Math.Ceiling(waitDelay.Value.TotalSeconds));
-        if (networkBackoff)
-        {
-            return totalSeconds;
-        }
-
-        // A concrete waitDelay is a scheduler deadline (queue_wait_seconds, construction timer,
-        // farm-list cooldown, etc.). Action pacing must never shorten it: doing so woke the loop
-        // every 4-25 seconds even when the next item was deferred for minutes or hours, causing
-        // repeated status reads and farm-list polling. Pacing only supplies the delay when the
-        // scheduler has no real deadline and is performing a routine idle pass.
-        if (waitDelay is not null)
-        {
-            return totalSeconds;
-        }
-
-        var minMs = (int)Math.Round(Math.Max(0, options.ActionPacingLoopMinSeconds) * 1000);
-        var maxMs = (int)Math.Round(Math.Max(options.ActionPacingLoopMinSeconds, options.ActionPacingLoopMaxSeconds) * 1000);
-        var pacingSeconds = Random.Shared.Next(minMs, maxMs + 1) / 1000.0;
-        var pacingTotalSeconds = Math.Max(1, (int)Math.Ceiling(pacingSeconds));
-        return pacingTotalSeconds;
     }
 
     // Occasional human-like "stepped away from the computer" pause. Called at the top of a loop
@@ -3014,37 +2693,15 @@ public partial class MainWindow
     // pause of the duration range fires; when it ends the interval reschedules. Logged under Pacing.
     private async Task MaybeTakeIdleBreakAsync(BotOptions options, CancellationToken token)
     {
-        if (!options.ActionPacingIdleBreakEnabled)
+        var plan = _automationIdlePacing.PlanBreak(
+            options,
+            sessionAvailable: !IsSessionSleeping && _isLoggedIn && _browserSessionLikelyOpen);
+        if (!plan.ShouldTakeBreak)
         {
             return;
         }
 
-        var now = DateTimeOffset.UtcNow;
-        if (_nextIdleBreakDueUtc == DateTimeOffset.MinValue)
-        {
-            // First pass of this run: schedule the first break, don't fire immediately.
-            _nextIdleBreakDueUtc = now.Add(RandomIdleBreakInterval(options));
-            return;
-        }
-
-        if (now < _nextIdleBreakDueUtc)
-        {
-            return;
-        }
-
-        // Only "step away" during normal, logged-in operation. Never while the session is sleeping
-        // (the loop is stopped then anyway) or mid login/recovery — and if a break came due during such
-        // a window, reschedule instead of firing the instant work resumes.
-        if (IsSessionSleeping || !_isLoggedIn || !_browserSessionLikelyOpen)
-        {
-            _nextIdleBreakDueUtc = now.Add(RandomIdleBreakInterval(options));
-            return;
-        }
-
-        var durationMinutes = RandomInRangeMinutes(
-            options.ActionPacingIdleBreakDurationMinMinutes,
-            options.ActionPacingIdleBreakDurationMaxMinutes);
-        var totalSeconds = Math.Max(1, (int)Math.Round(durationMinutes * 60));
+        var totalSeconds = plan.DurationSeconds;
         AppendLog($"[pacing] idle break: stepping away for {totalSeconds}s.");
 
         var deadline = DateTimeOffset.UtcNow.AddSeconds(totalSeconds);
@@ -3059,7 +2716,7 @@ public partial class MainWindow
                 break;
             }
 
-            if (Volatile.Read(ref _continuousLoopWakeRequested) == 1)
+            if (_automationPassRuntime.IsImmediateWorkRequested)
             {
                 wakeRequested = true;
                 break;
@@ -3086,21 +2743,12 @@ public partial class MainWindow
         if (wakeRequested)
         {
             AppendLog("[pacing] idle break ended early: queue state or settings changed.");
-            _nextIdleBreakDueUtc = DateTimeOffset.UtcNow.Add(RandomIdleBreakInterval(options));
+            _automationIdlePacing.CompleteBreak(options);
             return;
         }
 
         AppendLog("[pacing] idle break over; resuming.");
-        _nextIdleBreakDueUtc = DateTimeOffset.UtcNow.Add(RandomIdleBreakInterval(options));
-    }
-
-    private static TimeSpan RandomIdleBreakInterval(BotOptions options)
-    {
-        var minutes = RandomInRangeMinutes(
-            options.ActionPacingIdleBreakIntervalMinMinutes,
-            options.ActionPacingIdleBreakIntervalMaxMinutes);
-        // Floor so a mis-set 0/tiny interval can't turn the loop into a constant-break busy loop.
-        return TimeSpan.FromSeconds(Math.Max(5.0, minutes * 60.0));
+        _automationIdlePacing.CompleteBreak(options);
     }
 
     // Occasional "idle browse": open a random enabled non-functional page (map/statistics/reports/
@@ -3108,48 +2756,25 @@ public partial class MainWindow
     // instead of only build pages. Between loop passes only — mirrors MaybeTakeIdleBreakAsync.
     private async Task MaybeDoIdleBrowseAsync(BotOptions options, CancellationToken token)
     {
-        if (!options.ActionPacingIdleBrowseEnabled)
+        var plan = _automationIdlePacing.PlanBrowse(
+            options,
+            sessionAvailable: !IsSessionSleeping && _isLoggedIn && _browserSessionLikelyOpen);
+        if (plan.NoPageSelected)
         {
-            return;
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        if (_nextIdleBrowseDueUtc == DateTimeOffset.MinValue)
-        {
-            // First pass of this run: schedule the first browse, don't fire immediately.
-            _nextIdleBrowseDueUtc = now.Add(RandomIdleBrowseInterval(options));
-            return;
-        }
-
-        if (now < _nextIdleBrowseDueUtc)
-        {
-            return;
-        }
-
-        // Only browse during normal, logged-in operation. Never while the session is sleeping or mid
-        // login/recovery — and if a browse came due during such a window, reschedule instead of firing
-        // the instant work resumes (same rule as the idle break).
-        if (IsSessionSleeping || !_isLoggedIn || !_browserSessionLikelyOpen)
-        {
-            _nextIdleBrowseDueUtc = now.Add(RandomIdleBrowseInterval(options));
-            return;
-        }
-
-        var pages = GetEnabledIdleBrowsePages(options);
-        if (pages.Count == 0)
-        {
-            // No page selected: treat as off, but keep rescheduling cheaply so re-enabling one works.
             AppendLog("[pacing:verbose] idle browse skipped: no pages selected.");
-            _nextIdleBrowseDueUtc = now.Add(RandomIdleBrowseInterval(options));
+            return;
+        }
+        if (!plan.ShouldBrowse)
+        {
             return;
         }
 
-        var page = pages[Random.Shared.Next(pages.Count)];
+        var page = plan.Page!;
         AppendLog($"[pacing] idle browse: viewing {page}.");
         using var activity = _dashboardActivityTracker.Begin("Idle browsing");
         try
         {
-            if (RequiresStatisticsLandingPage(page))
+            if (AutomationIdlePacing.RequiresStatisticsLandingPage(page))
             {
                 AppendLog("[pacing:verbose] idle browse: opening the statistics overview before the selected statistics page.");
                 await _botService.NavigateToPageAndReadHtmlAsync(
@@ -3169,44 +2794,7 @@ public partial class MainWindow
             AppendLog($"[pacing:verbose] idle browse skipped after page failure ({ex.Message}).");
         }
 
-        _nextIdleBrowseDueUtc = DateTimeOffset.UtcNow.Add(RandomIdleBrowseInterval(options));
-    }
-
-    // Official page paths for the idle-browse whitelist, filtered to the ones toggled on in settings.
-    internal static List<string> GetEnabledIdleBrowsePages(BotOptions options)
-    {
-        var pages = new List<string>(8);
-        if (options.ActionPacingIdleBrowsePageMap) pages.Add("karte.php");
-        if (options.ActionPacingIdleBrowsePageStatistics) pages.Add("/statistics/general");
-        if (options.ActionPacingIdleBrowsePageStatisticsHero) pages.Add("/statistics/hero");
-        if (options.ActionPacingIdleBrowsePageStatisticsTop10) pages.Add("/statistics/player/top10");
-        if (options.ActionPacingIdleBrowsePageStatisticsDefenders) pages.Add("/statistics/player/defenders");
-        if (options.ActionPacingIdleBrowsePageStatisticsAttackers) pages.Add("/statistics/player/attackers");
-        if (options.ActionPacingIdleBrowsePageReports) pages.Add("berichte.php");
-        if (options.ActionPacingIdleBrowsePageMessages) pages.Add("nachrichten.php");
-        return pages;
-    }
-
-    internal static bool RequiresStatisticsLandingPage(string page)
-    {
-        return page.StartsWith("/statistics/", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(page, "/statistics", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static TimeSpan RandomIdleBrowseInterval(BotOptions options)
-    {
-        var minutes = RandomInRangeMinutes(
-            options.ActionPacingIdleBrowseIntervalMinMinutes,
-            options.ActionPacingIdleBrowseIntervalMaxMinutes);
-        // Floor so a mis-set 0/tiny interval can't turn the loop into a constant-browse busy loop.
-        return TimeSpan.FromSeconds(Math.Max(5.0, minutes * 60.0));
-    }
-
-    private static double RandomInRangeMinutes(double min, double max)
-    {
-        var lo = Math.Max(0, min);
-        var hi = Math.Max(lo, max);
-        return lo + (Random.Shared.NextDouble() * (hi - lo));
+        _automationIdlePacing.CompleteBrowse(options);
     }
 
     private static bool IsHeroLowHpCooldown(QueueItem item, Exception ex)
@@ -3240,8 +2828,8 @@ public partial class MainWindow
 
     private void RecordVillageBatchAttempt(QueueItem item, string source)
     {
-        var before = _villageBatchState.SnapshotFor(_activeWorkingVillageKey);
-        var after = _villageBatchState.RecordAttempt(
+        var before = _automationPassRuntime.SnapshotVillageBatch(_activeWorkingVillageKey);
+        var after = _automationPassRuntime.RecordVillageAttempt(
             GetQueueItemVillageKey(item),
             _activeWorkingVillageKey);
         if (string.IsNullOrWhiteSpace(after.VillageKey))
@@ -3306,12 +2894,10 @@ public partial class MainWindow
         }
 
         var signature = string.Join("|", warnings);
-        if (string.Equals(signature, _lastConservativeAutomationWarningSignature, StringComparison.Ordinal))
+        if (!_automationSessionRuntime.ShouldPublishWarnings(signature))
         {
             return;
         }
-
-        _lastConservativeAutomationWarningSignature = signature;
         foreach (var warning in warnings)
         {
             AppendLog(warning);

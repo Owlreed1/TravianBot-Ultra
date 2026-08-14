@@ -274,7 +274,7 @@ public partial class MainWindow
             && !_buildQueueReachedZeroPendingCompletion)
         {
             _buildQueueReachedZeroPendingCompletion = true;
-            _continuousLoopConstructionStatusNeedsSync = true;
+            _automationSessionRuntime.RequestConstructionStatusSync();
         RequestContinuousAutomationWake();
             AppendLoopPickVerbose(
                 "[construction-queue:verbose] local construction timer reached zero; requesting confirmed Travian status.",

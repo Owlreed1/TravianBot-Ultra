@@ -11,16 +11,20 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
     private readonly IOfficialTravianAutomationPort _officialTravian;
     private readonly TimeProvider _timeProvider;
     private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
+    private readonly AutomationNetworkBackoff _networkBackoff;
     private readonly object _sync = new();
+    private readonly object _publicationSync = new();
+    private readonly SortedDictionary<long, AutomationUpdate> _pendingPublications = [];
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
-    private readonly SemaphoreSlim _wakeSignal = new(0, 1);
+    private readonly AutomationMailbox _mailbox = new();
     private long _nextRunId;
     private long _nextUpdateSequence;
-    private int _wakePending;
+    private long _nextPublicationSequence = 1;
     private Task? _runTask;
     private LoopController.GateLease? _autoQueueGateLease;
     private TaskCompletionSource<AutomationDecisionChoice?>? _pendingDecisionCompletion;
     private AutomationDecisionRequestId? _lastAnsweredDecisionId;
+    private readonly HashSet<AutomationDecisionRequestId> _staleDecisionIds = [];
     private AutomationSnapshot _current = AutomationSnapshot.Stopped;
 
     public AutomationDesk(LoopController loopController, TimeProvider? timeProvider = null)
@@ -37,7 +41,8 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
         IAutomationStatePort state,
         IOfficialTravianAutomationPort officialTravian,
         TimeProvider? timeProvider = null,
-        Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
+        Func<TimeSpan, CancellationToken, Task>? delayAsync = null,
+        AutomationNetworkBackoff? networkBackoff = null)
     {
         _loopController = loopController;
         _state = state;
@@ -45,6 +50,7 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
         _timeProvider = timeProvider ?? TimeProvider.System;
         _delayAsync = delayAsync ?? ((delay, cancellationToken) =>
             Task.Delay(delay, _timeProvider, cancellationToken));
+        _networkBackoff = networkBackoff ?? new AutomationNetworkBackoff(_timeProvider);
         _loopController.AutomationStopRequested += OnAutomationStopRequested;
     }
 
@@ -96,7 +102,6 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
                     .ConfigureAwait(false);
                 if (acquiredGate is null)
                 {
-                    _loopController.Logger.Invoke("[automation] Auto Queue start rejected: gate is busy.");
                     return new AutomationStartResult.Busy();
                 }
             }
@@ -108,9 +113,10 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
             {
                 var runToken = StartLifecycle(request.Mode);
                 _autoQueueGateLease = acquiredGate;
-                Interlocked.Exchange(ref _wakePending, 0);
+                _mailbox.Reset();
                 runId = new AutomationRunId(Interlocked.Increment(ref _nextRunId));
                 Current = new AutomationSnapshot(runId, request.Mode, request.Context, AutomationPhase.Running);
+                _networkBackoff.MarkHealthy();
                 var automationEvent = new AutomationEvent.RunStarted(
                     runId,
                     _timeProvider.GetUtcNow(),
@@ -120,11 +126,6 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
                     Interlocked.Increment(ref _nextUpdateSequence),
                     automationEvent,
                     Current);
-                _loopController.Logger.Invoke(
-                    $"[automation] Run {runId.Value} started: mode={request.Mode}, account={request.Context.AccountKey}.");
-                while (_wakeSignal.Wait(0, CancellationToken.None))
-                {
-                }
                 runStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 _runTask = Task.Run(
                     async () =>
@@ -160,9 +161,7 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
                 if (Current.Phase == AutomationPhase.Stopping)
                 {
                     CancelCurrentRun(cancelCurrentAction: true);
-                    SignalWake();
-                    _loopController.Logger.Invoke(
-                        "[automation] Graceful stop escalated to current-action cancellation.");
+                    _mailbox.Signal();
                 }
             }
         }
@@ -193,11 +192,15 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
 
             runId = activeRunId;
             Current = Current with { Phase = AutomationPhase.Stopping };
+            if (Current.PendingDecision is { } staleDecision)
+            {
+                _staleDecisionIds.Add(staleDecision.RequestId);
+            }
             _pendingDecisionCompletion?.TrySetResult(null);
             _pendingDecisionCompletion = null;
             CancelCurrentRun(mode == AutomationStopMode.CancelCurrentAction);
-            SignalWake();
-            Interlocked.Exchange(ref _wakePending, 0);
+            _mailbox.Signal();
+            _mailbox.ConsumeWake();
             runTask = _runTask;
         }
 
@@ -238,7 +241,6 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
                 _loopController.DisposeLoop();
             }
             ReleaseAutoQueueGate();
-            _loopController.Logger.Invoke($"[automation] Run {runId.Value} stopped: mode={mode}.");
         }
 
         PublishUpdate(update);
@@ -247,6 +249,7 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
 
     public AutomationWakeResult Wake(AutomationWakeReason reason)
     {
+        AutomationUpdate update;
         lock (_sync)
         {
             if (Current.Phase == AutomationPhase.Stopping)
@@ -259,15 +262,23 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
                 return AutomationWakeResult.NotRunning;
             }
 
-            if (Interlocked.Exchange(ref _wakePending, 1) == 1)
+            if (!_mailbox.PostWake())
             {
                 return AutomationWakeResult.Coalesced;
             }
 
-            _loopController.Logger.Invoke($"[automation] Wake requested: reason={reason}.");
-            SignalWake();
-            return AutomationWakeResult.Accepted;
+            var automationEvent = new AutomationEvent.WakeAccepted(
+                Current.RunId!.Value,
+                _timeProvider.GetUtcNow(),
+                reason);
+            update = new AutomationUpdate(
+                Interlocked.Increment(ref _nextUpdateSequence),
+                automationEvent,
+                Current);
         }
+
+        PublishUpdate(update);
+        return AutomationWakeResult.Accepted;
     }
 
     public AutomationDecisionResult Respond(
@@ -286,14 +297,21 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
             var pending = Current.PendingDecision;
             if (pending is null || _pendingDecisionCompletion is null)
             {
-                return _lastAnsweredDecisionId == requestId
-                    ? AutomationDecisionResult.AlreadyAnswered
+                if (_lastAnsweredDecisionId == requestId)
+                {
+                    return AutomationDecisionResult.AlreadyAnswered;
+                }
+
+                return _staleDecisionIds.Contains(requestId)
+                    ? AutomationDecisionResult.StaleRun
                     : AutomationDecisionResult.UnknownRequest;
             }
 
             if (pending.RequestId != requestId)
             {
-                return AutomationDecisionResult.UnknownRequest;
+                return _staleDecisionIds.Contains(requestId)
+                    ? AutomationDecisionResult.StaleRun
+                    : AutomationDecisionResult.UnknownRequest;
             }
 
             completion = _pendingDecisionCompletion;
@@ -319,9 +337,23 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
     {
         await StopAsync(AutomationStopMode.CancelCurrentAction).ConfigureAwait(false);
         _loopController.AutomationStopRequested -= OnAutomationStopRequested;
+        _mailbox.Dispose();
     }
 
     private void PublishUpdate(AutomationUpdate update)
+    {
+        lock (_publicationSync)
+        {
+            _pendingPublications[update.Sequence] = update;
+            while (_pendingPublications.Remove(_nextPublicationSequence, out var next))
+            {
+                _nextPublicationSequence++;
+                PublishToSubscribers(next);
+            }
+        }
+    }
+
+    private void PublishToSubscribers(AutomationUpdate update)
     {
         var subscribers = Updated;
         if (subscribers is null)
@@ -335,10 +367,9 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
             {
                 subscriber(this, update);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _loopController.Logger.Invoke(
-                    $"[automation] Update subscriber failed at sequence {update.Sequence}: {ex.Message}");
+                // Presentation failures cannot change authoritative automation state.
             }
         }
     }
@@ -372,7 +403,7 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
                 }
 
                 await WaitForWakeOrDeadlineAsync(pass.NextDeadline, cancellationToken).ConfigureAwait(false);
-                Interlocked.Exchange(ref _wakePending, 0);
+                _mailbox.ConsumeWake();
             }
         }
         finally
@@ -393,6 +424,7 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
         try
         {
             var snapshot = await _state.ReadAsync(mode, context, cancellationToken).ConfigureAwait(false);
+            _networkBackoff.MarkHealthy();
             var now = _timeProvider.GetUtcNow();
             var action = snapshot.Candidates
                 .Where(candidate => candidate.NextAttemptAt <= now)
@@ -480,18 +512,27 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _loopController.Logger.Invoke(
-                $"[automation] Run {runId.Value} pass failed: type={ex.GetType().Name}.");
+            var failure = AutomationFailureClassifier.Classify(ex);
+            if (failure.IsRetryable && IsCurrentRun(runId, context))
+            {
+                var retryDelay = _networkBackoff.NextRetryDelay();
+                _networkBackoff.MarkUnavailable(retryDelay);
+                var retryAt = _timeProvider.GetUtcNow().Add(retryDelay);
+                PublishRunEvent(new AutomationEvent.RunDeferred(
+                    runId,
+                    _timeProvider.GetUtcNow(),
+                    mode,
+                    failure,
+                    retryAt));
+                return new AutomationPassResult(false, retryAt);
+            }
+
             AutomationUpdate? faultUpdate = null;
             lock (_sync)
             {
                 if (Current.RunId == runId)
                 {
                     Current = Current with { Phase = AutomationPhase.Faulted };
-                    var failure = new AutomationFailure(
-                        AutomationFailureKind.AdapterContract,
-                        ex.GetType().Name,
-                        IsRetryable: false);
                     faultUpdate = new AutomationUpdate(
                         Interlocked.Increment(ref _nextUpdateSequence),
                         new AutomationEvent.RunFaulted(
@@ -549,7 +590,6 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
                 _loopController.DisposeLoop();
             }
             ReleaseAutoQueueGate();
-            _loopController.Logger.Invoke($"[automation] Run {runId.Value} completed.");
         }
 
         PublishUpdate(update);
@@ -595,7 +635,7 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
     {
         if (nextDeadline is null)
         {
-            await _wakeSignal.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await _mailbox.WaitAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -606,7 +646,7 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
         }
 
         using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var wakeTask = _wakeSignal.WaitAsync(waitCancellation.Token);
+        var wakeTask = _mailbox.WaitAsync(Timeout.InfiniteTimeSpan, waitCancellation.Token);
         var deadlineTask = _delayAsync(remaining, waitCancellation.Token);
         await Task.WhenAny(wakeTask, deadlineTask).ConfigureAwait(false);
         await waitCancellation.CancelAsync().ConfigureAwait(false);
@@ -625,19 +665,7 @@ public sealed class AutomationDesk : IAutomationDesk, IAsyncDisposable
             ? _loopController.LoopStopRequested
             : _loopController.QueueStopRequested;
 
-    private void SignalWake()
-    {
-        try
-        {
-            _wakeSignal.Release();
-        }
-        catch (SemaphoreFullException)
-        {
-            // A pending signal already represents every coalesced wake request.
-        }
-    }
-
-    private void OnAutomationStopRequested() => SignalWake();
+    private void OnAutomationStopRequested() => _mailbox.Signal();
 
     private bool IsCurrentRun(AutomationRunId runId, AutomationRunContext context)
     {

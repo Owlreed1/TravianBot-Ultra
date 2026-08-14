@@ -1,4 +1,5 @@
 using TbotUltra.Core.Configuration;
+using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Worker.Services;
 using Xunit;
 
@@ -16,7 +17,7 @@ public sealed class ContinuousLoopNetworkBackoffTests
             ActionPacingLoopMaxSeconds = 25,
         };
 
-        var seconds = MainWindow.ResolveContinuousLoopWaitSeconds(
+        var seconds = AutomationDeadlinePolicy.ResolveWaitSeconds(
             TimeSpan.FromSeconds(47),
             options,
             networkBackoff: true);
@@ -34,7 +35,7 @@ public sealed class ContinuousLoopNetworkBackoffTests
             ActionPacingLoopMaxSeconds = 25,
         };
 
-        var seconds = MainWindow.ResolveContinuousLoopWaitSeconds(
+        var seconds = AutomationDeadlinePolicy.ResolveWaitSeconds(
             TimeSpan.FromSeconds(4177),
             options,
             networkBackoff: false);
@@ -45,18 +46,18 @@ public sealed class ContinuousLoopNetworkBackoffTests
     [Fact]
     public void IsTransientConnectionFailure_AcceptsNavigationAndUnknownPageState()
     {
-        Assert.True(MainWindow.IsTransientConnectionFailure(
+        Assert.True(AutomationNetworkBackoff.IsTransientConnectionFailure(
             new TransientNavigationException("Navigation timed out.")));
-        Assert.True(MainWindow.IsTransientConnectionFailure(
+        Assert.True(AutomationNetworkBackoff.IsTransientConnectionFailure(
             new InvalidOperationException("Not logged in. Current page state is 'unknown'.")));
-        Assert.True(MainWindow.IsTransientConnectionFailure(
+        Assert.True(AutomationNetworkBackoff.IsTransientConnectionFailure(
             new InvalidOperationException("Wrapped", new TransientNavigationException("Navigation timed out."))));
     }
 
     [Fact]
     public void IsTransientConnectionFailure_RejectsConfirmedLoggedOutState()
     {
-        Assert.False(MainWindow.IsTransientConnectionFailure(
+        Assert.False(AutomationNetworkBackoff.IsTransientConnectionFailure(
             new InvalidOperationException("Not logged in. Current page state is 'logged_out'.")));
     }
 
@@ -69,67 +70,7 @@ public sealed class ContinuousLoopNetworkBackoffTests
     {
         Assert.Equal(
             TimeSpan.FromMinutes(minutes),
-            MainWindow.ResolveAutomaticProxyRecoveryRetryDelay(attempt));
+            AutomationProxyRecoveryRuntime.ResolveRetryDelay(attempt));
     }
 
-    [Fact]
-    public void IdleBreak_EndsEarlyWhenSettingsWakeTheContinuousLoop()
-    {
-        var projectRoot = TbotUltra.Worker.ProjectRootLocator.FindProjectRoot();
-        var source = File.ReadAllText(Path.Combine(
-            projectRoot,
-            "src",
-            "TbotUltra.Desktop",
-            "MainWindow.ContinuousLoop.cs"));
-        var methodStart = source.IndexOf(
-            "private async Task MaybeTakeIdleBreakAsync",
-            StringComparison.Ordinal);
-        var methodEnd = source.IndexOf(
-            "    private static TimeSpan RandomIdleBreakInterval",
-            methodStart,
-            StringComparison.Ordinal);
-
-        Assert.True(methodStart >= 0 && methodEnd > methodStart);
-        var methodBody = source[methodStart..methodEnd];
-
-        Assert.Contains(
-            "Volatile.Read(ref _continuousLoopWakeRequested) == 1",
-            methodBody,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "idle break ended early: queue state or settings changed.",
-            methodBody,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "var immediateWorkRequested = Interlocked.Exchange(ref _continuousLoopWakeRequested, 0) == 1;",
-            source,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "if (!immediateWorkRequested)",
-            source,
-            StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void KeepAlive_DisabledAndReenabled_ResetTheSchedule()
-    {
-        var projectRoot = TbotUltra.Worker.ProjectRootLocator.FindProjectRoot();
-        var continuousLoopSource = File.ReadAllText(Path.Combine(
-            projectRoot,
-            "src",
-            "TbotUltra.Desktop",
-            "MainWindow.ContinuousLoop.cs"));
-        var sessionSource = File.ReadAllText(Path.Combine(
-            projectRoot,
-            "src",
-            "TbotUltra.Desktop",
-            "MainWindow.Session.cs"));
-
-        Assert.Contains("if (!options.ContinuousKeepAliveEnabled)", continuousLoopSource, StringComparison.Ordinal);
-        Assert.Contains("_continuousKeepAliveEnabledLastApplied = false;", continuousLoopSource, StringComparison.Ordinal);
-        Assert.Contains("if (_continuousKeepAliveEnabledLastApplied == false)", continuousLoopSource, StringComparison.Ordinal);
-        Assert.Contains("_nextContinuousKeepAliveAtUtc = now.Add(ResolveContinuousKeepAliveDelay(options));", continuousLoopSource, StringComparison.Ordinal);
-        Assert.Contains("_nextContinuousKeepAliveAtUtc = DateTimeOffset.MinValue;", sessionSource, StringComparison.Ordinal);
-        Assert.Contains("_continuousKeepAliveEnabledLastApplied = null;", sessionSource, StringComparison.Ordinal);
-    }
 }

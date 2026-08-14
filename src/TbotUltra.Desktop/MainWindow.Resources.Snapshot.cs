@@ -7,6 +7,7 @@ using System.Windows;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
+using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Worker;
 using TbotUltra.Worker.Domain;
 using TbotUltra.Worker.Services;
@@ -594,57 +595,14 @@ public partial class MainWindow
     // remain alarms; a crashed target is discarded by BotTaskRunner before this exception returns.
     private static bool IsTransientPageReadFailure(Exception ex)
     {
-        return IsTransientConnectionFailure(ex)
+        return AutomationNetworkBackoff.IsTransientConnectionFailure(ex)
             || BrowserFailureClassifier.IsTargetCrash(ex)
             || BrowserFailureClassifier.IsTransientNavigation(ex);
     }
 
-    internal static bool IsTransientConnectionFailure(Exception ex)
-    {
-        for (var current = ex; current is not null; current = current.InnerException)
-        {
-            if (current is TransientNavigationException
-                || current.Message.Contains("page state is 'unknown'", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private DateTimeOffset _transientNetworkUnavailableUntilUtc;
-    private int _consecutiveTransientConnectionFailures;
-
-    private void MarkTransientNetworkUnavailable(TimeSpan delay)
-    {
-        var unavailableUntil = DateTimeOffset.UtcNow + delay;
-        if (unavailableUntil > _transientNetworkUnavailableUntilUtc)
-        {
-            _transientNetworkUnavailableUntilUtc = unavailableUntil;
-        }
-    }
-
-    private bool IsTransientNetworkUnavailable()
-        => DateTimeOffset.UtcNow < _transientNetworkUnavailableUntilUtc;
-
-    private TimeSpan GetTransientNetworkUnavailableRemaining()
-    {
-        var remaining = _transientNetworkUnavailableUntilUtc - DateTimeOffset.UtcNow;
-        return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
-    }
-
-    private TimeSpan NextTransientNavigationRetryDelay()
-    {
-        _consecutiveTransientConnectionFailures = Math.Min(_consecutiveTransientConnectionFailures + 1, 3);
-        var minimumSeconds = 30 * (1 << (_consecutiveTransientConnectionFailures - 1));
-        return TimeSpan.FromSeconds(Random.Shared.Next(minimumSeconds, minimumSeconds * 2 + 1));
-    }
-
     private void MarkNetworkConnectionHealthy()
     {
-        _consecutiveTransientConnectionFailures = 0;
-        _transientNetworkUnavailableUntilUtc = DateTimeOffset.MinValue;
+        _automationNetworkBackoff.MarkHealthy();
         ResetAutomaticProxyRecoveryRetry();
     }
 
@@ -657,7 +615,7 @@ public partial class MainWindow
             return false;
         }
 
-        if (IsTransientNetworkUnavailable())
+        if (_automationNetworkBackoff.IsUnavailable)
         {
             return false;
         }
@@ -716,7 +674,7 @@ public partial class MainWindow
 
             if (IsTransientPageReadFailure(ex))
             {
-                MarkTransientNetworkUnavailable(TimeSpan.FromSeconds(30));
+                _automationNetworkBackoff.MarkUnavailable(TimeSpan.FromSeconds(30));
                 AppendLog($"[resource-refresh:verbose] background refresh skipped after transient page failure ({ex.Message})");
             }
             else

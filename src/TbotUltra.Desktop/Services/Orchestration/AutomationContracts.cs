@@ -181,6 +181,20 @@ public abstract record AutomationEvent(
         AutomationRunMode RunMode,
         AutomationFailure Failure)
         : AutomationEvent(RunId, OccurredAt);
+
+    public sealed record RunDeferred(
+        AutomationRunId RunId,
+        DateTimeOffset OccurredAt,
+        AutomationRunMode RunMode,
+        AutomationFailure Failure,
+        DateTimeOffset RetryAt)
+        : AutomationEvent(RunId, OccurredAt);
+
+    public sealed record WakeAccepted(
+        AutomationRunId RunId,
+        DateTimeOffset OccurredAt,
+        AutomationWakeReason Reason)
+        : AutomationEvent(RunId, OccurredAt);
 }
 
 public sealed record AutomationUpdate(

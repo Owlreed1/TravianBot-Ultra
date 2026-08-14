@@ -1,5 +1,6 @@
 using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Worker.Domain;
+using TbotUltra.Worker.Services;
 using Xunit;
 
 namespace TbotUltra.Desktop.Tests;
@@ -373,6 +374,69 @@ public sealed class AutomationDeskTests
     }
 
     [Fact]
+    public async Task StaleBrowserGeneration_PublishesItsTypedTerminalFailure()
+    {
+        var now = new DateTimeOffset(2026, 8, 14, 12, 0, 0, TimeSpan.Zero);
+        using var loopController = new LoopController();
+        await using var automation = new AutomationDesk(
+            loopController,
+            new ThrowingAutomationStatePort(new AutomationContextException(
+                AutomationFailureKind.StaleBrowserGeneration,
+                "browser-generation-changed",
+                "changed")),
+            new InMemoryOfficialTravianPort(AutomationActionOutcome.Completed),
+            new FixedTimeProvider(now));
+        var faulted = new TaskCompletionSource<AutomationEvent.RunFaulted>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        automation.Updated += (_, update) =>
+        {
+            if (update.Event is AutomationEvent.RunFaulted failure)
+            {
+                faulted.TrySetResult(failure);
+            }
+        };
+
+        await automation.StartAsync(new AutomationStart(
+            AutomationRunMode.ContinuousLoop,
+            new AutomationRunContext("account-1", new Uri("https://ts1.x1.example/"), 7)));
+
+        var failure = await faulted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(AutomationFailureKind.StaleBrowserGeneration, failure.Failure.Kind);
+        Assert.Equal("browser-generation-changed", failure.Failure.DiagnosticCode);
+        Assert.False(failure.Failure.IsRetryable);
+    }
+
+    [Fact]
+    public async Task TransientNavigationFailure_PublishesARetryableTypedFailure()
+    {
+        var now = new DateTimeOffset(2026, 8, 14, 12, 0, 0, TimeSpan.Zero);
+        using var loopController = new LoopController();
+        await using var automation = new AutomationDesk(
+            loopController,
+            new ThrowingAutomationStatePort(new TransientNavigationException("navigation timed out")),
+            new InMemoryOfficialTravianPort(AutomationActionOutcome.Completed),
+            new FixedTimeProvider(now));
+        var deferred = new TaskCompletionSource<AutomationEvent.RunDeferred>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        automation.Updated += (_, update) =>
+        {
+            if (update.Event is AutomationEvent.RunDeferred failure)
+            {
+                deferred.TrySetResult(failure);
+            }
+        };
+
+        await automation.StartAsync(new AutomationStart(
+            AutomationRunMode.ContinuousLoop,
+            new AutomationRunContext("account-1", new Uri("https://ts1.x1.example/"), 7)));
+
+        var failure = await deferred.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(AutomationFailureKind.TransientNetwork, failure.Failure.Kind);
+        Assert.True(failure.Failure.IsRetryable);
+        Assert.Equal(AutomationPhase.Running, automation.Current.Phase);
+    }
+
+    [Fact]
     public async Task Respond_ApprovesThePendingDecisionBeforeExecution()
     {
         var now = new DateTimeOffset(2026, 8, 14, 12, 0, 0, TimeSpan.Zero);
@@ -425,6 +489,66 @@ public sealed class AutomationDeskTests
         Assert.Null(automation.Current.PendingDecision);
     }
 
+    [Fact]
+    public async Task Respond_RejectsDuplicateAndStaleRunDecisions()
+    {
+        var now = new DateTimeOffset(2026, 8, 14, 12, 0, 0, TimeSpan.Zero);
+        var candidate = new AutomationCandidate(
+            Guid.NewGuid(),
+            "hero_manage",
+            QueueGroup.Hero,
+            "0|0",
+            0,
+            now,
+            new AutomationDecisionRequirement("confirm"));
+        var state = new InMemoryAutomationStatePort(new AutomationStateSnapshot([candidate]));
+        using var loopController = new LoopController();
+        await using var automation = new AutomationDesk(
+            loopController,
+            state,
+            new RecordingOfficialTravianPort(),
+            new FixedTimeProvider(now));
+        var firstRequest = new TaskCompletionSource<AutomationDecisionRequestId>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        automation.Updated += (_, update) =>
+        {
+            if (update.Event is AutomationEvent.DecisionRequested requested)
+            {
+                firstRequest.TrySetResult(requested.Decision.RequestId);
+            }
+        };
+        var firstContext = new AutomationRunContext("account-1", new Uri("https://ts1.x1.example/"), 7);
+        await automation.StartAsync(new AutomationStart(AutomationRunMode.ContinuousLoop, firstContext));
+        var answeredId = await firstRequest.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(
+            AutomationDecisionResult.Accepted,
+            automation.Respond(answeredId, AutomationDecisionChoice.Decline));
+        Assert.Equal(
+            AutomationDecisionResult.AlreadyAnswered,
+            automation.Respond(answeredId, AutomationDecisionChoice.Decline));
+
+        state.Replace(new AutomationStateSnapshot([candidate with { Id = Guid.NewGuid() }]));
+        var staleRequest = new TaskCompletionSource<AutomationDecisionRequestId>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        automation.Updated += (_, update) =>
+        {
+            if (update.Event is AutomationEvent.DecisionRequested requested
+                && requested.Decision.RequestId != answeredId)
+            {
+                staleRequest.TrySetResult(requested.Decision.RequestId);
+            }
+        };
+        automation.Wake(AutomationWakeReason.QueueChanged);
+        var staleId = await staleRequest.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await automation.StartAsync(new AutomationStart(
+            AutomationRunMode.ContinuousLoop,
+            new AutomationRunContext("account-2", new Uri("https://ts2.x1.example/"), 8)));
+
+        Assert.Equal(
+            AutomationDecisionResult.StaleRun,
+            automation.Respond(staleId, AutomationDecisionChoice.Approve));
+    }
+
     private sealed class InMemoryAutomationStatePort(AutomationStateSnapshot snapshot) : IAutomationStatePort
     {
         private AutomationStateSnapshot _snapshot = snapshot;
@@ -466,6 +590,20 @@ public sealed class AutomationDeskTests
             AutomationRunContext context,
             AutomationCandidate action,
             CancellationToken cancellationToken) => ValueTask.FromResult(outcome);
+    }
+
+    private sealed class ThrowingAutomationStatePort(Exception exception) : IAutomationStatePort
+    {
+        public ValueTask<AutomationStateSnapshot> ReadAsync(
+            AutomationRunMode mode,
+            AutomationRunContext context,
+            CancellationToken cancellationToken) => ValueTask.FromException<AutomationStateSnapshot>(exception);
+
+        public ValueTask ApplyAsync(
+            AutomationRunMode mode,
+            AutomationRunContext context,
+            AutomationStateChange change,
+            CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 
     private sealed class BlockingOfficialTravianPort : IOfficialTravianAutomationPort

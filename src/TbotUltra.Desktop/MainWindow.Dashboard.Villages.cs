@@ -950,7 +950,7 @@ public partial class MainWindow
             village => village.VillageKey,
             village => ResolveNextContinuousLoopForecast(nowUtc, village.VillageKey),
             StringComparer.OrdinalIgnoreCase);
-        var batchVillageKey = _villageBatchState.SnapshotFor(_activeWorkingVillageKey).VillageKey;
+        var batchVillageKey = _automationPassRuntime.SnapshotVillageBatch(_activeWorkingVillageKey).VillageKey;
         var rotationKeys = QueueGroupCatalog.AllGroups.ToDictionary(
             group => group,
             _ => batchVillageKey);

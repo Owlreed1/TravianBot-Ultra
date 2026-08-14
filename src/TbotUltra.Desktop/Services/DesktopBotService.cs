@@ -12,6 +12,8 @@ public sealed class DesktopBotService : IDesktopBotService
     private readonly IQueueScheduler _queueScheduler;
     private readonly QueueExecutor _queueExecutor;
 
+    public long BrowserGeneration => _taskRunner.BrowserGeneration;
+
     public DesktopBotService(BotTaskRunner taskRunner, IQueueStore queueStore, IQueueScheduler queueScheduler, QueueExecutor queueExecutor)
     {
         _taskRunner = taskRunner;

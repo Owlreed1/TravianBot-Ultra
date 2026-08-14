@@ -1,4 +1,5 @@
 using TbotUltra.Core.Configuration;
+using TbotUltra.Desktop.Services.Orchestration;
 using Xunit;
 
 namespace TbotUltra.Desktop.Tests;
@@ -8,7 +9,7 @@ public sealed class IdleBrowsePageSelectionTests
     [Fact]
     public void GetEnabledIdleBrowsePages_IncludesOfficialStatisticsPagesByDefault()
     {
-        var pages = MainWindow.GetEnabledIdleBrowsePages(new BotOptions());
+        var pages = AutomationIdlePacing.GetEnabledBrowsePages(new BotOptions());
 
         Assert.Contains("/statistics/general", pages);
         Assert.Contains("/statistics/hero", pages);
@@ -25,7 +26,7 @@ public sealed class IdleBrowsePageSelectionTests
     [InlineData("/statistics/general")]
     public void RequiresStatisticsLandingPage_ReturnsTrueForStatisticsSubPages(string page)
     {
-        Assert.True(MainWindow.RequiresStatisticsLandingPage(page));
+        Assert.True(AutomationIdlePacing.RequiresStatisticsLandingPage(page));
     }
 
     [Theory]
@@ -33,6 +34,6 @@ public sealed class IdleBrowsePageSelectionTests
     [InlineData("karte.php")]
     public void RequiresStatisticsLandingPage_ReturnsFalseForLandingAndOtherPages(string page)
     {
-        Assert.False(MainWindow.RequiresStatisticsLandingPage(page));
+        Assert.False(AutomationIdlePacing.RequiresStatisticsLandingPage(page));
     }
 }

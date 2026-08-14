@@ -1058,7 +1058,7 @@ public partial class MainWindow
             _pendingSwitchVillageName = null;
             _pendingSwitchVillageUrl = null;
         }
-        _villageBatchState.Reset();
+        _automationPassRuntime.ResetVillageBatch();
         _defaultEnabledGroupKeys.Clear();
 
         _troopsBlockedReasonKey = null;
@@ -1074,11 +1074,7 @@ public partial class MainWindow
         _breweryBlockedReasonText = null;
         _breweryBlockedPreviouslyEnabled = false;
 
-        _lastContinuousInboxCheckUtc = DateTimeOffset.MinValue;
-        _lastContinuousBrowserActivityUtc = DateTimeOffset.MinValue;
-        _nextContinuousKeepAliveAtUtc = DateTimeOffset.MinValue;
-        _continuousKeepAliveEnabledLastApplied = null;
-        _lastContinuousKeepAliveFailureUtc = DateTimeOffset.MinValue;
+        _automationSessionRuntime.Reset();
         _inlineWaitUntilUtc = DateTimeOffset.MinValue;
         _npcTradeSessionCount = 0;
         _npcTradeTroopSessionCount = 0;

@@ -1,0 +1,67 @@
+using TbotUltra.Desktop.Services;
+using TbotUltra.Desktop.Services.Orchestration;
+using Xunit;
+
+namespace TbotUltra.Desktop.Tests;
+
+public sealed class AutomationPassRuntimeTests
+{
+    [Fact]
+    public void ImmediateWorkRequests_CoalesceUntilConsumed()
+    {
+        var runtime = new AutomationPassRuntime();
+
+        runtime.RequestImmediateWork();
+        runtime.RequestImmediateWork();
+
+        Assert.True(runtime.IsImmediateWorkRequested);
+        Assert.True(runtime.ConsumeImmediateWorkRequest());
+        Assert.False(runtime.ConsumeImmediateWorkRequest());
+        Assert.False(runtime.IsImmediateWorkRequested);
+    }
+
+    [Fact]
+    public void ContinuousPassIds_AreMonotonicAndPublishTheCurrentPass()
+    {
+        var runtime = new AutomationPassRuntime();
+
+        var first = runtime.BeginContinuousPass();
+        var second = runtime.BeginContinuousPass();
+
+        Assert.Equal(first + 1, second);
+        Assert.Equal(second, runtime.CurrentContinuousPassId);
+    }
+
+    [Fact]
+    public void AutoQueueRun_ResetsTheSharedVillageBatch()
+    {
+        var runtime = new AutomationPassRuntime();
+        runtime.RecordVillageAttempt("a", "a");
+        Assert.Equal(1, runtime.SnapshotVillageBatch("a").AttemptCount);
+
+        runtime.BeginAutoQueueRun(42);
+
+        Assert.Equal(42, runtime.AutoQueueRunLogId);
+        Assert.Equal(0, runtime.SnapshotVillageBatch("a").AttemptCount);
+    }
+
+    [Fact]
+    public void VillageBatch_IsSharedAcrossPassModesUntilExplicitlyReset()
+    {
+        var runtime = new AutomationPassRuntime();
+
+        runtime.RecordVillageAttempt("a", "a");
+        var observedByNextPass = runtime.SnapshotVillageBatch("a");
+
+        Assert.Equal(new VillageBatchSnapshot("a", 1), observedByNextPass);
+    }
+
+    [Fact]
+    public void VillageReactionBudget_StopsAtTheSharedBatchLimit()
+    {
+        var runtime = new AutomationPassRuntime();
+
+        Assert.True(runtime.CanAttemptVillageTask(runtime.VillageAttemptLimit - 1));
+        Assert.False(runtime.CanAttemptVillageTask(runtime.VillageAttemptLimit));
+    }
+}

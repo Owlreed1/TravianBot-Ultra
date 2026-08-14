@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Core.Tasks;
 using TbotUltra.Desktop.Services;
+using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Worker.Domain;
 using TbotUltra.Worker.Services;
 
@@ -1030,10 +1031,10 @@ public partial class MainWindow
             return false;
         }
 
-        if (IsTransientConnectionFailure(ex))
+        if (AutomationNetworkBackoff.IsTransientConnectionFailure(ex))
         {
-            var retryDelay = NextTransientNavigationRetryDelay();
-            MarkTransientNetworkUnavailable(retryDelay);
+            var retryDelay = _automationNetworkBackoff.NextRetryDelay();
+            _automationNetworkBackoff.MarkUnavailable(retryDelay);
             if (_botService.MarkQueueItemDeferred(item.Id, retryDelay))
             {
                 AppendLog(

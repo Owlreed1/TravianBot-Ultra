@@ -1,3 +1,4 @@
+using TbotUltra.Desktop.Services.Orchestration;
 using Xunit;
 
 namespace TbotUltra.Desktop.Tests;
@@ -9,7 +10,7 @@ public sealed class ContinuousLoopWaitDelayTests
     {
         var now = new DateTimeOffset(2026, 8, 2, 12, 0, 0, TimeSpan.Zero);
 
-        var result = MainWindow.ResolveContinuousLoopWaitDelay(
+        var result = AutomationDeadlinePolicy.ResolveNextDelay(
             now,
             now.AddSeconds(620),
             null,
@@ -23,7 +24,7 @@ public sealed class ContinuousLoopWaitDelayTests
     {
         var now = new DateTimeOffset(2026, 8, 11, 17, 15, 40, TimeSpan.Zero);
 
-        var result = MainWindow.ResolveContinuousLoopWaitDelay(
+        var result = AutomationDeadlinePolicy.ResolveNextDelay(
             now,
             now.AddMinutes(9).AddSeconds(28),
             now.AddMinutes(2).AddSeconds(40),

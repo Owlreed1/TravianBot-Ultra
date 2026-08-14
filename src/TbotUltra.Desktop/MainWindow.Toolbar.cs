@@ -236,10 +236,13 @@ public partial class MainWindow
         if (saved)
         {
             ResetChangedRestartDelayTasks(optionsBeforeSettings, optionsAfterSettings);
-            if (optionsAfterSettings.ShortVillageDeferSeconds != optionsBeforeSettings.ShortVillageDeferSeconds
-                && IsContinuousLoopRunning())
+            if (AutomationSettingsWakePolicy.ShouldWakeForShortVillageWaitChange(
+                    saved,
+                    optionsBeforeSettings.ShortVillageDeferSeconds,
+                    optionsAfterSettings.ShortVillageDeferSeconds,
+                    IsContinuousLoopRunning()))
             {
-        RequestContinuousAutomationWake();
+                RequestContinuousAutomationWake();
                 AppendLog(
                     $"[pacing] Short village wait changed to {optionsAfterSettings.ShortVillageDeferSeconds}s; "
                     + "continuous loop wake requested.");

@@ -78,6 +78,8 @@ public sealed partial class BotTaskRunner
     private readonly PriorityBrowserWorkCoordinator _priorityBrowserWork = new();
     private readonly BrowserSessionGeneration _sessionGeneration = new();
     private readonly BrowserSessionAdmission _browserSessionAdmission = new();
+
+    public long BrowserGeneration => _sessionGeneration.Capture();
     private BrowserSession? _sharedVisibleSession;
     private IPage? _sharedVisiblePage;
     private IPage? _travcoPage;

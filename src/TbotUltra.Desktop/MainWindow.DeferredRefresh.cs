@@ -630,7 +630,7 @@ public partial class MainWindow
 
     private void ResetConstructionBuildQueueTimerForManualRefresh()
     {
-        _continuousLoopConstructionStatusNeedsSync = true;
+        _automationSessionRuntime.RequestConstructionStatusSync();
         _buildQueueReachedZeroPendingCompletion = _buildQueueActiveCount > 0;
 
         UpdateBuildQueueStatusText();
