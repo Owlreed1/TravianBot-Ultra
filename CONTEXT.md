@@ -116,6 +116,10 @@ _Avoid_: Blocking demolish loop, demolition sleep
 One randomized pass through every known village that reads the enabled live game state, updates the per-village status cache and lets already-enabled automation react before moving to the next village. It leaves the browser on the final naturally visited village; the next round is scheduled separately.
 _Avoid_: Village scan loop, village refresh
 
+**Automation Pass**:
+One between-actions iteration shared by Continuous Loop and Auto Queue. It may execute at most one eligible queued action before the next selection.
+_Avoid_: Loop tick, Auto Queue iteration
+
 **Send Troops**:
 The verified Official Travian flow that opens the Rally Point troop form and prepares troop dispatch for combat or Farm Lists.
 _Avoid_: Manual Farming, Natar farming

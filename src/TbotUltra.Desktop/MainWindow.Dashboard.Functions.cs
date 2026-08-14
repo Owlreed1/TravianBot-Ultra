@@ -60,7 +60,7 @@ public partial class MainWindow
         _villageBatchState.Reset();
         if (IsContinuousLoopRunning() || _autoQueueRunning)
         {
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
         }
 
         RequestQueueUiRefresh(immediate: true);
@@ -91,7 +91,7 @@ public partial class MainWindow
         _villageBatchState.Reset();
         if (IsContinuousLoopRunning() || _autoQueueRunning)
         {
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
         }
 
         _buildQueueActiveCount = 0;

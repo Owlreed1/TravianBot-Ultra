@@ -33,7 +33,7 @@ public partial class MainWindow
         // When the bot is running it owns the browser session, so enqueue the snapshot to run inside the
         // loop (queuing it mid-run is safe). When it's idle/paused the queue isn't draining, so a queued
         // task would never run ("nothing happens") — read the buildings directly instead.
-        var loopRunning = _autoQueueRunning || (_loopTask is not null && !_loopTask.IsCompleted);
+        var loopRunning = _autoQueueRunning || IsContinuousLoopRunning();
         if (loopRunning)
         {
             EnqueueQuickTask("load_buildings_snapshot", "Load buildings snapshot", priority: 100);

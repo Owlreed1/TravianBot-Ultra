@@ -460,6 +460,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
 ## Target architecture
 
 - Smaller domain services for construction, farming, hero, map, messages, and account state.
+- One deep Desktop orchestration module owns Continuous Loop and Auto Queue policy and runtime state;
+  `LoopController` retains lifecycle/cancellation and Worker retains Official Travian browser actions.
 - Pure fixture-tested parsers/calculators independent of Playwright.
 - Thin browser adapters with explicit timeouts, cancellation, and result states.
 - ViewModels exposing commands/state without browser or filesystem details.
@@ -480,6 +482,7 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - [TravianClient seams](adr/2026-06-25-travianclient-seams.md)
 - [Browser session and login](adr/2026-07-18-browser-session-and-login.md)
 - [Bonus video](adr/2026-07-18-bonus-video.md)
+- [Continuous automation orchestration](adr/2026-08-14-continuous-automation-orchestration.md)
 
 ## Arkiverad historik
 

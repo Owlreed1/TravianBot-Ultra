@@ -28,7 +28,7 @@ public partial class MainWindow
         }
 
         AppendLog($"[construction-humanize] {(enabled ? "enabled" : "disabled")}; cleared stale pacing state from {resetCount} pending row(s).");
-        Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
         RefreshQueueUi();
     }
 }

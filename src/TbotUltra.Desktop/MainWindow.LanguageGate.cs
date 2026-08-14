@@ -1,4 +1,5 @@
 using System.Windows;
+using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Worker.Domain;
 using TbotUltra.Worker.Services;
 
@@ -8,8 +9,7 @@ public partial class MainWindow
 {
     private async Task<bool> HandleUnexpectedTravianLanguageAsync(UnexpectedTravianLanguageException ex)
     {
-        _loopController.RequestQueueStop();
-        _loopController.RequestLoopStop();
+        RequestAutomationStop(AutomationStopMode.AfterCurrentAction);
         AppendLog($"[language] Bot paused: {ex.Message}");
         return await ShowTravianLanguageGateAsync(ex.CurrentLanguage);
     }

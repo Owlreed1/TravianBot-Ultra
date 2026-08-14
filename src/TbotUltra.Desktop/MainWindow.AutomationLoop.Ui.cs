@@ -1,4 +1,5 @@
 using System;
+using TbotUltra.Desktop.Services.Orchestration;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -298,7 +299,7 @@ public partial class MainWindow
             return;
         }
 
-        var isRunning = (_loopTask is not null && !_loopTask.IsCompleted) || _autoQueueRunning;
+        var isRunning = IsContinuousLoopRunning() || _autoQueueRunning;
         var hasPausedQueueItems = false;
         string? queueRunningTaskName = null;
         IReadOnlyList<QueueItem> queueItems = [];
@@ -988,8 +989,7 @@ public partial class MainWindow
             && IsContinuousLoopRunning())
         {
             _restartContinuousLoopAfterStop = HasEnabledContinuousLoopGroupsExcept(disabledGroup);
-            _loopController.RequestLoopStop();
-            _loopController.CancelLoop();
+            RequestAutomationStop(AutomationStopMode.CancelCurrentAction);
             AppendLog($"{QueueGroupCatalog.GetTitle(disabledGroup)} group disabled. Stopping current loop task.");
         }
 
@@ -1054,11 +1054,11 @@ public partial class MainWindow
 
         if (automationWillHandle)
         {
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
             if (_autoQueueRunning && !continuousLoopRunning)
             {
                 _startContinuousLoopAfterQueueStop = true;
-                _loopController.RequestQueueStop();
+                RequestAutomationStop(AutomationStopMode.AfterCurrentAction);
                 AppendLog($"{option.Title} group enabled. Queue wait will stop and continuous loop will check it now.");
             }
             else

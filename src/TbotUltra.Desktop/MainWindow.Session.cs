@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using TbotUltra.Desktop.Services.Orchestration;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -621,7 +622,7 @@ public partial class MainWindow
 
         _accountSwitchInProgress = true;
         var resumeContinuousLoop = resumeContinuousLoopOverride
-            ?? (_loopTask is not null && !_loopTask.IsCompleted);
+            ?? IsContinuousLoopRunning();
         var resumeAutoQueue = _autoQueueRunning;
         try
         {
@@ -661,7 +662,7 @@ public partial class MainWindow
             // Restore exactly what was running before the change: the continuous loop if it was running,
             // otherwise the auto-queue if that was. If the bot was paused/idle, both stay off. The idle
             // check keeps a login that another trigger already resumed from being started a second time.
-            var loopIdle = _loopTask is null || _loopTask.IsCompleted;
+            var loopIdle = !IsContinuousLoopRunning();
             if (resumeContinuousLoop && loopIdle)
             {
                 StartContinuousLoopRunner();
@@ -932,11 +933,8 @@ public partial class MainWindow
 
     private async Task StopAllAutomationAndWaitAsync()
     {
-        _loopController.RequestLoopStop();
-        _loopController.RequestQueueStop();
+        RequestAutomationStop(AutomationStopMode.CancelCurrentAction);
         _loopController.CancelOperation();
-        _loopController.CancelAutoQueueRun();
-        _loopController.CancelLoop();
         _loopController.CancelVillageSwitch();
         // Also abort session-scoped refreshes (post-task/manual status reads) that previously ran
         // with CancellationToken.None and could outlive the drain below while holding the session gate.
@@ -948,7 +946,7 @@ public partial class MainWindow
             if (!_uiBusy
                 && !_autoQueueRunning
                 && !_resourceSnapshotRefreshRunning
-                && (_loopTask is null || _loopTask.IsCompleted))
+                && !IsContinuousLoopRunning())
             {
                 break;
             }

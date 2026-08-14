@@ -169,7 +169,6 @@ public partial class MainWindow : Window
     private readonly HashSet<int> _buildingDemolishingSlots = new();
     private static readonly IReadOnlyDictionary<int, (double Left, double Top)> BuildingSlotLayoutById = BuildingsViewModel.CreateBuildingSlotLayout();
 
-    private Task? _loopTask;
     private bool _chromiumEnsured;
     // Browser operations run concurrently; without this the same missing browser would open one dialog
     // per in-flight operation.
@@ -196,6 +195,10 @@ public partial class MainWindow : Window
     private long _operationCounter;
     private long _loopTickCounter;
     private readonly LoopController _loopController;
+    private readonly AutomationDesk _automationDesk;
+    private long _automationBrowserGeneration;
+    private long _autoQueueRunLogId;
+    private long _continuousAutomationTickId;
     private readonly BackgroundTaskTracker _backgroundTasks = new();
     private readonly SessionPacer _sessionPacer = new();
 
@@ -260,7 +263,11 @@ public partial class MainWindow : Window
     private TextBox? _logsPopupStatisticsTextBox;
     private Button? _activeSidebarButton;
     private Guid? _pendingQueueUiSelectId;
-    private volatile bool _autoQueueRunning;
+    // Compatibility projection for callers being migrated away from the former mutable mode flag.
+    private bool _autoQueueRunning =>
+        _automationDesk is not null
+        && _automationDesk.Current.Mode == AutomationRunMode.AutoQueue
+        && _automationDesk.Current.Phase is AutomationPhase.Running or AutomationPhase.Stopping;
     private volatile bool _uiBusy;
     private volatile bool _inboxAutoEnabled;
     private bool _loginInProgress;
@@ -456,6 +463,13 @@ public partial class MainWindow : Window
         var queueScheduler = new PriorityFifoQueueScheduler();
         var queueExecutor = new QueueExecutor(taskRunner);
         _botService = new DesktopBotService(taskRunner, queueStore, queueScheduler, queueExecutor);
+        _automationDesk = new AutomationDesk(
+            _loopController,
+            new DelegateAutomationStatePort(
+                ReadAutomationStateAsync,
+                static (_, _, _, _) => ValueTask.CompletedTask),
+            new DelegateOfficialTravianAutomationPort(ExecuteAutomationActionAsync));
+        _automationDesk.Updated += AutomationDesk_Updated;
         _heroPanelService = new HeroPanelService(new DesktopHeroPanelClient(_botService), _botConfigStore);
         _resourcesPanelService = new ResourcesPanelService(_botConfigStore, _villageSettingsStore);
         _farmingPanelService = new FarmingPanelService(new DesktopFarmingPanelClient(_botService), _botConfigStore);
@@ -1269,7 +1283,7 @@ public partial class MainWindow : Window
             _travianQueueViewModel.SetPrimaryCommandAvailability(!busy && !frozen);
             SetEnabled(ResetProgramButton, !frozen);
             SetEnabled(StorageRefreshButton, defaultEnabled);
-            var automationActive = _autoQueueRunning || (_loopTask is not null && !_loopTask.IsCompleted);
+            var automationActive = _autoQueueRunning || IsContinuousLoopRunning();
             SetEnabled(
                 AccountScanButton,
                 _isLoggedIn
@@ -1285,7 +1299,7 @@ public partial class MainWindow : Window
             if (StartLoopButton is not null)
             {
                 StartLoopButton.IsEnabled = _isLoggedIn && !sleeping && !frozen && !_travianLanguageGateActive;
-                StartLoopButton.Content = (busy || _autoQueueRunning || !string.IsNullOrWhiteSpace(_activeFunctionDisplayName) || (_loopTask is not null && !_loopTask.IsCompleted))
+                StartLoopButton.Content = (busy || _autoQueueRunning || !string.IsNullOrWhiteSpace(_activeFunctionDisplayName) || IsContinuousLoopRunning())
                     ? "Pause bot"
                     : "Start bot";
             }
@@ -1692,39 +1706,27 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task TrackLoopCompletionAsync(Task loopTask)
+    private void CompleteContinuousLoopPresentation()
     {
-        try
+        _ = Dispatcher.BeginInvoke(() =>
         {
-            await loopTask;
-        }
-        finally
-        {
-            _ = Dispatcher.BeginInvoke(() =>
+            StartLoopButton.Content = "Start bot";
+            StartLoopButton.IsEnabled = !IsFreezeActive;
+            SetLoopIndicator(false);
+            NotifySessionPacingAutomationStopped();
+            AppendLog("Loop stopped.");
+            if (!IsFreezeActive
+                && _restartContinuousLoopAfterStop
+                && _isLoggedIn
+                && !IsContinuousLoopRunning())
             {
-                if (!ReferenceEquals(_loopTask, loopTask))
-                {
-                    return;
-                }
-
-                StartLoopButton.Content = "Start bot";
-                StartLoopButton.IsEnabled = !IsFreezeActive;
-                SetLoopIndicator(false);
-                NotifySessionPacingAutomationStopped();
-                AppendLog("Loop stopped.");
-                if (!IsFreezeActive
-                    && _restartContinuousLoopAfterStop
-                    && _isLoggedIn
-                    && !IsContinuousLoopRunning())
-                {
-                    _restartContinuousLoopAfterStop = false;
-                    StartContinuousLoopRunner();
-                    return;
-                }
-
                 _restartContinuousLoopAfterStop = false;
-            });
-        }
+                StartContinuousLoopRunner();
+                return;
+            }
+
+            _restartContinuousLoopAfterStop = false;
+        });
     }
 
     private void HeroViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)

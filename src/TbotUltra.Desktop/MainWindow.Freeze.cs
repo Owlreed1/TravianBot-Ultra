@@ -1,4 +1,5 @@
 using System.Windows;
+using TbotUltra.Desktop.Services.Orchestration;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -49,11 +50,8 @@ public partial class MainWindow
         _resourceSnapshotRefreshTimer.Stop();
         EndInlineWait();
 
-        _loopController.RequestLoopStop();
-        _loopController.RequestQueueStop();
+        RequestAutomationStop(AutomationStopMode.CancelCurrentAction);
         _loopController.CancelOperation();
-        _loopController.CancelAutoQueueRun();
-        _loopController.CancelLoop();
         _loopController.CancelVillageSwitch();
         _loopController.CancelSessionScope();
 

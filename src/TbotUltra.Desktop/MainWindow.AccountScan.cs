@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using TbotUltra.Desktop.Services.Orchestration;
 using System.Windows;
 using System.Windows.Controls;
 using TbotUltra.Core.Configuration;
@@ -204,8 +205,7 @@ public partial class MainWindow
 
         _startContinuousLoopAfterQueueStop = false;
         _restartContinuousLoopAfterStop = false;
-        _loopController.RequestLoopStop();
-        _loopController.RequestQueueStop();
+        RequestAutomationStop(AutomationStopMode.AfterCurrentAction);
         UpdateExecutionStateIndicator();
         AppendLog("[account-scan] Pause requested; waiting for current action to finish.");
 
@@ -213,7 +213,7 @@ public partial class MainWindow
         while (DateTime.UtcNow < gracefulDeadline)
         {
             if (!_autoQueueRunning
-                && (_loopTask is null || _loopTask.IsCompleted)
+                && !IsContinuousLoopRunning()
                 && !_uiBusy)
             {
                 AppendLog("[account-scan] Automation paused.");
@@ -225,14 +225,13 @@ public partial class MainWindow
 
         AppendLog("[account-scan] Graceful pause timed out; canceling current action.");
         _loopController.CancelOperation();
-        _loopController.CancelAutoQueueRun();
-        _loopController.CancelLoop();
+        RequestAutomationStop(AutomationStopMode.CancelCurrentAction);
 
         var cancelDeadline = DateTime.UtcNow.AddSeconds(10);
         while (DateTime.UtcNow < cancelDeadline)
         {
             if (!_autoQueueRunning
-                && (_loopTask is null || _loopTask.IsCompleted)
+                && !IsContinuousLoopRunning()
                 && !_uiBusy)
             {
                 AppendLog("[account-scan] Automation stopped after cancellation.");
@@ -482,7 +481,6 @@ public partial class MainWindow
         if (resumeQueue && !_autoQueueRunning)
         {
             AppendLog("[account-scan] Resuming queue auto-run.");
-            _loopController.ClearQueueStopRequest();
             await TriggerQueueAutoRunAsync();
         }
     }

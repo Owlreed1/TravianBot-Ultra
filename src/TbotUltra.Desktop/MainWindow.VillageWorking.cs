@@ -1425,7 +1425,7 @@ public partial class MainWindow
 
             // Wake the continuous loop if it is idle-waiting so the switch happens as soon as possible
             // (it is still honored only between tasks, never mid-task, to avoid breaking a running action).
-            System.Threading.Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+            RequestContinuousAutomationWake();
             AppendLog($"Switch village: moving the bot to '{selected.Name}' as soon as the current action finishes.");
             RefreshQueueUi();
             return;

@@ -68,13 +68,13 @@ public partial class MainWindow
             return;
         }
 
-        if (_uiBusy && (_loopTask is null || _loopTask.IsCompleted))
+        if (_uiBusy && !IsContinuousLoopRunning())
         {
             RequestImmediatePauseAutomation("Pause requested. Cancelling current task...");
             return;
         }
 
-        if (_loopTask is not null && !_loopTask.IsCompleted)
+        if (IsContinuousLoopRunning())
         {
             RequestImmediatePauseAutomation("Pause requested. Cancelling current task...");
             return;
@@ -144,10 +144,7 @@ public partial class MainWindow
 
     private void RequestImmediatePauseAutomation(string message)
     {
-        _loopController.RequestLoopStop();
-        _loopController.RequestQueueStop();
-        _loopController.CancelLoop();
-        _loopController.CancelAutoQueueRun();
+        RequestAutomationStop(AutomationStopMode.CancelCurrentAction);
         _loopController.CancelOperation();
         _loopController.CancelSessionScope();
 
@@ -242,7 +239,7 @@ public partial class MainWindow
             if (optionsAfterSettings.ShortVillageDeferSeconds != optionsBeforeSettings.ShortVillageDeferSeconds
                 && IsContinuousLoopRunning())
             {
-                Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
                 AppendLog(
                     $"[pacing] Short village wait changed to {optionsAfterSettings.ShortVillageDeferSeconds}s; "
                     + "continuous loop wake requested.");
@@ -348,14 +345,12 @@ public partial class MainWindow
             _resourceSnapshotRefreshTimer.Stop();
             _troopTrainingDeferredRefreshDebounceTimer.Stop();
             _queueUiRefreshTimer.Stop();
-            _loopController.RequestLoopStop();
-            _loopController.RequestQueueStop();
+            RequestAutomationStop(AutomationStopMode.CancelCurrentAction);
             _loopController.CancelOperation();
-            _loopController.CancelAutoQueueRun();
-            _loopController.CancelLoop();
             _loopController.CancelVillageSwitch();
             _loopController.CancelQueueAutoRunRoot();
             _loopController.CancelSessionScope();
+            await _automationDesk.DisposeAsync();
             ClosePopupWindows();
 
             var backgroundTasksStopped = await _backgroundTasks.StopAsync(TimeSpan.FromSeconds(10));
@@ -384,7 +379,6 @@ public partial class MainWindow
             }
 
             _loopController.DisposeOperation();
-            _loopController.DisposeAutoQueueRun();
             _loopController.DisposeVillageSwitch();
         }
         catch (Exception ex)

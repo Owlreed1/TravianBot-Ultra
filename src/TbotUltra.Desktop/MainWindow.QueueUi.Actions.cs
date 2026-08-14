@@ -1,4 +1,5 @@
 using System;
+using TbotUltra.Desktop.Services.Orchestration;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -304,11 +305,8 @@ public partial class MainWindow
             return;
         }
 
-        _loopController.RequestLoopStop();
-        _loopController.RequestQueueStop();
+        RequestAutomationStop(AutomationStopMode.CancelCurrentAction);
         _loopController.CancelOperation();
-        _loopController.CancelAutoQueueRun();
-        _loopController.CancelLoop();
 
         var removed = 0;
         foreach (var item in activeItems)

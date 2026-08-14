@@ -121,7 +121,7 @@ public partial class MainWindow
 
         if (IsContinuousLoopRunning())
         {
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
         }
 
         AppendLog($"Saved Hero resource settings for {window.Results.Count} village(s).");

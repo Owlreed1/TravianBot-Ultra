@@ -143,7 +143,7 @@ public partial class MainWindow
 
         if (IsContinuousLoopRunning())
         {
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
         }
 
         AppendLog($"Saved construct-faster settings for {window.Results.Count} village(s).");

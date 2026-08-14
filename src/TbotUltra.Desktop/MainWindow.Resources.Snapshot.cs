@@ -824,7 +824,7 @@ public partial class MainWindow
             return;
         }
 
-        Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
         AppendLog("Hero attributes: continuous loop wake requested for spend_hero_attribute_points.");
     }
 
@@ -892,7 +892,7 @@ public partial class MainWindow
         AppendLog($"Hero: jitter refresh saw {refreshedStatus.AdventureCount} adventure(s) available — queued hero_manage now.");
         if (IsContinuousLoopRunning())
         {
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
         }
         else
         {
@@ -1328,7 +1328,7 @@ public partial class MainWindow
         UpdateAutomationLoopRunningIndicators();
         if (IsContinuousLoopRunning())
         {
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
         }
         else
         {
@@ -1407,7 +1407,7 @@ public partial class MainWindow
             AppendLog($"Hero: revive finished early (no reviving icon) — released {released} deferred hero_manage item(s) to run now.");
             if (IsContinuousLoopRunning())
             {
-                Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
             }
             else
             {
@@ -1479,7 +1479,7 @@ public partial class MainWindow
             AppendLog($"Hero: home signal detected — released {released} deferred hero_manage item(s) now.");
             if (IsContinuousLoopRunning())
             {
-                Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
             }
             else
             {

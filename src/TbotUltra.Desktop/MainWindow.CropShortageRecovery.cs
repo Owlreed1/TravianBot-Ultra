@@ -26,7 +26,7 @@ public partial class MainWindow
             return;
         }
 
-        Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
         AppendLog($"[crop-shortage] recovery enabled; released {released} deferred Construction item(s).");
         RequestQueueUiRefresh();
     }

@@ -1,4 +1,5 @@
 using System;
+using TbotUltra.Desktop.Services.Orchestration;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -1648,8 +1649,7 @@ public partial class MainWindow
 
         _startContinuousLoopAfterQueueStop = false;
         _restartContinuousLoopAfterStop = false;
-        _loopController.RequestLoopStop();
-        _loopController.RequestQueueStop();
+        RequestAutomationStop(AutomationStopMode.AfterCurrentAction);
         UpdateExecutionStateIndicator();
         AppendLog("[farm-list] pause requested; waiting for the current bot action to finish.");
 
@@ -1674,8 +1674,6 @@ public partial class MainWindow
             return;
         }
 
-        _loopController.ClearLoopStopRequest();
-        _loopController.ClearQueueStopRequest();
         if (_loopController.IsClosing || !_isLoggedIn || IsSessionSleeping || IsFreezeActive)
         {
             AppendLog("[farm-list] automation was not resumed because the session is unavailable.");

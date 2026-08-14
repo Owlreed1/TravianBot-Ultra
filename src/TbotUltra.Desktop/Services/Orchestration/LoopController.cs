@@ -30,6 +30,9 @@ public sealed class LoopController : IDisposable
     private volatile bool _loopStopRequested;
     private volatile bool _queueStopRequested;
 
+    /// <summary>Raised when either automation runner receives a stop request.</summary>
+    public event Action? AutomationStopRequested;
+
     /// <summary>
     /// Optional sink for structured log lines. Defaults to <see cref="Debug.WriteLine(string)"/>
     /// so the controller can be used before MainWindow's logger is wired up.
@@ -83,6 +86,7 @@ public sealed class LoopController : IDisposable
 
         _loopStopRequested = true;
         Logger.Invoke("[loop] Loop stop requested.");
+        AutomationStopRequested?.Invoke();
     }
 
     /// <summary>
@@ -98,6 +102,7 @@ public sealed class LoopController : IDisposable
 
         _queueStopRequested = true;
         Logger.Invoke("[loop] Queue stop requested.");
+        AutomationStopRequested?.Invoke();
     }
 
     /// <summary>
@@ -217,6 +222,13 @@ public sealed class LoopController : IDisposable
 
     /// <summary>Requests cancellation of the continuous loop, if any.</summary>
     public void CancelLoop() => _loopCts?.Cancel();
+
+    /// <summary>Disposes the completed continuous-loop scope. Idempotent.</summary>
+    public void DisposeLoop()
+    {
+        _loopCts?.Dispose();
+        _loopCts = null;
+    }
 
     // --- Village-switch CTS ---
 

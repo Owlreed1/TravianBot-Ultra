@@ -44,8 +44,14 @@ public sealed class ContinuousLoopSchedulingSourceTests
             "TbotUltra.Desktop",
             "MainWindow.ContinuousLoop.cs"));
 
-        Assert.Contains("RecordVillageBatchAttempt(next, $\"LOOP {tickId}\")", source, StringComparison.Ordinal);
-        Assert.Contains("RecordVillageBatchAttempt(next, $\"AUTOQ {runId}\")", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "RecordVillageBatchAttempt(item, $\"LOOP {_continuousAutomationTickId}\")",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "RecordVillageBatchAttempt(item, $\"AUTOQ {_autoQueueRunLogId}\")",
+            source,
+            StringComparison.Ordinal);
         Assert.DoesNotContain("_continuousGroupRotationVillageKeys", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_continuousConstructionRotationVillageKey", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_autoQueueRotationVillageKey", source, StringComparison.Ordinal);
@@ -89,7 +95,7 @@ public sealed class ContinuousLoopSchedulingSourceTests
             source,
             StringComparison.Ordinal);
         Assert.Contains("&& IsContinuousLoopRunning()", source, StringComparison.Ordinal);
-        Assert.Contains("Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);", source, StringComparison.Ordinal);
+        Assert.Contains("RequestContinuousAutomationWake();", source, StringComparison.Ordinal);
     }
 
     [Fact]

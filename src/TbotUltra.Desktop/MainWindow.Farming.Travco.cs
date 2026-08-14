@@ -1,4 +1,5 @@
 using System.Windows;
+using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Worker.Domain;
 
@@ -146,14 +147,13 @@ public partial class MainWindow
             return;
         }
 
-        _loopController.RequestLoopStop();
-        _loopController.RequestQueueStop();
+        RequestAutomationStop(AutomationStopMode.AfterCurrentAction);
         AppendLog("[travco] pause requested; waiting for the current bot action to finish.");
 
         var deadline = DateTime.UtcNow.AddSeconds(30);
         while (DateTime.UtcNow < deadline)
         {
-            if (!_autoQueueRunning && (_loopTask is null || _loopTask.IsCompleted) && !_uiBusy)
+            if (!_autoQueueRunning && !IsContinuousLoopRunning() && !_uiBusy)
             {
                 AppendLog("[travco] bot paused.");
                 return;
@@ -164,8 +164,7 @@ public partial class MainWindow
 
         AppendLog("[travco] graceful pause timed out; canceling the active bot operation.");
         _loopController.CancelOperation();
-        _loopController.CancelAutoQueueRun();
-        _loopController.CancelLoop();
+        RequestAutomationStop(AutomationStopMode.CancelCurrentAction);
     }
 
     private IReadOnlyList<VillageSelectionItem> GetTravcoVillages()
@@ -223,7 +222,6 @@ public partial class MainWindow
         else if (_travcoResumeQueue && !_autoQueueRunning)
         {
             AppendLog("[travco] resuming queue auto-run.");
-            _loopController.ClearQueueStopRequest();
             await TriggerQueueAutoRunAsync();
         }
 

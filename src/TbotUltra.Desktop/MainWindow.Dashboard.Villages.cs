@@ -1,4 +1,5 @@
 using System;
+using TbotUltra.Desktop.Services.Orchestration;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -1087,7 +1088,7 @@ public partial class MainWindow
 
         if (IsContinuousLoopRunning())
         {
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
             AppendLog("Village settings saved. Continuous loop will refresh the queue now.");
         }
     }
@@ -1115,7 +1116,7 @@ public partial class MainWindow
 
     private bool IsExecutionActiveForVillageChange()
     {
-        return _uiBusy || _autoQueueRunning || (_loopTask is not null && !_loopTask.IsCompleted);
+        return _uiBusy || _autoQueueRunning || IsContinuousLoopRunning();
     }
 
     // Switching the viewed village while the bot is running stops the active run, but no longer clears
@@ -1126,17 +1127,14 @@ public partial class MainWindow
         var label = string.IsNullOrWhiteSpace(villageName) ? "-" : villageName;
         AppendLog($"Village changed to '{label}' while bot is running. Stopping active work (queue kept).");
 
-        _loopController.RequestLoopStop();
-        _loopController.RequestQueueStop();
+        RequestAutomationStop(AutomationStopMode.CancelCurrentAction);
         _loopController.CancelOperation();
-        _loopController.CancelAutoQueueRun();
-        _loopController.CancelLoop();
         _loopController.CancelVillageSwitch();
 
         var stopDeadline = DateTime.UtcNow.AddSeconds(8);
         while (DateTime.UtcNow < stopDeadline)
         {
-            if (!_uiBusy && !_autoQueueRunning && (_loopTask is null || _loopTask.IsCompleted))
+            if (!_uiBusy && !_autoQueueRunning && !IsContinuousLoopRunning())
             {
                 break;
             }

@@ -35,7 +35,7 @@ public partial class MainWindow
         RemoveDisabledHeroCropAntiStarveTasks(options);
         if (options.HeroCropAntiStarveEnabled && IsContinuousLoopRunning())
         {
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
         }
     }
 

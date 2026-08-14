@@ -108,7 +108,7 @@ public partial class MainWindow
                 return;
             }
 
-            if (!force && (_uiBusy || _autoQueueRunning || (_loopTask is not null && !_loopTask.IsCompleted)))
+            if (!force && (_uiBusy || _autoQueueRunning || IsContinuousLoopRunning()))
             {
                 return;
             }

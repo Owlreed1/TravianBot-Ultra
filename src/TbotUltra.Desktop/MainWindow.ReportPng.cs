@@ -143,7 +143,7 @@ public partial class MainWindow
     private bool IsReportPngBlockedByRunningWork()
     {
         return _autoQueueRunning
-            || (_loopTask is not null && !_loopTask.IsCompleted)
+            || IsContinuousLoopRunning()
             || _loopController.HasActiveOperation;
     }
 

@@ -352,6 +352,7 @@ public partial class MainWindow
 
     protected override void OnClosed(EventArgs e)
     {
+        _automationDesk.Updated -= AutomationDesk_Updated;
         _botService.FarmLossDestinationChanged -= OnFarmLossDestinationChanged;
         _botService.ActiveVillageVerified -= OnActiveVillageVerified;
         TravianClient.HeroInventoryUpdated -= OnWorkerHeroInventoryUpdated;

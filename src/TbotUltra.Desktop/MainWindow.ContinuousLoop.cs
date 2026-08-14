@@ -9,6 +9,7 @@ using TbotUltra.Core.Tasks;
 using TbotUltra.Core.Travian;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
+using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Worker;
 using TbotUltra.Worker.Domain;
 using TbotUltra.Worker.Services;
@@ -69,7 +70,7 @@ public partial class MainWindow
         if (IsContinuousLoopRunning())
         {
             Interlocked.Exchange(ref _villageStatusSweepForceRequested, 1);
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
             AppendLog("[village-scan] Scan now requested; the active loop will start it at the next safe boundary.");
             return;
         }
@@ -644,55 +645,389 @@ public partial class MainWindow
             return;
         }
 
-        if (_loopTask is not null && !_loopTask.IsCompleted)
+        if (_autoQueueRunning)
+        {
+            _automationDesk.Wake(AutomationWakeReason.QueueChanged);
+            return;
+        }
+
+        if (IsContinuousLoopRunning())
         {
             return;
+        }
+
+        AutomationRunContext context;
+        try
+        {
+            context = CreateAutomationRunContext();
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[automation] Auto Queue start failed: {FormatExceptionForLog(ex)}");
+            return;
+        }
+
+        _villageBatchState.Reset();
+        _autoQueueRunLogId = Interlocked.Increment(ref _operationCounter);
+        LogConservativeAutomationWarnings(AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions()));
+        AppendLog($"[AUTOQ {_autoQueueRunLogId}] START");
+        var result = await _automationDesk.StartAsync(new AutomationStart(AutomationRunMode.AutoQueue, context));
+        if (result is AutomationStartResult.Busy)
+        {
+            AppendLog("[automation] Auto Queue start skipped because another run owns the gate.");
+        }
+    }
+
+    private AutomationRunContext CreateAutomationRunContext()
+    {
+        var accountKey = _accountStore.ActiveAccountName();
+        if (string.IsNullOrWhiteSpace(accountKey))
+        {
+            throw new InvalidOperationException("No active account is selected.");
+        }
+
+        var baseUrl = LoadBotOptions().BaseUrl;
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var officialServerRoot))
+        {
+            throw new InvalidOperationException("The active account has no valid Official Travian server URL.");
+        }
+
+        return new AutomationRunContext(
+            accountKey,
+            officialServerRoot,
+            Interlocked.Increment(ref _automationBrowserGeneration));
+    }
+
+    private ValueTask<AutomationStateSnapshot> ReadAutomationStateAsync(
+        AutomationRunMode mode,
+        AutomationRunContext context,
+        CancellationToken cancellationToken) => mode == AutomationRunMode.ContinuousLoop
+            ? ReadContinuousAutomationStateAsync(context, cancellationToken)
+            : ReadAutoQueueAutomationStateAsync(context, cancellationToken);
+
+    private async ValueTask<AutomationStateSnapshot> ReadContinuousAutomationStateAsync(
+        AutomationRunContext context,
+        CancellationToken cancellationToken)
+    {
+        EnsureCurrentAutomationContext(context);
+        var options = AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions());
+        var tickId = Interlocked.Increment(ref _loopTickCounter);
+        _continuousAutomationTickId = tickId;
+        var tickStopwatch = Stopwatch.StartNew();
+        try
+        {
+            if (TryScheduleAutomaticProxyRecovery(options))
+            {
+                return new AutomationStateSnapshot([], IsComplete: true);
+            }
+
+            var networkBackoffRemaining = GetTransientNetworkUnavailableRemaining();
+            if (networkBackoffRemaining > TimeSpan.Zero)
+            {
+                AppendLog($"[LOOP {tickId}] WAIT {Math.Ceiling(networkBackoffRemaining.TotalSeconds):F0}s");
+                return new AutomationStateSnapshot(
+                    [],
+                    NextWakeAt: DateTimeOffset.UtcNow.Add(networkBackoffRemaining));
+            }
+
+            var immediateWorkRequested = Interlocked.Exchange(ref _continuousLoopWakeRequested, 0) == 1;
+            if (!immediateWorkRequested)
+            {
+                await MaybeTakeIdleBreakAsync(options, cancellationToken);
+                immediateWorkRequested =
+                    Interlocked.Exchange(ref _continuousLoopWakeRequested, 0) == 1;
+            }
+            if (!immediateWorkRequested)
+            {
+                await MaybeDoIdleBrowseAsync(options, cancellationToken);
+            }
+
+            await EnsureChromiumInstalledAsync();
+            await HonorPendingVillageSwitchAsync(options, cancellationToken);
+            var forceVillageStatusSweep =
+                Interlocked.Exchange(ref _villageStatusSweepForceRequested, 0) == 1;
+            await MaybeRunVillageStatusSweepAsync(options, cancellationToken, forceVillageStatusSweep);
+            await EnsureContinuousLoopConstructionStatusAsync(options, cancellationToken);
+            await MaybeAnalyzeNewVillageDuringContinuousLoopAsync(options, cancellationToken);
+            await EnsureContinuousLoopRuntimeItemsAsync(options, cancellationToken);
+            await MaybeCheckInboxDuringContinuousLoopAsync(cancellationToken);
+
+            var next = SelectNextQueueItemForContinuousLoop();
+            if (next is not null)
+            {
+                AppendLog(
+                    $"[LOOP {tickId}] PICK group={next.Group}, task={next.TaskName}, "
+                    + $"retries={next.Retries}/{next.MaxRetries}");
+                _lastLoopIdleHeartbeatUtc = DateTimeOffset.UtcNow;
+                return new AutomationStateSnapshot([ToAutomationCandidate(next)]);
+            }
+
+            await MaybeKeepBrowserFreshDuringContinuousLoopAsync(options, cancellationToken);
+            var waitDelay = ResolveContinuousLoopWaitDelay(options);
+            var totalSeconds = ResolveContinuousLoopWaitSeconds(waitDelay, options, networkBackoff: false);
+            if (DateTimeOffset.UtcNow - _lastLoopIdleHeartbeatUtc >= LoopIdleHeartbeatInterval)
+            {
+                _lastLoopIdleHeartbeatUtc = DateTimeOffset.UtcNow;
+                AppendLog($"[LOOP {tickId}] idle — nothing ready, waiting {totalSeconds}s");
+            }
+            var nextWakeAt = DateTimeOffset.UtcNow.AddSeconds(totalSeconds);
+            if (options.ContinuousKeepAliveEnabled
+                && _nextContinuousKeepAliveAtUtc > DateTimeOffset.UtcNow
+                && _nextContinuousKeepAliveAtUtc < nextWakeAt)
+            {
+                nextWakeAt = _nextContinuousKeepAliveAtUtc;
+            }
+            return new AutomationStateSnapshot(
+                [],
+                NextWakeAt: nextWakeAt);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (AccountAccessException ex)
+        {
+            await HoldAccountAutomationAsync(ex);
+            return new AutomationStateSnapshot([], IsComplete: true);
+        }
+        catch (Exception ex) when (IsTransientConnectionFailure(ex))
+        {
+            var retryDelay = NextTransientNavigationRetryDelay();
+            MarkTransientNetworkUnavailable(retryDelay);
+            if (TryScheduleAutomaticProxyRecovery(options))
+            {
+                return new AutomationStateSnapshot([], IsComplete: true);
+            }
+
+            AppendLog(
+                $"[LOOP {tickId}] TRANSIENT {tickStopwatch.Elapsed.TotalSeconds:F1}s | "
+                + $"network unavailable; retry in {retryDelay.TotalSeconds:F0}s | {FormatExceptionForLog(ex)}");
+            return new AutomationStateSnapshot(
+                [],
+                NextWakeAt: DateTimeOffset.UtcNow.Add(retryDelay));
+        }
+        catch (Exception ex)
+        {
+            AppendLog(
+                $"[LOOP {tickId}] FAIL {tickStopwatch.Elapsed.TotalSeconds:F1}s | "
+                + FormatExceptionForLog(ex));
+            var retrySeconds = ResolveContinuousLoopWaitSeconds(null, options, networkBackoff: false);
+            return new AutomationStateSnapshot(
+                [],
+                NextWakeAt: DateTimeOffset.UtcNow.AddSeconds(retrySeconds));
+        }
+    }
+
+    private async ValueTask<AutomationStateSnapshot> ReadAutoQueueAutomationStateAsync(
+        AutomationRunContext context,
+        CancellationToken cancellationToken)
+    {
+        EnsureCurrentAutomationContext(context);
+        await HonorPendingVillageSwitchAsync(
+            ApplySelectedVillageToOptions(LoadBotOptions()),
+            cancellationToken);
+
+        var selected = SelectNextQueueItemForContinuousLoop();
+        if (selected is not null)
+        {
+            return new AutomationStateSnapshot([ToAutomationCandidate(selected)]);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var eligibleItems = _botService
+            .GetQueueItemsForDisplay()
+            .Where(IsQueueItemAllowedByAutomationSettings)
+            .ToList();
+        var nextDeferredItem = eligibleItems
+            .Where(item => !item.IsRuntimeOnly && item.Status == QueueStatus.Pending)
+            .FirstOrDefault(item => item.NextAttemptAt > now)
+            ?? eligibleItems
+                .Where(item => item.Status == QueueStatus.Pending && item.NextAttemptAt > now)
+                .OrderBy(item => item.NextAttemptAt)
+                .FirstOrDefault();
+
+        if (nextDeferredItem is null)
+        {
+            AppendLog($"[AUTOQ {_autoQueueRunLogId}] DONE (queue empty).");
+            return new AutomationStateSnapshot([], IsComplete: true);
+        }
+
+        AppendLog(
+            $"[AUTOQ {_autoQueueRunLogId}] WAIT "
+            + $"{Math.Max(0, (nextDeferredItem.NextAttemptAt - now).TotalSeconds):F0}s "
+            + $"for deferred task={nextDeferredItem.TaskName}");
+        return new AutomationStateSnapshot([ToAutomationCandidate(nextDeferredItem)]);
+    }
+
+    private ValueTask<AutomationActionOutcome> ExecuteAutomationActionAsync(
+        AutomationRunMode mode,
+        AutomationRunContext context,
+        AutomationCandidate action,
+        CancellationToken cancellationToken) => mode == AutomationRunMode.ContinuousLoop
+            ? ExecuteContinuousAutomationActionAsync(context, action, cancellationToken)
+            : ExecuteAutoQueueAutomationActionAsync(context, action, cancellationToken);
+
+    private async ValueTask<AutomationActionOutcome> ExecuteContinuousAutomationActionAsync(
+        AutomationRunContext context,
+        AutomationCandidate action,
+        CancellationToken cancellationToken)
+    {
+        EnsureCurrentAutomationContext(context);
+        var item = _botService
+            .GetQueueItemsForDisplay()
+            .FirstOrDefault(candidate => candidate.Id == action.Id);
+        if (item is null)
+        {
+            AppendLog($"[LOOP {_continuousAutomationTickId}] SKIP missing queue item id={action.Id}");
+            return AutomationActionOutcome.Skipped;
+        }
+
+        var options = AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions());
+        if (_loopController.LoopStopRequested)
+        {
+            return AutomationActionOutcome.Blocked;
+        }
+
+        await ActionPacer.FromOptions(options, AppendLog).DelayAsync(
+            options.ActionPacingTaskMinSeconds,
+            options.ActionPacingTaskMaxSeconds,
+            cancellationToken,
+            "before task");
+        RecordVillageBatchAttempt(item, $"LOOP {_continuousAutomationTickId}");
+        var shouldContinue = await ExecuteSingleQueueItemAsync(
+            item,
+            options,
+            $"[LOOP {_continuousAutomationTickId}]",
+            QueueExecutionMode.ContinuousLoop,
+            cancellationToken);
+        MarkContinuousBrowserActivity(options);
+        if (!shouldContinue)
+        {
+            return AutomationActionOutcome.Blocked;
+        }
+
+        if (_loopController.LoopStopRequested)
+        {
+            return AutomationActionOutcome.Completed;
+        }
+
+        await ApplyPostTaskCooldownAsync(item, options, cancellationToken);
+        return AutomationActionOutcome.Completed;
+    }
+
+    private async ValueTask<AutomationActionOutcome> ExecuteAutoQueueAutomationActionAsync(
+        AutomationRunContext context,
+        AutomationCandidate action,
+        CancellationToken cancellationToken)
+    {
+        EnsureCurrentAutomationContext(context);
+        var item = _botService
+            .GetQueueItemsForDisplay()
+            .FirstOrDefault(candidate => candidate.Id == action.Id);
+        if (item is null)
+        {
+            AppendLog($"[AUTOQ {_autoQueueRunLogId}] SKIP missing queue item id={action.Id}");
+            return AutomationActionOutcome.Skipped;
+        }
+
+        await EnsureChromiumInstalledAsync();
+        var options = AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions());
+        AppendLog($"[AUTOQ {_autoQueueRunLogId}] RUN task={item.TaskName}, id={item.Id}");
+        RecordVillageBatchAttempt(item, $"AUTOQ {_autoQueueRunLogId}");
+        var shouldContinue = await ExecuteSingleQueueItemAsync(
+            item,
+            options,
+            $"[AUTOQ {_autoQueueRunLogId}]",
+            QueueExecutionMode.AutoQueue,
+            cancellationToken);
+        if (!shouldContinue)
+        {
+            return AutomationActionOutcome.Blocked;
         }
 
         if (_loopController.QueueStopRequested)
         {
+            return AutomationActionOutcome.Completed;
+        }
+
+        await ApplyPostTaskCooldownAsync(item, options, cancellationToken);
+        return AutomationActionOutcome.Completed;
+    }
+
+    private void EnsureCurrentAutomationContext(AutomationRunContext context)
+    {
+        if (!string.Equals(
+                context.AccountKey,
+                _accountStore.ActiveAccountName(),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The active account changed during the automation run.");
+        }
+
+        if (context.BrowserGeneration != Volatile.Read(ref _automationBrowserGeneration))
+        {
+            throw new InvalidOperationException("The browser generation changed during the automation run.");
+        }
+    }
+
+    private static AutomationCandidate ToAutomationCandidate(QueueItem item) => new(
+        item.Id,
+        item.TaskName,
+        item.Group,
+        item.Payload.GetValueOrDefault("villageKey"),
+        item.Priority,
+        item.NextAttemptAt);
+
+    private void AutomationDesk_Updated(object? sender, AutomationUpdate update)
+    {
+        if (update.Event is AutomationEvent.RunStarted)
+        {
+            UpdateExecutionStateIndicatorOnUiThread();
             return;
         }
 
-        var gateLease = await _loopController.TryAcquireQueueAutoRunGateAsync(_loopController.QueueAutoRunRootToken);
-        if (gateLease is null)
+        if (update.Event is not AutomationEvent.RunStopped
+            && update.Event is not AutomationEvent.RunFaulted)
         {
             return;
         }
 
-        var autoQueueTask = Task.Run(async () =>
+        var runMode = update.Event switch
         {
-            var autoToken = _loopController.StartAutoQueueRun();
-            try
-            {
-                _autoQueueRunning = true;
-                UpdateExecutionStateIndicatorOnUiThread();
-                await ExecuteQueuedItemsNowAsync(autoToken);
-            }
-            finally
-            {
-                _autoQueueRunning = false;
-                _loopController.DisposeAutoQueueRun();
-                UpdateExecutionStateIndicatorOnUiThread();
-                gateLease.Dispose();
-                _ = Dispatcher.BeginInvoke(() =>
-                {
-                    if (_startContinuousLoopAfterQueueStop
-                        && _isLoggedIn
-                        && !_uiBusy
-                        && !_autoQueueRunning
-                        && !IsContinuousLoopRunning())
-                    {
-                        _startContinuousLoopAfterQueueStop = false;
-                        StartContinuousLoopRunner();
-                        return;
-                    }
+            AutomationEvent.RunStopped stopped => stopped.RunMode,
+            AutomationEvent.RunFaulted runFaulted => runFaulted.RunMode,
+            _ => (AutomationRunMode?)null,
+        };
+        if (update.Event is AutomationEvent.RunFaulted faultEvent)
+        {
+            AppendLog(
+                $"[automation] Run {faultEvent.RunId.Value} faulted: "
+                + $"kind={faultEvent.Failure.Kind}, code={faultEvent.Failure.DiagnosticCode}.");
+        }
 
-                    _startContinuousLoopAfterQueueStop = false;
-                });
+        if (runMode == AutomationRunMode.ContinuousLoop)
+        {
+            UpdateExecutionStateIndicatorOnUiThread();
+            CompleteContinuousLoopPresentation();
+            return;
+        }
+
+        UpdateExecutionStateIndicatorOnUiThread();
+        _ = Dispatcher.BeginInvoke(() =>
+        {
+            if (_startContinuousLoopAfterQueueStop
+                && _isLoggedIn
+                && !_uiBusy
+                && !_autoQueueRunning
+                && !IsContinuousLoopRunning())
+            {
+                _startContinuousLoopAfterQueueStop = false;
+                StartContinuousLoopRunner();
+                return;
             }
+
+            _startContinuousLoopAfterQueueStop = false;
         });
-        _backgroundTasks.Track(autoQueueTask);
     }
 
     private void TriggerQueueAutoRunFromEnqueue()
@@ -718,8 +1053,20 @@ public partial class MainWindow
             return;
         }
 
-        _loopController.ClearQueueStopRequest();
+
+        if (_autoQueueRunning)
+        {
+            _automationDesk.Wake(AutomationWakeReason.QueueChanged);
+            return;
+        }
+
         _ = TriggerQueueAutoRunAsync();
+    }
+
+    private void RequestContinuousAutomationWake()
+    {
+        Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        _automationDesk.Wake(AutomationWakeReason.QueueChanged);
     }
 
     private bool HasQueueAutoRunEligibleWork()
@@ -2525,154 +2872,6 @@ public partial class MainWindow
             || IsTransientPageReadFailure(ex);
     }
 
-    private async Task RunContinuousLoopAsync(CancellationToken token)
-    {
-        // Start a fresh batch each time the loop starts; the verified browser village seeds it.
-        _villageBatchState.Reset();
-        // Reschedule the first idle "step away" break and idle browse relative to this run's start.
-        _nextIdleBreakDueUtc = DateTimeOffset.MinValue;
-        _nextIdleBrowseDueUtc = DateTimeOffset.MinValue;
-        while (!token.IsCancellationRequested)
-        {
-            if (_loopController.LoopStopRequested)
-            {
-                AppendLog("Loop stop requested. Exiting after current action.");
-                break;
-            }
-
-            var options = AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions());
-            var tickId = Interlocked.Increment(ref _loopTickCounter);
-            var tickSw = Stopwatch.StartNew();
-            try
-            {
-                if (TryScheduleAutomaticProxyRecovery(options))
-                {
-                    break;
-                }
-
-                var networkBackoffRemaining = GetTransientNetworkUnavailableRemaining();
-                if (networkBackoffRemaining > TimeSpan.Zero)
-                {
-                    await WaitForNextContinuousLoopPassAsync(
-                        tickId,
-                        networkBackoffRemaining,
-                        options,
-                        token,
-                        routineIdleWait: false,
-                        networkBackoff: true);
-                    continue;
-                }
-
-                // Occasional human-like "stepped away from the computer" pause. Between tasks only, so it
-                // never interrupts a build/click.
-                var immediateWorkRequested = Interlocked.Exchange(ref _continuousLoopWakeRequested, 0) == 1;
-                if (!immediateWorkRequested)
-                {
-                    await MaybeTakeIdleBreakAsync(options, token);
-                    immediateWorkRequested =
-                        Interlocked.Exchange(ref _continuousLoopWakeRequested, 0) == 1;
-                }
-                // Occasional human-like "look around" — open a non-functional page (map/reports/etc.)
-                // and read nothing. Between tasks only, same as the idle break.
-                if (!immediateWorkRequested)
-                {
-                    await MaybeDoIdleBrowseAsync(options, token);
-                }
-                await EnsureChromiumInstalledAsync();
-                await HonorPendingVillageSwitchAsync(options, token);
-                var forceVillageStatusSweep =
-                    Interlocked.Exchange(ref _villageStatusSweepForceRequested, 0) == 1;
-                await MaybeRunVillageStatusSweepAsync(options, token, forceVillageStatusSweep);
-                await EnsureContinuousLoopConstructionStatusAsync(options, token);
-                await MaybeAnalyzeNewVillageDuringContinuousLoopAsync(options, token);
-                await EnsureContinuousLoopRuntimeItemsAsync(options, token);
-                await MaybeCheckInboxDuringContinuousLoopAsync(token);
-
-                var next = SelectNextQueueItemForContinuousLoop();
-                if (next is not null)
-                {
-                    AppendLog($"[LOOP {tickId}] PICK group={next.Group}, task={next.TaskName}, retries={next.Retries}/{next.MaxRetries}");
-                    // Real activity is its own liveness signal — reset the idle heartbeat so it only fires
-                    // after the loop has genuinely gone quiet.
-                    _lastLoopIdleHeartbeatUtc = DateTimeOffset.UtcNow;
-                    // Pause pressed while picking: exit before sitting out the pre-task pacing delay. The
-                    // item stays pending and runs on resume — nothing is in flight yet, so this is safe and
-                    // makes Pause react immediately instead of waiting out a few seconds of pacing.
-                    if (_loopController.LoopStopRequested)
-                    {
-                        break;
-                    }
-
-                    await ActionPacer.FromOptions(options, AppendLog).DelayAsync(
-                        options.ActionPacingTaskMinSeconds,
-                        options.ActionPacingTaskMaxSeconds,
-                        token,
-                        "before task");
-                    RecordVillageBatchAttempt(next, $"LOOP {tickId}");
-                    var shouldContinue = await ExecuteSingleQueueItemAsync(
-                        next,
-                        options,
-                        $"[LOOP {tickId}]",
-                        QueueExecutionMode.ContinuousLoop,
-                        token);
-                    MarkContinuousBrowserActivity(options);
-                    if (!shouldContinue)
-                    {
-                        break;
-                    }
-
-                    // Pause pressed during the task: skip the post-task cooldown (pure idle pacing, nothing
-                    // in flight) so the loop exits right after the action instead of waiting it out.
-                    if (_loopController.LoopStopRequested)
-                    {
-                        break;
-                    }
-
-                    await ApplyPostTaskCooldownAsync(next, options, token);
-                }
-                else
-                {
-                    var waitDelay = ResolveContinuousLoopWaitDelay(options);
-                    await WaitForNextContinuousLoopPassAsync(tickId, waitDelay, options, token, routineIdleWait: true);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch (AccountAccessException ex)
-            {
-                await HoldAccountAutomationAsync(ex);
-                break;
-            }
-            catch (Exception ex) when (IsTransientConnectionFailure(ex))
-            {
-                var retryDelay = NextTransientNavigationRetryDelay();
-                MarkTransientNetworkUnavailable(retryDelay);
-                if (TryScheduleAutomaticProxyRecovery(options))
-                {
-                    break;
-                }
-
-                AppendLog(
-                    $"[LOOP {tickId}] TRANSIENT {tickSw.Elapsed.TotalSeconds:F1}s | "
-                    + $"network unavailable; retry in {retryDelay.TotalSeconds:F0}s | {FormatExceptionForLog(ex)}");
-                await WaitForNextContinuousLoopPassAsync(
-                    tickId,
-                    retryDelay,
-                    options,
-                    token,
-                    routineIdleWait: false,
-                    networkBackoff: true);
-            }
-            catch (Exception ex)
-            {
-                AppendLog($"[LOOP {tickId}] FAIL {tickSw.Elapsed.TotalSeconds:F1}s | {FormatExceptionForLog(ex)}");
-                await WaitForNextContinuousLoopPassAsync(tickId, null, options, token, routineIdleWait: false);
-            }
-        }
-    }
-
     private TimeSpan? ResolveContinuousLoopWaitDelay(BotOptions options)
     {
         try
@@ -2746,77 +2945,6 @@ public partial class MainWindow
         return delay < TimeSpan.FromSeconds(1)
             ? TimeSpan.FromSeconds(1)
             : delay;
-    }
-
-    private async Task WaitForNextContinuousLoopPassAsync(
-        long tickId,
-        TimeSpan? waitDelay,
-        BotOptions options,
-        CancellationToken token,
-        bool routineIdleWait = false,
-        bool networkBackoff = false)
-    {
-        var totalSeconds = ResolveContinuousLoopWaitSeconds(waitDelay, options, networkBackoff);
-
-        // Routine idle waits are throttled to a single "[LOOP n] idle" heartbeat every couple of minutes
-        // so the loop spine no longer fills the log; the FAIL path (and any non-idle caller) still logs
-        // its wait every time. Logging-only — the wait below is unchanged.
-        if (!routineIdleWait)
-        {
-            AppendLog($"[LOOP {tickId}] WAIT {totalSeconds}s");
-        }
-        else if (DateTimeOffset.UtcNow - _lastLoopIdleHeartbeatUtc >= LoopIdleHeartbeatInterval)
-        {
-            _lastLoopIdleHeartbeatUtc = DateTimeOffset.UtcNow;
-            AppendLog($"[LOOP {tickId}] idle — nothing ready, waiting {totalSeconds}s");
-        }
-
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(totalSeconds);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            token.ThrowIfCancellationRequested();
-            if (_loopController.LoopStopRequested)
-            {
-                AppendLog($"[LOOP {tickId}] WAIT canceled by stop.");
-                return;
-            }
-
-            var wakeRequested = Volatile.Read(ref _continuousLoopWakeRequested) == 1;
-            if (!networkBackoff && wakeRequested)
-            {
-                AppendLog($"[LOOP {tickId}] WAIT ended early: queue state or settings changed.");
-                return;
-            }
-
-            try
-            {
-                if (!networkBackoff && SelectNextQueueItemForContinuousLoop(preview: true) is not null)
-                {
-                    AppendLog($"[LOOP {tickId}] WAIT ended early: queue item ready.");
-                    return;
-                }
-            }
-            catch
-            {
-                // If checking readiness fails, keep the wait responsive and let the next pass log the real error.
-            }
-
-            if (!networkBackoff)
-            {
-                await MaybeKeepBrowserFreshDuringContinuousLoopAsync(options, token);
-            }
-
-            var remaining = deadline - DateTimeOffset.UtcNow;
-            if (remaining <= TimeSpan.Zero)
-            {
-                return;
-            }
-
-            var slice = remaining < TimeSpan.FromSeconds(ContinuousLoopMaxSleepSliceSeconds)
-                ? remaining
-                : TimeSpan.FromSeconds(ContinuousLoopMaxSleepSliceSeconds);
-            await Task.Delay(slice, token);
-        }
     }
 
     private async Task<bool> ResolveContinuousGoldClubStatusAsync(BotOptions options, CancellationToken cancellationToken)
@@ -3094,152 +3222,6 @@ public partial class MainWindow
         {
             _heroViewModel.AdventureStatusText = $"Hero HP too low. Next adventure check in {seconds}s.";
         });
-    }
-
-    private async Task ExecuteQueuedItemsNowAsync(CancellationToken cancellationToken)
-    {
-        var runId = System.Threading.Interlocked.Increment(ref _operationCounter);
-        // Each run starts a fresh batch so it does not resume a stale fairness counter.
-        _villageBatchState.Reset();
-        LogConservativeAutomationWarnings(AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions()));
-        AppendLog($"[AUTOQ {runId}] START");
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            if (_loopController.QueueStopRequested)
-            {
-                AppendLog($"[AUTOQ {runId}] STOPPED (graceful stop requested).");
-                return;
-            }
-
-            if (_loopTask is not null && !_loopTask.IsCompleted)
-            {
-                AppendLog($"[AUTOQ {runId}] STOPPED (loop is running).");
-                return;
-            }
-
-            // Honor a Switch-village request made while the queue is running (between items, safe).
-            await HonorPendingVillageSwitchAsync(ApplySelectedVillageToOptions(LoadBotOptions()), cancellationToken);
-
-            QueueItem? next;
-            try
-            {
-                next = SelectNextQueueItemForContinuousLoop();
-            }
-            catch (Exception ex)
-            {
-                AppendLog($"[AUTOQ {runId}] FAIL selecting queue item: {FormatExceptionForLog(ex)}");
-                return;
-            }
-
-            if (next is null)
-            {
-                var now = DateTimeOffset.UtcNow;
-                var eligibleItems = _botService
-                    .GetQueueItemsForDisplay()
-                    .Where(IsQueueItemAllowedByAutomationSettings)
-                    .ToList();
-
-                var nextDeferredItem = eligibleItems
-                    .Where(item => !item.IsRuntimeOnly && item.Status == QueueStatus.Pending)
-                    .FirstOrDefault(item => item.NextAttemptAt > now);
-
-                if (nextDeferredItem is null)
-                {
-                    nextDeferredItem = eligibleItems
-                        .Where(item => item.Status == QueueStatus.Pending && item.NextAttemptAt > now)
-                        .OrderBy(item => item.NextAttemptAt)
-                        .FirstOrDefault();
-                }
-
-                if (nextDeferredItem is null)
-                {
-                    AppendLog($"[AUTOQ {runId}] DONE (queue empty).");
-                    return;
-                }
-
-                var waitDelay = nextDeferredItem.NextAttemptAt - now;
-                if (waitDelay < TimeSpan.Zero)
-                {
-                    waitDelay = TimeSpan.Zero;
-                }
-
-                AppendLog($"[AUTOQ {runId}] WAIT {waitDelay.TotalSeconds:F0}s for deferred task={nextDeferredItem.TaskName}");
-                var continueAutoQueue = await WaitForNextAutoQueuePassAsync(runId, waitDelay, cancellationToken);
-                if (!continueAutoQueue)
-                {
-                    return;
-                }
-
-                continue;
-            }
-
-            await EnsureChromiumInstalledAsync();
-            var options = AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions());
-            AppendLog($"[AUTOQ {runId}] RUN task={next.TaskName}, id={next.Id}");
-            RecordVillageBatchAttempt(next, $"AUTOQ {runId}");
-            var shouldContinue = await ExecuteSingleQueueItemAsync(
-                next,
-                options,
-                $"[AUTOQ {runId}]",
-                QueueExecutionMode.AutoQueue,
-                cancellationToken);
-            if (!shouldContinue)
-            {
-                return;
-            }
-
-            // Pause pressed during the task: skip the post-task cooldown (pure idle pacing, nothing in
-            // flight) so the queue run stops promptly instead of waiting it out.
-            if (_loopController.QueueStopRequested)
-            {
-                return;
-            }
-
-            await ApplyPostTaskCooldownAsync(next, options, cancellationToken);
-        }
-    }
-
-    private async Task<bool> WaitForNextAutoQueuePassAsync(
-        long runId,
-        TimeSpan waitDelay,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var deadline = DateTimeOffset.UtcNow.Add(waitDelay);
-            while (DateTimeOffset.UtcNow < deadline)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (_loopController.QueueStopRequested)
-                {
-                    AppendLog($"[AUTOQ {runId}] WAIT canceled by stop.");
-                    return false;
-                }
-
-                if (Interlocked.Exchange(ref _continuousLoopWakeRequested, 0) == 1)
-                {
-                    AppendLog($"[AUTOQ {runId}] WAIT ended early: queue state or settings changed.");
-                    return true;
-                }
-
-                var remaining = deadline - DateTimeOffset.UtcNow;
-                if (remaining <= TimeSpan.Zero)
-                {
-                    return true;
-                }
-
-                var slice = remaining < TimeSpan.FromSeconds(ContinuousLoopMaxSleepSliceSeconds)
-                    ? remaining
-                    : TimeSpan.FromSeconds(ContinuousLoopMaxSleepSliceSeconds);
-                await Task.Delay(slice, cancellationToken);
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return false;
-        }
-
-        return true;
     }
 
     private Task ApplyPostTaskCooldownAsync(QueueItem item, BotOptions options, CancellationToken cancellationToken)

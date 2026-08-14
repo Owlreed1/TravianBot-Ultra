@@ -30,7 +30,7 @@ public partial class MainWindow
         }
 
         // Automation must be running, otherwise a pulled-forward item would never execute.
-        var loopRunning = _loopTask is not null && !_loopTask.IsCompleted;
+        var loopRunning = IsContinuousLoopRunning();
         if (!loopRunning && !_autoQueueRunning)
         {
             return;

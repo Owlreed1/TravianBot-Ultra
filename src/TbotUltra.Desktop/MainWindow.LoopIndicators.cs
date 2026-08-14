@@ -71,7 +71,7 @@ public partial class MainWindow
             return;
         }
 
-        var loopRunning = _loopTask is not null && !_loopTask.IsCompleted;
+        var loopRunning = IsContinuousLoopRunning();
         var hasPausedQueueItems = false;
         var hasRunningQueueItems = false;
         var hasFailedQueueItems = false;
@@ -275,7 +275,7 @@ public partial class MainWindow
         {
             _buildQueueReachedZeroPendingCompletion = true;
             _continuousLoopConstructionStatusNeedsSync = true;
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
             AppendLoopPickVerbose(
                 "[construction-queue:verbose] local construction timer reached zero; requesting confirmed Travian status.",
                 "construction-queue:timer-zero");

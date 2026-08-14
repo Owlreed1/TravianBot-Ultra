@@ -1,4 +1,5 @@
 using System.Windows;
+using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Services;
 
@@ -48,10 +49,7 @@ public partial class MainWindow
             }
         }
 
-        _loopController.RequestLoopStop();
-        _loopController.RequestQueueStop();
-        _loopController.CancelAutoQueueRun();
-        _loopController.CancelLoop();
+        RequestAutomationStop(AutomationStopMode.CancelCurrentAction);
         _loopController.CancelVillageSwitch();
         _loopController.CancelSessionScope();
 

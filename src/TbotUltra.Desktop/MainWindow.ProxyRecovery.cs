@@ -1,6 +1,7 @@
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
+using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Worker.Infrastructure;
 
 namespace TbotUltra.Desktop;
@@ -42,17 +43,16 @@ public partial class MainWindow
     {
         try
         {
-            var endingLoop = _loopTask;
-            if (endingLoop is not null && !endingLoop.IsCompleted)
+            using var stopTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            try
             {
-                try
-                {
-                    await endingLoop.WaitAsync(TimeSpan.FromSeconds(10));
-                }
-                catch (TimeoutException)
-                {
-                    AppendLog("[proxy-recovery] loop shutdown wait timed out; continuing with controlled session stop.");
-                }
+                await _automationDesk.StopAsync(
+                    AutomationStopMode.AfterCurrentAction,
+                    stopTimeout.Token);
+            }
+            catch (OperationCanceledException) when (stopTimeout.IsCancellationRequested)
+            {
+                AppendLog("[proxy-recovery] loop shutdown wait timed out; continuing with controlled session stop.");
             }
 
             using var recoveryCts = new CancellationTokenSource(TimeSpan.FromMinutes(2));

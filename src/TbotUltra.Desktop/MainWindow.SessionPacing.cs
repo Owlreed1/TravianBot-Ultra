@@ -219,7 +219,7 @@ public partial class MainWindow
             // Capture the pre-sleep state BEFORE stopping anything, so wake can restore it.
             _sleepSnapshot = new SleepSnapshot(
                 WasLoggedIn: _isLoggedIn,
-                WasContinuousLoopRunning: _loopTask is not null && !_loopTask.IsCompleted,
+                WasContinuousLoopRunning: IsContinuousLoopRunning(),
                 WasQueueAutoRunning: _autoQueueRunning);
             AppendLog($"[pacing] pre-sleep state: loggedIn={_sleepSnapshot.WasLoggedIn}, "
                 + $"continuousLoop={_sleepSnapshot.WasContinuousLoopRunning}, queueAutoRun={_sleepSnapshot.WasQueueAutoRunning}.");
@@ -236,11 +236,8 @@ public partial class MainWindow
             }
 
             AppendLog("[pacing] controlled session stop requested.");
-            _loopController.RequestLoopStop();
-            _loopController.RequestQueueStop();
+            RequestAutomationStop(AutomationStopMode.CancelCurrentAction);
             _loopController.CancelOperation();
-            _loopController.CancelAutoQueueRun();
-            _loopController.CancelLoop();
 
             // Disable background session work BEFORE closing the browser (mirrors ResetForAccountSwitchAsync). While
             // these stay true, the ~20s resource-refresh tick can slip onto the session gate during/after
@@ -290,14 +287,13 @@ public partial class MainWindow
 
     private async Task<bool> RequestGracefulAutomationStopForSleepAsync()
     {
-        _loopController.RequestLoopStop();
-        _loopController.RequestQueueStop();
+        RequestAutomationStop(AutomationStopMode.AfterCurrentAction);
         var deadline = DateTimeOffset.UtcNow + GracefulSleepStopTimeout;
         var announced = false;
         while (DateTimeOffset.UtcNow < deadline)
         {
             if (!_autoQueueRunning
-                && (_loopTask is null || _loopTask.IsCompleted)
+                && !IsContinuousLoopRunning()
                 && !_loopController.HasActiveOperation)
             {
                 return true;
@@ -370,7 +366,7 @@ public partial class MainWindow
                 return;
             }
 
-            var loopIdle = _loopTask is null || _loopTask.IsCompleted;
+            var loopIdle = !IsContinuousLoopRunning();
             switch (SessionWakeDecisions.ResolveResume(_sleepSnapshot, loopIdle, _autoQueueRunning))
             {
                 case WakeResumeAction.ResumeContinuousLoop:
@@ -982,7 +978,7 @@ public partial class MainWindow
         SetEnabled(LoadResourcesButton, !sleeping && !frozen && !_uiBusy);
         SetEnabled(OpenResourceTestFunctionsButton, !sleeping && !frozen && !_uiBusy);
         SetEnabled(StorageRefreshButton, !sleeping && !frozen && !_uiBusy);
-        var automationActive = _autoQueueRunning || (_loopTask is not null && !_loopTask.IsCompleted);
+        var automationActive = _autoQueueRunning || IsContinuousLoopRunning();
         SetEnabled(
             AccountScanButton,
             !sleeping

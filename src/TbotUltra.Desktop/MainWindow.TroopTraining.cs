@@ -1,4 +1,5 @@
 using System;
+using TbotUltra.Desktop.Services.Orchestration;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -302,11 +303,11 @@ public partial class MainWindow
         var continuousLoopRunning = IsContinuousLoopRunning();
         if (continuousLoopRunning || _autoQueueRunning)
         {
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
             if (_autoQueueRunning && !continuousLoopRunning)
             {
                 _startContinuousLoopAfterQueueStop = true;
-                _loopController.RequestQueueStop();
+                RequestAutomationStop(AutomationStopMode.AfterCurrentAction);
                 AppendLog($"Brewery celebration: {reason}. Queue wait will stop and continuous loop will check it now.");
             }
             else

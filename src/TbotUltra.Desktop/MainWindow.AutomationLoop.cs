@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Worker.Domain;
 using TbotUltra.Worker.Services;
 
@@ -47,10 +48,17 @@ public partial class MainWindow
 
     private bool IsContinuousLoopRunning()
     {
-        return _loopTask is not null && !_loopTask.IsCompleted;
+        if (_automationDesk is null)
+        {
+            return false;
+        }
+
+        var snapshot = _automationDesk.Current;
+        return snapshot.Mode == AutomationRunMode.ContinuousLoop
+            && snapshot.Phase is AutomationPhase.Running or AutomationPhase.Stopping;
     }
 
-    private void StartContinuousLoopRunner()
+    private async void StartContinuousLoopRunner()
     {
         if (BlockIfActiveAccountOnHold("Continuous loop"))
         {
@@ -63,10 +71,21 @@ public partial class MainWindow
         }
 
         var initialOptions = LoadBotOptions();
-        _loopController.ClearLoopStopRequest();
-        _loopController.ClearQueueStopRequest();
         _continuousLoopConstructionStatusNeedsSync = true;
-        var token = _loopController.StartLoop("loop");
+        _villageBatchState.Reset();
+        _nextIdleBreakDueUtc = DateTimeOffset.MinValue;
+        _nextIdleBrowseDueUtc = DateTimeOffset.MinValue;
+
+        AutomationRunContext context;
+        try
+        {
+            context = CreateAutomationRunContext();
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[automation] Continuous Loop start failed: {FormatExceptionForLog(ex)}");
+            return;
+        }
 
         StartLoopButton.Content = "Pause bot";
         StartLoopButton.IsEnabled = true;
@@ -75,9 +94,47 @@ public partial class MainWindow
         LogConservativeAutomationWarnings(initialOptions);
         NotifySessionPacingAutomationStarted();
 
-        _loopTask = Task.Run(() => RunContinuousLoopAsync(token), token);
-        _backgroundTasks.Track(_loopTask);
-        _ = TrackLoopCompletionAsync(_loopTask);
+        AutomationStartResult result;
+        try
+        {
+            result = await _automationDesk.StartAsync(new AutomationStart(
+                AutomationRunMode.ContinuousLoop,
+                context));
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[automation] Continuous Loop start failed: {FormatExceptionForLog(ex)}");
+            CompleteContinuousLoopPresentation();
+            return;
+        }
+        if (result is AutomationStartResult.Busy)
+        {
+            AppendLog("[automation] Continuous Loop start skipped because another run is busy.");
+            CompleteContinuousLoopPresentation();
+        }
+    }
+
+    private void RequestAutomationStop(AutomationStopMode mode)
+    {
+        _ = StopAutomationSafelyAsync(mode);
+    }
+
+    private async Task StopAutomationSafelyAsync(
+        AutomationStopMode mode,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _automationDesk.StopAsync(mode, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The caller owns timeout/cancellation reporting.
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[automation] Stop failed: {FormatExceptionForLog(ex)}");
+        }
     }
 
     private IReadOnlyList<QueueItem> GetContinuousLoopRelevantQueueItems()

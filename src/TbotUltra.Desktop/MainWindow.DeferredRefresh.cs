@@ -428,7 +428,7 @@ public partial class MainWindow
             if (released > 0)
             {
                 AppendLog($"[construction-{source}-fill] released {released} construction row(s) for immediate live validation while humanization is disabled.");
-                Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
                 RefreshQueueUi();
             }
             return;
@@ -481,7 +481,7 @@ public partial class MainWindow
         if (prepared > 0)
         {
             AppendLog($"[construction-{source}-fill] prepared {prepared} construction row(s) to fill available slots without construction start delay.");
-            Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
             RefreshQueueUi();
         }
     }
@@ -557,7 +557,7 @@ public partial class MainWindow
         }
 
         AppendLog($"Construction resource waits released ({source}): {released} village head(s) will retry now.");
-        Interlocked.Exchange(ref _continuousLoopWakeRequested, 1);
+        RequestContinuousAutomationWake();
         RefreshQueueUi();
     }
 
