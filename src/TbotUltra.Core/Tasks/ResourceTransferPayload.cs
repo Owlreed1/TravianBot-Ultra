@@ -30,7 +30,7 @@ public sealed record ResourceTransferPayload(
         }
 
         var target = ReadTrimmed(payload, BotOptionPayloadKeys.ResourceTransferTargetVillageName) ?? string.Empty;
-        var sources = ParseNames(ReadTrimmed(payload, BotOptionPayloadKeys.ResourceTransferSourceVillageNames));
+        var sources = VillageNameListPayloadCodec.Parse(ReadTrimmed(payload, BotOptionPayloadKeys.ResourceTransferSourceVillageNames));
         result = new ResourceTransferPayload(enabled, target, sources, threshold, keep, fill, sendWood, sendClay, sendIron, sendCrop);
         return true;
     }
@@ -41,7 +41,7 @@ public sealed record ResourceTransferPayload(
         {
             [BotOptionPayloadKeys.ResourceTransferEnabled] = Enabled ? "true" : "false",
             [BotOptionPayloadKeys.ResourceTransferTargetVillageName] = TargetVillageName.Trim(),
-            [BotOptionPayloadKeys.ResourceTransferSourceVillageNames] = string.Join(",", SourceVillageNames.Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)),
+            [BotOptionPayloadKeys.ResourceTransferSourceVillageNames] = VillageNameListPayloadCodec.Serialize(SourceVillageNames),
             [BotOptionPayloadKeys.ResourceTransferSourceThresholdPercent] = SourceThresholdPercent.ToString(),
             [BotOptionPayloadKeys.ResourceTransferSourceKeepPercent] = SourceKeepPercent.ToString(),
             [BotOptionPayloadKeys.ResourceTransferTargetFillPercent] = TargetFillPercent.ToString(),
@@ -82,12 +82,4 @@ public sealed record ResourceTransferPayload(
             : null;
     }
 
-    private static IReadOnlyList<string> ParseNames(string? raw)
-    {
-        return (raw ?? string.Empty)
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
 }

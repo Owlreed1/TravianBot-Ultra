@@ -58,4 +58,17 @@ public sealed class ResourceTransferPayloadApplierTests
         Assert.Equal(75, result.ResourceTransferSourceThresholdPercent);
         Assert.Equal(new[] { "Existing" }, result.ResourceTransferSourceVillageNames);
     }
+
+    [Fact]
+    public void Apply_ParsesJsonVillageNameContainingComma()
+    {
+        var payload = new Dictionary<string, string>
+        {
+            [BotOptionPayloadKeys.ResourceTransferSourceVillageNames] = "[\"1 for all, all for 1\"]",
+        };
+
+        var result = BotOptionsPayloadApplier.Apply(new BotOptions(), payload);
+
+        Assert.Equal(["1 for all, all for 1"], result.ResourceTransferSourceVillageNames);
+    }
 }

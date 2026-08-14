@@ -55,7 +55,7 @@ internal static class ResourceTransferPayloadApplier
             }
             else if (key.Equals(BotOptionPayloadKeys.ResourceTransferSourceVillageNames, StringComparison.OrdinalIgnoreCase))
             {
-                result = result with { SourceVillageNames = ParseVillageNames(value) };
+                result = result with { SourceVillageNames = VillageNameListPayloadCodec.Parse(value) };
             }
             else if (TryReadInt(key, value, BotOptionPayloadKeys.ResourceTransferSourceThresholdPercent, out var sourceThreshold))
             {
@@ -89,13 +89,6 @@ internal static class ResourceTransferPayloadApplier
 
         return result;
     }
-
-    private static List<string> ParseVillageNames(string value)
-        => value
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(item => !string.IsNullOrWhiteSpace(item))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
 
     private static bool TryReadInt(string key, string value, string expectedKey, out int parsed)
     {

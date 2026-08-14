@@ -168,7 +168,7 @@ public partial class MainWindow
         return _resourceTransferVillages.FirstOrDefault();
     }
 
-    private Dictionary<string, string> BuildResourceTransferPayload()
+    private ResourceTransferPayload BuildResourceTransferPayload()
     {
         var target = ResourceTransferTargetVillageComboBox.SelectedItem as ResourceTransferVillageItem;
         var sourceNames = _resourceTransferVillages
@@ -188,7 +188,7 @@ public partial class MainWindow
             SendWood: ResourceTransferWoodCheckBox.IsChecked == true,
             SendClay: ResourceTransferClayCheckBox.IsChecked == true,
             SendIron: ResourceTransferIronCheckBox.IsChecked == true,
-            SendCrop: ResourceTransferCropCheckBox.IsChecked == true).ToDictionary();
+            SendCrop: ResourceTransferCropCheckBox.IsChecked == true);
     }
 
     private void PersistResourceTransferSettings()
@@ -198,12 +198,11 @@ public partial class MainWindow
             return;
         }
 
-        var payload = BuildResourceTransferPayload();
+        var settings = BuildResourceTransferPayload();
         var config = _botConfigStore.Load();
-        config[BotOptionPayloadKeys.ResourceTransferTargetVillageName] = payload[BotOptionPayloadKeys.ResourceTransferTargetVillageName];
+        config[BotOptionPayloadKeys.ResourceTransferTargetVillageName] = settings.TargetVillageName;
         config[BotOptionPayloadKeys.ResourceTransferSourceVillageNames] = new JsonArray(
-            payload[BotOptionPayloadKeys.ResourceTransferSourceVillageNames]
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            settings.SourceVillageNames
                 .Select(name => JsonValue.Create(name)!)
                 .ToArray());
         config[BotOptionPayloadKeys.ResourceTransferSourceThresholdPercent] = ReadComboPercent(ResourceTransferSourceThresholdComboBox, 50);
@@ -314,7 +313,7 @@ public partial class MainWindow
             return;
         }
 
-        var payload = BuildResourceTransferPayload();
+        var payload = BuildResourceTransferPayload().ToDictionary();
         _botService.Enqueue("send_resources_between_villages", payload, priority: 5, maxRetries: 0);
         RefreshQueueUi();
         TriggerQueueAutoRunFromEnqueue();
