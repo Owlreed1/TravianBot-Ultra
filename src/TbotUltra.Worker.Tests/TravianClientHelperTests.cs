@@ -986,6 +986,7 @@ public sealed class TravianClientHelperTests
     [InlineData("BlockedByResources", "BlockedByResources")]
     [InlineData("BlockedByQueue", "BlockedByQueue")]
     [InlineData("BlockedByMaxLevel", "BlockedByMaxLevel")]
+    [InlineData("BlockedByCropShortage", "BlockedByCropShortage")]
     [InlineData("  CanUpgrade  ", "CanUpgrade")]
     [InlineData("Unknown", "BlockedUnknown")]
     [InlineData(null, "BlockedUnknown")]

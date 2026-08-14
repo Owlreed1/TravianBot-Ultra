@@ -85,6 +85,26 @@ public sealed class TravianOfficialConstructionDomTests
     }
 
     [Fact]
+    public void OfficialConstructDom_DetectsScopedCropShortageBlock()
+    {
+        const string html = """
+            <div id="contract_building23" class="buildingWrapper">
+              <div class="upgradeBuilding"><div id="contract" class="contractWrapper">
+                <div class="upgradeBlocked">
+                  <div class="errorMessage"><span class="none">Lack of food: extend cropland first!</span></div>
+                </div>
+              </div></div>
+            </div>
+            """;
+
+        Assert.True(BuildingDomParser.HasCropShortageBlockFromHtmlForTests(html));
+        Assert.False(BuildingDomParser.HasCropShortageBlockFromHtmlForTests(
+            "<div class='errorMessage'>Lack of food: extend cropland first!</div>"));
+        Assert.False(BuildingDomParser.HasCropShortageBlockFromHtmlForTests(
+            "<div class='upgradeBlocked'><div class='errorMessage'>Extend granary first</div></div>"));
+    }
+
+    [Fact]
     public void OfficialDorf2Dom_ParsesOfficialDataAttributes()
     {
         var html = ReadDomFixture("TS50_Village - Buildings.txt");

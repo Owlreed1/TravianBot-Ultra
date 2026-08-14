@@ -25,6 +25,7 @@ public enum ConstructionDeferReason
     Resources,
     Requirements,
     StorageCapacity,
+    CropShortage,
     Humanize,
     Retry,
 }
@@ -94,6 +95,12 @@ public static class ConstructionQueueState
                 || message.Contains("resource wait", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("wait_reason=", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("upgrade_required_", StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static bool IsCropShortageDeferMessage(string? message)
+    {
+        return !string.IsNullOrWhiteSpace(message)
+            && message.Contains("wait_reason=crop_shortage", StringComparison.OrdinalIgnoreCase);
     }
 
     // The worker's humanize gate deferred this start (slot free, only waiting out the human pause).
@@ -278,6 +285,11 @@ public static class ConstructionQueueState
         if (string.Equals(reason, BotOptionPayloadKeys.UpgradeDeferReasonStorageCapacity, StringComparison.OrdinalIgnoreCase))
         {
             return ConstructionDeferReason.StorageCapacity;
+        }
+
+        if (string.Equals(reason, BotOptionPayloadKeys.UpgradeDeferReasonCropShortage, StringComparison.OrdinalIgnoreCase))
+        {
+            return ConstructionDeferReason.CropShortage;
         }
 
         if (string.Equals(reason, BotOptionPayloadKeys.UpgradeDeferReasonHumanize, StringComparison.OrdinalIgnoreCase))

@@ -112,6 +112,14 @@ public static class AccountStoragePaths
         return Path.Combine(AccountDirectory(projectRoot, accountName), "town_hall.json");
     }
 
+    public static string HeroCropAntiStarveSettingsPath(string projectRoot, string accountName, string? serverUrl = null)
+    {
+        return Path.Combine(
+            AccountDirectory(projectRoot, accountName),
+            "hero_crop_anti_starve",
+            $"{NormalizeServerKey(serverUrl)}.json");
+    }
+
     public static string TownHallCelebrationStatePath(string projectRoot, string accountName)
     {
         return Path.Combine(AccountDirectory(projectRoot, accountName), "town_hall_state.json");

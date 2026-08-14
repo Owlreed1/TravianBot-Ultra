@@ -20,6 +20,7 @@ public sealed partial class BotTaskRunner
         if (result.Contains("hero_reviving", StringComparison.OrdinalIgnoreCase)) return TaskWaitReasons.HeroReviving;
         if (result.Contains("Hero is away", StringComparison.OrdinalIgnoreCase)) return TaskWaitReasons.HeroAway;
         if (result.Contains("adventure_skipped_hp_too_low", StringComparison.OrdinalIgnoreCase) || result.Contains("Hero HP too low", StringComparison.OrdinalIgnoreCase)) return TaskWaitReasons.HeroHpTooLow;
+        if (result.Contains("wait_reason=crop_shortage", StringComparison.OrdinalIgnoreCase)) return TaskWaitReasons.CropShortage;
         return result.Contains("queued", StringComparison.OrdinalIgnoreCase) ? TaskWaitReasons.WorkQueued : null;
     }
 

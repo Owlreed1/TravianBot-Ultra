@@ -171,7 +171,8 @@ public sealed record ResourceStorageForecast(
     long? Capacity,
     double? PercentOfCapacity,
     double? ProductionPerHour,
-    int? SecondsToFull);
+    int? SecondsToFull,
+    int? SecondsToEmpty = null);
 
 public sealed record HeroStatus(
     bool Exists = false,

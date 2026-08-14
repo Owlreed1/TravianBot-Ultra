@@ -55,6 +55,11 @@ public sealed class SettingsWindowTests : IDisposable
             Assert.True(window.SettingsVm.Hero.SmithyUpgradeRestartDelay.IsEnabled);
             Assert.Equal("10", window.SettingsVm.Hero.SmithyUpgradeRestartDelay.DelayMinMinutes);
             Assert.Equal("30", window.SettingsVm.Hero.SmithyUpgradeRestartDelay.DelayMaxMinutes);
+            Assert.False(window.SettingsVm.Hero.CropAntiStarveEnabled);
+            Assert.Equal("30", window.SettingsVm.Hero.CropAntiStarveTriggerMinutes);
+            Assert.Equal("90", window.SettingsVm.Hero.CropAntiStarveTargetMinutes);
+            Assert.Equal("10000", window.SettingsVm.Hero.CropAntiStarveMaxCropPerTransfer);
+            Assert.Equal("5000", window.SettingsVm.Hero.CropAntiStarveMinHeroCropRemaining);
             Assert.Equal("100", Assert.IsType<TextBox>(window.FindName("GoldLimitTextBox")).Text);
             Assert.Equal("20", Assert.IsType<TextBox>(window.FindName("DailyGoldSpendingLimitTextBox")).Text);
             Assert.Equal("100", Assert.IsType<TextBox>(window.FindName("SilverLimitTextBox")).Text);

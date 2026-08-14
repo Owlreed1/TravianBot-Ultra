@@ -19,4 +19,16 @@ public sealed partial class BotTaskRunner
             .SpendAttributePointsAsync(context.Options.HeroStatPriority, context.CancellationToken);
         context.Log(result);
     }
+
+    private static async Task ExecuteAntiStarveHeroCropAsync(TaskExecutionContext context)
+    {
+        var result = await context.Client.RunHeroCropAntiStarveAsync(
+            context.Options.HeroCropAntiStarveTriggerMinutes,
+            context.Options.HeroCropAntiStarveTargetMinutes,
+            context.Options.HeroCropAntiStarveMaxCropPerTransfer,
+            context.Options.HeroCropAntiStarveMinHeroCropRemaining,
+            context.CancellationToken);
+        context.Log(result);
+        ThrowIfTaskBlocked("anti_starve_hero_crop", result);
+    }
 }

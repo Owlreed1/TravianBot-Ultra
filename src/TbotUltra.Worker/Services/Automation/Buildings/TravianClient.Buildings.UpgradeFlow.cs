@@ -162,6 +162,11 @@ public sealed partial class TravianClient : IBuildingClient
                     null,
                     string.Empty);
 
+                if (actionability.Outcome == UpgradeAttemptOutcome.BlockedByCropShortage)
+                {
+                    return BuildCropShortageBlockedResult(slotId, buildingName);
+                }
+
                 // The current build page already has the exact resource block and hero-transfer control.
                 // Use it before any dorf2 queue probe so a normal top-up does not navigate away and back.
                 if (pageAnalysis.LooksBlockedByResources)
@@ -1042,6 +1047,11 @@ public sealed partial class TravianClient : IBuildingClient
                     null,
                     null,
                     string.Empty);
+
+                if (actionability.Outcome == UpgradeAttemptOutcome.BlockedByCropShortage)
+                {
+                    return BuildCropShortageBlockedResult(slotId, buildingName);
+                }
 
                 // The current build page already has the exact resource block and hero-transfer control.
                 // Use it before any dorf2 queue probe so a normal top-up does not navigate away and back.

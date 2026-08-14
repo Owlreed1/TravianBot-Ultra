@@ -806,7 +806,10 @@ public partial class MainWindow
         // considered/union set), not just the selected one — otherwise Hero never runs while a village that
         // has it OFF is selected even though the hero-home village has it ON.
         var heroPollingEnabled = consideredGroups.Contains(QueueGroup.Hero) || ShouldKeepHeroAdventurePolling();
-        if (consideredGroups.Count <= 0 && !heroPollingEnabled && onlyVillage is null)
+        if (consideredGroups.Count <= 0
+            && !heroPollingEnabled
+            && !options.HeroCropAntiStarveEnabled
+            && onlyVillage is null)
         {
             return;
         }
@@ -838,6 +841,69 @@ public partial class MainWindow
             : _villageSettingsStore.IsEnabledByKey(GetVillageKey(onlyVillage), defaultIfUnknown: false)
                 ? [onlyVillage]
                 : [];
+
+        if (options.HeroCropAntiStarveEnabled)
+        {
+            var antiStarveAccount = _accountStore.ActiveAccountName();
+            var antiStarveVillages = onlyVillage is null ? GetAllKnownVillages() : [onlyVillage];
+            foreach (var village in antiStarveVillages)
+            {
+                var villageKey = GetVillageKey(village);
+                var antiStarvePriority = 100;
+                if (_villageStatusCache.TryGetByKey(villageKey, out var antiStarveStatus))
+                {
+                    var eta = antiStarveStatus.ResourceStorageForecasts?
+                        .FirstOrDefault(forecast => string.Equals(forecast.ResourceKey, "crop", StringComparison.OrdinalIgnoreCase))?
+                        .SecondsToEmpty;
+                    if (eta is int secondsToEmpty)
+                    {
+                        antiStarvePriority += Math.Clamp(
+                            options.HeroCropAntiStarveTriggerMinutes * 60 - secondsToEmpty,
+                            0,
+                            100_000);
+                    }
+                }
+
+                if (!HeroCropAntiStarveSettingsStore.IsEnabled(
+                        _projectRoot,
+                        antiStarveAccount,
+                        options.BaseUrl,
+                        villageKey,
+                        defaultIfMissing: true))
+                {
+                    continue;
+                }
+
+                var canonicalVillageKey = _villageSettingsStore.ResolveCanonicalKey(villageKey) ?? villageKey;
+                var existingAntiStarve = activeItems.FirstOrDefault(item =>
+                    string.Equals(item.TaskName, "anti_starve_hero_crop", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(GetQueueItemVillageKey(item), canonicalVillageKey, StringComparison.OrdinalIgnoreCase));
+                if (existingAntiStarve is not null)
+                {
+                    if (existingAntiStarve.Status == QueueStatus.Pending
+                        && existingAntiStarve.Priority != antiStarvePriority)
+                    {
+                        _botService.UpdatePendingQueueItem(
+                            existingAntiStarve.Id,
+                            payload: null,
+                            priority: antiStarvePriority);
+                    }
+                    continue;
+                }
+
+                _botService.EnqueueRuntime(
+                    "anti_starve_hero_crop",
+                    "Anti-starve hero crop",
+                    BuildVillageRuntimePayload(village),
+                    priority: antiStarvePriority,
+                    maxRetries: 0);
+                AppendLog($"[anti-starve] monitoring enabled for village='{village.Name}'.");
+            }
+        }
+        else
+        {
+            RemoveDisabledHeroCropAntiStarveTasks(options);
+        }
 
         if (onlyVillage is null && heroPollingEnabled && !HasActiveTask("hero_manage"))
         {
@@ -2037,6 +2103,23 @@ public partial class MainWindow
         }
 
         return selection.Item;
+    }
+
+    private List<VillageSelectionItem> GetAllKnownVillages()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            return Dispatcher.Invoke(GetAllKnownVillages);
+        }
+
+        var source = (DashboardVillageList.ItemsSource as IEnumerable<VillageSelectionItem>)
+            ?? (VillageComboBox.ItemsSource as IEnumerable<VillageSelectionItem>)
+            ?? Enumerable.Empty<VillageSelectionItem>();
+        return source
+            .Where(v => !string.IsNullOrWhiteSpace(v.Name) && !string.Equals(v.Name, "-", StringComparison.Ordinal))
+            .GroupBy(GetVillageKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
     }
 
     private bool TryPrepareConstructionStartDelay(

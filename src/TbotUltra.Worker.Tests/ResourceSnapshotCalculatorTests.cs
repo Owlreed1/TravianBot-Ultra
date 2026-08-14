@@ -92,6 +92,19 @@ public sealed class ResourceSnapshotCalculatorTests
         Assert.Equal(3_600, crop.SecondsToFull);
     }
 
+    [Fact]
+    public void BuildStorageForecasts_ComputesCropTimeToEmptyForNegativeProduction()
+    {
+        var resources = new Dictionary<string, string> { ["crop"] = "6000" };
+        var production = new Dictionary<string, double?> { ["crop"] = -12_000 };
+
+        var result = ResourceSnapshotCalculator.BuildStorageForecasts(resources, 10_000, 20_000, production);
+
+        var crop = Assert.Single(result, item => item.ResourceKey == "crop");
+        Assert.Equal(1_800, crop.SecondsToEmpty);
+        Assert.Null(crop.SecondsToFull);
+    }
+
     [Theory]
     [InlineData(null, 0)]
     [InlineData(0, 0)]

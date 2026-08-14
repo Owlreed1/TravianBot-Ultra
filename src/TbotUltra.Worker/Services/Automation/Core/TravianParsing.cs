@@ -109,6 +109,7 @@ internal static class TravianParsing
             "BlockedByResources" => TravianClient.UpgradeAttemptOutcome.BlockedByResources,
             "BlockedByQueue" => TravianClient.UpgradeAttemptOutcome.BlockedByQueue,
             "BlockedByMaxLevel" => TravianClient.UpgradeAttemptOutcome.BlockedByMaxLevel,
+            "BlockedByCropShortage" => TravianClient.UpgradeAttemptOutcome.BlockedByCropShortage,
             _ => TravianClient.UpgradeAttemptOutcome.BlockedUnknown,
         };
     }

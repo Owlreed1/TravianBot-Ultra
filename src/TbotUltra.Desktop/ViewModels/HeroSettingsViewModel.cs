@@ -1,6 +1,7 @@
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Common;
 using TbotUltra.Desktop.Models;
+using System.Collections.ObjectModel;
 
 namespace TbotUltra.Desktop.ViewModels;
 
@@ -8,6 +9,18 @@ namespace TbotUltra.Desktop.ViewModels;
 public sealed class HeroSettingsViewModel : BaseViewModel
 {
     private int _hpRegenPerDayPercent = 40;
+    private bool _cropAntiStarveEnabled = HeroCropAntiStarveDefaults.Enabled;
+    private string _cropAntiStarveTriggerMinutes = HeroCropAntiStarveDefaults.TriggerMinutes.ToString();
+    private string _cropAntiStarveTargetMinutes = HeroCropAntiStarveDefaults.TargetMinutes.ToString();
+    private string _cropAntiStarveMaxCropPerTransfer = HeroCropAntiStarveDefaults.MaxCropPerTransfer.ToString();
+    private string _cropAntiStarveMinHeroCropRemaining = HeroCropAntiStarveDefaults.MinHeroCropRemaining.ToString();
+
+    public ObservableCollection<HeroCropAntiStarveVillageRow> CropAntiStarveVillages { get; } = [];
+    public bool CropAntiStarveEnabled { get => _cropAntiStarveEnabled; set => SetProperty(ref _cropAntiStarveEnabled, value); }
+    public string CropAntiStarveTriggerMinutes { get => _cropAntiStarveTriggerMinutes; set => SetProperty(ref _cropAntiStarveTriggerMinutes, value); }
+    public string CropAntiStarveTargetMinutes { get => _cropAntiStarveTargetMinutes; set => SetProperty(ref _cropAntiStarveTargetMinutes, value); }
+    public string CropAntiStarveMaxCropPerTransfer { get => _cropAntiStarveMaxCropPerTransfer; set => SetProperty(ref _cropAntiStarveMaxCropPerTransfer, value); }
+    public string CropAntiStarveMinHeroCropRemaining { get => _cropAntiStarveMinHeroCropRemaining; set => SetProperty(ref _cropAntiStarveMinHeroCropRemaining, value); }
     public RestartDelaySettings AdventureRestartDelay { get; } = new(
         HeroAdventureRestartDelayDefaults.Enabled,
         HeroAdventureRestartDelayDefaults.MinMinutes,

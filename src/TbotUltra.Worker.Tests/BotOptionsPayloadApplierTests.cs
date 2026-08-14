@@ -7,6 +7,19 @@ namespace TbotUltra.Worker.Tests;
 public sealed class BotOptionsPayloadApplierTests
 {
     [Fact]
+    public void CropShortageRecovery_DefaultsTrueAndCanBeDisabled()
+    {
+        var defaults = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        var disabled = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [BotOptionPayloadKeys.ConstructionCropShortageRecoveryEnabled] = "false",
+        }).Build();
+
+        Assert.True(BotOptionsFactory.FromConfiguration(defaults).ConstructionCropShortageRecoveryEnabled);
+        Assert.False(BotOptionsFactory.FromConfiguration(disabled).ConstructionCropShortageRecoveryEnabled);
+    }
+
+    [Fact]
     public void Apply_PreservesStableVillageKeyForRenamedVillage()
     {
         var result = BotOptionsPayloadApplier.Apply(new BotOptions(), new Dictionary<string, string>

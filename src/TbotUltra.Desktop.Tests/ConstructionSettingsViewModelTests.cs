@@ -7,6 +7,15 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class ConstructionSettingsViewModelTests
 {
     [Fact]
+    public void CropShortageRecovery_IsEnabledByDefault()
+    {
+        var vm = new ConstructionSettingsViewModel();
+
+        Assert.True(vm.CropShortageRecoveryEnabled);
+        Assert.True(ConstructionDefaults.CropShortageRecoveryEnabled);
+    }
+
+    [Fact]
     public void StorageUpgradeLevelsAhead_NormalizesToConfiguredRange()
     {
         var vm = new ConstructionSettingsViewModel

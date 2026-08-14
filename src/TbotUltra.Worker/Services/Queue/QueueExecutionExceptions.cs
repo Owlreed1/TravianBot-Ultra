@@ -44,6 +44,9 @@ public static class TaskWaitReasons
 
     /// <summary>hero_manage deferred because the hero's HP is below the adventure threshold.</summary>
     public const string HeroHpTooLow = "hero_hp_too_low";
+
+    /// <summary>Construction is blocked until cropland production is recovered.</summary>
+    public const string CropShortage = "crop_shortage";
 }
 
 /// <summary>

@@ -229,6 +229,9 @@ public static class BotOptionsFactory
             ConstructionHumanizeDelayEnabled = configuration.GetValue(BotOptionPayloadKeys.ConstructionHumanizeDelayEnabled, PacingDefaults.ConstructionHumanizeDelayEnabled),
             ConstructionStorageUpgradeLevelsAhead = ConstructionDefaults.NormalizeStorageUpgradeLevelsAhead(
                 configuration.GetValue(BotOptionPayloadKeys.ConstructionStorageUpgradeLevelsAhead, ConstructionDefaults.StorageUpgradeLevelsAhead)),
+            ConstructionCropShortageRecoveryEnabled = configuration.GetValue(
+                BotOptionPayloadKeys.ConstructionCropShortageRecoveryEnabled,
+                ConstructionDefaults.CropShortageRecoveryEnabled),
             ConstructionHumanizeStateVersion = configuration.GetValue(BotOptionPayloadKeys.ConstructionHumanizeStateVersion, 0),
             ConstructionHumanizeQueuePercentMin = configuration.GetValue(BotOptionPayloadKeys.ConstructionHumanizeQueuePercentMin, PacingDefaults.ConstructionHumanizeQueuePercentMin),
             ConstructionHumanizeQueuePercentMax = configuration.GetValue(BotOptionPayloadKeys.ConstructionHumanizeQueuePercentMax, PacingDefaults.ConstructionHumanizeQueuePercentMax),
@@ -293,6 +296,11 @@ public static class BotOptionsFactory
             HeroResourceUseSmithy = configuration.GetValue(BotOptionPayloadKeys.HeroResourceUseSmithy, false),
             HeroResourceUseBrewery = configuration.GetValue(BotOptionPayloadKeys.HeroResourceUseBrewery, false),
             HeroResourceUseTownHall = configuration.GetValue(BotOptionPayloadKeys.HeroResourceUseTownHall, false),
+            HeroCropAntiStarveEnabled = configuration.GetValue(BotOptionPayloadKeys.HeroCropAntiStarveEnabled, HeroCropAntiStarveDefaults.Enabled),
+            HeroCropAntiStarveTriggerMinutes = configuration.GetValue(BotOptionPayloadKeys.HeroCropAntiStarveTriggerMinutes, HeroCropAntiStarveDefaults.TriggerMinutes),
+            HeroCropAntiStarveTargetMinutes = configuration.GetValue(BotOptionPayloadKeys.HeroCropAntiStarveTargetMinutes, HeroCropAntiStarveDefaults.TargetMinutes),
+            HeroCropAntiStarveMaxCropPerTransfer = configuration.GetValue(BotOptionPayloadKeys.HeroCropAntiStarveMaxCropPerTransfer, HeroCropAntiStarveDefaults.MaxCropPerTransfer),
+            HeroCropAntiStarveMinHeroCropRemaining = configuration.GetValue(BotOptionPayloadKeys.HeroCropAntiStarveMinHeroCropRemaining, HeroCropAntiStarveDefaults.MinHeroCropRemaining),
             UpgradeSelectorProfile = configuration[BotOptionPayloadKeys.UpgradeSelectorProfile] ?? "auto",
         };
     }

@@ -898,6 +898,10 @@ public partial class MainWindow
             {
                 await RefreshCurrentPageStorageStatusAsync(options, "construction_success", cancellationToken);
             }
+            if (item.Payload.ContainsKey(BotOptionPayloadKeys.CropShortageRecoveryParentId))
+            {
+                await HandleCropShortageRecoveryStepSucceededAsync(item);
+            }
         }
         else if (string.Equals(item.TaskName, "hero_manage", StringComparison.OrdinalIgnoreCase)
                  || string.Equals(item.TaskName, "spend_hero_attribute_points", StringComparison.OrdinalIgnoreCase))
@@ -1202,9 +1206,11 @@ public partial class MainWindow
                             ? BotOptionPayloadKeys.UpgradeDeferReasonQueueFull
                             : ConstructionQueueState.IsConstructionInProgressDeferMessage(ex.Message)
                                 ? BotOptionPayloadKeys.UpgradeDeferReasonInProgress
-                                : ConstructionQueueState.IsConstructionStorageCapacityDeferMessage(ex.Message)
+                            : ConstructionQueueState.IsConstructionStorageCapacityDeferMessage(ex.Message)
                                     ? BotOptionPayloadKeys.UpgradeDeferReasonStorageCapacity
-                                    : ConstructionQueueState.IsConstructionRequirementDeferMessage(ex.Message)
+                                : ConstructionQueueState.IsCropShortageDeferMessage(ex.Message)
+                                    ? BotOptionPayloadKeys.UpgradeDeferReasonCropShortage
+                                : ConstructionQueueState.IsConstructionRequirementDeferMessage(ex.Message)
                                         ? BotOptionPayloadKeys.UpgradeDeferReasonRequirements
                                         : ConstructionQueueState.IsConstructionResourceDeferMessage(ex.Message)
                                             ? BotOptionPayloadKeys.UpgradeDeferReasonResources
@@ -1356,6 +1362,13 @@ public partial class MainWindow
 
                 await RefreshFarmListsUiAfterAutoSendIfNeededAsync(item, ex.Message);
                 AppendLog($"{logPrefix} DEFER {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | next try in {queueWaitDelay.TotalSeconds:F0}s{constructionSuffix}");
+                if (string.Equals(item.TaskName, "anti_starve_hero_crop", StringComparison.OrdinalIgnoreCase)
+                    && ex.Message.Contains("anti_starve_alarm=true", StringComparison.OrdinalIgnoreCase))
+                {
+                    AppendLog(
+                        $"ALARM: Hero crop anti-starve needs attention in village "
+                        + $"'{GetQueueItemVillageName(item) ?? "-"}'. {ex.Message.Replace(Environment.NewLine, " ")}");
+                }
                 // A building or resource mutation can start one build and then defer because the NEXT level
                 // is blocked. That deferral skips the success-path construction refresh, so the cached live
                 // Travian queue can stay empty even though the worker just observed a full queue. Re-read the
@@ -1371,6 +1384,12 @@ public partial class MainWindow
                     {
                         AppendLog($"Construction status refresh after defer skipped: {refreshEx.Message}");
                     }
+                }
+
+                if (IsConstructionQueueTask(item.TaskName)
+                    && ConstructionQueueState.IsCropShortageDeferMessage(ex.Message))
+                {
+                    await HandleCropShortageDeferAsync(item);
                 }
 
                 // build_troops always DEFERS on its happy path: it queues troops, then returns

@@ -9,6 +9,28 @@ namespace TbotUltra.Worker.Services;
 // Upgrade button analysis and resource/actionability decisions.
 public sealed partial class TravianClient
 {
+    private string BuildCropShortageBlockedResult(int slotId, string buildingName)
+    {
+        var waitSeconds = _config.ConstructionCropShortageRecoveryEnabled ? 1 : 1800;
+        var disabledToken = _config.ConstructionCropShortageRecoveryEnabled
+            ? string.Empty
+            : " crop_shortage_recovery=disabled";
+        return $"Slot {slotId} ({buildingName}) blocked by crop shortage. wait_reason=crop_shortage{disabledToken} queue_wait_seconds={waitSeconds}";
+    }
+
+    private async Task<bool> CurrentPageHasCropShortageBlockAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return await _page.EvaluateAsync<bool>(
+            """
+            () => {
+              const node = document.querySelector('.upgradeBlocked > .errorMessage');
+              const text = String(node?.textContent || '').replace(/\s+/g, ' ').trim();
+              return /lack\s+of\s+food\s*:\s*extend\s+cropland\s+first!?/i.test(text);
+            }
+            """);
+    }
+
     private async Task<UpgradeAttemptResult> AnalyzeUpgradeActionabilityAsync(
         int slotId,
         CancellationToken cancellationToken,
@@ -306,6 +328,17 @@ public sealed partial class TravianClient
                       const upgradeBlockedEl = document.querySelector('.upgradeBlocked');
                       if (upgradeBlockedEl) {
                         const blockText = clean(upgradeBlockedEl.textContent || '').toLowerCase();
+                        const errorText = clean(upgradeBlockedEl.querySelector('.errorMessage')?.textContent || '').toLowerCase();
+                        const isCropShortageBlock = /lack\s+of\s+food\s*:\s*extend\s+cropland\s+first!?/i.test(errorText);
+                        if (isCropShortageBlock) {
+                          return JSON.stringify({
+                            outcome: 'BlockedByCropShortage',
+                            reason: 'Lack of food: extend cropland first!',
+                            detectedMaxLevel: detectMaxLevel(),
+                            queueWaitSeconds: null,
+                            summary: picked.slice(0, 8)
+                          });
+                        }
                         const isResourceBlock = /enough\s*resources\s*on|not\s*enough|insufficient|missing\s*resources/i.test(blockText);
                         const isStorageCapacityBlock =
                           /extend\s+(?:the\s+)?(?:warehouse|granary|silo)/i.test(blockText)

@@ -252,6 +252,7 @@ public sealed partial class TravianClient
         BlockedByQueue = 2,
         BlockedByMaxLevel = 3,
         BlockedUnknown = 4,
+        BlockedByCropShortage = 5,
     }
 
     private sealed record UpgradeAttemptResult(

@@ -77,6 +77,15 @@ internal static class BuildingDomParser
         return hasConstructChoices && !hasUpgrade;
     }
 
+    internal static bool HasCropShortageBlockFromHtmlForTests(string html)
+    {
+        var source = html ?? string.Empty;
+        return Regex.IsMatch(
+            source,
+            @"class=[""'][^""']*upgradeBlocked[^""']*[""'][\s\S]*?class=[""'][^""']*errorMessage[^""']*[""'][\s\S]*?lack\s+of\s+food\s*:\s*extend\s+cropland\s+first!?",
+            RegexOptions.IgnoreCase);
+    }
+
     /// <summary>
     /// C# mirror of <c>TravianClient.ReadConstructRequirementErrorAsync</c>. Returns the missing-requirement text
     /// listed in a building's <c>#contract_building{gid}</c> wrapper (Official's span.buildingCondition.error),

@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Desktop.ViewModels;
+using TbotUltra.Desktop.Models;
 
 namespace TbotUltra.Desktop;
 
@@ -68,7 +69,8 @@ public partial class SettingsWindow : Window
         Func<DateTimeOffset>? villageStatusSweepNextScanProvider = null,
         Func<DateTimeOffset>? continuousKeepAliveNextReloadProvider = null,
         Func<Task>? runVillageStatusSweepNow = null,
-        bool newAccountAnalysisCompleted = false)
+        bool newAccountAnalysisCompleted = false,
+        IReadOnlyList<HeroCropAntiStarveVillageRow>? heroCropAntiStarveVillages = null)
     {
         InitializeComponent();
         ThemeChrome.EnableEarlyDarkTitleBar(this);
@@ -100,6 +102,10 @@ public partial class SettingsWindow : Window
         foreach (var row in townHallRows ?? [])
         {
             SettingsVm.Celebrations.TownHallRows.Add(row);
+        }
+        foreach (var row in heroCropAntiStarveVillages ?? [])
+        {
+            SettingsVm.Hero.CropAntiStarveVillages.Add(row);
         }
         DataContext = this;
         AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(SettingsInputChanged));
@@ -245,6 +251,9 @@ public partial class SettingsWindow : Window
         SettingsVm.Construction.StorageUpgradeLevelsAhead = ConstructionDefaults.NormalizeStorageUpgradeLevelsAhead(
             _config[BotOptionPayloadKeys.ConstructionStorageUpgradeLevelsAhead]?.GetValue<int>()
             ?? ConstructionDefaults.StorageUpgradeLevelsAhead);
+        SettingsVm.Construction.CropShortageRecoveryEnabled = ReadBool(
+            BotOptionPayloadKeys.ConstructionCropShortageRecoveryEnabled,
+            ConstructionDefaults.CropShortageRecoveryEnabled);
         LoadConstructionHumanizeConfigToUi();
         SettingsVm.Farming.ShowFarmListLastSentTimer = ReadBool(BotOptionPayloadKeys.ShowFarmListLastSentTimer, FarmingDefaults.ShowLastSentTimer);
         SettingsVm.Farming.FarmListLastSentLimitEnabled = ReadBool(BotOptionPayloadKeys.FarmListLastSentLimitEnabled, FarmingDefaults.LastSentLimitEnabled);
@@ -306,6 +315,21 @@ public partial class SettingsWindow : Window
             HeroAdventureRestartDelayDefaults.MaxMinutes));
         var heroHpRegen = Math.Clamp(ReadInt(BotOptionPayloadKeys.HeroHpRegenPerDayPercent, 40), 20, 100);
         SettingsVm.Hero.HpRegenPerDayPercent = Math.Clamp(((heroHpRegen + 5) / 10) * 10, 20, 100);
+        SettingsVm.Hero.CropAntiStarveEnabled = ReadBool(
+            BotOptionPayloadKeys.HeroCropAntiStarveEnabled,
+            HeroCropAntiStarveDefaults.Enabled);
+        SettingsVm.Hero.CropAntiStarveTriggerMinutes = ReadInt(
+            BotOptionPayloadKeys.HeroCropAntiStarveTriggerMinutes,
+            HeroCropAntiStarveDefaults.TriggerMinutes).ToString(CultureInfo.InvariantCulture);
+        SettingsVm.Hero.CropAntiStarveTargetMinutes = ReadInt(
+            BotOptionPayloadKeys.HeroCropAntiStarveTargetMinutes,
+            HeroCropAntiStarveDefaults.TargetMinutes).ToString(CultureInfo.InvariantCulture);
+        SettingsVm.Hero.CropAntiStarveMaxCropPerTransfer = ReadInt(
+            BotOptionPayloadKeys.HeroCropAntiStarveMaxCropPerTransfer,
+            HeroCropAntiStarveDefaults.MaxCropPerTransfer).ToString(CultureInfo.InvariantCulture);
+        SettingsVm.Hero.CropAntiStarveMinHeroCropRemaining = ReadInt(
+            BotOptionPayloadKeys.HeroCropAntiStarveMinHeroCropRemaining,
+            HeroCropAntiStarveDefaults.MinHeroCropRemaining).ToString(CultureInfo.InvariantCulture);
         SettingsVm.Hero.SmithyUpgradeRestartDelay.IsEnabled =
             _config[BotOptionPayloadKeys.SmithyUpgradeRestartDelayEnabled]?.GetValue<bool>()
             ?? SmithyUpgradeRestartDelayDefaults.Enabled;
@@ -540,6 +564,29 @@ public partial class SettingsWindow : Window
             SavePacingConfigFromUi();
             _config[BotOptionPayloadKeys.ConstructionStorageUpgradeLevelsAhead] =
                 SettingsVm.Construction.StorageUpgradeLevelsAhead;
+            _config[BotOptionPayloadKeys.ConstructionCropShortageRecoveryEnabled] =
+                SettingsVm.Construction.CropShortageRecoveryEnabled;
+            _config[BotOptionPayloadKeys.HeroCropAntiStarveEnabled] = SettingsVm.Hero.CropAntiStarveEnabled;
+            _config[BotOptionPayloadKeys.HeroCropAntiStarveTriggerMinutes] = ReadIntText(
+                SettingsVm.Hero.CropAntiStarveTriggerMinutes,
+                HeroCropAntiStarveDefaults.TriggerMinutes,
+                1,
+                1440);
+            _config[BotOptionPayloadKeys.HeroCropAntiStarveTargetMinutes] = ReadIntText(
+                SettingsVm.Hero.CropAntiStarveTargetMinutes,
+                HeroCropAntiStarveDefaults.TargetMinutes,
+                1,
+                1440);
+            _config[BotOptionPayloadKeys.HeroCropAntiStarveMaxCropPerTransfer] = ReadIntText(
+                SettingsVm.Hero.CropAntiStarveMaxCropPerTransfer,
+                HeroCropAntiStarveDefaults.MaxCropPerTransfer,
+                1,
+                int.MaxValue);
+            _config[BotOptionPayloadKeys.HeroCropAntiStarveMinHeroCropRemaining] = ReadIntText(
+                SettingsVm.Hero.CropAntiStarveMinHeroCropRemaining,
+                HeroCropAntiStarveDefaults.MinHeroCropRemaining,
+                0,
+                int.MaxValue);
             SaveConstructionHumanizeConfigFromUi();
             _config[BotOptionPayloadKeys.ShowFarmListLastSentTimer] = SettingsVm.Farming.ShowFarmListLastSentTimer;
             _config[BotOptionPayloadKeys.FarmListLastSentLimitEnabled] = SettingsVm.Farming.FarmListLastSentLimitEnabled;
@@ -621,6 +668,10 @@ public partial class SettingsWindow : Window
             (DemolishDelayMaxTextBox, "Demolish delay maximum", true, 0, 1440),
             (HeroAdventureRestartDelayMinTextBox, "Hero adventure restart delay minimum", false, 0, double.MaxValue),
             (HeroAdventureRestartDelayMaxTextBox, "Hero adventure restart delay maximum", false, 0, double.MaxValue),
+            (HeroCropAntiStarveTriggerTextBox, "Anti-starve trigger", true, 1, 1440),
+            (HeroCropAntiStarveTargetTextBox, "Anti-starve target", true, 1, 1440),
+            (HeroCropAntiStarveMaxTransferTextBox, "Anti-starve maximum crop per transfer", true, 1, int.MaxValue),
+            (HeroCropAntiStarveMinRemainingTextBox, "Anti-starve minimum hero crop remaining", true, 0, int.MaxValue),
             (SmithyUpgradeRestartDelayMinTextBox, "Smithy restart delay minimum", false, 0, double.MaxValue),
             (SmithyUpgradeRestartDelayMaxTextBox, "Smithy restart delay maximum", false, 0, double.MaxValue),
             (TownHallRestartDelayMinTextBox, "Town Hall restart delay minimum", false, 0, double.MaxValue),
@@ -701,7 +752,40 @@ public partial class SettingsWindow : Window
             return false;
         }
 
+        var antiStarveTrigger = int.Parse(HeroCropAntiStarveTriggerTextBox.Text, CultureInfo.InvariantCulture);
+        var antiStarveTarget = int.Parse(HeroCropAntiStarveTargetTextBox.Text, CultureInfo.InvariantCulture);
+        if (antiStarveTarget <= antiStarveTrigger)
+        {
+            ShowInvalidNumericInput(
+                HeroCropAntiStarveTargetTextBox,
+                "Anti-starve target",
+                "The target must be greater than the trigger.",
+                true,
+                antiStarveTrigger + 1,
+                1440,
+                HeroCropAntiStarveTriggerTextBox.Text);
+            return false;
+        }
+
         return true;
+    }
+
+    private void HeroCropAntiStarveVillages_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new HeroCropAntiStarveVillagesWindow(SettingsVm.Hero.CropAntiStarveVillages)
+        {
+            Owner = this,
+        };
+        if (window.ShowDialog() != true)
+        {
+            return;
+        }
+
+        SettingsVm.Hero.CropAntiStarveVillages.Clear();
+        foreach (var row in window.Results)
+        {
+            SettingsVm.Hero.CropAntiStarveVillages.Add(row);
+        }
     }
 
     internal static bool TryValidateNumericInputText(

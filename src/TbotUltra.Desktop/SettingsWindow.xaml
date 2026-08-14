@@ -706,6 +706,17 @@
                             </Border>
 
                             <Border Style="{StaticResource SettingsGroupBox}" Margin="0,10,0,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <CheckBox Content="Auto-upgrade croplands when food blocks construction"
+                                              FontWeight="SemiBold"
+                                              Foreground="{DynamicResource TextPrimaryBrush}"
+                                              IsChecked="{Binding SettingsVm.Construction.CropShortageRecoveryEnabled, Mode=TwoWay}" />
+                                    <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                    ToolTip="When Travian blocks a construction with 'Lack of food: extend cropland first!', prioritize up to two lowest-level cropland upgrades. Existing construction queue items are kept." />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource SettingsGroupBox}" Margin="0,10,0,0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Demolish delay (min)" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -901,6 +912,45 @@
                                               SelectedItem="{Binding SettingsVm.Hero.HpRegenPerDayPercent, Mode=TwoWay}" />
                                 </StackPanel>
                             </Border>
+                            <Border Style="{StaticResource SettingsGroupBox}" Margin="0,10,0,0">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <CheckBox Content="Anti-starve with hero crop"
+                                                  FontWeight="SemiBold"
+                                                  IsChecked="{Binding SettingsVm.Hero.CropAntiStarveEnabled, Mode=TwoWay}" />
+                                        <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                        ToolTip="Uses crop from the hero inventory when a selected village with negative production is close to empty. The configured hero crop reserve is never transferred." />
+                                    </StackPanel>
+                                    <Grid Margin="24,12,0,0" IsEnabled="{Binding SettingsVm.Hero.CropAntiStarveEnabled}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="230" />
+                                            <ColumnDefinition Width="90" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="Transfer below (minutes to empty)" VerticalAlignment="Center" Margin="0,0,8,8" />
+                                        <TextBox x:Name="HeroCropAntiStarveTriggerTextBox" Grid.Column="1" Margin="0,0,0,8"
+                                                 Text="{Binding SettingsVm.Hero.CropAntiStarveTriggerMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBlock Grid.Row="1" Text="Restore to (minutes to empty)" VerticalAlignment="Center" Margin="0,0,8,8" />
+                                        <TextBox x:Name="HeroCropAntiStarveTargetTextBox" Grid.Row="1" Grid.Column="1" Margin="0,0,0,8"
+                                                 Text="{Binding SettingsVm.Hero.CropAntiStarveTargetMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBlock Grid.Row="2" Text="Maximum crop per transfer" VerticalAlignment="Center" Margin="0,0,8,8" />
+                                        <TextBox x:Name="HeroCropAntiStarveMaxTransferTextBox" Grid.Row="2" Grid.Column="1" Margin="0,0,0,8"
+                                                 Text="{Binding SettingsVm.Hero.CropAntiStarveMaxCropPerTransfer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBlock Grid.Row="3" Text="Minimum hero crop remaining" VerticalAlignment="Center" Margin="0,0,8,8" />
+                                        <TextBox x:Name="HeroCropAntiStarveMinRemainingTextBox" Grid.Row="3" Grid.Column="1" Margin="0,0,0,8"
+                                                 Text="{Binding SettingsVm.Hero.CropAntiStarveMinHeroCropRemaining, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <Button Grid.Row="4" Grid.ColumnSpan="2" Content="Villages…" HorizontalAlignment="Left"
+                                                Padding="14,6" Click="HeroCropAntiStarveVillages_Click" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </Border>
 
@@ -981,6 +1031,7 @@
                                     </ComboBox>
                                 </StackPanel>
                             </Border>
+
                         </StackPanel>
                     </Border>
 

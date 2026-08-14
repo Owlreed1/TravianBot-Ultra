@@ -505,6 +505,9 @@ public sealed record BotOptions
     [ConfigurationKeyName(BotOptionPayloadKeys.ConstructionStorageUpgradeLevelsAhead)]
     public int ConstructionStorageUpgradeLevelsAhead { get; init; } = ConstructionDefaults.StorageUpgradeLevelsAhead;
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.ConstructionCropShortageRecoveryEnabled)]
+    public bool ConstructionCropShortageRecoveryEnabled { get; init; } = ConstructionDefaults.CropShortageRecoveryEnabled;
+
     [ConfigurationKeyName(BotOptionPayloadKeys.ConstructionHumanizeStateVersion)]
     public int ConstructionHumanizeStateVersion { get; init; }
 
@@ -716,6 +719,21 @@ public sealed record BotOptions
 
     [ConfigurationKeyName(BotOptionPayloadKeys.HeroResourceUseTownHall)]
     public bool HeroResourceUseTownHall { get; init; }
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.HeroCropAntiStarveEnabled)]
+    public bool HeroCropAntiStarveEnabled { get; init; } = HeroCropAntiStarveDefaults.Enabled;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.HeroCropAntiStarveTriggerMinutes)]
+    public int HeroCropAntiStarveTriggerMinutes { get; init; } = HeroCropAntiStarveDefaults.TriggerMinutes;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.HeroCropAntiStarveTargetMinutes)]
+    public int HeroCropAntiStarveTargetMinutes { get; init; } = HeroCropAntiStarveDefaults.TargetMinutes;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.HeroCropAntiStarveMaxCropPerTransfer)]
+    public int HeroCropAntiStarveMaxCropPerTransfer { get; init; } = HeroCropAntiStarveDefaults.MaxCropPerTransfer;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.HeroCropAntiStarveMinHeroCropRemaining)]
+    public int HeroCropAntiStarveMinHeroCropRemaining { get; init; } = HeroCropAntiStarveDefaults.MinHeroCropRemaining;
 
     [ConfigurationKeyName("upgrade_selector_profile")]
     public string UpgradeSelectorProfile { get; init; } = "auto";

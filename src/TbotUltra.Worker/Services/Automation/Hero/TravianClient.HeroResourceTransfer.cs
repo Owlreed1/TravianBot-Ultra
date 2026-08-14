@@ -661,13 +661,14 @@ public sealed partial class TravianClient
 
     private async Task<bool> TryConfirmHeroResourceTransferDialogAsync(
         CancellationToken cancellationToken,
-        string reason)
+        string reason,
+        bool requireExactTransfer = false)
     {
         await DelayBeforeClickAsync(cancellationToken, reason);
 
         return await _page.EvaluateAsync<bool>(
             """
-            () => {
+            (requireExactTransfer) => {
               const normalize = value => (value || '').replace(/\s+/g, ' ').trim();
               const dialog = document.querySelector('div.resourceTransferDialog')
                 || (normalize(document.querySelector('#dialogContent h3')?.textContent).toLowerCase() === 'transfer resources'
@@ -696,14 +697,17 @@ public sealed partial class TravianClient
               ].filter(Boolean);
               const button = buttons.find(b => isVisible(b)
                 && isEnabled(b)
-                && (/transfer selected/i.test(b.textContent || '') || b.closest('.actionButton.preSelected')));
+                && (/transfer selected/i.test(b.textContent || '')
+                  || normalize(b.textContent || '').toLowerCase() === 'transfer'
+                  || (!requireExactTransfer && b.closest('.actionButton.preSelected'))));
               if (!button) return false;
 
               button.scrollIntoView({ block: 'center', inline: 'center' });
               button.click();
               return true;
             }
-            """);
+            """,
+            requireExactTransfer);
     }
 
     private async Task<HeroInventoryResources?> TryFillHeroResourceTransferDialogAsync(

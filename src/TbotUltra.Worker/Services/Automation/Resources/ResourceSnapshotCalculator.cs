@@ -97,13 +97,23 @@ internal static class ResourceSnapshotCalculator
                     : (int)computedSeconds;
             }
 
+            int? secondsToEmpty = null;
+            if (current is not null && production is < 0)
+            {
+                var computedSeconds = Math.Ceiling((current.Value / -production.Value) * 3600.0);
+                secondsToEmpty = computedSeconds >= int.MaxValue
+                    ? int.MaxValue
+                    : Math.Max(0, (int)computedSeconds);
+            }
+
             result.Add(new ResourceStorageForecast(
                 ResourceKey: key,
                 Current: current,
                 Capacity: capacity,
                 PercentOfCapacity: percent,
                 ProductionPerHour: production,
-                SecondsToFull: secondsToFull));
+                SecondsToFull: secondsToFull,
+                SecondsToEmpty: secondsToEmpty));
         }
 
         return result;

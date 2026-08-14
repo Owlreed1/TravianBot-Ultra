@@ -139,6 +139,11 @@ public static class BotOptionPayloadKeys
     public const string HeroResourceUseSmithy = "hero_resource_use_smithy";
     public const string HeroResourceUseBrewery = "hero_resource_use_brewery";
     public const string HeroResourceUseTownHall = "hero_resource_use_town_hall";
+    public const string HeroCropAntiStarveEnabled = "hero_crop_anti_starve_enabled";
+    public const string HeroCropAntiStarveTriggerMinutes = "hero_crop_anti_starve_trigger_minutes";
+    public const string HeroCropAntiStarveTargetMinutes = "hero_crop_anti_starve_target_minutes";
+    public const string HeroCropAntiStarveMaxCropPerTransfer = "hero_crop_anti_starve_max_crop_per_transfer";
+    public const string HeroCropAntiStarveMinHeroCropRemaining = "hero_crop_anti_starve_min_hero_crop_remaining";
     public const string ContinuousFarmListNames = "continuous_farm_list_names";
     // Stable Travian farm-list ids (lid) for the selected lists. Persisted alongside the names so
     // the selection survives a village/list rename: the name changes on Travian but the lid does not.
@@ -328,6 +333,12 @@ public static class BotOptionPayloadKeys
 
     public const string ConstructionHumanizeDelayEnabled = "construction_humanize_delay_enabled";
     public const string ConstructionStorageUpgradeLevelsAhead = "construction_storage_upgrade_levels_ahead";
+    public const string ConstructionCropShortageRecoveryEnabled = "construction_crop_shortage_recovery_enabled";
+    public const string UpgradeDeferReasonCropShortage = "crop_shortage";
+    public const string CropShortageRecoveryParentId = "crop_shortage_recovery_parent_id";
+    public const string CropShortageOriginalPriority = "crop_shortage_original_priority";
+    public const string CropShortageCompletedSteps = "crop_shortage_completed_steps";
+    public const string AutoAddedByCropShortageRecovery = "crop_shortage_recovery";
     public const string ConstructionHumanizeStateVersion = "construction_humanize_state_version";
     public const string ConstructionHumanizeQueuePercentMin = "construction_humanize_queue_percent_min";
     public const string ConstructionHumanizeQueuePercentMax = "construction_humanize_queue_percent_max";

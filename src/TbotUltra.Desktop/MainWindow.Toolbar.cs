@@ -207,7 +207,8 @@ public partial class MainWindow
             GetVillageStatusSweepNextScanUtc,
             GetContinuousKeepAliveNextReloadUtc,
             RunVillageStatusSweepNowFromSettingsAsync,
-            HasCompletedNewAccountAnalysis())
+            HasCompletedNewAccountAnalysis(),
+            BuildHeroCropAntiStarveVillageRows())
         {
             Owner = Application.Current.Windows
                 .OfType<Window>()
@@ -222,6 +223,12 @@ public partial class MainWindow
         if (optionsAfterSettings.ConstructionHumanizeDelayEnabled != optionsBeforeSettings.ConstructionHumanizeDelayEnabled)
         {
             ApplyConstructionHumanizeToggleTransition(optionsAfterSettings.ConstructionHumanizeDelayEnabled);
+        }
+        if (saved
+            && !optionsBeforeSettings.ConstructionCropShortageRecoveryEnabled
+            && optionsAfterSettings.ConstructionCropShortageRecoveryEnabled)
+        {
+            ReleaseDisabledCropShortageDefers();
         }
         if (optionsAfterSettings.DetailedBrowserLoggingEnabled != detailedBrowserLoggingBefore)
         {
@@ -244,6 +251,7 @@ public partial class MainWindow
             {
                 PersistTownHallSettings(window.TownHallResults, villageSettingsRows);
             }
+            PersistHeroCropAntiStarveVillages(window.SettingsVm.Hero.CropAntiStarveVillages);
             LogConservativeAutomationWarnings(optionsAfterSettings);
         }
 

@@ -185,6 +185,10 @@ public sealed partial class TravianClient : IBuildingClient
             var durationSeconds = pageAnalysis.DurationSeconds;
             // Read the population the new building grants before clicking (page changes after).
             var populationDelta = pageAnalysis.PopulationDelta;
+            if (await CurrentPageHasCropShortageBlockAsync(cancellationToken))
+            {
+                return WithEffectiveSlot(BuildCropShortageBlockedResult(slotId, buildingName));
+            }
             if (!pageAnalysis.LooksBlockedByResources)
             {
                 await TryLoadMissingHeroInventoryFromCurrentBuildPageAsync(
@@ -220,6 +224,10 @@ public sealed partial class TravianClient : IBuildingClient
                     "construct no-click",
                     cancellationToken,
                     constructGid: gid);
+                if (await CurrentPageHasCropShortageBlockAsync(cancellationToken))
+                {
+                    return WithEffectiveSlot(BuildCropShortageBlockedResult(slotId, buildingName));
+                }
                 var blockedByResources = pageAnalysis.LooksBlockedByResources;
                 var missingRequirements = pageAnalysis.ConstructRequirementError;
                 if (!string.IsNullOrWhiteSpace(missingRequirements))

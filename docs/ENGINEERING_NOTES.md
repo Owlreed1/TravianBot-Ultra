@@ -225,6 +225,13 @@ Published artifacts belong under `artifacts/`, never beside source files.
   HP read is authoritative and releases the deferred Hero task immediately once the threshold is met. That release
   is centralized in the shared UI HP-read helper, so login, quick re-login, browser restart, the manual refresh
   button, and the periodic tick all clear a stale regen-estimate countdown, not just the background tick.
+- Hero crop anti-starve is account-configured but selected per coordinate-keyed village and runs only while the
+  continuous bot is Running. A missing per-village entry defaults enabled; the account master defaults disabled.
+  Negative crop production uses the fresh dorf1 stock/production snapshot to calculate time to empty. Transfers
+  navigate through `/hero/inventory`, open the visible `.heroItem` containing `.item.item148`, fill only
+  `input[name="crop"]`, and click the enabled dialog action whose normalized text is exactly `Transfer` (never
+  `Transfer maximum`). The configured minimum hero crop is an absolute post-transfer reserve: transferable crop is
+  at most `hero crop - minimum remaining`, in addition to the per-transfer maximum and granary free capacity.
 - Account-wide construction behavior, including storage look-ahead and construction start delay, belongs in the
   Construction settings category rather than the Buildings workspace.
 - Secondary explanations use the shared `i` tooltip when permanent text wastes space.
@@ -288,6 +295,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
   upgrades; the displayed order must match the queue insertion order. The account-scoped Construction setting can
   request 1-10 storage levels ahead (default 2); a triggered storage action targets the greater of the minimum level
   required by the cost and the current storage-building level plus that configured value.
+- The account-wide Construction setting for crop-shortage recovery is enabled by default. Only the scoped Official
+  `.upgradeBlocked > .errorMessage` text `Lack of food: extend cropland first!` triggers it; negative production alone
+  does not. Keep the blocked construction head, prioritize at most two lowest-level cropland steps (including active
+  ones), and resume that village's Construction queue only after a completed recovery step and a fresh positive crop
+  production read. With recovery disabled, defer only that village's Construction head for 30 minutes and alarm.
 - Resource `Upgrade to max` uses the level-10 staged plan only in non-capital villages. Capitals show that max-mode
   storage planning is unsupported and direct the user to choose an explicit `Upgrade all to level` target.
 - Official storage blocks use `.upgradeBlocked > .errorMessage`; disabled actions can remain in the DOM with a
