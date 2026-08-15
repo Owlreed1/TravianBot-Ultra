@@ -33,7 +33,7 @@ public sealed class ResourceConstructionQueueMatcherTests
     }
 
     [Fact]
-    public void HighestQueuedLevelForSlot_FallsBackToNameWhenQueuedSlotIsUnknown()
+    public void HighestQueuedLevelForSlot_DoesNotMatchKnownSlotByNameWhenQueuedSlotIsUnknown()
     {
         var active = new[]
         {
@@ -42,7 +42,7 @@ public sealed class ResourceConstructionQueueMatcherTests
 
         var level = ResourceConstructionQueueMatcher.HighestQueuedLevelForSlot(active, 13, "Cropland", 4);
 
-        Assert.Equal(5, level);
+        Assert.Equal(4, level);
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public sealed class ResourceConstructionQueueMatcherTests
     }
 
     [Fact]
-    public void HighestQueuedLevelForSlot_UsesUnknownLevelAfterExactSlotIdentity()
+    public void HighestQueuedLevelForSlot_DoesNotBorrowUnknownLevelAfterExactSlotIdentity()
     {
         var active = new[]
         {
@@ -107,6 +107,41 @@ public sealed class ResourceConstructionQueueMatcherTests
         var level = ResourceConstructionQueueMatcher.HighestQueuedLevelForSlot(
             active, queue, 2, "Cropland", 7);
 
-        Assert.Equal(8, level);
+        Assert.Equal(7, level);
+    }
+
+    [Fact]
+    public void HighestQueuedLevelForSlot_OneUnknownCroplandDoesNotMatchFiveKnownSlots()
+    {
+        var active = new[]
+        {
+            new ActiveConstruction(ConstructionKind.Resource, "Cropland", 6, 440, null),
+        };
+        var queue = new[]
+        {
+            new BuildQueueItem("Cropland level 6", "00:07:20"),
+        };
+
+        var matchedSlots = new[] { 9, 10, 11, 12, 13 }
+            .Count(slot => ResourceConstructionQueueMatcher.HighestQueuedLevelForSlot(
+                active, queue, slot, "Cropland", 5) >= 6);
+
+        Assert.Equal(0, matchedSlots);
+    }
+
+    [Theory]
+    [InlineData(6, 7, true)]
+    [InlineData(6, 6, false)]
+    [InlineData(6, null, false)]
+    public void IsTargetAlreadyQueuedOnExactSlot_RequiresOfferAboveTarget(
+        int targetLevel,
+        int? detectedOfferLevel,
+        bool expected)
+    {
+        var result = ResourceConstructionQueueMatcher.IsTargetAlreadyQueuedOnExactSlot(
+            targetLevel,
+            detectedOfferLevel);
+
+        Assert.Equal(expected, result);
     }
 }

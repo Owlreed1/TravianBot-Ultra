@@ -9,7 +9,7 @@ internal static class ResourceConstructionQueueMatcher
         int slotId,
         string resourceName,
         int currentLevel,
-        bool allowUnknownSlotNameFallback = true)
+        bool allowUnknownSlotNameFallback = false)
     {
         var highestQueuedLevel = activeConstructions
             .Where(item => IsMatch(item, slotId, resourceName, allowUnknownSlotNameFallback))
@@ -24,7 +24,7 @@ internal static class ResourceConstructionQueueMatcher
         int slotId,
         string resourceName,
         int currentLevel,
-        bool allowUnknownSlotNameFallback = true)
+        bool allowUnknownSlotNameFallback = false)
     {
         var matchingLevels = buildQueue
             .Where(item =>
@@ -43,42 +43,9 @@ internal static class ResourceConstructionQueueMatcher
         string resourceName,
         int currentLevel)
     {
-        var exactLevel = Math.Max(
+        return Math.Max(
             HighestQueuedLevelForSlot(activeConstructions, slotId, resourceName, currentLevel, false),
             HighestQueuedLevelForSlot(buildQueue, slotId, resourceName, currentLevel, false));
-        if (exactLevel > currentLevel)
-        {
-            return exactLevel;
-        }
-
-        var hasExactSlotIdentity = activeConstructions.Any(item =>
-                item.Kind == ConstructionKind.Resource && item.SlotId == slotId)
-            || buildQueue.Any(item => item.SlotId == slotId);
-        if (hasExactSlotIdentity)
-        {
-            // Exact queue identity makes an unknown-slot same-name level safe as supplemental data.
-            return Math.Max(
-                HighestQueuedLevelForSlot(activeConstructions, slotId, resourceName, currentLevel),
-                HighestQueuedLevelForSlot(buildQueue, slotId, resourceName, currentLevel));
-        }
-
-        // Resource names repeat across many fields. If either queue source identifies a same-name
-        // construction by another slot, an unknown-slot same-name row cannot safely represent this slot.
-        var hasKnownSameNameSlot = activeConstructions.Any(item =>
-                item.Kind == ConstructionKind.Resource
-                && item.SlotId is not null
-                && BuildingNames.Same(item.Name, resourceName))
-            || buildQueue.Any(item =>
-                item.SlotId is not null
-                && BuildQueueFingerprints.TextMatchesBuilding(item.Text, resourceName));
-        if (hasKnownSameNameSlot)
-        {
-            return currentLevel;
-        }
-
-        return Math.Max(
-            HighestQueuedLevelForSlot(activeConstructions, slotId, resourceName, currentLevel),
-            HighestQueuedLevelForSlot(buildQueue, slotId, resourceName, currentLevel));
     }
 
     internal static IReadOnlyList<ActiveConstruction> MatchForResourceSlot(
@@ -90,6 +57,9 @@ internal static class ResourceConstructionQueueMatcher
             .Where(item => IsMatch(item, slotId, resourceName))
             .ToList();
     }
+
+    internal static bool IsTargetAlreadyQueuedOnExactSlot(int targetLevel, int? detectedOfferLevel)
+        => detectedOfferLevel is int offerLevel && offerLevel > targetLevel;
 
     private static bool IsMatch(
         ActiveConstruction item,

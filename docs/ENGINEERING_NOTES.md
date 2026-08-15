@@ -360,6 +360,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   the last valid snapshot or fabricate zero/empty state.
 - Construction mutations use the short fresh-read cache; read-only observations may use the longer cache but
   never past a known completion deadline. Navigation and state-changing clicks invalidate both.
+- A resource construction with unknown slot identity may prove queue occupancy and timing, but never that a
+  specific known resource slot is already in progress merely because its repeated field name and level match.
+  Confirm the exact slot from queue identity or from that slot's own build page.
 - Construction Queue Reconciliation plans only from confirmed full live status and applies all pending-item
   changes atomically; cache or local timers are never reconciliation evidence.
 - Deferred resource-gated waits are re-estimated LIVE on every resource read (jitter included), not left on

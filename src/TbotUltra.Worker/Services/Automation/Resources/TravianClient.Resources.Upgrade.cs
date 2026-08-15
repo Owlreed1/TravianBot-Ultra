@@ -94,6 +94,22 @@ public sealed partial class TravianClient
                     return $"Resource slot {slotId} is level {currentLevel}. Target {effectiveTarget} reached after {upgrades} upgrades.";
                 }
 
+                if (ResourceConstructionQueueMatcher.IsTargetAlreadyQueuedOnExactSlot(
+                        effectiveTarget,
+                        actionability.DetectedTargetLevel))
+                {
+                    Notify(
+                        $"[resources] exact slot {slotId} offers level {actionability.DetectedTargetLevel}; " +
+                        $"target level {effectiveTarget} is already queued on that slot.");
+                    var queuedWaitSeconds = await ReadQueuedResourceWaitSecondsAsync(
+                        resourceName,
+                        slotId,
+                        actionability.QueueWaitSeconds,
+                        cancellationToken);
+                    return $"Resource slot {slotId}: queued upgrade toward level {effectiveTarget}. " +
+                        $"Exact slot offers level {actionability.DetectedTargetLevel}. queue_wait_seconds={queuedWaitSeconds}";
+                }
+
                 if (highestKnownLevel >= effectiveTarget)
                 {
                     var queuedWaitSeconds = await ReadQueuedResourceWaitSecondsAsync(resourceName, slotId, null, cancellationToken);
