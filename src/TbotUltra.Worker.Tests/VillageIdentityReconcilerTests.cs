@@ -7,6 +7,28 @@ namespace TbotUltra.Worker.Tests;
 public sealed class VillageIdentityReconcilerTests
 {
     [Fact]
+    public void MergeFreshListWithCached_PreservesVillagesMissingFromPartialSidebarRender()
+    {
+        var cached = Enumerable.Range(1, 8)
+            .Select(index => new Village(
+                $"Village {index}",
+                $"dorf1.php?newdid={index}",
+                CoordX: index,
+                CoordY: index,
+                Population: index * 100))
+            .ToList();
+        var partial = new[]
+        {
+            cached[1] with { Population = 999 },
+        };
+
+        var merged = VillageIdentityReconciler.MergeFreshListWithCached(partial, cached);
+
+        Assert.Equal(8, merged.Count);
+        Assert.Equal(999, Assert.Single(merged, village => village.CoordX == 2).Population);
+    }
+
+    [Fact]
     public void FindByNameOrCoordinates_PrefersCoordinatesWhenNamesAreDuplicated()
     {
         Village[] villages =

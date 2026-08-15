@@ -121,8 +121,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Proxy settings are account-scoped. Browser, HTTP client, tests, and bonus video use the same effective route.
   Never log credentials or place them in user-visible URLs.
 - Retry only transient failures with bounded attempts. Apply configured pacing; do not add unbounded sleeps.
-- Alarms represent actionable failures. Expected waiting/blocking is normal status. Deduplicate identical alarms
-  for 30 minutes; repeated occurrences update visible count without another alarm line.
+- Alarms represent actionable failures. Expected waiting/blocking and an explicitly retrying bounded transient
+  attempt are normal status. Deduplicate identical alarms for 30 minutes; repeated occurrences update visible
+  count without another alarm line.
 - Detailed browser logging is development-only and off by default. Trace semantic operations, emit exactly one
   end event per flow, and sanitize all secrets. Navigation/mutations use the traced adapters.
 
@@ -232,6 +233,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   `input[name="crop"]`, and click the enabled dialog action whose normalized text is exactly `Transfer` (never
   `Transfer maximum`). The configured minimum hero crop is an absolute post-transfer reserve: transferable crop is
   at most `hero crop - minimum remaining`, in addition to the per-transfer maximum and granary free capacity.
+  Post-transfer ETA verification allows 60 seconds of observation drift; actual transfer limits or failed stock
+  verification still raise the anti-starve alarm.
 - Account-wide construction behavior, including storage look-ahead and construction start delay, belongs in the
   Construction settings category rather than the Buildings workspace.
 - Secondary explanations use the shared `i` tooltip when permanent text wastes space.
@@ -314,6 +317,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   when its exact target slot already has the intended building, when a single-instance building exists anywhere,
   or when a level-gated duplicate has not reached its required level; rebind dependent upgrades to the confirmed
   live slot. Keep the construct when an additional copy is legal.
+- A matching active prerequisite below the required level defers its dependent construct until the active step
+  finishes, even when Official omits the active slot id. Re-plan the remaining prerequisite levels from the next
+  complete live overview; never terminal-fail the dependent construct during that intermediate state.
 - After a successful hero resource transfer reloads the same verified build.php slot, retry its exact construct or
   upgrade action directly; do not restart through queue and dorf2 probes unless the direct action remains unavailable.
 - An upgrade that confirms its planned slot is empty is not a successful no-op. Reconstruct the expected building in
@@ -402,6 +408,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   duplicate village names must not share a humanize deadline.
 - Persisted account analysis may seed the stable village list. Cold start without a snapshot reads the profile;
   later full logins merge the live sidebar so new/renamed villages are found without another profile visit.
+- A transient village refresh that returns only part of an already verified list must merge fresh rows into the
+  existing list instead of shrinking the Dashboard; only an explicitly complete login list may remove villages.
 - New-account analysis is account+server scoped. A pending first-login analysis forces hero inventory, hero
   attributes, and new-village startup until all three succeed; legacy account snapshots are already initialized.
 - Browser activity statistics are account-scoped: lifetime counters persist; session counters do not.

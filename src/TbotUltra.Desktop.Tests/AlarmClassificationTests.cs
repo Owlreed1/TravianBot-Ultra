@@ -41,4 +41,18 @@ public sealed class AlarmClassificationTests
     {
         Assert.False(MainWindow.IsAlarmMessage(message));
     }
+
+    [Fact]
+    public void TransientUpgradeAnalysisRetry_IsNotAlarm()
+    {
+        Assert.False(MainWindow.IsAlarmMessage(
+            "Upgrade analysis for slot 10 hit transient execution-context error on attempt 1/3. Retrying..."));
+    }
+
+    [Fact]
+    public void ExhaustedUpgradeAnalysisRetry_RemainsAlarm()
+    {
+        Assert.True(MainWindow.IsAlarmMessage(
+            "Upgrade analysis failed for slot 10: exhausted retries."));
+    }
 }

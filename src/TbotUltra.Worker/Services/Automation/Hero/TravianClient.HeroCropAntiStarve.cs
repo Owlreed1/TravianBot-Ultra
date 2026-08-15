@@ -156,7 +156,8 @@ public sealed partial class TravianClient
         var verifiedIncrease = afterCrop is not null && afterCrop.Value >= expectedMinimum;
         var postEta = afterForecast?.SecondsToEmpty;
         var nextCheck = HeroCropAntiStarveCalculator.ResolvePostTransferCheckSeconds(postEta);
-        var partial = decision.IsPartial || postEta is int eta && eta < targetMinutes * 60;
+        var partial = decision.IsPartial
+            || HeroCropAntiStarveCalculator.IsPostTransferEtaShortfallActionable(postEta, targetMinutes);
         var alarm = !verifiedIncrease || partial ? " anti_starve_alarm=true" : string.Empty;
         return $"Anti-starve transferred crop={decision.TransferAmount} hero_before={dialogInventory.Crop} hero_after_min={dialogInventory.Crop - decision.TransferAmount} post_crop={afterCrop?.ToString() ?? "unknown"} post_eta_seconds={postEta?.ToString() ?? "unknown"} partial={partial.ToString().ToLowerInvariant()} verified={verifiedIncrease.ToString().ToLowerInvariant()}{alarm} queue_wait_seconds={nextCheck}";
     }

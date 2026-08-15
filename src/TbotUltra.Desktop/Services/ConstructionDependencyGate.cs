@@ -56,7 +56,7 @@ public static class ConstructionDependencyGate
 
         var activeMatches = ConstructionQueueState.ResolveCurrentActiveConstructions(status, now)
             .SelectMany(active => missing
-                .Where(requirement => ActiveConstructionSatisfiesRequirement(active, requirement))
+                .Where(requirement => ActiveConstructionMatchesRequirement(active, requirement))
                 .Select(requirement => (Active: active, Requirement: requirement)))
             .ToList();
         if (activeMatches.Count == 0)
@@ -102,6 +102,15 @@ public static class ConstructionDependencyGate
         }
 
         var projectedStatus = ProjectQueuedBuildingStatus(status, sameVillageQueueItems);
+        var activeDelay = ResolveConstructDelay(item, status, now);
+        if (activeDelay is not null)
+        {
+            return new ConstructionRequirementGuardResult(
+                ConstructionRequirementGuardAction.DeferForActivePrerequisite,
+                activeDelay.Delay,
+                activeDelay.Detail);
+        }
+
         var unresolved = missing
             .Where(requirement => Math.Max(
                 ResolveQueuedRequirementLevel(projectedStatus, sameVillageQueueItems, requirement),
@@ -113,15 +122,6 @@ public static class ConstructionDependencyGate
                 ConstructionRequirementGuardAction.FailMissingPrerequisite,
                 null,
                 FormatRequirements(unresolved));
-        }
-
-        var activeDelay = ResolveConstructDelay(item, status, now);
-        if (activeDelay is not null)
-        {
-            return new ConstructionRequirementGuardResult(
-                ConstructionRequirementGuardAction.DeferForActivePrerequisite,
-                activeDelay.Delay,
-                activeDelay.Detail);
         }
 
         return new ConstructionRequirementGuardResult(
@@ -160,13 +160,11 @@ public static class ConstructionDependencyGate
         return missing;
     }
 
-    private static bool ActiveConstructionSatisfiesRequirement(
+    private static bool ActiveConstructionMatchesRequirement(
         ActiveConstruction active,
         BuildingRequirementEntry requirement)
     {
-        return active.Level is int level
-            && level >= requirement.Level
-            && !string.IsNullOrWhiteSpace(active.Name)
+        return !string.IsNullOrWhiteSpace(active.Name)
             && active.Name.Contains(requirement.Name, StringComparison.OrdinalIgnoreCase);
     }
 

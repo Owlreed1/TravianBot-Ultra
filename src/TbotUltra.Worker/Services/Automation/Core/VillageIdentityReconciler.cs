@@ -84,6 +84,42 @@ internal static class VillageIdentityReconciler
             };
     }
 
+    internal static IReadOnlyList<Village> MergeFreshListWithCached(
+        IReadOnlyList<Village> fresh,
+        IReadOnlyList<Village> cached)
+    {
+        var merged = fresh
+            .Select(village => MergeFreshWithCached(village, cached))
+            .ToList();
+        if (merged.Count >= cached.Count)
+        {
+            return merged;
+        }
+
+        foreach (var cachedVillage in cached)
+        {
+            var cachedDid = TravianUrls.TryParseNewdid(cachedVillage.Url);
+            var alreadyPresent = merged.Any(freshVillage =>
+            {
+                var freshDid = TravianUrls.TryParseNewdid(freshVillage.Url);
+                if (cachedDid.HasValue && freshDid.HasValue)
+                {
+                    return cachedDid.Value == freshDid.Value;
+                }
+
+                return SameCoordinates(
+                    (cachedVillage.CoordX, cachedVillage.CoordY),
+                    (freshVillage.CoordX, freshVillage.CoordY));
+            });
+            if (!alreadyPresent)
+            {
+                merged.Add(cachedVillage);
+            }
+        }
+
+        return merged;
+    }
+
     internal static bool HasCoordinates((int? X, int? Y) coordinates) =>
         coordinates.X.HasValue && coordinates.Y.HasValue;
 

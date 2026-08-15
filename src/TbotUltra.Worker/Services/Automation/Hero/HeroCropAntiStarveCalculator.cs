@@ -9,6 +9,8 @@ public sealed record HeroCropAntiStarveDecision(
 
 public static class HeroCropAntiStarveCalculator
 {
+    private const int PostTransferObservationToleranceSeconds = 60;
+
     public static HeroCropAntiStarveDecision Calculate(
         long currentCrop,
         long granaryCapacity,
@@ -63,5 +65,16 @@ public static class HeroCropAntiStarveCalculator
         }
 
         return 5 * 60;
+    }
+
+    public static bool IsPostTransferEtaShortfallActionable(int? secondsToEmpty, int targetMinutes)
+    {
+        if (secondsToEmpty is not int eta)
+        {
+            return false;
+        }
+
+        var targetSeconds = Math.Max(1, targetMinutes) * 60;
+        return eta < Math.Max(0, targetSeconds - PostTransferObservationToleranceSeconds);
     }
 }

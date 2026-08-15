@@ -100,6 +100,37 @@ public sealed class ConstructionDependencyGateTests
     }
 
     [Fact]
+    public void ResolveConstructRequirementGuard_DefersWhenLowerLevelPrerequisiteIsActiveWithoutSlot()
+    {
+        var item = new QueueItem
+        {
+            TaskName = "construct_building",
+            Status = QueueStatus.Pending,
+            NextAttemptAt = Now,
+            Payload = new BuildingConstructPayload(29, 27, "Treasury").ToDictionary(),
+        };
+        var finish = TimerSnapshot.FromRemaining(180, Now);
+        var status = CreateStatus(
+            buildings: [],
+            activeConstructions:
+            [
+                new ActiveConstruction(
+                    ConstructionKind.Building,
+                    "Main Building",
+                    1,
+                    180,
+                    "00:03:00",
+                    finish),
+            ]);
+
+        var result = ConstructionDependencyGate.ResolveConstructRequirementGuard(item, status, [], Now);
+
+        Assert.Equal(ConstructionRequirementGuardAction.DeferForActivePrerequisite, result.Action);
+        Assert.Equal(TimeSpan.FromSeconds(190), result.Delay);
+        Assert.Contains("Main Building 10+", result.Detail);
+    }
+
+    [Fact]
     public void ResolveConstructRequirementGuard_DefersWhenPrerequisiteIsQueued()
     {
         var item = CreateStableConstructItem();

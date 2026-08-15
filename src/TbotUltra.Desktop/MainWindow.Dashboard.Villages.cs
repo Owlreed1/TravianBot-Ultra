@@ -32,7 +32,8 @@ public partial class MainWindow
         string? activeVillageName,
         string? preferredVillageName = null,
         int? activeVillageCoordX = null,
-        int? activeVillageCoordY = null)
+        int? activeVillageCoordY = null,
+        bool allowVillageRemoval = false)
     {
         var selectedVillageName = string.IsNullOrWhiteSpace(preferredVillageName)
             ? GetSelectedVillageName()
@@ -52,7 +53,8 @@ public partial class MainWindow
             selectedVillageName,
             activeVillageName,
             preferredVillageKey,
-            activeVillageKey);
+            activeVillageKey,
+            allowVillageRemoval);
     }
 
     private void SyncDashboardVillageUiFromPayloadVillages(
@@ -88,9 +90,37 @@ public partial class MainWindow
         string? preferredVillageName,
         string? fallbackVillageName,
         string? preferredVillageKey = null,
-        string? fallbackVillageKey = null)
+        string? fallbackVillageKey = null,
+        bool allowVillageRemoval = false)
     {
         var ensuredItems = EnsureVillageSelectionItems(items);
+        if (!allowVillageRemoval)
+        {
+            var existingItems = Enumerable.Empty<VillageSelectionItem>()
+                .Concat(VillageComboBox.ItemsSource as IEnumerable<VillageSelectionItem> ?? [])
+                .Concat(DashboardVillageList.ItemsSource as IEnumerable<VillageSelectionItem> ?? [])
+                .Where(item => !string.IsNullOrWhiteSpace(item.Name)
+                    && !string.Equals(item.Name, "-", StringComparison.Ordinal))
+                .GroupBy(GetVillageKey, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+            var mergedItems = VillageListUpdatePolicy.PreserveKnownVillages(
+                ensuredItems,
+                existingItems,
+                GetVillageKey);
+            if (mergedItems.Count > ensuredItems.Count)
+            {
+                AppendLog(
+                    $"[village-list] incomplete refresh returned {ensuredItems.Count} of "
+                    + $"{mergedItems.Count} known villages; preserved the verified list.");
+            }
+            ensuredItems = mergedItems;
+        }
+
+        if (HasRealVillages(ensuredItems))
+        {
+            VillagesInfoTextBlock.Text = $"Villages: {ensuredItems.Count(item => !string.Equals(item.Name, "-", StringComparison.Ordinal))}";
+        }
         ApplyVillagePickerItems(
             ensuredItems,
             preferredVillageName,

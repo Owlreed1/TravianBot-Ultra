@@ -582,6 +582,12 @@ public partial class MainWindow
             return false;
         }
 
+        if (value.Contains("transient execution-context error")
+            && value.Contains("retrying"))
+        {
+            return false;
+        }
+
         if (value.Contains("captcha warmup"))
         {
             return false;

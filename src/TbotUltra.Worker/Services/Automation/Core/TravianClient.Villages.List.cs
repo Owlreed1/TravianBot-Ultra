@@ -76,11 +76,9 @@ public sealed partial class TravianClient
             {
                 if (_cachedVillages is { Count: > 0 } prior)
                 {
-                    var merged = sidebar
-                        // Fresh sidebar coordinates are authoritative. Merge cached metadata by did,
-                        // then coordinates, and use a name only when that name is unambiguous.
-                        .Select(v => VillageIdentityReconciler.MergeFreshWithCached(v, prior))
-                        .ToList();
+                    // Fresh sidebar coordinates are authoritative. A partial render must still keep
+                    // villages from the last verified list instead of shrinking account automation.
+                    var merged = VillageIdentityReconciler.MergeFreshListWithCached(sidebar, prior);
                     UpdateCachedVillages(merged);
                     if (IsCapitalProfileVerificationDue())
                     {
@@ -140,9 +138,7 @@ public sealed partial class TravianClient
                 if (sidebarVillages.Count > 0)
                 {
                     var merged = _cachedVillages is { Count: > 0 } prior
-                        ? sidebarVillages
-                            .Select(village => VillageIdentityReconciler.MergeFreshWithCached(village, prior))
-                            .ToList()
+                        ? VillageIdentityReconciler.MergeFreshListWithCached(sidebarVillages, prior)
                         : sidebarVillages.ToList();
                     UpdateCachedVillages(merged);
                     if (IsCapitalProfileVerificationDue())

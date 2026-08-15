@@ -59,4 +59,18 @@ public sealed class HeroCropAntiStarveCalculatorTests
     {
         Assert.Equal(expected, HeroCropAntiStarveCalculator.ResolvePostTransferCheckSeconds(eta));
     }
+
+    [Theory]
+    [InlineData(5395, 90, false)]
+    [InlineData(5340, 90, false)]
+    [InlineData(5339, 90, true)]
+    public void IsPostTransferEtaShortfallActionable_AllowsOneMinuteObservationTolerance(
+        int etaSeconds,
+        int targetMinutes,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            HeroCropAntiStarveCalculator.IsPostTransferEtaShortfallActionable(etaSeconds, targetMinutes));
+    }
 }

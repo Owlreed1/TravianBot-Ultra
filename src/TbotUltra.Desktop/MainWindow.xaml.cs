@@ -1206,7 +1206,8 @@ public partial class MainWindow : Window
             status.ActiveVillage,
             status.ActiveVillage,
             status.ActiveVillageCoordX,
-            status.ActiveVillageCoordY);
+            status.ActiveVillageCoordY,
+            allowVillageRemoval: true);
         var rows = ApplyResourceRowsAndVillageStatus(status, includeQueuedTargets: true);
         TriggerDeferredConstructionWaitRefresh(status, "post_login");
 
