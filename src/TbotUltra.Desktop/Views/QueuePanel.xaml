@@ -186,6 +186,11 @@
                       ColumnHeaderHeight="32"
                       RowHeight="30"
                       FontSize="12">
+                <DataGrid.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel VirtualizationMode="Recycling" />
+                    </ItemsPanelTemplate>
+                </DataGrid.ItemsPanel>
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow">
                         <Style.Triggers>
@@ -378,6 +383,11 @@
                       ColumnHeaderHeight="32"
                       RowHeight="30"
                       FontSize="12">
+                <DataGrid.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel VirtualizationMode="Recycling" />
+                    </ItemsPanelTemplate>
+                </DataGrid.ItemsPanel>
                 <DataGrid.ColumnHeaderStyle>
                     <Style TargetType="DataGridColumnHeader">
                         <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />

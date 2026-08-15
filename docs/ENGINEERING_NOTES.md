@@ -193,6 +193,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
 
 ## Feature implementation conventions
 
+- Keep the WPF dispatcher limited to bounded presentation work: recurring ticks update countdowns from cached
+  projections, expensive queue/overview calculations run from immutable snapshots, and persisted cache writes run
+  through a serial latest-snapshot writer. Queue display refreshes are read-only; history is projected only when shown.
+
 ### Core and Worker
 
 - Parse HTML/JSON into domain models before scheduling decisions.

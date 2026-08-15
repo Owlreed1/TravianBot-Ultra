@@ -134,6 +134,11 @@ public sealed class VillageCacheStore
     public void Save(IReadOnlyDictionary<string, VillageStatus> villagesByKey)
     {
         var account = GetActiveAccountName();
+        Save(account, villagesByKey);
+    }
+
+    internal void Save(string? account, IReadOnlyDictionary<string, VillageStatus> villagesByKey)
+    {
         if (string.IsNullOrWhiteSpace(account) || villagesByKey is null || villagesByKey.Count == 0)
         {
             return;

@@ -163,7 +163,9 @@ public partial class MainWindow
         IReadOnlyList<QueueItem> queueItems;
         try
         {
-            queueItems = _botService.GetQueueItemsForDisplay();
+            queueItems = _queueItemsForUiProjection.Count > 0
+                ? _queueItemsForUiProjection
+                : _botService.GetQueueItemsForDisplay();
         }
         catch
         {

@@ -356,6 +356,8 @@ public partial class MainWindow
             await _automationDesk.DisposeAsync();
             ClosePopupWindows();
 
+            await _villageCacheWriter.WhenIdleAsync();
+
             var backgroundTasksStopped = await _backgroundTasks.StopAsync(TimeSpan.FromSeconds(10));
             if (!backgroundTasksStopped)
             {

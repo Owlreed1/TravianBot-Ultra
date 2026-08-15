@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Core.Tasks;
 using TbotUltra.Core.Travian;
@@ -126,7 +127,7 @@ public partial class MainWindow
             }
         }
 
-        RefreshVillageActivityIndicatorsOnDashboard();
+        RequestDashboardVillageProjectionRefresh();
     }
 
     // Seeds the remembered hero home village (from a previous session) so the dashboard icon shows on the
@@ -141,7 +142,7 @@ public partial class MainWindow
             {
                 _heroHomeVillageName = NormalizeVillageName(saved);
                 _heroHomeVillageKey = savedKey;
-                RefreshVillageActivityIndicatorsOnDashboard();
+                RequestDashboardVillageProjectionRefresh();
             }
         }
         catch (Exception ex)
@@ -174,10 +175,13 @@ public partial class MainWindow
         }
 
         var heroHome = NormalizeVillageName(_heroHomeVillageName);
-        var queuedVillages = BuildVillagesWithConstructionQueue();
+        var queueItems = _queueItemsForUiProjection.Count > 0
+            ? _queueItemsForUiProjection
+            : GetQueueSnapshotForUi();
+        var queuedVillages = BuildVillagesWithConstructionQueue(queueItems);
         // Per-village set of groups with a deferred/blocked task (Pending but not yet due) — drives the
         // amber "waiting" state on the matching icons (e.g. construction waiting for resources/queue).
-        var deferredByVillage = BuildVillagesWithDeferredWork();
+        var deferredByVillage = BuildVillagesWithDeferredWork(queueItems);
         foreach (var item in items)
         {
             var name = NormalizeVillageName(item.Name);
@@ -217,12 +221,12 @@ public partial class MainWindow
 
     // Village keys that currently have at least one pending construction item queued. Drives the green
     // (has queue) vs muted (empty) queue icon so the user sees which villages need more queued.
-    private HashSet<string> BuildVillagesWithConstructionQueue()
+    private HashSet<string> BuildVillagesWithConstructionQueue(IReadOnlyList<QueueItem> queueItems)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            foreach (var item in GetQueueSnapshotForUi())
+            foreach (var item in queueItems)
             {
                 if (!ConstructionQueueState.IsActiveQueueStatus(item.Status)
                     || !IsConstructionQueueTask(item.TaskName))
@@ -248,13 +252,13 @@ public partial class MainWindow
     // Per-village groups that currently have a DEFERRED task (Pending but NextAttemptAt in the future,
     // e.g. waiting for resources or a full build queue). Drives the amber "waiting" icon state so a village
     // with blocked-but-pending work isn't shown as fully idle.
-    private Dictionary<string, HashSet<QueueGroup>> BuildVillagesWithDeferredWork()
+    private Dictionary<string, HashSet<QueueGroup>> BuildVillagesWithDeferredWork(IReadOnlyList<QueueItem> queueItems)
     {
         var map = new Dictionary<string, HashSet<QueueGroup>>(StringComparer.OrdinalIgnoreCase);
         try
         {
             var now = DateTimeOffset.UtcNow;
-            foreach (var item in GetQueueSnapshotForUi())
+            foreach (var item in queueItems)
             {
                 if (item.Status != QueueStatus.Pending || item.NextAttemptAt <= now)
                 {
@@ -406,7 +410,7 @@ public partial class MainWindow
             }
         }
 
-        RefreshVillageActivityIndicatorsOnDashboard();
+        RequestDashboardVillageProjectionRefresh();
     }
 
     private IReadOnlyList<ActiveSmithyUpgrade> ResolveActiveSmithyQueue(string? villageKey)
@@ -443,6 +447,36 @@ public partial class MainWindow
 
         RefreshTravianBuildQueueUi();
         RefreshTravianSmithyQueueUi();
+    }
+
+    private bool _dashboardVillageProjectionPending;
+
+    private void RequestDashboardVillageProjectionRefresh()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            _ = Dispatcher.BeginInvoke(RequestDashboardVillageProjectionRefresh);
+            return;
+        }
+
+        if (_dashboardVillageProjectionPending)
+        {
+            return;
+        }
+
+        _dashboardVillageProjectionPending = true;
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.ContextIdle,
+            new Action(() =>
+            {
+                _dashboardVillageProjectionPending = false;
+                if (_isVillageDropdownOpen)
+                {
+                    return;
+                }
+
+                MeasureUiWork("dashboard projection", RefreshVillageActivityIndicatorsOnDashboard);
+            }));
     }
 
     private static IReadOnlyList<VillageActivitySlot> BuildBuildingActivitySlots(
@@ -894,6 +928,7 @@ public partial class MainWindow
         }
 
         StoreVillageStatusCacheEntry(name, status);
+        InvalidateVillageOverview();
 
         // An empty queue is confirmed only by a current dorf1/dorf2 overview read. Treat that visit as
         // a human deciding to queue work now: arm the short-lived fill override for this village so all
@@ -909,20 +944,22 @@ public partial class MainWindow
 
         if (isFullRead)
         {
-            _villageCacheStore.Save(_villageStatusCache.Snapshot);
+            _villageCacheWriter.Request(new VillageCacheWrite(
+                _accountStore.ActiveAccountName(),
+                _villageStatusCache.Snapshot));
         }
 
         // Repaint the Dashboard village-list overview (Buildings/Troops slots) from the refreshed cache.
         if (Dispatcher.CheckAccess())
         {
-            RefreshVillageActivityIndicatorsOnDashboard();
+            RequestDashboardVillageProjectionRefresh();
             ApplyVillageTribeToUiIfSelected(status);
         }
         else
         {
             _ = Dispatcher.BeginInvoke(() =>
             {
-                RefreshVillageActivityIndicatorsOnDashboard();
+                RequestDashboardVillageProjectionRefresh();
                 ApplyVillageTribeToUiIfSelected(status);
             });
         }
@@ -1301,7 +1338,7 @@ public partial class MainWindow
             // Storage bars must follow the selected village too (they were staying on the previous one).
             _resourcesViewModel.ApplyStorageForecasts(cached, renderImmediately: true);
             _lastBuildingStatus = cached;
-            PopulateBuildingsTab(cached);
+            PopulateBuildingsTab(cached, requestQueueEstimateRefresh: false);
             _troopTrainingViewModel.ApplyStatus(cached, cached.TroopTrainingQueues);
             if (cached.SmithyUpgradeStatus is not null)
             {
@@ -1327,7 +1364,7 @@ public partial class MainWindow
             ClearVillageDetailUiForUncachedSelection(selected.Name);
         }
 
-        RefreshQueueUi();
+        ApplyCachedQueueRowsForSelectedVillage();
         // Show this village's auto-loop group toggles + construction timer.
         ApplyAutomationLoopGroupsForSelectedVillage();
         // Load this village's troop-training override into the Troops tab so it tracks the selection.

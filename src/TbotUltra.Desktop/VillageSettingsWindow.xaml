@@ -186,19 +186,23 @@
                               CanUserReorderColumns="False"
                               HeadersVisibility="Column"
                               GridLinesVisibility="Horizontal"
+                              EnableRowVirtualization="True"
+                              EnableColumnVirtualization="True"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling"
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="#" Width="Auto" Binding="{Binding Position}" />
-                            <DataGridTextColumn Header="Task" Width="Auto" MaxWidth="340" Binding="{Binding Task}">
+                            <DataGridTextColumn Header="#" Width="42" Binding="{Binding Position}" />
+                            <DataGridTextColumn Header="Task" Width="340" Binding="{Binding Task}">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="TextWrapping" Value="Wrap" />
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Village" Width="Auto" Binding="{Binding Village}" />
-                            <DataGridTextColumn Header="Group" Width="Auto" Binding="{Binding Group}" />
-                            <DataGridTemplateColumn Header="Status" Width="Auto">
+                            <DataGridTextColumn Header="Village" Width="160" Binding="{Binding Village}" />
+                            <DataGridTextColumn Header="Group" Width="140" Binding="{Binding Group}" />
+                            <DataGridTemplateColumn Header="Status" Width="190">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock local:OverviewStatusText.Text="{Binding Timing}"
@@ -222,6 +226,10 @@
                               CanUserReorderColumns="False"
                               HeadersVisibility="Column"
                               GridLinesVisibility="Horizontal"
+                              EnableRowVirtualization="True"
+                              EnableColumnVirtualization="True"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling"
                               FrozenColumnCount="2"
                               ScrollViewer.HorizontalScrollBarVisibility="Auto"
                               ScrollViewer.VerticalScrollBarVisibility="Auto">

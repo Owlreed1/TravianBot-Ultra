@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
@@ -530,19 +531,21 @@ public partial class MainWindow
                 return null;
             }
 
-            await Dispatcher.InvokeAsync(() => MeasureUiWork("resource snapshot apply", () =>
-            {
-                ApplyResourceStatusToUi(status);
-                // Pick up renamed/new villages read from the current page (guarded so it never blanks
-                // the list when the page had no readable village info).
-                TryUpdateDashboardVillagesFromStatus(status);
-                // Keep the hero/dashboard adventure count in sync each refresh when the indicator was
-                // readable on the current page (null = not found, so leave the last value untouched).
-                if (status.AdventureCount is int adventureCount)
+            await Dispatcher.InvokeAsync(
+                () => MeasureUiWork("resource snapshot apply", () =>
                 {
-                    ApplyHeroAdventureAvailability(adventureCount);
-                }
-            }));
+                    ApplyResourceStatusToUi(status);
+                    // Pick up renamed/new villages read from the current page (guarded so it never blanks
+                    // the list when the page had no readable village info).
+                    TryUpdateDashboardVillagesFromStatus(status);
+                    // Keep the hero/dashboard adventure count in sync each refresh when the indicator was
+                    // readable on the current page (null = not found, so leave the last value untouched).
+                    if (status.AdventureCount is int adventureCount)
+                    {
+                        ApplyHeroAdventureAvailability(adventureCount);
+                    }
+                }),
+                DispatcherPriority.ContextIdle);
             return status;
         }
         catch (UnexpectedTravianLanguageException)

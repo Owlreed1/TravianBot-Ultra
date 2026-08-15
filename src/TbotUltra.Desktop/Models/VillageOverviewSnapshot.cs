@@ -51,3 +51,29 @@ internal sealed record PipelineTaskSource(
     string? VillageKey,
     string VillageName,
     bool IsAllowed);
+
+internal sealed record VillageOverviewProjection(
+    IReadOnlyList<VillageOverviewSource> Villages,
+    IReadOnlyList<PipelineTaskSource> Tasks,
+    IReadOnlyList<QueueGroup> OrderedGroups,
+    string? ActiveVillageKey,
+    QueueItem? ExactNext,
+    Func<DateTimeOffset, string> FinishTimeFormatter,
+    IReadOnlyDictionary<QueueGroup, string?> RotationVillageKeys,
+    IReadOnlyDictionary<string, double> ConstructionQueueSecondsByVillage,
+    Func<double, string> DurationFormatter,
+    IReadOnlyDictionary<string, ContinuousLoopForecast> ForecastsByVillage)
+{
+    internal VillageOverviewSnapshot Render(DateTimeOffset nowUtc) => VillageOverviewFactory.Create(
+        Villages,
+        Tasks,
+        OrderedGroups,
+        ActiveVillageKey,
+        ExactNext,
+        nowUtc,
+        FinishTimeFormatter,
+        RotationVillageKeys,
+        ConstructionQueueSecondsByVillage,
+        DurationFormatter,
+        ForecastsByVillage);
+}

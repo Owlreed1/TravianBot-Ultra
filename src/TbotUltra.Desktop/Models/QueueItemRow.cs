@@ -2,7 +2,7 @@ using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Desktop.Models;
 
-public sealed class QueueItemRow
+public sealed record QueueItemRow
 {
     public Guid Id { get; init; }
     public QueueGroup Group { get; init; }

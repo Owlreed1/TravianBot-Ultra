@@ -181,14 +181,17 @@ public partial class MainWindow
             return;
         }
 
-        NextTaskTextBlock.Text = ResolveNextTaskDisplayText();
+        _cachedNextTaskProjection = ResolveNextTaskProjection();
+        RenderNextTaskUi(DateTimeOffset.UtcNow);
     }
 
-    private string ResolveNextTaskDisplayText()
+    private DashboardNextTaskProjection? _cachedNextTaskProjection;
+
+    private DashboardNextTaskProjection? ResolveNextTaskProjection()
     {
         if (!_isLoggedIn)
         {
-            return "Idle";
+            return new DashboardNextTaskProjection(DashboardNextTaskState.Idle, null, null);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -205,16 +208,42 @@ public partial class MainWindow
         {
             var activeOperationName = _dashboardActivityTracker.Current ?? _activeFunctionDisplayName;
             return string.IsNullOrWhiteSpace(activeOperationName)
-                ? "-"
-                : $"Running: {activeOperationName}";
+                ? null
+                : new DashboardNextTaskProjection(
+                    DashboardNextTaskState.RunningOperation,
+                    null,
+                    null,
+                    activeOperationName);
         }
 
-        return projection.State switch
+        return projection;
+    }
+
+    private void TickNextTaskUi() => RenderNextTaskUi(DateTimeOffset.UtcNow);
+
+    private void RenderNextTaskUi(DateTimeOffset nowUtc)
+    {
+        if (NextTaskTextBlock is null)
+        {
+            return;
+        }
+
+        var projection = _cachedNextTaskProjection;
+        if (projection is null)
+        {
+            NextTaskTextBlock.Text = "-";
+            return;
+        }
+
+        NextTaskTextBlock.Text = projection.State switch
         {
             DashboardNextTaskState.Running => $"Running: {DescribeNextTask(projection.QueueItem!)}",
             DashboardNextTaskState.RunningOperation => $"Running: {projection.OperationName}",
             DashboardNextTaskState.Next => $"Next: {DescribeNextTask(projection.QueueItem!)}",
-            DashboardNextTaskState.Waiting => $"Waiting {FormatNextTaskCountdown(projection.Remaining ?? TimeSpan.Zero)}: {DescribeNextTask(projection.QueueItem!)}",
+            DashboardNextTaskState.Waiting => $"Waiting {FormatNextTaskCountdown(
+                projection.ReadyAtUtc is DateTimeOffset readyAt
+                    ? readyAt - nowUtc
+                    : projection.Remaining ?? TimeSpan.Zero)}: {DescribeNextTask(projection.QueueItem!)}",
             DashboardNextTaskState.WaitingForRefresh => "Waiting for refresh",
             DashboardNextTaskState.NothingQueued => "Nothing queued",
             _ => "Idle",

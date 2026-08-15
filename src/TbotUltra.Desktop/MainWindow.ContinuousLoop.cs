@@ -1931,9 +1931,10 @@ public partial class MainWindow
 
     private ContinuousLoopForecast ResolveNextContinuousLoopForecast(
         DateTimeOffset now,
-        string? villageKeyFilter = null)
+        string? villageKeyFilter = null,
+        IReadOnlyList<QueueItem>? queueItemsOverride = null)
     {
-        var queueItems = GetQueueSnapshotForUi();
+        var queueItems = queueItemsOverride ?? GetQueueSnapshotForUi();
         var scopedItems = queueItems
             .Where(item => string.IsNullOrWhiteSpace(villageKeyFilter)
                 || string.Equals(

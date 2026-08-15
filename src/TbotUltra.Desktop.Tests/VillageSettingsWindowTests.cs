@@ -98,6 +98,27 @@ public sealed class VillageSettingsWindowTests
         button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     }
 
+    [Fact]
+    public void Constructor_DoesNotBuildOverviewBeforeTheWindowIsShown()
+    {
+        _wpf.Run(() =>
+        {
+            var calls = 0;
+            var window = new VillageSettingsWindow(
+                [],
+                overviewProjectionProvider: _ =>
+                {
+                    calls++;
+                    return Task.FromResult<VillageOverviewProjection>(null!);
+                },
+                overviewSourceVersionProvider: () => 1);
+
+            Assert.Equal(0, calls);
+            Assert.Equal("Loading overview...", Assert.IsType<TextBlock>(window.FindName("OverviewUpdatedTextBlock")).Text);
+            window.Close();
+        });
+    }
+
     private static string HeaderTitle(DataGridColumn column)
     {
         return (column.Header as TextBlock)?.Text ?? string.Empty;

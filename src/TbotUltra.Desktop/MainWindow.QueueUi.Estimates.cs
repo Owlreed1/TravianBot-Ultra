@@ -78,15 +78,13 @@ public partial class MainWindow
     // a slot in one village never offsets the same slot in another) walked in queue order. Keyed by the
     // village key the overview already attributed the item to, so the column lines up with its row.
     // Villages with no estimatable construction are absent from the result.
-    private Dictionary<string, double> BuildConstructionQueueSecondsByVillage(IReadOnlyList<PipelineTaskSource> tasks)
+    private static Dictionary<string, double> BuildConstructionQueueSecondsByVillage(
+        IReadOnlyList<PipelineTaskSource> tasks,
+        IReadOnlyDictionary<Guid, QueueItemRow> rowsById)
     {
         var secondsByVillage = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-        // Reuse the exact rows currently rendered by the Queue tab. Rebuilding estimates here can use a
-        // different village cache snapshot than the tab and produce a different total for the same queue.
-        var rowsById = tasks.All(source => _queueEstimateRowsById.ContainsKey(source.Item.Id))
-            ? _queueEstimateRowsById
-            : BuildQueueEstimateRows(tasks.Select(source => source.Item).ToList())
-                .ToDictionary(row => row.Id);
+        // Reuse the immutable copy captured from the Queue tab on the UI thread. Missing rows stay
+        // unestimated until the next queue projection instead of reading UI collections in background.
         foreach (var source in tasks)
         {
             if (!rowsById.TryGetValue(source.Item.Id, out var row)

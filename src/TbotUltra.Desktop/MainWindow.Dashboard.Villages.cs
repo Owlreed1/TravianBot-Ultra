@@ -861,21 +861,57 @@ public partial class MainWindow
             OpenHeroResourceSettingsFromVillageSettings,
             OpenConstructFasterSettingsFromVillageSettings,
             OnVillageSettingsSaved,
-            BuildVillageSettingsOverviewSnapshot)
+            BuildVillageSettingsOverviewProjectionAsync,
+            GetVillageOverviewSourceVersion)
         {
             Owner = this,
         };
         window.ShowDialog();
     }
 
-    private VillageOverviewSnapshot BuildVillageSettingsOverviewSnapshot()
+    private long _villageOverviewSourceVersion;
+
+    private long GetVillageOverviewSourceVersion() => Interlocked.Read(ref _villageOverviewSourceVersion);
+
+    private void InvalidateVillageOverview() => Interlocked.Increment(ref _villageOverviewSourceVersion);
+
+    private Task<VillageOverviewProjection> BuildVillageSettingsOverviewProjectionAsync(CancellationToken cancellationToken)
     {
         var source = ((DashboardVillageList.ItemsSource as IEnumerable<VillageSelectionItem>)
             ?? (VillageComboBox.ItemsSource as IEnumerable<VillageSelectionItem>)
             ?? Enumerable.Empty<VillageSelectionItem>())
             .Where(village => !string.IsNullOrWhiteSpace(village.Name)
                 && !string.Equals(village.Name, "-", StringComparison.Ordinal))
+            .Select(village => new VillageSelectionItem
+            {
+                Name = village.Name,
+                Url = village.Url,
+                IsCapital = village.IsCapital,
+                CoordX = village.CoordX,
+                CoordY = village.CoordY,
+                Population = village.Population,
+                CropFields = village.CropFields,
+                Tribe = village.Tribe,
+            })
             .ToList();
+        var orderedGroups = GetContinuousLoopConsideredGroupsInOrder().ToList();
+        var estimateRowsById = new Dictionary<Guid, QueueItemRow>(_queueEstimateRowsById);
+        return Task.Run(
+            () => BuildVillageSettingsOverviewProjection(
+                source,
+                orderedGroups,
+                estimateRowsById,
+                cancellationToken),
+            cancellationToken);
+    }
+
+    private VillageOverviewProjection BuildVillageSettingsOverviewProjection(
+        IReadOnlyList<VillageSelectionItem> source,
+        IReadOnlyList<QueueGroup> orderedGroups,
+        IReadOnlyDictionary<Guid, QueueItemRow> estimateRowsById,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var duplicateNames = source
             .GroupBy(village => NormalizeVillageName(village.Name) ?? string.Empty, StringComparer.OrdinalIgnoreCase)
             .Where(group => group.Count() > 1)
@@ -974,32 +1010,33 @@ public partial class MainWindow
                 allowed);
         }).ToList();
 
-        var globalForecast = ResolveNextContinuousLoopForecast(nowUtc);
+        cancellationToken.ThrowIfCancellationRequested();
+        var globalForecast = ResolveNextContinuousLoopForecast(nowUtc, queueItemsOverride: queueItems);
         var exactNext = globalForecast.Item;
         var forecastsByVillage = villages.ToDictionary(
             village => village.VillageKey,
-            village => ResolveNextContinuousLoopForecast(nowUtc, village.VillageKey),
+            village => ResolveNextContinuousLoopForecast(nowUtc, village.VillageKey, queueItems),
             StringComparer.OrdinalIgnoreCase);
         var batchVillageKey = _automationPassRuntime.SnapshotVillageBatch(_activeWorkingVillageKey).VillageKey;
         var rotationKeys = QueueGroupCatalog.AllGroups.ToDictionary(
             group => group,
             _ => batchVillageKey);
 
-        var snapshot = VillageOverviewFactory.Create(
+        var projection = new VillageOverviewProjection(
             villages,
             tasks,
-            GetContinuousLoopConsideredGroupsInOrder(),
+            orderedGroups,
             _activeWorkingVillageKey,
             exactNext,
-            nowUtc,
             FormatQueueFinishTime,
             rotationKeys,
-            BuildConstructionQueueSecondsByVillage(tasks),
+            BuildConstructionQueueSecondsByVillage(tasks, estimateRowsById),
             FormatBuildDuration,
             forecastsByVillage);
 
+        var snapshot = projection.Render(nowUtc);
         LogOverviewAttributionDiagnostics(villages, snapshot, attributionMisses, attributedPendingByKey);
-        return snapshot;
+        return projection;
     }
 
     // Resolves the overview village a queue item belongs to: canonical key first, then a unique village name.
@@ -1112,6 +1149,7 @@ public partial class MainWindow
 
     private void OnVillageSettingsSaved()
     {
+        InvalidateVillageOverview();
         RefreshVillageEnabledStateOnDashboard();
         RefreshAutomationLoopDashboardUi();
         SaveConstructFasterMasterFlag();

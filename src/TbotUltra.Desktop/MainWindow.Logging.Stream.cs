@@ -81,10 +81,11 @@ public partial class MainWindow
     {
         try
         {
-            var terminalAnchor = CaptureLogListAnchor(TerminalListBox);
-            var popupTerminalAnchor = CaptureLogListAnchor(_logsPopupLogList);
-            var alarmAnchor = CaptureLogListAnchor(AlarmListBox);
-            var popupAlarmAnchor = CaptureLogListAnchor(_logsPopupAlarmList);
+            var logsVisible = IsMainTabSelected(LogsTabItem) || _logsPopupWindow?.IsVisible == true;
+            var terminalAnchor = logsVisible ? CaptureLogListAnchor(TerminalListBox) : null;
+            var popupTerminalAnchor = logsVisible ? CaptureLogListAnchor(_logsPopupLogList) : null;
+            var alarmAnchor = logsVisible ? CaptureLogListAnchor(AlarmListBox) : null;
+            var popupAlarmAnchor = logsVisible ? CaptureLogListAnchor(_logsPopupAlarmList) : null;
             var messages = new List<string>(MaxLogLinesPerFlush);
             var logLinesForSessionLog = new List<string>(MaxLogLinesPerFlush * 2);
             var alarmLinesForSessionLog = new List<string>(MaxLogLinesPerFlush);
@@ -110,6 +111,7 @@ public partial class MainWindow
             string? lastPrimaryPart = null;
             var browserStatisticsChanged = false;
             var alarmEntriesChanged = false;
+            var executionStateChanged = false;
             var flushStopwatch = Stopwatch.StartNew();
             for (var messageIndex = 0; messageIndex < messages.Count; messageIndex++)
             {
@@ -172,6 +174,7 @@ public partial class MainWindow
                         if (waitUntilUtc > _inlineWaitUntilUtc)
                         {
                             _inlineWaitUntilUtc = waitUntilUtc;
+                            executionStateChanged = true;
                         }
                     }
 
@@ -223,25 +226,35 @@ public partial class MainWindow
             TryAppendSessionLogLines(logLinesForSessionLog, alarmLinesForSessionLog);
             if (alarmEntriesChanged)
             {
-                if (IsMainTabSelected(LogsTabItem))
+                if (logsVisible)
                 {
                     AlarmListBox.Items.Refresh();
+                    _logsPopupAlarmList?.Items.Refresh();
                 }
-
-                _logsPopupAlarmList?.Items.Refresh();
             }
 
             if (lastRawMessage is not null)
             {
-                UpdateStatusFromVisibleLog(lastRawMessage, lastPrimaryPart);
+                UpdateStatusFromVisibleLog(lastRawMessage, lastPrimaryPart, logsVisible);
             }
 
-            UpdateTerminalAlarmUi();
-            UpdateExecutionStateIndicator();
-            RestoreLogListAnchor(TerminalListBox, terminalAnchor);
-            RestoreLogListAnchor(_logsPopupLogList, popupTerminalAnchor);
-            RestoreLogListAnchor(AlarmListBox, alarmAnchor);
-            RestoreLogListAnchor(_logsPopupAlarmList, popupAlarmAnchor);
+            if (logsVisible || alarmEntriesChanged)
+            {
+                UpdateTerminalAlarmUi();
+            }
+
+            if (executionStateChanged)
+            {
+                UpdateExecutionStateIndicator();
+            }
+
+            if (terminalAnchor is not null)
+            {
+                RestoreLogListAnchor(TerminalListBox, terminalAnchor);
+                RestoreLogListAnchor(_logsPopupLogList, popupTerminalAnchor!);
+                RestoreLogListAnchor(AlarmListBox, alarmAnchor!);
+                RestoreLogListAnchor(_logsPopupAlarmList, popupAlarmAnchor!);
+            }
 
             if (hasMore)
             {
@@ -261,9 +274,12 @@ public partial class MainWindow
     private void FlushPendingLogsToUiMeasured()
         => MeasureUiWork("log UI flush", FlushPendingLogsToUi);
 
-    private void UpdateStatusFromVisibleLog(string? fallbackRawMessage = null, string? fallbackPrimaryPart = null)
+    private void UpdateStatusFromVisibleLog(
+        string? fallbackRawMessage = null,
+        string? fallbackPrimaryPart = null,
+        bool searchVisibleEntries = true)
     {
-        var latestVisible = VisibleTerminalEntries().FirstOrDefault();
+        var latestVisible = searchVisibleEntries ? VisibleTerminalEntries().FirstOrDefault() : null;
         if (latestVisible is not null)
         {
             StatusTextBlock.Text = latestVisible.Text;

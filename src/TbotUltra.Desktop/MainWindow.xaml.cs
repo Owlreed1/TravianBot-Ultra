@@ -39,7 +39,7 @@ public partial class MainWindow : Window
     private const int ResourceFieldMaxLevel = 40;
     private const int NonCapitalResourceMaxLevel = 10;
     private const int MaxFarmListsShown = 120;
-    private const int MaxLogLinesPerFlush = 220;
+    private const int MaxLogLinesPerFlush = 24;
     private static readonly TimeSpan LogUiFlushBudget = TimeSpan.FromMilliseconds(12);
     private const int MaxSessionLogFiles = 5;
     private const int ContinuousLoopMaxSleepSliceSeconds = 1;
@@ -96,6 +96,8 @@ public partial class MainWindow : Window
     private readonly TravcoListStore _travcoListStore;
     private readonly AllVillagesImportSettingsStore _allVillagesImportSettingsStore;
     private readonly VillageCacheStore _villageCacheStore;
+    private readonly LatestSnapshotWriter<VillageCacheWrite> _villageCacheWriter;
+    private sealed record VillageCacheWrite(string AccountName, IReadOnlyDictionary<string, VillageStatus> Snapshot);
     private readonly IAccountProvider _accountProvider;
     private readonly EnvAccountStore _accountStore;
     private string _uiActiveAccountName = string.Empty;
@@ -256,6 +258,8 @@ public partial class MainWindow : Window
     public FarmListsViewModel FarmListsVm => _farmListsViewModel;
     private readonly SemaphoreSlim _inboxRefreshGate = new(1, 1);
     private readonly DispatcherTimer _queueUiRefreshTimer;
+    private bool _queueUiRefreshPending;
+    private bool _isVillageDropdownOpen;
     // UI-thread micro-snapshot of the queue (see GetQueueSnapshotForUi): coalesces the per-tick burst of
     // display reads into one disk read.
     private IReadOnlyList<QueueItem>? _uiQueueSnapshot;
@@ -435,6 +439,11 @@ public partial class MainWindow : Window
             () => LoadBotOptions().BaseUrl,
             AppendLog);
         _villageCacheStore = new VillageCacheStore(_projectRoot, () => _accountStore.ActiveAccountName(), AppendLog);
+        _villageCacheWriter = new LatestSnapshotWriter<VillageCacheWrite>(write =>
+        {
+            _villageCacheStore.Save(write.AccountName, write.Snapshot);
+            return Task.CompletedTask;
+        });
         InitializeSessionPacing();
         _accountAnalysisStore = new AccountAnalysisStore(_projectRoot);
         _heroAttributeSnapshotStore = new HeroAttributeSnapshotStore(_projectRoot);
@@ -518,19 +527,14 @@ public partial class MainWindow : Window
                 TickBuildQueueCountdown();
                 RefreshDemolishStatusForSelectedVillage();
 
-                // The "Next task" value runs the loop selector (reads the queue/options). Queue reads now
-                // come from the in-memory cache, so recompute every second; also refreshed on real
-                // queue/group changes via RefreshAutomationLoopDashboardUi.
-                UpdateNextTaskUi();
+                // Only render the cached projection here. Queue/status changes rebuild it through
+                // RefreshAutomationLoopDashboardUi; the one-second pulse merely advances its countdown.
+                TickNextTaskUi();
                 _troopTrainingViewModel.TickCountdowns(serverNow);
                 TickSmithyUpgradeCountdown();
                 _resourcesViewModel.TickLiveForecasts();
 
-                if (dashboardTabSelected)
-                {
-                    MeasureUiWork("dashboard projection", RefreshVillageActivityIndicatorsOnDashboard);
-                }
-                else if (IsMainTabSelected(QueueTabItem))
+                if (IsMainTabSelected(QueueTabItem))
                 {
                     UpdateBuildQueueStatusText();
                     RefreshTravianBuildQueueUi();
@@ -547,7 +551,6 @@ public partial class MainWindow : Window
                     UpdateReinforcementStatus();
                 }
 
-                UpdateExecutionStateIndicator(updateAutomationLoopCards: dashboardTabSelected);
             }
             catch (Exception ex)
             {
@@ -597,6 +600,13 @@ public partial class MainWindow : Window
         _queueUiRefreshTimer.Tick += (_, _) =>
         {
             _queueUiRefreshTimer.Stop();
+            if (_isVillageDropdownOpen)
+            {
+                _queueUiRefreshPending = true;
+                return;
+            }
+
+            _queueUiRefreshPending = false;
             var selectId = _pendingQueueUiSelectId;
             _pendingQueueUiSelectId = null;
             MeasureUiWork("queue refresh", () => RefreshQueueUi(selectId));
@@ -684,6 +694,8 @@ public partial class MainWindow : Window
 
         ResetVillageSelectionUi();
         VillageComboBox.SelectionChanged += VillageComboBox_SelectionChanged;
+        VillageComboBox.DropDownOpened += VillageComboBox_DropDownOpened;
+        VillageComboBox.DropDownClosed += VillageComboBox_DropDownClosed;
         BuildingCategoryComboBox.ItemsSource = new[] { "all", "infrastructure", "army_buildings", "resource_buildings" };
         BuildingCategoryComboBox.SelectedIndex = 0;
         ConstructBuildingComboBox.ItemsSource = _buildingCatalogOptions;

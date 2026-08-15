@@ -41,7 +41,8 @@ internal sealed class DashboardProjectionService
             ContinuousLoopForecastState.Waiting => new DashboardNextTaskProjection(
                 DashboardNextTaskState.Waiting,
                 request.Forecast.Item,
-                request.Forecast.ReadyAtUtc - request.NowUtc),
+                request.Forecast.ReadyAtUtc - request.NowUtc,
+                ReadyAtUtc: request.Forecast.ReadyAtUtc),
             ContinuousLoopForecastState.WaitingForRefresh => new DashboardNextTaskProjection(
                 DashboardNextTaskState.WaitingForRefresh,
                 null,
@@ -61,7 +62,8 @@ internal sealed record DashboardNextTaskProjection(
     DashboardNextTaskState State,
     QueueItem? QueueItem,
     TimeSpan? Remaining,
-    string? OperationName = null);
+    string? OperationName = null,
+    DateTimeOffset? ReadyAtUtc = null);
 
 internal enum DashboardNextTaskState
 {

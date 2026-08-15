@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.ViewModels;
 using System.Windows.Input;
@@ -80,6 +81,23 @@ public sealed class TravianQueueViewModelTests
         vm.ApplyHistoryQueueRows([]);
 
         Assert.Empty(vm.HistoryQueueRows);
+    }
+
+    [Fact]
+    public void ApplyQueueRows_ReusesUnchangedRowsWithoutResettingTheCollection()
+    {
+        var vm = new TravianQueueViewModel();
+        var first = new QueueItemRow { Id = Guid.NewGuid(), DisplayName = "First" };
+        var second = new QueueItemRow { Id = Guid.NewGuid(), DisplayName = "Second" };
+        vm.ApplyActiveQueueRows([first, second]);
+        var actions = new List<NotifyCollectionChangedAction>();
+        vm.ActiveQueueRows.CollectionChanged += (_, args) => actions.Add(args.Action);
+
+        vm.ApplyActiveQueueRows([first, second]);
+
+        Assert.Same(first, vm.ActiveQueueRows[0]);
+        Assert.Same(second, vm.ActiveQueueRows[1]);
+        Assert.Empty(actions);
     }
 
     [Fact]

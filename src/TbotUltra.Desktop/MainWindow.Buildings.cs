@@ -1187,7 +1187,7 @@ public partial class MainWindow
         return System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s+", " ");
     }
 
-    private void PopulateBuildingsTab(VillageStatus status)
+    private void PopulateBuildingsTab(VillageStatus status, bool requestQueueEstimateRefresh = true)
     {
         // Keep the Buildings tab locked to the village the user is viewing in the dropdown. A background
         // read for a different (active) village must not blow away the selected village's building view
@@ -1320,7 +1320,7 @@ public partial class MainWindow
         // The Main Building level just became available for this village. Recompute the queue estimates
         // so already-queued items reflect the build-time discount. Skipped when this call came from
         // RefreshQueueUi itself (see _isRefreshingQueueUi) to avoid an endless refresh loop.
-        if (!_isRefreshingQueueUi)
+        if (requestQueueEstimateRefresh && !_isRefreshingQueueUi)
         {
             RequestQueueUiRefresh();
         }

@@ -7,6 +7,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 using TbotUltra.Desktop.Models;
+using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
 using TbotUltra.Worker.Services;
 
@@ -31,12 +32,18 @@ public partial class VillageSettingsWindow : Window
     private readonly Action<IReadOnlyList<VillageSettingsRow>>? _onHeroResourceSettingsRequested;
     private readonly Action<IReadOnlyList<VillageSettingsRow>>? _onConstructFasterSettingsRequested;
     private readonly Action? _onSaved;
-    private readonly Func<VillageOverviewSnapshot>? _overviewSnapshotProvider;
+    private readonly Func<CancellationToken, Task<VillageOverviewProjection>>? _overviewProjectionProvider;
+    private readonly Func<long>? _overviewSourceVersionProvider;
+    private readonly LatestWinsProjectionCoordinator<VillageOverviewProjection> _overviewCoordinator = new();
     private readonly DispatcherTimer? _overviewRefreshTimer;
+    private VillageOverviewProjection? _overviewProjection;
+    private long _appliedOverviewSourceVersion = -1;
+    private long _requestedOverviewSourceVersion = -1;
+    private bool _overviewClosed;
     private readonly ObservableCollection<UpcomingTaskRow> _upcomingTaskRows = [];
     private readonly ObservableCollection<VillageOverviewRow> _overviewVillageRows = [];
 
-    public VillageSettingsWindow(
+    internal VillageSettingsWindow(
         IReadOnlyList<VillageSettingsRow> rows,
         Action<VillageSettingsRow>? onEnabledChanged = null,
         Action<VillageSettingsRow>? onNpcTradeChanged = null,
@@ -49,7 +56,8 @@ public partial class VillageSettingsWindow : Window
         Action<IReadOnlyList<VillageSettingsRow>>? onHeroResourceSettingsRequested = null,
         Action<IReadOnlyList<VillageSettingsRow>>? onConstructFasterSettingsRequested = null,
         Action? onSaved = null,
-        Func<VillageOverviewSnapshot>? overviewSnapshotProvider = null)
+        Func<CancellationToken, Task<VillageOverviewProjection>>? overviewProjectionProvider = null,
+        Func<long>? overviewSourceVersionProvider = null)
     {
         InitializeComponent();
         ThemeChrome.EnableEarlyDarkTitleBar(this);
@@ -66,7 +74,8 @@ public partial class VillageSettingsWindow : Window
         _onHeroResourceSettingsRequested = onHeroResourceSettingsRequested;
         _onConstructFasterSettingsRequested = onConstructFasterSettingsRequested;
         _onSaved = onSaved;
-        _overviewSnapshotProvider = overviewSnapshotProvider;
+        _overviewProjectionProvider = overviewProjectionProvider;
+        _overviewSourceVersionProvider = overviewSourceVersionProvider;
         BuildGroupColumns(rows);
         BuildOverviewColumns();
         ApplyTribeColumnVisibility(rows);
@@ -74,13 +83,26 @@ public partial class VillageSettingsWindow : Window
         UpcomingTasksDataGrid.ItemsSource = _upcomingTaskRows;
         VillageOverviewDataGrid.ItemsSource = _overviewVillageRows;
 
-        if (_overviewSnapshotProvider is not null)
+        if (_overviewProjectionProvider is not null)
         {
-            RefreshOverview();
+            OverviewUpdatedTextBlock.Text = "Loading overview...";
             _overviewRefreshTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
-            _overviewRefreshTimer.Tick += (_, _) => RefreshOverview();
-            _overviewRefreshTimer.Start();
-            Closed += (_, _) => _overviewRefreshTimer.Stop();
+            _overviewRefreshTimer.Tick += async (_, _) => await RefreshOverviewAsync();
+            Loaded += async (_, _) =>
+            {
+                await Dispatcher.Yield(DispatcherPriority.ContextIdle);
+                await RefreshOverviewAsync(force: true);
+                if (!_overviewClosed)
+                {
+                    _overviewRefreshTimer.Start();
+                }
+            };
+            Closed += (_, _) =>
+            {
+                _overviewClosed = true;
+                _overviewRefreshTimer.Stop();
+                _overviewCoordinator.Dispose();
+            };
         }
     }
 
@@ -95,31 +117,61 @@ public partial class VillageSettingsWindow : Window
         }).ToList(),
     };
 
-    private void RefreshOverview()
+    private async Task RefreshOverviewAsync(bool force = false)
     {
-        if (_overviewSnapshotProvider is null)
+        if (_overviewProjectionProvider is null)
         {
             return;
         }
 
         try
         {
-            var snapshot = _overviewSnapshotProvider();
-            OverviewRunningTaskTextBlock.Text = $"Running: {snapshot.RunningTask}";
-            OverviewUpdatedTextBlock.Text = $"Updated {snapshot.CapturedAtUtc.ToLocalTime():HH:mm:ss}";
-            var upcoming = snapshot.UpcomingTasks.ToList();
-            if (upcoming.Count < 5)
+            var sourceVersion = _overviewSourceVersionProvider?.Invoke() ?? 0;
+            if (force || _overviewProjection is null || sourceVersion != _appliedOverviewSourceVersion)
             {
-                upcoming.Add(new UpcomingTaskRow("-", "No more schedulable tasks", "-", "-", "-", "-"));
+                if (!force && sourceVersion == _requestedOverviewSourceVersion)
+                {
+                    if (_overviewProjection is not null)
+                    {
+                        ApplyOverviewSnapshot(_overviewProjection.Render(DateTimeOffset.UtcNow));
+                    }
+
+                    return;
+                }
+
+                _requestedOverviewSourceVersion = sourceVersion;
+                await _overviewCoordinator.RequestAsync(
+                    _overviewProjectionProvider,
+                    projection =>
+                    {
+                        _overviewProjection = projection;
+                        _appliedOverviewSourceVersion = sourceVersion;
+                        ApplyOverviewSnapshot(projection.Render(DateTimeOffset.UtcNow));
+                    });
+                return;
             }
 
-            ReplaceRows(_upcomingTaskRows, upcoming);
-            ReplaceRows(_overviewVillageRows, snapshot.Villages);
+            ApplyOverviewSnapshot(_overviewProjection.Render(DateTimeOffset.UtcNow));
         }
         catch (Exception ex)
         {
+            _requestedOverviewSourceVersion = -1;
             OverviewUpdatedTextBlock.Text = $"Overview unavailable: {ex.Message}";
         }
+    }
+
+    private void ApplyOverviewSnapshot(VillageOverviewSnapshot snapshot)
+    {
+        OverviewRunningTaskTextBlock.Text = $"Running: {snapshot.RunningTask}";
+        OverviewUpdatedTextBlock.Text = $"Updated {snapshot.CapturedAtUtc.ToLocalTime():HH:mm:ss}";
+        var upcoming = snapshot.UpcomingTasks.ToList();
+        if (upcoming.Count < 5)
+        {
+            upcoming.Add(new UpcomingTaskRow("-", "No more schedulable tasks", "-", "-", "-", "-"));
+        }
+
+        ReplaceRows(_upcomingTaskRows, upcoming);
+        ReplaceRows(_overviewVillageRows, snapshot.Villages);
     }
 
     private static void ReplaceRows<T>(ObservableCollection<T> target, IReadOnlyList<T> source)
@@ -267,8 +319,8 @@ public partial class VillageSettingsWindow : Window
     }
 
     // A single overview cell: a wrapping TextBlock whose status text is color-coded per line via the
-    // OverviewStatusText attached property. The column auto-sizes to content up to maxWidth (then the text
-    // wraps). The Village name column binds plain Text (colorize: false) so a village name is never mistaken
+    // OverviewStatusText attached property. Fixed widths avoid a full column re-measure on every countdown
+    // tick. The Village name column binds plain Text (colorize: false) so a village name is never mistaken
     // for a status keyword.
     private static DataGridTemplateColumn BuildOverviewColumn(
         string header,
@@ -290,9 +342,8 @@ public partial class VillageSettingsWindow : Window
         return new DataGridTemplateColumn
         {
             Header = header,
-            Width = DataGridLength.Auto,
+            Width = new DataGridLength(maxWidth),
             MinWidth = 60,
-            MaxWidth = maxWidth,
             CellTemplate = new DataTemplate { VisualTree = text },
         };
     }

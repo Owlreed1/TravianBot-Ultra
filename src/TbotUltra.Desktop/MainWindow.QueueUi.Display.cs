@@ -16,6 +16,12 @@ public partial class MainWindow
     // The Queue tab is the authoritative estimate projection. Village Settings reads these same rows
     // so its per-village totals cannot drift from the Queue tab after a cache or selection change.
     private readonly Dictionary<Guid, QueueItemRow> _queueEstimateRowsById = [];
+    private IReadOnlyList<QueueItemRow> _allActiveQueueRows = [];
+    private IReadOnlyList<QueueItemRow> _allHistoryQueueRows = [];
+    private IReadOnlyList<QueueItem> _historyQueueItems = [];
+    private bool _historyQueueProjectionDirty;
+    private IReadOnlyList<QueueItem> _queueItemsForUiProjection = [];
+    private bool _hasQueueDisplayProjection;
 
     private string BuildQueueDisplayName(QueueItem item)
     {
@@ -56,33 +62,22 @@ public partial class MainWindow
         try
         {
             var ordered = _queuePanelService.GetItems().ToList();
+            _queueItemsForUiProjection = ordered;
             ClearStaleBuildingPendingCaches(ordered);
-            // Drop construction upgrades whose target level is already reached (built manually or covered
-            // by an earlier queued step) so the queue only shows real remaining work. Re-fetch after a prune.
-            if (PruneCompletedConstructionQueueItems(ordered))
-            {
-                ordered = _queuePanelService.GetItems().ToList();
-            }
 
             _queueServerTimeOffset = ResolveQueueServerTimeOffset();
-            var rows = BuildQueueEstimateRows(ordered);
+            var projection = BuildQueueDisplayRows(ordered);
+            _allActiveQueueRows = projection.ActiveRows;
+            _historyQueueItems = projection.HistoryItems;
+            _historyQueueProjectionDirty = true;
+            _hasQueueDisplayProjection = true;
             _queueEstimateRowsById.Clear();
-            foreach (var row in rows)
+            foreach (var row in projection.ActiveRows)
             {
                 _queueEstimateRowsById[row.Id] = row;
             }
-            var activeRows = rows
-                .Where(row =>
-                    row.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused
-                    || (row.Status == QueueStatus.Failed && !row.IsRuntimeOnly))
-                .ToList();
-            UpdateDashboardQueueDurationTooltips(activeRows);
-            var historyRows = rows
-                .Where(row =>
-                    row.Status == QueueStatus.Succeeded
-                    || row.Status == QueueStatus.Canceled
-                    || (row.Status == QueueStatus.Failed && row.IsRuntimeOnly))
-                .ToList();
+            UpdateDashboardQueueDurationTooltips(projection.ActiveRows);
+            RequestDashboardVillageProjectionRefresh();
             var nowUtc = DateTimeOffset.UtcNow;
             var hasRunningQueueItems = ordered.Any(item => item.Status == QueueStatus.Running);
             var hasDeferredQueueItems = ordered.Any(item =>
@@ -94,11 +89,14 @@ public partial class MainWindow
             // Filter the displayed rows to the village selected in the dropdown so the Queue tab shows
             // that village's queue. Village-less (global) tasks are always shown. State flags above use
             // the unfiltered list so execution status stays account-wide.
-            var displayedActiveRows = FilterQueueRowsForSelectedVillage(activeRows);
-            var displayedHistoryRows = FilterQueueRowsForSelectedVillage(historyRows);
-
+            var displayedActiveRows = FilterQueueRowsForSelectedVillage(projection.ActiveRows);
             _travianQueueViewModel.ApplyActiveQueueRows(displayedActiveRows);
-            _travianQueueViewModel.ApplyHistoryQueueRows(displayedHistoryRows);
+            if (ShouldProjectQueueHistory())
+            {
+                EnsureQueueHistoryProjection();
+                _travianQueueViewModel.ApplyHistoryQueueRows(
+                    FilterQueueRowsForSelectedVillage(_allHistoryQueueRows));
+            }
             RefreshTravianBuildQueueUi();
             RefreshTravianSmithyQueueUi();
             UpdateQueueEstimateTotals(displayedActiveRows);
@@ -126,6 +124,7 @@ public partial class MainWindow
                 }
             }
             UpdateExecutionStateIndicator();
+            UpdateNextTaskUi();
         }
         catch (Exception ex)
         {
@@ -139,22 +138,69 @@ public partial class MainWindow
     }
 
     // Produces the one estimate projection consumed by both the Queue tab and Village Settings overview.
-    private List<QueueItemRow> BuildQueueEstimateRows(IReadOnlyList<QueueItem> ordered)
+    private QueueDisplayRows BuildQueueDisplayRows(IReadOnlyList<QueueItem> ordered)
     {
         var displayRunningId = ResolveDisplayRunningQueueItemId(ordered);
         var serverSpeed = ResolveServerSpeed();
         var mainBuildingLevel = ResolveMainBuildingLevel();
         var queuedCoverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        return ordered
-            .Select(item => QueueItemRowFactory.Create(
+        return QueueDisplayProjection.Build(
+            ordered,
+            item => QueueItemRowFactory.Create(
                 item,
                 EstimateForQueueItem(item, serverSpeed, mainBuildingLevel, queuedCoverage),
                 displayRunningId,
                 GetQueueItemCurrentVillageName,
                 GetQueueItemVillageKey,
                 BuildQueueDisplayName,
+                FormatQueueServerTime));
+    }
+
+    private bool ShouldProjectQueueHistory() =>
+        ReferenceEquals(QueueSectionTabControl?.SelectedItem, HistoryQueueTabItem)
+        || _queuePopupWindow is not null;
+
+    private void EnsureQueueHistoryProjection()
+    {
+        if (!_historyQueueProjectionDirty)
+        {
+            return;
+        }
+
+        _allHistoryQueueRows = _historyQueueItems
+            .Select(item => QueueItemRowFactory.Create(
+                item,
+                QueueItemEstimate.None,
+                displayRunningId: null,
+                GetQueueItemCurrentVillageName,
+                GetQueueItemVillageKey,
+                BuildQueueDisplayName,
                 FormatQueueServerTime))
             .ToList();
+        _historyQueueProjectionDirty = false;
+    }
+
+    private void ApplyCachedQueueRowsForSelectedVillage()
+    {
+        if (!_hasQueueDisplayProjection)
+        {
+            RequestQueueUiRefresh();
+            return;
+        }
+
+        var activeRows = FilterQueueRowsForSelectedVillage(_allActiveQueueRows);
+        _travianQueueViewModel.ApplyActiveQueueRows(activeRows);
+        if (ShouldProjectQueueHistory())
+        {
+            EnsureQueueHistoryProjection();
+            _travianQueueViewModel.ApplyHistoryQueueRows(
+                FilterQueueRowsForSelectedVillage(_allHistoryQueueRows));
+        }
+
+        RefreshTravianBuildQueueUi();
+        RefreshTravianSmithyQueueUi();
+        UpdateQueueEstimateTotals(activeRows);
+        SyncPendingResourceTargetsInUi();
     }
 
     private void UpdateDashboardQueueDurationTooltips(IReadOnlyList<QueueItemRow> rows)
@@ -320,9 +366,19 @@ public partial class MainWindow
             _pendingQueueUiSelectId = selectId;
         }
 
+        InvalidateVillageOverview();
+
+        _queueUiRefreshPending = true;
+        if (_isVillageDropdownOpen)
+        {
+            _queueUiRefreshTimer.Stop();
+            return;
+        }
+
         if (immediate)
         {
             _queueUiRefreshTimer.Stop();
+            _queueUiRefreshPending = false;
             var immediateSelectId = _pendingQueueUiSelectId;
             _pendingQueueUiSelectId = null;
             MeasureUiWork("queue refresh", () => RefreshQueueUi(immediateSelectId));
@@ -333,6 +389,28 @@ public partial class MainWindow
         _queueUiRefreshTimer.Start();
     }
 
+    private void VillageComboBox_DropDownOpened(object? sender, EventArgs e)
+    {
+        _isVillageDropdownOpen = true;
+        if (_queueUiRefreshTimer.IsEnabled)
+        {
+            _queueUiRefreshPending = true;
+            _queueUiRefreshTimer.Stop();
+        }
+    }
+
+    private void VillageComboBox_DropDownClosed(object? sender, EventArgs e)
+    {
+        _isVillageDropdownOpen = false;
+        if (_queueUiRefreshPending)
+        {
+            _queueUiRefreshTimer.Stop();
+            _queueUiRefreshTimer.Start();
+        }
+
+        RequestDashboardVillageProjectionRefresh();
+    }
+
     private void QueueSectionTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(sender, QueueSectionTabControl))
@@ -341,5 +419,12 @@ public partial class MainWindow
         }
 
         UpdateQueueClearButtonContent();
+        if (ReferenceEquals(QueueSectionTabControl.SelectedItem, HistoryQueueTabItem)
+            && _hasQueueDisplayProjection)
+        {
+            EnsureQueueHistoryProjection();
+            _travianQueueViewModel.ApplyHistoryQueueRows(
+                FilterQueueRowsForSelectedVillage(_allHistoryQueueRows));
+        }
     }
 }

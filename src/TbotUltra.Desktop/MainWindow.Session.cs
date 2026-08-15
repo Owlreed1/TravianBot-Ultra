@@ -858,6 +858,14 @@ public partial class MainWindow
             VillageComboBox.ItemsSource = placeholder;
             VillageComboBox.SelectedItem = placeholder[0];
             DashboardVillageList.ItemsSource = Array.Empty<VillageSelectionItem>();
+            _queueItemsForUiProjection = [];
+            _historyQueueItems = [];
+            _allActiveQueueRows = [];
+            _allHistoryQueueRows = [];
+            _hasQueueDisplayProjection = false;
+            _historyQueueProjectionDirty = false;
+            _travianQueueViewModel.ApplyActiveQueueRows([]);
+            _travianQueueViewModel.ApplyHistoryQueueRows([]);
         }
         finally
         {

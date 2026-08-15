@@ -108,10 +108,57 @@ public sealed class TravianQueueViewModel : BaseViewModel
         => Reconcile(SmithyQueueRows, rows, (target, source) => target.ApplySnapshot(source));
 
     public void ApplyActiveQueueRows(IReadOnlyList<QueueItemRow> rows)
-        => Replace(ActiveQueueRows, rows);
+        => ReconcileQueueRows(ActiveQueueRows, rows);
 
     public void ApplyHistoryQueueRows(IReadOnlyList<QueueItemRow> rows)
-        => Replace(HistoryQueueRows, rows);
+        => ReconcileQueueRows(HistoryQueueRows, rows);
+
+    private static void ReconcileQueueRows(
+        ObservableCollection<QueueItemRow> target,
+        IReadOnlyList<QueueItemRow> rows)
+    {
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var desired = rows[index];
+            if (index < target.Count && target[index].Id == desired.Id)
+            {
+                if (target[index] != desired)
+                {
+                    target[index] = desired;
+                }
+
+                continue;
+            }
+
+            var existingIndex = -1;
+            for (var candidateIndex = index + 1; candidateIndex < target.Count; candidateIndex++)
+            {
+                if (target[candidateIndex].Id == desired.Id)
+                {
+                    existingIndex = candidateIndex;
+                    break;
+                }
+            }
+
+            if (existingIndex >= 0)
+            {
+                target.Move(existingIndex, index);
+                if (target[index] != desired)
+                {
+                    target[index] = desired;
+                }
+            }
+            else
+            {
+                target.Insert(index, desired);
+            }
+        }
+
+        while (target.Count > rows.Count)
+        {
+            target.RemoveAt(target.Count - 1);
+        }
+    }
 
     private static void Replace<T>(ObservableCollection<T> target, IReadOnlyList<T> rows)
     {

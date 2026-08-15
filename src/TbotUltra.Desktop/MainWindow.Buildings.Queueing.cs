@@ -21,7 +21,10 @@ public partial class MainWindow
 
     private IReadOnlyList<QueueItem> GetActiveQueueItems()
     {
-        return _buildingsPanelService.GetQueueItems()
+        var queueItems = _queueItemsForUiProjection.Count > 0
+            ? _queueItemsForUiProjection
+            : _buildingsPanelService.GetQueueItems();
+        return queueItems
             .Where(item => IsActiveQueueStatus(item.Status))
             .ToList();
     }

@@ -15,6 +15,9 @@ public partial class MainWindow
             return;
         }
 
+        EnsureQueueHistoryProjection();
+        ApplyCachedQueueRowsForSelectedVillage();
+
         var activeGrid = new DataGrid
         {
             AutoGenerateColumns = false,
@@ -26,7 +29,10 @@ public partial class MainWindow
             BorderThickness = new Thickness(1),
             Margin = new Thickness(0, 0, 0, 8),
             ItemsSource = QueueDataGrid.ItemsSource,
+            EnableRowVirtualization = true,
+            EnableColumnVirtualization = true,
         };
+        VirtualizingPanel.SetVirtualizationMode(activeGrid, VirtualizationMode.Recycling);
         activeGrid.Columns.Add(new DataGridTextColumn { Header = "Group", Binding = new Binding("GroupName"), Width = new DataGridLength(1.15, DataGridLengthUnitType.Star) });
         activeGrid.Columns.Add(new DataGridTextColumn { Header = "Village", Binding = new Binding("VillageName"), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
         activeGrid.Columns.Add(new DataGridTextColumn { Header = "Task", Binding = new Binding("DisplayName"), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
@@ -44,7 +50,10 @@ public partial class MainWindow
             BorderBrush = new SolidColorBrush(ThemeColors.Get("BorderBrush")),
             BorderThickness = new Thickness(1),
             ItemsSource = QueueHistoryDataGrid.ItemsSource,
+            EnableRowVirtualization = true,
+            EnableColumnVirtualization = true,
         };
+        VirtualizingPanel.SetVirtualizationMode(historyGrid, VirtualizationMode.Recycling);
         historyGrid.Columns.Add(new DataGridTextColumn { Header = "Group", Binding = new Binding("GroupName"), Width = new DataGridLength(1.15, DataGridLengthUnitType.Star) });
         historyGrid.Columns.Add(new DataGridTextColumn { Header = "Village", Binding = new Binding("VillageName"), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
         historyGrid.Columns.Add(new DataGridTextColumn { Header = "Completed task", Binding = new Binding("DisplayName"), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
