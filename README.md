@@ -314,7 +314,11 @@ Credentials and per-account data are stored locally only (in `.env` and
 
 ## License
 
-Released under the [MIT License](LICENSE).
+This project is source-available for personal and non-commercial use.
+
+Commercial use, sale, redistribution for profit, or inclusion in a commercial product or service is prohibited without prior written permission from the copyright holder.
+
+See the [LICENSE](LICENSE) file for the full license terms.
 
 ---
 
