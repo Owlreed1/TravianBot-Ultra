@@ -202,56 +202,10 @@
                         </Style.Triggers>
                     </Style>
                 </DataGrid.RowStyle>
-                <DataGrid.ColumnHeaderStyle>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
-                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-                        <Setter Property="FontWeight" Value="SemiBold" />
-                        <Setter Property="FontSize" Value="11" />
-                        <Setter Property="Padding" Value="10,6" />
-                        <Setter Property="BorderBrush" Value="{DynamicResource ControlBackgroundBrush}" />
-                        <Setter Property="BorderThickness" Value="0,0,1,1" />
-                        <Setter Property="HorizontalContentAlignment" Value="Left" />
-                    </Style>
-                </DataGrid.ColumnHeaderStyle>
-                <DataGrid.CellStyle>
-                    <Style TargetType="DataGridCell">
-                        <Setter Property="Padding" Value="10,4" />
-                        <Setter Property="BorderThickness" Value="0" />
-                        <Setter Property="Foreground" Value="{DynamicResource DataGridCellTextBrush}" />
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="DataGridCell">
-                                    <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}">
-                                        <ContentPresenter VerticalAlignment="Center" />
-                                    </Border>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Style.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource SelectedRowBgBrush}" />
-                                <Setter Property="Foreground" Value="{DynamicResource DataGridCellTextBrush}" />
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </DataGrid.CellStyle>
                 <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="Group" Width="1.15*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate><TextBlock Text="{Binding GroupName}" Foreground="{DynamicResource DataGridCellTextBrush}" /></DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Village" Width="1.2*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate><TextBlock Text="{Binding VillageName}" Foreground="{DynamicResource DataGridCellTextBrush}" /></DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Task" Width="2.4*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate><TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource DataGridCellTextBrush}" /></DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Group" Width="1.15*" Binding="{Binding GroupName}" />
+                    <DataGridTextColumn Header="Village" Width="1.2*" Binding="{Binding VillageName}" />
+                    <DataGridTextColumn Header="Task" Width="2.4*" Binding="{Binding DisplayName}" />
                     <DataGridTemplateColumn Header="Status" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
@@ -275,11 +229,7 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Time" Width="1.1*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate><TextBlock Text="{Binding BuildTimeText}" Foreground="{DynamicResource DataGridCellTextBrush}" /></DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Time" Width="1.1*" Binding="{Binding BuildTimeText}" />
                     <DataGridTemplateColumn Header="Cost (W | C | I | Cr)" Width="1.7*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
@@ -404,55 +354,10 @@
                         <VirtualizingStackPanel VirtualizationMode="Recycling" />
                     </ItemsPanelTemplate>
                 </DataGrid.ItemsPanel>
-                <DataGrid.ColumnHeaderStyle>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
-                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-                        <Setter Property="FontWeight" Value="SemiBold" />
-                        <Setter Property="FontSize" Value="11" />
-                        <Setter Property="Padding" Value="10,6" />
-                        <Setter Property="BorderBrush" Value="{DynamicResource ControlBackgroundBrush}" />
-                        <Setter Property="BorderThickness" Value="0,0,1,1" />
-                        <Setter Property="HorizontalContentAlignment" Value="Left" />
-                    </Style>
-                </DataGrid.ColumnHeaderStyle>
-                <DataGrid.CellStyle>
-                    <Style TargetType="DataGridCell">
-                        <Setter Property="Padding" Value="10,4" />
-                        <Setter Property="BorderThickness" Value="0" />
-                        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="DataGridCell">
-                                    <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}">
-                                        <ContentPresenter VerticalAlignment="Center" />
-                                    </Border>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Style.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </DataGrid.CellStyle>
                 <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="Group" Width="1.15*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate><TextBlock Text="{Binding GroupName}" Foreground="{DynamicResource TextMutedBrush}" /></DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Village" Width="1.2*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate><TextBlock Text="{Binding VillageName}" Foreground="{DynamicResource TextMutedBrush}" /></DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Completed task" Width="2.4*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate><TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource TextMutedBrush}" /></DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Group" Width="1.15*" Binding="{Binding GroupName}" />
+                    <DataGridTextColumn Header="Village" Width="1.2*" Binding="{Binding VillageName}" />
+                    <DataGridTextColumn Header="Completed task" Width="2.4*" Binding="{Binding DisplayName}" />
                     <DataGridTemplateColumn Header="Status" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
@@ -472,16 +377,8 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Retries" Width="0.7*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate><TextBlock Text="{Binding Retries}" Foreground="{DynamicResource TextMutedBrush}" /></DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Created" Width="1.5*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate><TextBlock Text="{Binding CreatedAtServer}" Foreground="{DynamicResource TextMutedBrush}" /></DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Retries" Width="0.7*" Binding="{Binding Retries}" />
+                    <DataGridTextColumn Header="Created" Width="1.5*" Binding="{Binding CreatedAtServer}" />
                 </DataGrid.Columns>
             </DataGrid>
         </Grid>

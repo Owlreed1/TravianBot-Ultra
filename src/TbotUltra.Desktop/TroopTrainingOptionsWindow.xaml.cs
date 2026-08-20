@@ -96,6 +96,19 @@ public partial class TroopTrainingOptionsWindow : Window
             return;
         }
 
+        var missingResourceSelection = Rows.FirstOrDefault(row => row.RequiresResourceSelection && !row.HasResourceSelection);
+        if (missingResourceSelection is not null)
+        {
+            AppDialog.Show(
+                this,
+                $"{missingResourceSelection.VillageName}: select at least one resource when an enabled troop building uses % resources.",
+                "Invalid troop settings",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            missingResourceSelection.IsExpanded = true;
+            return;
+        }
+
         Results = BuildResults();
         DialogResult = true;
         Close();

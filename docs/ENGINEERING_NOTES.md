@@ -424,6 +424,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - New-account analysis is account+server scoped. A pending first-login analysis forces hero inventory, hero
   attributes, and new-village startup until all three succeed; legacy account snapshots are already initialized.
 - Browser activity statistics are account-scoped: lifetime counters persist; session counters do not.
+- Build troops `% resources` checkboxes use OR semantics: at least one resource must be selected, any selected
+  resource at or above the percentage threshold releases training, and deferred waits use the earliest selected
+  resource ETA. This trigger never replaces the normal all-resource affordability, NPC, or hero-resource checks.
 - Farm-list exact timers get a 5-15s render margin; unreadable disabled timers use an estimated 60s wait.
 - "Send toggled lists" sends selected farm lists ONE AT A TIME via `SendFarmListsSequentiallyAsync`: click each list's Start,
   then wait for that list's `.farmListStatus` "N/M being raided" numerator to rise (or its Start to disable)
@@ -451,6 +454,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   `#dialogOverlay` intercepts every click on the form inputs (coordinate click times out). `OpenAddRaidFormAsync`
   closes any lingering dialog before opening, and a single target's fill/save exception is skipped (bounded
   consecutive-failure abort) instead of failing the whole batch.
+- Reused Add-target dialogs must replace X/Y through the traced input path and re-read both fresh fields as an exact
+  pair before validation. Retry replacement only a bounded number of times and never click Save while either
+  coordinate differs from the requested value.
 - Hero attribute priority is execution-authoritative from the latest saved account settings. A queued
   `hero_manage` or `spend_hero_attribute_points` payload is only a snapshot and must never overwrite a reorder
   the user made in the UI while the task was waiting.

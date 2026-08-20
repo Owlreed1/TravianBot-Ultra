@@ -273,11 +273,11 @@
                                             <StackPanel>
                                                 <!-- Village-level resource checks -->
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                                    <TextBlock Text="Check for % resources:"
+                                                    <TextBlock Text="Trigger % resources with:"
                                                                Style="{StaticResource DetailLabelStyle}"
                                                                Margin="0,0,10,0"
                                                                ToolTipService.InitialShowDelay="100"
-                                                               ToolTip="Only selected resources are checked when Run trigger is set to % resources." />
+                                                               ToolTip="Training starts when any selected resource reaches the configured limit. Select at least one." />
                                                     <CheckBox Content="Wood" Margin="0,0,12,0" VerticalAlignment="Center"
                                                               IsChecked="{Binding CheckWood, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                                     <CheckBox Content="Clay" Margin="0,0,12,0" VerticalAlignment="Center"

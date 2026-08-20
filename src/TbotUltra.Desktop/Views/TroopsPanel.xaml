@@ -234,7 +234,7 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                <TextBlock Text="Resources to check for % resources"
+                                <TextBlock Text="Resources that can trigger % resources"
                                            Foreground="{DynamicResource TextSubtleBrush}"
                                            FontSize="11"
                                            VerticalAlignment="Center" />
@@ -255,7 +255,7 @@
                                                            Foreground="{DynamicResource TooltipForegroundBrush}"
                                                            Margin="0,0,0,6" />
                                                 <TextBlock TextWrapping="Wrap"
-                                                           Text="Only selected resources are checked when Run trigger is set to % resources." />
+                                                           Text="Training starts when any selected resource reaches the configured limit. Select at least one." />
                                             </StackPanel>
                                         </ToolTip>
                                     </Border.ToolTip>

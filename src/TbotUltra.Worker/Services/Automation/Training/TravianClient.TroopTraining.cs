@@ -879,40 +879,29 @@ public sealed partial class TravianClient : ITrainingClient
         int fallbackCooldownSeconds,
         string label)
     {
+        var evaluation = TroopTrainingResourceThresholdCalculator.Evaluate(
+            currentResources,
+            productionByHour,
+            capacities.WarehouseCapacity,
+            capacities.GranaryCapacity,
+            request.MinimumResourcesPercent,
+            request.CheckWood,
+            request.CheckClay,
+            request.CheckIron,
+            request.CheckCrop,
+            fallbackCooldownSeconds);
         return BuildTroopTrainingWaitOutcome(
             buildingName,
             troopType,
             currentResources,
             productionByHour,
-            BuildRequiredResourcesForPercentThresholdOnly(request, capacities),
-            fallbackCooldownSeconds,
+            evaluation.RequiredResources,
+            new TroopTrainingWaitEstimate(
+                evaluation.WaitSeconds,
+                evaluation.WaitReason,
+                evaluation.RequiredResources,
+                productionByHour),
             label);
-    }
-
-    private static IReadOnlyDictionary<string, long> BuildRequiredResourcesForPercentThresholdOnly(
-        TroopTrainingRequest request,
-        ResourceCapacitySnapshot capacities)
-    {
-        var threshold = Math.Clamp(request.MinimumResourcesPercent, 0, 100);
-        var selectedKeys = ResolveCheckedResourceKeys(request).ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["wood"] = selectedKeys.Contains("wood") ? ComputePercentRequirement(capacities.WarehouseCapacity, threshold) : 0,
-            ["clay"] = selectedKeys.Contains("clay") ? ComputePercentRequirement(capacities.WarehouseCapacity, threshold) : 0,
-            ["iron"] = selectedKeys.Contains("iron") ? ComputePercentRequirement(capacities.WarehouseCapacity, threshold) : 0,
-            ["crop"] = selectedKeys.Contains("crop") ? ComputePercentRequirement(capacities.GranaryCapacity, threshold) : 0,
-        };
-    }
-
-    private static long ComputePercentRequirement(long? capacity, int thresholdPercent)
-    {
-        if (capacity is not > 0)
-        {
-            return 0;
-        }
-
-        return (long)Math.Ceiling(capacity.Value * (Math.Clamp(thresholdPercent, 0, 100) / 100d));
     }
 
     private static TroopTrainingAttemptOutcome BuildTroopTrainingWaitOutcome(
@@ -1054,56 +1043,17 @@ public sealed partial class TravianClient : ITrainingClient
         ResourceCapacitySnapshot capacities,
         TroopTrainingRequest request)
     {
-        var threshold = Math.Clamp(request.MinimumResourcesPercent, 0, 100);
-        if (threshold <= 0)
-        {
-            return true;
-        }
-        var selectedKeys = ResolveCheckedResourceKeys(request);
-        return selectedKeys.All(key =>
-        {
-            var capacity = string.Equals(key, "crop", StringComparison.OrdinalIgnoreCase)
-                ? capacities.GranaryCapacity
-                : capacities.WarehouseCapacity;
-            return capacity is > 0 && HasMinimumResourcePercent(resources, key, capacity.Value, threshold);
-        });
-    }
-
-    private static bool HasMinimumResourcePercent(IReadOnlyDictionary<string, long> resources, string key, long capacity, int thresholdPercent)
-    {
-        if (capacity <= 0)
-        {
-            return false;
-        }
-
-        var current = resources.TryGetValue(key, out var value) ? Math.Max(0L, value) : 0L;
-        return (current * 100d / capacity) >= thresholdPercent;
-    }
-
-    private static IReadOnlyList<string> ResolveCheckedResourceKeys(TroopTrainingRequest request)
-    {
-        var keys = new List<string>();
-        if (request.CheckWood)
-        {
-            keys.Add("wood");
-        }
-
-        if (request.CheckClay)
-        {
-            keys.Add("clay");
-        }
-
-        if (request.CheckIron)
-        {
-            keys.Add("iron");
-        }
-
-        if (request.CheckCrop)
-        {
-            keys.Add("crop");
-        }
-
-        return keys.Count > 0 ? keys : ["wood", "clay", "iron", "crop"];
+        return TroopTrainingResourceThresholdCalculator.Evaluate(
+            resources,
+            new Dictionary<string, double?>(),
+            capacities.WarehouseCapacity,
+            capacities.GranaryCapacity,
+            request.MinimumResourcesPercent,
+            request.CheckWood,
+            request.CheckClay,
+            request.CheckIron,
+            request.CheckCrop,
+            fallbackCooldownSeconds: 1).IsReady;
     }
 
     private static Building? ResolveTroopTrainingBuilding(IReadOnlyList<Building> buildings, TroopTrainingBuildingType buildingType)

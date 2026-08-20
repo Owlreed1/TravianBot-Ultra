@@ -438,22 +438,10 @@ public sealed partial class TravianClient
         // coordinates, so the bot doesn't fill the freshly-loaded form instantly (more human-like).
         await DelayBeforeClickAsync(cancellationToken, "add farm: enter coordinates");
 
-        var xInput = _page.Locator(
-            "#farmListTargetForm input[name=\"x\"], " +
-            "#farmListTargetForm input[name=\"xCoord\"], " +
-            "#farmListTargetForm input[id*=\"xCoord\" i]").First;
-        var yInput = _page.Locator(
-            "#farmListTargetForm input[name=\"y\"], " +
-            "#farmListTargetForm input[name=\"yCoord\"], " +
-            "#farmListTargetForm input[id*=\"yCoord\" i]").First;
-
-        await TypeHumanlyAsync(xInput, x.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken);
-        Notify($"[farm-list] Add target X filled with {x} for '{farmListName}'.");
-        await Task.Delay(Random.Shared.Next(90, 220), cancellationToken);
-
-        await TypeHumanlyAsync(yInput, y.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken);
-        Notify($"[farm-list] Add target Y filled with {y} for '{farmListName}'.");
-        await Task.Delay(Random.Shared.Next(90, 220), cancellationToken);
+        if (!await FillAndVerifyFarmCoordinatesAsync(x, y, farmListName, cancellationToken))
+        {
+            return AddRaidSaveOutcome.Failed;
+        }
 
         var validationTriggered = await _page.EvaluateAsync<bool>(
             """
@@ -677,6 +665,66 @@ public sealed partial class TravianClient
 
         Notify($"[farm-list] Add target save ended in unexpected state '{saveState}' for ({x}|{y}) in '{farmListName}'.");
         return AddRaidSaveOutcome.Failed;
+    }
+
+    // Reused Add-target forms can restore the previous React-controlled value immediately after a normal
+    // clear. Type through the traced input path, then read both fresh fields back as one operation. Never
+    // continue to target validation unless the form contains exactly the requested pair.
+    private async Task<bool> FillAndVerifyFarmCoordinatesAsync(
+        int x,
+        int y,
+        string farmListName,
+        CancellationToken cancellationToken)
+    {
+        const int maxAttempts = 3;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var xInput = _page.Locator(
+                "#farmListTargetForm input[name=\"x\"], " +
+                "#farmListTargetForm input[name=\"xCoord\"], " +
+                "#farmListTargetForm input[id*=\"xCoord\" i]").First;
+            var yInput = _page.Locator(
+                "#farmListTargetForm input[name=\"y\"], " +
+                "#farmListTargetForm input[name=\"yCoord\"], " +
+                "#farmListTargetForm input[id*=\"yCoord\" i]").First;
+
+            var expectedX = x.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var expectedY = y.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            await TypeHumanlyAsync(xInput, expectedX, cancellationToken);
+            await Task.Delay(Random.Shared.Next(90, 220), cancellationToken);
+            await TypeHumanlyAsync(yInput, expectedY, cancellationToken);
+
+            // Give React one turn to commit its controlled state, then query fresh elements in case the
+            // coordinate inputs were re-rendered by either input event.
+            await Task.Delay(60, cancellationToken);
+            xInput = _page.Locator(
+                "#farmListTargetForm input[name=\"x\"], " +
+                "#farmListTargetForm input[name=\"xCoord\"], " +
+                "#farmListTargetForm input[id*=\"xCoord\" i]").First;
+            yInput = _page.Locator(
+                "#farmListTargetForm input[name=\"y\"], " +
+                "#farmListTargetForm input[name=\"yCoord\"], " +
+                "#farmListTargetForm input[id*=\"yCoord\" i]").First;
+            var actualX = await xInput.InputValueAsync(new LocatorInputValueOptions { Timeout = _config.TimeoutMs })
+                .WaitAsync(cancellationToken);
+            var actualY = await yInput.InputValueAsync(new LocatorInputValueOptions { Timeout = _config.TimeoutMs })
+                .WaitAsync(cancellationToken);
+            var verified = string.Equals(actualX, expectedX, StringComparison.Ordinal)
+                && string.Equals(actualY, expectedY, StringComparison.Ordinal);
+
+            if (verified)
+            {
+                Notify($"[farm-list] Add target coordinates verified as ({x}|{y}) for '{farmListName}'.");
+                return true;
+            }
+
+            Notify($"[farm-list] coordinate input mismatch for ({x}|{y}) in '{farmListName}' " +
+                $"(attempt {attempt}/{maxAttempts}); replacing both fields again.");
+        }
+
+        Notify($"[farm-list] Could not verify coordinate inputs for ({x}|{y}) in '{farmListName}'; Save was not attempted.");
+        return false;
     }
 
     // Waits for Travian's async Add-target lookup to resolve after the coordinates were entered. Returns as
