@@ -114,6 +114,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   batch alive, and preview/forecast selection must not mutate the batch owner or attempt count.
 - Applying Session pacing settings while automation is active must take effect immediately: enabling starts its run
   timer, while disabling a scheduled sleep resumes the captured automation state.
+- Raising or disabling Daily max while sleeping for the old daily limit must re-evaluate the restriction immediately.
+  If the recorded runtime is below the new limit and Allowed hours permit running, wake with zero added sleep delay.
 - Known queue deadlines are authoritative and may not be shortened by pacing.
 - Action pacing is mandatory. Persisted configuration and incoming payloads may change its delay ranges but may
   not disable it. The manual Catapult wave tab burst is the only exception: it uses only its explicitly selected
@@ -124,6 +126,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Alarms represent actionable failures. Expected waiting/blocking and an explicitly retrying bounded transient
   attempt are normal status. Deduplicate identical alarms for 30 minutes; repeated occurrences update visible
   count without another alarm line.
+- Build-estimate server-speed detection accepts both `5x` and lobby-style `X5` names. Before the account has a
+  verified login, missing speed is expected and silently uses 1x; only an unparseable logged-in account alarms.
 - Detailed browser logging is development-only and off by default. Trace semantic operations, emit exactly one
   end event per flow, and sanitize all secrets. Navigation/mutations use the traced adapters.
 
@@ -450,6 +454,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Hero attribute priority is execution-authoritative from the latest saved account settings. A queued
   `hero_manage` or `spend_hero_attribute_points` payload is only a snapshot and must never overwrite a reorder
   the user made in the UI while the task was waiting.
+- Hero runtime state is published as one structured Worker update (`HeroRuntimeStatus`). The Hero page and the
+  Village overview icon must consume that same update so away/dead/reviving state cannot diverge between views.
 - Hero inventory resources are an account+server persisted last-known snapshot. Quick re-login, process restart,
   and account switching restore it; incomplete inventory reads never replace it with fabricated zeroes. When no
   snapshot has ever been captured, construction/resource actions may open their existing resource-transfer dialog,
@@ -458,6 +464,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   General/Village tab click; that makes a Collect-to-tab transition effectively instantaneous.
 - Bonus-video failures use shared protected timing, typed cooldowns, account proxy routing, and sanitized logs.
   See [bonus-video ADR](adr/2026-07-18-bonus-video.md).
+- One `activate_production_bonus` run is a contiguous four-resource batch: after its initial cooldown gate,
+  attempt every resource found activatable before returning control to other automation. A failure or newly
+  created internal video cooldown for one resource must not stop the remaining resources in that same batch.
 - Diagnostics use shared busy/cancel behavior, sanitize settings/logs/paths/URLs/auth/proxy data, and never present
   partial output as a successful archive. Screenshots may contain visible game data.
 - The Dashboard active-village border represents verified live browser state only. Queue selection/Running state

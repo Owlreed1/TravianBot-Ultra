@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Threading;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
@@ -35,6 +36,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     private string? _templateLoadWarning;
     private bool _isLoadingTemplateRows;
     private CancellationTokenSource? _templateLoadCts;
+    private readonly DispatcherTimer _planPreviewTimer;
 
     public ObservableCollection<BuildingTemplate> Templates { get; } = [];
     public ObservableCollection<BuildingTemplateRowView> Rows { get; } = [];
@@ -140,6 +142,15 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         _mainBuildingLevel = mainBuildingLevel;
 
         Rows.CollectionChanged += Rows_CollectionChanged;
+        _planPreviewTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(120),
+        };
+        _planPreviewTimer.Tick += (_, _) =>
+        {
+            _planPreviewTimer.Stop();
+            RefreshPlanPreview();
+        };
         LoadBuildingOptions(status.Tribe);
         Loaded += BuildingTemplatesWindow_Loaded;
         Closed += BuildingTemplatesWindow_Closed;
@@ -177,6 +188,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     private async void BuildingTemplatesWindow_Loaded(object sender, RoutedEventArgs e)
     {
         Loaded -= BuildingTemplatesWindow_Loaded;
+        LoadingOverlay.Show("Building templates", "Loading templates...");
         var loadCts = new CancellationTokenSource();
         _templateLoadCts = loadCts;
         try
@@ -215,6 +227,8 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             }
 
             SelectedTemplate = Templates[0];
+            _planPreviewTimer.Stop();
+            RefreshPlanPreview();
             LoadingOverlay.Hide();
         }
         finally
@@ -235,7 +249,10 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     }
 
     private void BuildingTemplatesWindow_Closed(object? sender, EventArgs e)
-        => _templateLoadCts?.Cancel();
+    {
+        _planPreviewTimer.Stop();
+        _templateLoadCts?.Cancel();
+    }
 
     private BuildingTemplate CreateNewTemplate(string name)
     {
@@ -284,7 +301,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         }
 
         RefreshIndexes();
-        RefreshPlanPreview();
+        RequestPlanPreviewRefresh();
     }
 
     private void Rows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -311,7 +328,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         }
 
         RefreshIndexes();
-        RefreshPlanPreview();
+        RequestPlanPreviewRefresh();
     }
 
     private void AddRowView(BuildingTemplateRowView row)
@@ -327,7 +344,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        RefreshPlanPreview();
+        RequestPlanPreviewRefresh();
     }
 
     private void NewTemplateButton_Click(object sender, RoutedEventArgs e)
@@ -537,6 +554,26 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         MoveSelectedRow(1);
     }
 
+    private void BuildingOptions_DropDownOpened(object sender, EventArgs e)
+    {
+        if (sender is not ComboBox { DataContext: BuildingTemplateRowView row } || !row.IsBuildingRow)
+        {
+            return;
+        }
+
+        RefreshBuildingOptionAvailability(row);
+    }
+
+    private void MoveRowTopButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveSelectedRowTo(0);
+    }
+
+    private void MoveRowBottomButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveSelectedRowTo(Rows.Count - 1);
+    }
+
     private void MoveSelectedRow(int delta)
     {
         if (SelectedRow is null)
@@ -552,8 +589,22 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         }
 
         Rows.Move(index, target);
-        RefreshIndexes();
-        RefreshPlanPreview();
+    }
+
+    private void MoveSelectedRowTo(int target)
+    {
+        if (SelectedRow is null)
+        {
+            return;
+        }
+
+        var index = Rows.IndexOf(SelectedRow);
+        if (index < 0 || target < 0 || target >= Rows.Count || index == target)
+        {
+            return;
+        }
+
+        Rows.Move(index, target);
     }
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -638,6 +689,12 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     private IReadOnlyList<BuildingTemplateRow> BuildTemplateRowsFromUi()
         => Rows.Select(row => row.ToTemplateRow()).ToList();
 
+    private void RequestPlanPreviewRefresh()
+    {
+        _planPreviewTimer.Stop();
+        _planPreviewTimer.Start();
+    }
+
     private void RefreshPlanPreview(BuildingTemplatePlanResult? existingPlan = null)
     {
         if (_isRefreshingPlanPreview)
@@ -648,7 +705,6 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         _isRefreshingPlanPreview = true;
         try
         {
-            RefreshBuildingOptionAvailability();
             var plan = existingPlan ?? _planner.Plan(BuildTemplateRowsFromUi(), _status, _serverSpeed, _mainBuildingLevel);
             foreach (var row in Rows)
             {
@@ -686,38 +742,35 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         }
     }
 
-    private void RefreshBuildingOptionAvailability()
+    private void RefreshBuildingOptionAvailability(BuildingTemplateRowView row)
     {
-        for (var rowIndex = 0; rowIndex < Rows.Count; rowIndex++)
+        var rowIndex = Rows.IndexOf(row);
+        if (rowIndex < 0)
         {
-            var row = Rows[rowIndex];
-            if (!row.IsBuildingRow)
+            return;
+        }
+
+        var precedingRows = Rows.Take(rowIndex).Select(item => item.ToTemplateRow()).ToList();
+        var options = BuildingOptions.Select(option =>
+        {
+            if (option.Gid is not int gid)
             {
-                continue;
+                return option;
             }
 
-            var precedingRows = Rows.Take(rowIndex).Select(item => item.ToTemplateRow()).ToList();
-            var options = BuildingOptions.Select(option =>
+            var result = _planner.EvaluateBuildingAvailability(
+                gid,
+                precedingRows,
+                _status,
+                _serverSpeed,
+                _mainBuildingLevel);
+            return option with
             {
-                if (option.Gid is not int gid)
-                {
-                    return option;
-                }
-
-                var result = _planner.EvaluateBuildingAvailability(
-                    gid,
-                    precedingRows,
-                    _status,
-                    _serverSpeed,
-                    _mainBuildingLevel);
-                return option with
-                {
-                    Availability = result.Availability,
-                    AvailabilityReason = result.Reason,
-                };
-            }).ToList();
-            row.SetOptionSources(options, ResourceOptions);
-        }
+                Availability = result.Availability,
+                AvailabilityReason = result.Reason,
+            };
+        }).ToList();
+        row.SetOptionSources(options, ResourceOptions);
     }
 
     private void RefreshIndexes()

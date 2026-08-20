@@ -237,9 +237,21 @@
                     </Style>
                 </DataGrid.CellStyle>
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Group" Width="1.15*" Binding="{Binding GroupName}" />
-                    <DataGridTextColumn Header="Village" Width="1.2*" Binding="{Binding VillageName}" />
-                    <DataGridTextColumn Header="Task" Width="2.4*" Binding="{Binding DisplayName}" />
+                    <DataGridTemplateColumn Header="Group" Width="1.15*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate><TextBlock Text="{Binding GroupName}" Foreground="{DynamicResource DataGridCellTextBrush}" /></DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Village" Width="1.2*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate><TextBlock Text="{Binding VillageName}" Foreground="{DynamicResource DataGridCellTextBrush}" /></DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Task" Width="2.4*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate><TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource DataGridCellTextBrush}" /></DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTemplateColumn Header="Status" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
@@ -263,7 +275,11 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Time" Width="1.1*" Binding="{Binding BuildTimeText}" />
+                    <DataGridTemplateColumn Header="Time" Width="1.1*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate><TextBlock Text="{Binding BuildTimeText}" Foreground="{DynamicResource DataGridCellTextBrush}" /></DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTemplateColumn Header="Cost (W | C | I | Cr)" Width="1.7*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
@@ -422,9 +438,21 @@
                     </Style>
                 </DataGrid.CellStyle>
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Group" Width="1.15*" Binding="{Binding GroupName}" />
-                    <DataGridTextColumn Header="Village" Width="1.2*" Binding="{Binding VillageName}" />
-                    <DataGridTextColumn Header="Completed task" Width="2.4*" Binding="{Binding DisplayName}" />
+                    <DataGridTemplateColumn Header="Group" Width="1.15*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate><TextBlock Text="{Binding GroupName}" Foreground="{DynamicResource TextMutedBrush}" /></DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Village" Width="1.2*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate><TextBlock Text="{Binding VillageName}" Foreground="{DynamicResource TextMutedBrush}" /></DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Completed task" Width="2.4*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate><TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource TextMutedBrush}" /></DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTemplateColumn Header="Status" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
@@ -444,8 +472,16 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Retries" Width="0.7*" Binding="{Binding Retries}" />
-                    <DataGridTextColumn Header="Created" Width="1.5*" Binding="{Binding CreatedAtServer}" />
+                    <DataGridTemplateColumn Header="Retries" Width="0.7*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate><TextBlock Text="{Binding Retries}" Foreground="{DynamicResource TextMutedBrush}" /></DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Created" Width="1.5*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate><TextBlock Text="{Binding CreatedAtServer}" Foreground="{DynamicResource TextMutedBrush}" /></DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
         </Grid>

@@ -33,7 +33,7 @@ public sealed partial class TravianClient
     // which needs GDPR/TCF consent while the rest of the session keeps it blocked (no stray sync tabs).
     private readonly Action<bool>? _setConsentDomainsAllowed;
     private readonly Func<IPage, CancellationToken, Task>? _cleanupAfterBonusVideoAsync;
-    private readonly Func<Func<IPage, CancellationToken, Task<string>>, CancellationToken, Task<string>>? _runInIsolatedBonusVideoBrowserAsync;
+    private readonly IsolatedBonusVideoRunner? _runInIsolatedBonusVideoBrowserAsync;
     private readonly Func<string, CancellationToken, Task<IPage>>? _rotateAfterLobbyLoginAsync;
     private readonly Func<LobbyWorldSelectionRequest, CancellationToken, Task<string?>>? _lobbyWorldSelectionRequested;
     private readonly Func<LobbyWorldServerResolution, CancellationToken, Task>? _lobbyWorldServerResolved;

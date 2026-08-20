@@ -102,23 +102,23 @@ public partial class MainWindow
                 group => group.OrderBy(item => item.CreatedAt).ToList(),
                 StringComparer.OrdinalIgnoreCase);
 
-        var rows = GetAllVillageKeyInfos()
-            .OrderBy(village => village.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(village =>
+        var rows = new List<DemolishOverviewRow>();
+        foreach (var village in GetAllVillageKeyInfos().OrderBy(village => village.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!activeItemsByVillage.TryGetValue(village.Key, out var items) || items.Count == 0)
             {
-                activeItemsByVillage.TryGetValue(village.Key, out var items);
-                var status = GetDemolishStatus(items?.FirstOrDefault(), now, true);
-                var statusText = status.Text;
-                if (items?.Count > 1)
-                {
-                    statusText += $" (+{items.Count - 1} queued)";
-                }
+                rows.Add(DemolishOverviewRow.Empty(village.Key, village.Name));
+                continue;
+            }
 
-                return new DemolishOverviewRow(village.Name, statusText, status.HasTimer);
-            })
-            .ToList();
+            foreach (var item in items)
+            {
+                var status = GetDemolishStatus(item, now, true);
+                rows.Add(new DemolishOverviewRow(village.Key, village.Name, status.Text, status.HasTimer, item.Id));
+            }
+        }
 
-        var overview = new DemolishOverviewWindow(rows) { Owner = this };
+        var overview = new DemolishOverviewWindow(rows, RemoveDemolishQueueItem) { Owner = this };
         overview.ShowDialog();
     }
 
@@ -135,7 +135,7 @@ public partial class MainWindow
             return;
         }
 
-        if (MessageBox.Show(this,
+        if (AppDialog.Show(this,
                 $"Stop and remove {items.Count} demolish task(s) for this village? A demolition already accepted by Travian will finish normally.",
                 "Stop demolition", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
         {
@@ -145,21 +145,57 @@ public partial class MainWindow
         var removed = 0;
         foreach (var item in items)
         {
-            RequestDemolishOperationStop(item.Id);
-            if (item.Status == QueueStatus.Running)
-            {
-                _botService.MarkQueueItemCanceled(item.Id);
-            }
-            if (_botService.RemoveQueueItem(item.Id))
+            if (TryRemoveDemolishQueueItem(item))
             {
                 removed++;
             }
         }
 
-        _buildingDemolishingSlots.Clear();
         RefreshDemolishStatusForSelectedVillage();
         RequestQueueUiRefresh();
         AppendLog($"[demolish] stopped {removed} queued task(s) for the selected village.");
+    }
+
+    private bool RemoveDemolishQueueItem(Guid itemId)
+    {
+        var item = _botService.GetQueueItemsForDisplay().FirstOrDefault(candidate => candidate.Id == itemId);
+        if (item is null)
+        {
+            return true;
+        }
+
+        if (!IsDemolishQueueItem(item))
+        {
+            AppendLog($"[demolish] refused to remove non-demolition queue item {itemId}.");
+            return false;
+        }
+
+        if (!TryRemoveDemolishQueueItem(item))
+        {
+            return false;
+        }
+
+        RefreshDemolishStatusForSelectedVillage();
+        RequestQueueUiRefresh();
+        AppendLog($"[demolish] removed queue item {item.Id} from the demolition overview.");
+        return true;
+    }
+
+    private bool TryRemoveDemolishQueueItem(QueueItem item)
+    {
+        RequestDemolishOperationStop(item.Id);
+        if (item.Status == QueueStatus.Running)
+        {
+            _botService.MarkQueueItemCanceled(item.Id);
+        }
+
+        if (_botService.RemoveQueueItem(item.Id))
+        {
+            return true;
+        }
+
+        AppendLog($"[demolish] could not remove queue item {item.Id}.");
+        return false;
     }
 
     private CancellationToken BeginDemolishOperation(QueueItem item, CancellationToken parentToken)

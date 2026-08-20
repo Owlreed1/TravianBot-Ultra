@@ -170,6 +170,15 @@ public sealed class SessionPacer
         {
             if (SleepReason is SessionSleepReason.Schedule or SessionSleepReason.DailyLimit)
             {
+                var restriction = GetActiveRestriction(now);
+                if (restriction == SessionSleepReason.None)
+                {
+                    Logger?.Invoke("[pacing] updated settings cleared the active restriction - waking immediately.");
+                    CompleteSleepAndWake();
+                    return;
+                }
+
+                SleepReason = restriction;
                 _wakeAt = ResolveRestrictionWake(now);
             }
 

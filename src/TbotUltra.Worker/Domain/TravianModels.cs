@@ -189,6 +189,12 @@ public sealed record HeroStatus(
     TimerSnapshot? ReturnFinish = null,
     TimerSnapshot? ReviveFinish = null);
 
+public sealed record HeroRuntimeStatus(
+    string DisplayText,
+    bool IsAway,
+    bool IsDead,
+    bool IsReviving);
+
 public sealed record HeroAttributeSnapshot(
     bool LevelUpAvailable = false,
     int FreePoints = 0,

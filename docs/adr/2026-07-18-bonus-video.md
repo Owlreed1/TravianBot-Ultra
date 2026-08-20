@@ -32,6 +32,9 @@ Active decision, extracted from `ENGINEERING_NOTES.md` on 2026-07-18.
   session 5m, missing codec 6h. Known failures receive no immediate second attempt.
 - Preserve typed failure and cooldown deadline across features. Production bonus defers to that deadline
   without replacing saved timers or treating an unattempted video as a four-hour failure.
+- The initial shared cooldown gate still applies before a production-bonus run starts. Once started, the four
+  resources form one contiguous batch: a resource-specific failure may set the route cooldown for later tasks,
+  but it does not prevent the remaining initially activatable resources from being attempted in this batch.
 - Production-bonus inspection is complete only when the Advantages tab contains lumber, clay, iron, and crop.
   Retry empty/partial React rendering; after two 30-second attempts, raise a task failure.
 - Diagnostics log only sanitized ad host, network error code, status, and aggregate counts—never paths,

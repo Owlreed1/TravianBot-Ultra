@@ -120,11 +120,21 @@
                             Height="28"
                             Margin="0,0,6,0"
                             Click="MoveRowUpButton_Click" />
+                    <Button Content="Top"
+                            Width="54"
+                            Height="28"
+                            Margin="0,0,6,0"
+                            Click="MoveRowTopButton_Click" />
                     <Button Content="Down"
                             Width="62"
                             Height="28"
                             Margin="0,0,6,0"
                             Click="MoveRowDownButton_Click" />
+                    <Button Content="Bottom"
+                            Width="66"
+                            Height="28"
+                            Margin="0,0,6,0"
+                            Click="MoveRowBottomButton_Click" />
                     <Button Content="Remove"
                             Width="78"
                             Height="28"
@@ -168,6 +178,7 @@
                                 <DataTemplate>
                                     <ComboBox ItemsSource="{Binding TargetOptionsView}"
                                               SelectedItem="{Binding Target, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              DropDownOpened="BuildingOptions_DropDownOpened"
                                               ScrollViewer.CanContentScroll="False"
                                               VirtualizingPanel.IsVirtualizing="False"
                                               MaxDropDownHeight="360">
@@ -347,6 +358,9 @@
         </Border>
 
         <views:BusyOverlayControl x:Name="LoadingOverlay"
+                                  Grid.ColumnSpan="3"
+                                  Panel.ZIndex="100"
+                                  Margin="-14"
                                   Title="Building templates"
                                   Text="Loading templates..."
                                   IsBusy="True"

@@ -126,9 +126,10 @@ public sealed partial class TravianClient
     /// reads back the resulting per-resource state (25%/15%/none + remaining timers) into the result
     /// string. Account-wide; Official Travian only.
     ///
-    /// Each resource is watched in its OWN isolated bonus-video browser: the isolated flow is hard-capped
-    /// at 120s, so four videos can never share one browser. Never spends gold and never clicks the gold
-    /// Activate/Extend/Upgrade buttons. Best-effort — only cancellation propagates.
+    /// Each resource is watched in its OWN isolated bonus-video browser. All resources found activatable at
+    /// the start are attempted contiguously in the same automation task; a failure for one resource is logged
+    /// but does not hand control back to other automation before the remaining resources are tried. Never
+    /// spends gold and never clicks the gold Activate/Extend/Upgrade buttons. Best-effort — only cancellation propagates.
     /// </summary>
     public async Task<string> ActivateProductionBonusVideosAsync(CancellationToken cancellationToken = default)
     {
@@ -159,8 +160,9 @@ public sealed partial class TravianClient
             }
             else
             {
-                foreach (var resource in activatable)
+                for (var resourceIndex = 0; resourceIndex < activatable.Count; resourceIndex++)
                 {
+                    var resource = activatable[resourceIndex];
                     cancellationToken.ThrowIfCancellationRequested();
                     try
                     {
@@ -170,15 +172,14 @@ public sealed partial class TravianClient
                                 var videoClient = CreateIsolatedBonusVideoClient(videoPage);
                                 return await videoClient.RunSingleProductionBonusVideoIsolatedAsync(resource, videoCancellationToken);
                             },
-                            cancellationToken);
+                            cancellationToken,
+                            bypassExistingCooldown: resourceIndex > 0);
                         var failureKind = BonusVideoFailureClassifier.Classify(videoResult);
                         if (failureKind != BonusVideoFailureKind.None
                             && !BonusVideoFailureClassifier.ShouldRetryImmediately(failureKind))
                         {
                             Notify(
-                                $"[production-bonus] stopping remaining video attempts after {failureKind}; "
-                                + "normal automation continues and videos can retry after cooldown.");
-                            break;
+                                $"[production-bonus] {resource}: {failureKind}; continuing the current batch with remaining resources.");
                         }
                     }
                     catch (OperationCanceledException)
@@ -191,8 +192,13 @@ public sealed partial class TravianClient
                         Notify(
                             $"[production-bonus] video cooldown active after {BonusVideoFailureClassifier.Format(ex.Kind)}; "
                             + $"deferring {waitSeconds}s without changing production timers.");
-                        return $"Production bonus: video cooldown active after {BonusVideoFailureClassifier.Format(ex.Kind)}. "
-                            + $"queue_wait_seconds={waitSeconds}";
+                        if (resourceIndex == 0)
+                        {
+                            return $"Production bonus: video cooldown active after {BonusVideoFailureClassifier.Format(ex.Kind)}. "
+                                + $"queue_wait_seconds={waitSeconds}";
+                        }
+
+                        Notify($"[production-bonus] {resource}: cooldown did not stop the current batch; continuing remaining resources.");
                     }
                     catch (Exception ex)
                     {
@@ -201,9 +207,7 @@ public sealed partial class TravianClient
                         if (!BonusVideoFailureClassifier.ShouldRetryImmediately(failureKind))
                         {
                             Notify(
-                                $"[production-bonus] stopping remaining video attempts after {failureKind}; "
-                                + "normal automation continues without changing route.");
-                            break;
+                                $"[production-bonus] {resource}: {failureKind}; continuing the current batch with remaining resources.");
                         }
                     }
                     finally
