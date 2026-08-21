@@ -59,6 +59,7 @@ public sealed partial class TravianClient
         public const string LobbyGameWorldCard = "div.gameworld.owner[data-wuid]";
         public const string LobbyGameWorldName = ".gameworldName";
         public const string LobbyPlayNowButton = "button.playNow";
+        public const string CurrentPlayerName = ".content > .playerName";
 
         public static readonly string[] LoginUsernameField =
         {

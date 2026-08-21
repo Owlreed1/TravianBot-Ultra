@@ -252,6 +252,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Manual operations matching the canonical begin/busy/complete/paused/fail shape go through
   `RunGuardedOperationAsync`; flows with extra state, dialogs, or custom cancel handling keep explicit blocks.
 - Keep `DataGrid.RowHeight` unset or `Double.NaN`; the string `Auto` is not a WPF `Double`.
+- Queue Active/History grids use star sizing with explicit per-column `MinWidth` and disabled user resizing in both
+  the embedded panel and Pop out. A narrow viewport must scroll horizontally; never allow a header drag or an early
+  hidden-tab measurement to collapse queued task columns into apparently blank rows.
 - Enumerate mutable collections through immutable snapshots when sanitizing/exporting.
 - Village Overview is read-only and uses cache/queue snapshots; opening it never navigates or scans.
 - Overview projections show only real deadlines and never mutate queue or scheduler state.
@@ -427,6 +430,12 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Build troops `% resources` checkboxes use OR semantics: at least one resource must be selected, any selected
   resource at or above the percentage threshold releases training, and deferred waits use the earliest selected
   resource ETA. This trigger never replaces the normal all-resource affordability, NPC, or hero-resource checks.
+- Build troops `maximum` amount mode must click Travian's numeric `.details .cta a[href='#']` shortcut beside the
+  selected troop input and verify Travian filled the advertised amount; do not type that maximum manually. The
+  existing paced Train-button click remains the submit action after the shortcut succeeds.
+- Map SQL `Skip own villages` resolves the in-game owner name from the active page's `.content > .playerName`;
+  never substitute the login email/account key. Add the resolved name to the normalized ignored-player filter so
+  every village owned by that player is excluded, and fail the import safely when the checked filter cannot resolve it.
 - Farm-list exact timers get a 5-15s render margin; unreadable disabled timers use an estimated 60s wait.
 - "Send toggled lists" sends selected farm lists ONE AT A TIME via `SendFarmListsSequentiallyAsync`: click each list's Start,
   then wait for that list's `.farmListStatus` "N/M being raided" numerator to rise (or its Start to disable)

@@ -1226,18 +1226,13 @@ public sealed partial class TravianClient : ITrainingClient
 
         if (useMaxShortcut)
         {
-            Notify($"[troops:verbose] submit:resolving max value for '{inputName}' from action link.");
-            var maxAmount = await ResolveTroopTrainingMaxAmountAsync(inputName);
-            Notify($"[troops:verbose] submit:resolved max value for '{inputName}' => {(maxAmount?.ToString() ?? "null")}.");
-            if (maxAmount is not > 0)
+            if (!await ClickTroopTrainingMaxAmountAsync(input, inputName, cancellationToken))
             {
-                Notify($"Troop training submit skipped: max value for '{inputName}' was not found.");
+                Notify($"Troop training submit skipped: maximum amount link for '{inputName}' was not found or did not fill the input.");
                 return false;
             }
 
-            await DelayBeforeClickAsync(cancellationToken); // Action pacing "Click" delay
-            await TypeHumanlyAsync(input, maxAmount.Value.ToString(), cancellationToken);
-            Notify($"[troops:verbose] submit:filled '{inputName}' with max value '{maxAmount.Value}'.");
+            Notify($"[troops:verbose] submit:clicked Travian maximum amount link for '{inputName}'.");
         }
         else
         {
@@ -1254,6 +1249,7 @@ public sealed partial class TravianClient : ITrainingClient
         }
 
         await Task.Delay(150, cancellationToken);
+        input = _page.Locator($"input[name='{inputName}'], input[id='{inputName}']").First;
         var parsedValueRaw = await input.InputValueAsync();
         var parsedDigits = new string(parsedValueRaw.Where(char.IsDigit).ToArray());
         Notify($"[troops:verbose] submit:input '{inputName}' now has raw='{parsedValueRaw}', digits='{parsedDigits}'.");
@@ -1316,48 +1312,45 @@ public sealed partial class TravianClient : ITrainingClient
         return string.IsNullOrWhiteSpace(resolved) ? null : resolved;
     }
 
-    private async Task<int?> ResolveTroopTrainingMaxAmountAsync(string inputName)
+    private async Task<bool> ClickTroopTrainingMaxAmountAsync(
+        Microsoft.Playwright.ILocator input,
+        string inputName,
+        CancellationToken cancellationToken)
     {
-        var rawValue = await _page.EvaluateAsync<string>(
-            """
-            (inputName) => {
-              const input = document.querySelector(`input[name="${inputName}"], input[id="${inputName}"]`);
-              if (!input) {
-                return "";
-              }
-
-              const action = input.closest('.action, .innerTroopWrapper, .details') || input.parentElement;
-              if (!action) {
-                return "";
-              }
-
-              const links = Array.from(action.querySelectorAll('a[href="#"], a'));
-              for (const link of links) {
-                const onclick = link.getAttribute('onclick') || '';
-                // Official markup can set the max through either jQuery .val(...) or direct .value assignment.
-                const onclickMatch = onclick.match(/(?:\.value\s*=\s*|\.val\(\s*)(\d+)/);
-                if (onclickMatch && onclickMatch[1]) {
-                  return onclickMatch[1];
-                }
-
-                const text = (link.textContent || '').trim();
-                if (/^\d+$/.test(text)) {
-                  return text;
-                }
-              }
-
-              return "";
-            }
-            """,
-            inputName);
-
-        if (int.TryParse(rawValue, out var maxAmount) && maxAmount > 0)
+        var details = input.Locator(
+            "xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' details ')][1]");
+        var links = details.Locator(".cta a[href='#']");
+        var linkCount = await links.CountAsync();
+        for (var index = 0; index < linkCount; index++)
         {
-            return maxAmount;
+            var link = links.Nth(index);
+            if (!await link.IsVisibleAsync())
+            {
+                continue;
+            }
+
+            var linkText = (await link.InnerTextAsync()).Trim();
+            var linkDigits = new string(linkText.Where(char.IsDigit).ToArray());
+            if (!int.TryParse(linkDigits, out var advertisedMaximum) || advertisedMaximum <= 0)
+            {
+                continue;
+            }
+
+            await DelayBeforeClickAsync(cancellationToken, "troop training maximum amount");
+            await ClickLocatorAsync(link, "troop-training-maximum-amount", cancellationToken);
+            await Task.Delay(100, cancellationToken);
+
+            var refreshedInput = _page.Locator($"input[name='{inputName}'], input[id='{inputName}']").First;
+            var filledValue = await refreshedInput.InputValueAsync();
+            var filledDigits = new string(filledValue.Where(char.IsDigit).ToArray());
+            if (int.TryParse(filledDigits, out var filledAmount) && filledAmount == advertisedMaximum)
+            {
+                return true;
+            }
+
+            Notify($"[troops:verbose] submit:maximum link showed {advertisedMaximum}, but '{inputName}' contained '{filledValue}'.");
         }
 
-        Notify($"[troops:verbose] submit:failed to parse max value for '{inputName}' from raw='{rawValue}'.");
-
-        return null;
+        return false;
     }
 }

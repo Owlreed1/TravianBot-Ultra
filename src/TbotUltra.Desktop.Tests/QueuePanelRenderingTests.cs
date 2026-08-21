@@ -72,6 +72,50 @@ public sealed class QueuePanelRenderingTests
         });
     }
 
+    [Fact]
+    public void ActiveQueue_ColumnsHaveNonCollapsibleMinimumWidthsAndCannotBeUserResized()
+    {
+        _wpf.Run(() =>
+        {
+            var viewModel = new TravianQueueViewModel();
+            viewModel.ApplyActiveQueueRows(
+            [
+                new QueueItemRow
+                {
+                    Id = Guid.NewGuid(),
+                    Group = QueueGroup.Construction,
+                    GroupName = "Construction",
+                    VillageName = "BRE",
+                    DisplayName = "Upgrade all resources to level 5",
+                    Status = QueueStatus.Pending,
+                    HasEstimate = true,
+                    BuildTimeText = "1h 38m",
+                    WoodText = "13,285",
+                    ClayText = "14,275",
+                    IronText = "10,855",
+                    CropText = "7,945",
+                },
+            ]);
+            var panel = new QueuePanel { DataContext = viewModel };
+            panel.Measure(new Size(940, 650));
+            panel.Arrange(new Rect(0, 0, 940, 650));
+            panel.UpdateLayout();
+
+            var queueGrid = FindVisualChildren<DataGrid>(panel)
+                .Single(grid => ReferenceEquals(grid.ItemsSource, viewModel.ActiveQueueRows));
+
+            Assert.False(queueGrid.CanUserResizeColumns);
+            Assert.Collection(
+                queueGrid.Columns,
+                column => Assert.True(column.MinWidth >= 90),
+                column => Assert.True(column.MinWidth >= 100),
+                column => Assert.True(column.MinWidth >= 220),
+                column => Assert.True(column.MinWidth >= 85),
+                column => Assert.True(column.MinWidth >= 90),
+                column => Assert.True(column.MinWidth >= 165));
+        });
+    }
+
     private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root)
         where T : DependencyObject
     {

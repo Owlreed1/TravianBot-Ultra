@@ -30,7 +30,8 @@ public sealed record MapSqlVillageImportRequest(
     bool IncludePlayers,
     bool IncludeNatars,
     IReadOnlyList<string> IgnoredPlayers,
-    IReadOnlyList<string> IgnoredAlliances);
+    IReadOnlyList<string> IgnoredAlliances,
+    bool SkipOwnVillages = true);
 
 public sealed record MapSqlVillageImportProgress(string Status);
 

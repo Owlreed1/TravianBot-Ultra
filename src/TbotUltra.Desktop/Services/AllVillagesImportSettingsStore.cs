@@ -10,9 +10,10 @@ public sealed class AllVillagesImportSettingsStore
         bool IncludePlayers,
         bool IncludeNatars,
         string IgnoredPlayers,
-        string IgnoredAlliances)
+        string IgnoredAlliances,
+        bool SkipOwnVillages = true)
     {
-        public static Settings Default { get; } = new(true, true, string.Empty, string.Empty);
+        public static Settings Default { get; } = new(true, true, string.Empty, string.Empty, true);
     }
 
     private static readonly object FileIoLock = new();

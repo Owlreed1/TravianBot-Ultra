@@ -107,6 +107,12 @@ public partial class TravcoToolsWindow : Window
         var listName = new TextBox { MinWidth = 360, ToolTip = "Leave empty to use All villages." };
         var ignoredPlayers = new TextBox { Text = saved.IgnoredPlayers, MinWidth = 360 };
         var ignoredAlliances = new TextBox { Text = saved.IgnoredAlliances, MinWidth = 360 };
+        var skipOwnVillages = new CheckBox
+        {
+            Content = "Skip own villages",
+            IsChecked = saved.SkipOwnVillages,
+            Margin = new Thickness(0, 12, 0, 0),
+        };
         var content = new StackPanel();
         var savedListText = new TextBlock
         {
@@ -131,6 +137,7 @@ public partial class TravcoToolsWindow : Window
         content.Children.Add(ignoredPlayers);
         content.Children.Add(new TextBlock { Text = "Ignore alliance (optional)", Margin = new Thickness(0, 12, 0, 4) });
         content.Children.Add(ignoredAlliances);
+        content.Children.Add(skipOwnVillages);
         content.Children.Add(new TextBlock
         {
             Text = "Use commas to separate names. Multihunter is always ignored.",
@@ -157,7 +164,8 @@ public partial class TravcoToolsWindow : Window
             includePlayers.IsChecked == true,
             includeNatars.IsChecked == true,
             ParseCommaSeparated(ignoredPlayers.Text),
-            ParseCommaSeparated(ignoredAlliances.Text));
+            ParseCommaSeparated(ignoredAlliances.Text),
+            skipOwnVillages.IsChecked == true);
         if (!request.IncludePlayers && !request.IncludeNatars)
         {
             SetStatus("Select Players or Natars before adding villages.");
@@ -168,7 +176,8 @@ public partial class TravcoToolsWindow : Window
             request.IncludePlayers,
             request.IncludeNatars,
             ignoredPlayers.Text.Trim(),
-            ignoredAlliances.Text.Trim()));
+            ignoredAlliances.Text.Trim(),
+            request.SkipOwnVillages));
         _ = RunAllVillagesImportAsync(request, listName.Text);
     }
 
