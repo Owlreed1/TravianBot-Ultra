@@ -15,6 +15,7 @@ public partial class MainWindow
     private readonly Dictionary<string, List<IncomingAttack>> _incomingAttacksByVillage = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IncomingAttackSignal> _incomingAttackPendingSignals = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTimeOffset> _incomingAttackLastReadUtc = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _incomingAttackConfirmedMovementCounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _incomingAttackReadsInFlight = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _incomingAttackDorf1ClearVersions = new(StringComparer.OrdinalIgnoreCase);
 
@@ -60,21 +61,25 @@ public partial class MainWindow
             {
                 continue;
             }
-            _incomingAttackPendingSignals.TryGetValue(villageKey, out var previousSignal);
-            var knownAttacks = _incomingAttacksByVillage.GetValueOrDefault(villageKey) ?? [];
             var nowUtc = DateTimeOffset.UtcNow;
             DateTimeOffset? lastReadUtc = _incomingAttackLastReadUtc.TryGetValue(villageKey, out var lastRead)
                 ? lastRead
                 : null;
+            int? confirmedMovementCount = _incomingAttackConfirmedMovementCounts.TryGetValue(villageKey, out var confirmedCount)
+                ? confirmedCount
+                : null;
             var shouldRead = IncomingAttackObservationPolicy.ShouldReadDetails(
                 normalizedSignal,
-                previousSignal,
-                knownAttacks,
+                confirmedMovementCount,
                 lastReadUtc,
                 nowUtc);
             _incomingAttackPendingSignals[villageKey] = normalizedSignal;
             if (shouldRead)
             {
+                if (confirmedMovementCount.HasValue && normalizedSignal.Dorf1ArrivalTimesUtc is { } arrivals)
+                {
+                    AppendLog($"[incoming-attacks] red Dorf1 movement count increased for '{normalizedSignal.VillageName}': {confirmedMovementCount.Value} -> {arrivals.Count}.");
+                }
                 QueueIncomingAttackDetailsRead(villageKey, normalizedSignal);
             }
         }
@@ -91,6 +96,7 @@ public partial class MainWindow
         var pendingRemoved = _incomingAttackPendingSignals.Remove(villageKey);
         var attacksRemoved = _incomingAttacksByVillage.Remove(villageKey);
         _incomingAttackLastReadUtc.Remove(villageKey);
+        _incomingAttackConfirmedMovementCounts.Remove(villageKey);
         if (pendingRemoved || attacksRemoved)
         {
             AppendLog($"[incoming-attacks] clear Dorf1 read removed the warning for '{villageName}'.");
@@ -210,6 +216,12 @@ public partial class MainWindow
                     .Where(attack => attack.ArrivalAtUtc > DateTimeOffset.UtcNow)
                     .OrderBy(attack => attack.ArrivalAtUtc)
                     .ToList();
+                var confirmedMovementCount = Math.Max(
+                    _incomingAttackConfirmedMovementCounts.GetValueOrDefault(resolvedKey),
+                    _incomingAttackConfirmedMovementCounts.GetValueOrDefault(villageKey));
+                _incomingAttackConfirmedMovementCounts[resolvedKey] = Math.Max(
+                    confirmedMovementCount,
+                    snapshot.Attacks.Count);
                 if (_incomingAttacksByVillage[resolvedKey].Count == 0)
                 {
                     CancelTroopEvasionForClearedVillage(resolvedKey);
@@ -219,6 +231,8 @@ public partial class MainWindow
                 {
                     _incomingAttackPendingSignals.Remove(resolvedKey);
                     _incomingAttacksByVillage.Remove(villageKey);
+                    _incomingAttackConfirmedMovementCounts.Remove(villageKey);
+                    _incomingAttackLastReadUtc.Remove(villageKey);
                 }
                 _incomingAttackLastReadUtc[resolvedKey] = DateTimeOffset.UtcNow;
                 RefreshIncomingAttackUi();
@@ -253,25 +267,20 @@ public partial class MainWindow
                 _incomingAttacksByVillage[pair.Key] = active;
                 if (!_incomingAttackPendingSignals.ContainsKey(pair.Key) && expired.FirstOrDefault() is { } arrived)
                 {
-                    _incomingAttackPendingSignals[pair.Key] = new IncomingAttackSignal(
-                        arrived.TargetVillageName,
-                        CoordX: arrived.TargetCoordX,
-                        CoordY: arrived.TargetCoordY,
-                        ObservedAtUtc: nowUtc);
+                    if (IsIncomingAttackMonitoringEnabled(pair.Key))
+                    {
+                        _incomingAttackPendingSignals[pair.Key] = new IncomingAttackSignal(
+                            arrived.TargetVillageName,
+                            CoordX: arrived.TargetCoordX,
+                            CoordY: arrived.TargetCoordY,
+                            ObservedAtUtc: nowUtc);
+                    }
                 }
             }
         }
 
         if (expiredKeys.Count > 0)
         {
-            foreach (var key in expiredKeys)
-            {
-                if (_incomingAttackPendingSignals.TryGetValue(key, out var signal)
-                    && IsIncomingAttackMonitoringActive())
-                {
-                    QueueIncomingAttackDetailsRead(key, signal);
-                }
-            }
             RefreshIncomingAttackUi();
             SaveIncomingAttackState();
         }
@@ -284,14 +293,15 @@ public partial class MainWindow
                 {
                     continue;
                 }
-                var knownAttacks = _incomingAttacksByVillage.GetValueOrDefault(pending.Key) ?? [];
                 DateTimeOffset? lastReadUtc = _incomingAttackLastReadUtc.TryGetValue(pending.Key, out var lastRead)
                     ? lastRead
                     : null;
+                int? confirmedMovementCount = _incomingAttackConfirmedMovementCounts.TryGetValue(pending.Key, out var confirmedCount)
+                    ? confirmedCount
+                    : null;
                 if (IncomingAttackObservationPolicy.ShouldReadDetails(
                         pending.Value,
-                        pending.Value,
-                        knownAttacks,
+                        confirmedMovementCount,
                         lastReadUtc,
                         nowUtc))
                 {
@@ -326,6 +336,10 @@ public partial class MainWindow
         foreach (var pending in _incomingAttackPendingSignals)
         {
             if (rows.Any(row => string.Equals(row.VillageKey, pending.Key, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+            if (_incomingAttackConfirmedMovementCounts.ContainsKey(pending.Key))
             {
                 continue;
             }
@@ -441,22 +455,32 @@ public partial class MainWindow
             AppendLog($"[incoming-attacks] restored {state.Attacks.Count} active movement(s) and {state.PendingSignals.Count} pending signal(s) from snapshot.");
         }
         _incomingAttacksByVillage.Clear();
+        _incomingAttackConfirmedMovementCounts.Clear();
+        foreach (var pair in state.ConfirmedMovementCounts)
+        {
+            if (pair.Value >= 0)
+            {
+                _incomingAttackConfirmedMovementCounts[pair.Key] = pair.Value;
+            }
+        }
         foreach (var attack in state.Attacks)
         {
             var key = attack.TargetVillageKey
                       ?? (attack.TargetCoordX.HasValue && attack.TargetCoordY.HasValue
                           ? $"xy:{attack.TargetCoordX.Value}|{attack.TargetCoordY.Value}"
                           : attack.TargetVillageName);
-            if (!IsIncomingAttackMonitoringEnabled(key))
-            {
-                continue;
-            }
             if (!_incomingAttacksByVillage.TryGetValue(key, out var attacks))
             {
                 attacks = [];
                 _incomingAttacksByVillage[key] = attacks;
             }
             attacks.Add(attack);
+        }
+        foreach (var pair in _incomingAttacksByVillage)
+        {
+            _incomingAttackConfirmedMovementCounts[pair.Key] = Math.Max(
+                _incomingAttackConfirmedMovementCounts.GetValueOrDefault(pair.Key),
+                pair.Value.Count);
         }
 
         _incomingAttackPendingSignals.Clear();
@@ -482,7 +506,8 @@ public partial class MainWindow
             _accountStore.ActiveAccountName(),
             LoadBotOptions().BaseUrl,
             _incomingAttacksByVillage.Values.SelectMany(attacks => attacks).ToList(),
-            _incomingAttackPendingSignals.Values.ToList());
+            _incomingAttackPendingSignals.Values.ToList(),
+            _incomingAttackConfirmedMovementCounts);
     }
 
     private void ClearIncomingAttackUiState()
@@ -490,6 +515,7 @@ public partial class MainWindow
         _incomingAttacksByVillage.Clear();
         _incomingAttackPendingSignals.Clear();
         _incomingAttackLastReadUtc.Clear();
+        _incomingAttackConfirmedMovementCounts.Clear();
         _incomingAttackReadsInFlight.Clear();
         _incomingAttackDorf1ClearVersions.Clear();
         _incomingAttackRows.Clear();
@@ -549,17 +575,41 @@ public partial class MainWindow
     internal void OnIncomingAttackMonitoringChanged(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.Tag is not IncomingAttackMonitoringVillageItem village) return;
-        if (village.Enabled)
+        ApplyIncomingAttackMonitoring(village.VillageKey, village.Enabled);
+        PersistIncomingAttackMonitoringChanges();
+    }
+
+    internal void OnToggleAllIncomingAttackMonitoringClicked(object sender, RoutedEventArgs e)
+    {
+        var enableAll = _incomingAttackMonitoringVillages.Any(village => !village.Enabled);
+        foreach (var village in _incomingAttackMonitoringVillages)
         {
-            _incomingAttackMonitoringDisabledKeys.Remove(village.VillageKey);
-            _incomingAttackLastReadUtc.Remove(village.VillageKey);
+            village.Enabled = enableAll;
+            ApplyIncomingAttackMonitoring(village.VillageKey, enableAll);
+        }
+
+        PersistIncomingAttackMonitoringChanges();
+    }
+
+    private void ApplyIncomingAttackMonitoring(string villageKey, bool enabled)
+    {
+        if (enabled)
+        {
+            _incomingAttackMonitoringDisabledKeys.Remove(villageKey);
+            _incomingAttackLastReadUtc.Remove(villageKey);
         }
         else
         {
-            _incomingAttackMonitoringDisabledKeys.Add(village.VillageKey);
-            ClearIncomingAttacksAfterAuthoritativeDorf1Read(village.VillageKey, village.VillageName);
+            _incomingAttackMonitoringDisabledKeys.Add(villageKey);
+            CancelTroopEvasionForClearedVillage(villageKey);
+            _incomingAttackPendingSignals.Remove(villageKey);
+            _incomingAttackLastReadUtc.Remove(villageKey);
         }
+    }
 
+    private void PersistIncomingAttackMonitoringChanges()
+    {
+        SyncIncomingAttackMonitoringVillages();
         _incomingAttackMonitoringStore.Save(
             _accountStore.ActiveAccountName(),
             LoadBotOptions().BaseUrl,
@@ -567,5 +617,21 @@ public partial class MainWindow
         SaveIncomingAttackState();
         RefreshIncomingAttackUi();
         UpdateTroopEvasionRuntimeStatuses();
+        SyncVillageProtectionSettingsRows();
+    }
+
+    internal void OnClearIncomingAttackListClicked(object sender, RoutedEventArgs e)
+    {
+        var clearedCount = _incomingAttacksByVillage.Values.Sum(attacks => attacks.Count);
+        foreach (var villageKey in _incomingAttacksByVillage.Keys.ToList())
+        {
+            CancelTroopEvasionForClearedVillage(villageKey);
+        }
+
+        _incomingAttacksByVillage.Clear();
+        _incomingAttackPendingSignals.Clear();
+        SaveIncomingAttackState();
+        RefreshIncomingAttackUi();
+        AppendLog($"[incoming-attacks] user cleared {clearedCount} movement(s) from the list.");
     }
 }

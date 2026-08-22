@@ -17,7 +17,7 @@ public sealed class TroopEvasionStoreTests : IDisposable
         var state = new TroopEvasionState(2, 10,
             [new("xy:1|2", "A", "dorf1.php?newdid=1", true, 3, 4, TroopEvasionMovementType.Raid, [1, 10], true)],
             [new("xy:1|2", now.AddMinutes(1), now.AddMinutes(11), now)],
-            33, -44, TroopEvasionMovementType.Attack);
+            33, -44, TroopEvasionMovementType.Attack, EvadeRaids: false, EvadeAttacks: true);
         store.Save("account", "https://one.example", state);
 
         var loaded = store.Load("account", "https://one.example", now);
@@ -27,7 +27,25 @@ public sealed class TroopEvasionStoreTests : IDisposable
         Assert.Equal(33, loaded.TargetX);
         Assert.Equal(-44, loaded.TargetY);
         Assert.Equal(TroopEvasionMovementType.Attack, loaded.MovementType);
+        Assert.False(loaded.EvadeRaids);
+        Assert.True(loaded.EvadeAttacks);
         Assert.Empty(store.Load("account", "https://two.example", now).Villages);
+    }
+
+    [Fact]
+    public void Load_MigratesVersionTwoWithBothIncomingTypesEnabled()
+    {
+        var path = AccountStoragePaths.TroopEvasionSettingsPath(_root, "account", "https://one.example");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, """
+            {"schemaVersion":2,"state":{"leadTimeMinutes":5,"protectionWindowMinutes":5,
+            "villages":[],"protections":[],"targetX":7,"targetY":-8,"movementType":5}}
+            """);
+
+        var loaded = new TroopEvasionStore(_root).Load("account", "https://one.example", DateTimeOffset.UtcNow);
+
+        Assert.True(loaded.EvadeRaids);
+        Assert.True(loaded.EvadeAttacks);
     }
 
     [Fact]

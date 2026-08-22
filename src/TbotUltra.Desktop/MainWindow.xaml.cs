@@ -449,6 +449,7 @@ public partial class MainWindow : Window
         TroopsHubPanelControl.IncomingAttackMonitoringVillages.ItemsSource = _incomingAttackMonitoringVillages;
         TroopsHubPanelControl.EvasionPanel.SettingsChanged += TroopEvasionSettingsChanged;
         TroopsHubPanelControl.EvasionPanel.ValidateRequested += TroopEvasionValidateRequested;
+        TroopsHubPanelControl.EvasionPanel.EnableValidationRequested += ValidateTroopEvasionEnable;
         _villageCacheWriter = new LatestSnapshotWriter<VillageCacheWrite>(write =>
         {
             _villageCacheStore.Save(write.AccountName, write.Snapshot);

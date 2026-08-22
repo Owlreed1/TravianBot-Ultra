@@ -759,10 +759,13 @@ public partial class MainWindow
     }
 
     private string? _dashboardVillagePanelsKey;
+    private IReadOnlyList<VillageSettingsRow>? _dashboardVillageSettingsRows;
+    private bool _syncingVillageProtectionSettings;
 
     private void ClearDashboardVillagePanels()
     {
         _dashboardVillagePanelsKey = null;
+        _dashboardVillageSettingsRows = null;
         DashboardHubPanelControl.ClearVillagePanels();
     }
 
@@ -864,6 +867,10 @@ public partial class MainWindow
                     NpcTrade = _villageSettingsStore.GetNpcTrade(keyInfo),
                     HeroResourcesEnabled = _villageSettingsStore.GetHeroResourcesEnabled(keyInfo),
                     ConstructFasterEnabled = _villageSettingsStore.GetConstructFaster(keyInfo),
+                    AttackScanEnabled = IsIncomingAttackMonitoringEnabled(keyInfo.Key),
+                    TroopEvadeEnabled = TroopsHubPanelControl.EvasionPanel.Villages
+                        .FirstOrDefault(item => string.Equals(item.VillageKey, keyInfo.Key, StringComparison.OrdinalIgnoreCase))
+                        ?.Enabled == true,
                     GroupToggles = toggles,
                 };
             })
@@ -874,6 +881,8 @@ public partial class MainWindow
             section: "Settings",
             onEnabledChanged: PersistVillageEnabledFromSettingsRow,
             onNpcTradeChanged: PersistVillageNpcTradeFromSettingsRow,
+            onAttackScanChanged: PersistVillageAttackScanFromSettingsRow,
+            onTroopEvadeChanged: PersistVillageTroopEvadeFromSettingsRow,
             onHeroResourcesChanged: PersistVillageHeroResourcesFromSettingsRow,
             onConstructFasterChanged: PersistVillageConstructFasterFromSettingsRow,
             onGroupsChanged: PersistVillageGroupsFromSettingsRow,
@@ -890,7 +899,76 @@ public partial class MainWindow
             overviewSourceVersionProvider: GetVillageOverviewSourceVersion);
 
         DashboardHubPanelControl.SetVillagePanels(settingsPanel, overviewPanel);
+        _dashboardVillageSettingsRows = rows;
         _dashboardVillagePanelsKey = panelKey;
+    }
+
+    private void PersistVillageAttackScanFromSettingsRow(VillageSettingsRow row)
+    {
+        if (_syncingVillageProtectionSettings || row.KeyInfo is null)
+        {
+            return;
+        }
+
+        ApplyIncomingAttackMonitoring(row.KeyInfo.Key, row.AttackScanEnabled);
+        PersistIncomingAttackMonitoringChanges();
+    }
+
+    private void PersistVillageTroopEvadeFromSettingsRow(VillageSettingsRow row)
+    {
+        if (_syncingVillageProtectionSettings || row.KeyInfo is null)
+        {
+            return;
+        }
+
+        var enabled = TroopsHubPanelControl.EvasionPanel.SetVillageEnabled(
+            row.KeyInfo.Key,
+            row.TroopEvadeEnabled);
+        SyncVillageProtectionSettingsRows();
+        if (row.TroopEvadeEnabled != enabled)
+        {
+            _syncingVillageProtectionSettings = true;
+            try
+            {
+                row.TroopEvadeEnabled = enabled;
+            }
+            finally
+            {
+                _syncingVillageProtectionSettings = false;
+            }
+        }
+    }
+
+    private void SyncVillageProtectionSettingsRows()
+    {
+        if (_dashboardVillageSettingsRows is null || _syncingVillageProtectionSettings)
+        {
+            return;
+        }
+
+        _syncingVillageProtectionSettings = true;
+        try
+        {
+            foreach (var row in _dashboardVillageSettingsRows)
+            {
+                if (row.KeyInfo is null)
+                {
+                    continue;
+                }
+
+                row.AttackScanEnabled = IsIncomingAttackMonitoringEnabled(row.KeyInfo.Key);
+                row.TroopEvadeEnabled = TroopsHubPanelControl.EvasionPanel.Villages
+                    .FirstOrDefault(item => string.Equals(
+                        item.VillageKey,
+                        row.KeyInfo.Key,
+                        StringComparison.OrdinalIgnoreCase))
+                    ?.Enabled == true;
+            }
+        }
+        finally
+        {
+            _syncingVillageProtectionSettings = false;
+        }
     }
 
     private long _villageOverviewSourceVersion;

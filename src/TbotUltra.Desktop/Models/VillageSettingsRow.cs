@@ -16,6 +16,7 @@ public sealed class VillageSettingsRow : INotifyPropertyChanged
     public bool IsCheckAllRow { get; init; }
     public Visibility ToggleVisibility => IsCheckAllRow ? Visibility.Collapsed : Visibility.Visible;
     public Visibility CheckAllVisibility => IsCheckAllRow ? Visibility.Visible : Visibility.Collapsed;
+    public bool CanToggle => !IsCheckAllRow;
     public string Name { get; init; } = string.Empty;
     public string PopText { get; init; } = string.Empty;
 
@@ -91,6 +92,38 @@ public sealed class VillageSettingsRow : INotifyPropertyChanged
             }
 
             _npcTrade = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private bool _attackScanEnabled = true;
+    public bool AttackScanEnabled
+    {
+        get => _attackScanEnabled;
+        set
+        {
+            if (_attackScanEnabled == value)
+            {
+                return;
+            }
+
+            _attackScanEnabled = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private bool _troopEvadeEnabled;
+    public bool TroopEvadeEnabled
+    {
+        get => _troopEvadeEnabled;
+        set
+        {
+            if (_troopEvadeEnabled == value)
+            {
+                return;
+            }
+
+            _troopEvadeEnabled = value;
             OnPropertyChanged();
         }
     }

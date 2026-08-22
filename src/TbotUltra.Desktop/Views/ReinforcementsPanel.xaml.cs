@@ -79,4 +79,10 @@ public partial class ReinforcementsPanel : UserControl
 
     private void IncomingAttackMonitoring_Changed(object sender, RoutedEventArgs e) =>
         Host?.OnIncomingAttackMonitoringChanged(sender, e);
+
+    private void ToggleAllIncomingAttackMonitoringButton_Click(object sender, RoutedEventArgs e) =>
+        Host?.OnToggleAllIncomingAttackMonitoringClicked(sender, e);
+
+    private void ClearIncomingAttackListButton_Click(object sender, RoutedEventArgs e) =>
+        Host?.OnClearIncomingAttackListClicked(sender, e);
 }

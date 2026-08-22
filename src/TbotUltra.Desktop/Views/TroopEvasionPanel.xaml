@@ -10,32 +10,35 @@
 
     <StackPanel Orientation="Horizontal">
       <TextBlock Text="Troop evasion" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-      <TextBlock x:Name="TroopEvasionInfoIcon" Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="15"
-                 Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSubtleBrush}"
-                 Cursor="Help" ToolTipService.InitialShowDelay="200"
-                 ToolTip="Sends selected troops shortly before a confirmed incoming red attack." />
+      <ContentControl x:Name="TroopEvasionInfoIcon"
+                      Style="{DynamicResource InfoTooltipIconStyle}"
+                      Margin="8,0,0,0"
+                      ToolTip="Sends selected troops shortly before a confirmed incoming red attack." />
     </StackPanel>
 
     <Border Grid.Row="1" Margin="0,12,0,10" Padding="12" CornerRadius="7"
             Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
       <Grid>
-        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal">
           <TextBlock Text="Lead time" VerticalAlignment="Center" />
-          <TextBlock x:Name="LeadTimeInfoIcon" Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="12"
-                     Margin="5,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSubtleBrush}"
-                     Cursor="Help" ToolTipService.InitialShowDelay="200"
-                     ToolTip="How many minutes before the incoming attack the evasion attempt starts." />
+          <ContentControl x:Name="LeadTimeInfoIcon"
+                          Style="{DynamicResource InfoTooltipIconStyle}"
+                          Margin="5,0,6,0"
+                          ToolTip="How many minutes before the incoming attack the evasion attempt starts." />
           <ComboBox x:Name="LeadTimeComboBox" Width="80" SelectionChanged="GlobalSetting_Changed" />
           <TextBlock Text="min" VerticalAlignment="Center" Margin="5,0,20,0" />
           <TextBlock Text="Protection window" VerticalAlignment="Center" />
-          <TextBlock x:Name="ProtectionWindowInfoIcon" Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="12"
-                     Margin="5,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSubtleBrush}"
-                     Cursor="Help" ToolTipService.InitialShowDelay="200"
-                     ToolTip="How long after the first triggering arrival another evasion send is suppressed." />
+          <ContentControl x:Name="ProtectionWindowInfoIcon"
+                          Style="{DynamicResource InfoTooltipIconStyle}"
+                          Margin="5,0,6,0"
+                          ToolTip="How long after the first triggering arrival another evasion send is suppressed." />
           <ComboBox x:Name="ProtectionWindowComboBox" Width="80" SelectionChanged="GlobalSetting_Changed" />
           <TextBlock Text="min" VerticalAlignment="Center" Margin="5,0,20,0" />
-          <TextBlock x:Name="PausedTextBlock" VerticalAlignment="Center" Foreground="{DynamicResource WarningBrush}" />
         </StackPanel>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0">
@@ -46,6 +49,15 @@
           <TextBox x:Name="TargetYTextBox" Width="70" Margin="6,0,20,0" TextChanged="GlobalDispatchSetting_Changed" />
           <TextBlock Text="Movement" FontWeight="SemiBold" VerticalAlignment="Center" />
           <ComboBox x:Name="MovementTypeComboBox" Width="140" Margin="8,0,0,0" SelectionChanged="GlobalDispatchSetting_Changed" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
+          <TextBlock Text="Evade for:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" />
+          <CheckBox x:Name="EvadeRaidsCheckBox" Content="Raids" IsChecked="True"
+                    Checked="GlobalEvadeForSetting_Changed" Unchecked="GlobalEvadeForSetting_Changed"
+                    Margin="0,0,18,0" />
+          <CheckBox x:Name="EvadeAttacksCheckBox" Content="Attacks" IsChecked="True"
+                    Checked="GlobalEvadeForSetting_Changed" Unchecked="GlobalEvadeForSetting_Changed" />
         </StackPanel>
       </Grid>
     </Border>

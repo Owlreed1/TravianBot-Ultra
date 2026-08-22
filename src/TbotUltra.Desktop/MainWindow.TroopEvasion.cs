@@ -32,7 +32,9 @@ public partial class MainWindow
                 _troopEvasionState.ProtectionWindowMinutes,
                 _troopEvasionState.TargetX,
                 _troopEvasionState.TargetY,
-                _troopEvasionState.MovementType);
+                _troopEvasionState.MovementType,
+                _troopEvasionState.EvadeRaids,
+                _troopEvasionState.EvadeAttacks);
             SyncTroopEvasionVillages();
         }
         finally { _suppressTroopEvasionSave = false; }
@@ -81,6 +83,7 @@ public partial class MainWindow
         }
         SaveTroopEvasionState();
         UpdateTroopEvasionRuntimeStatuses();
+        SyncVillageProtectionSettingsRows();
     }
 
     private void SaveTroopEvasionState()
@@ -95,24 +98,65 @@ public partial class MainWindow
             _troopEvasionProtections.Values.ToList(),
             TroopsHubPanelControl.EvasionPanel.TargetX,
             TroopsHubPanelControl.EvasionPanel.TargetY,
-            TroopsHubPanelControl.EvasionPanel.MovementType);
+            TroopsHubPanelControl.EvasionPanel.MovementType,
+            TroopsHubPanelControl.EvasionPanel.EvadeRaids,
+            TroopsHubPanelControl.EvasionPanel.EvadeAttacks);
         _troopEvasionStore.Save(_accountStore.ActiveAccountName(), LoadBotOptions().BaseUrl, _troopEvasionState);
     }
 
     private static bool TryBuildTroopEvasionSettings(TroopEvasionVillageItem item, out TroopEvasionVillageSettings settings, out string error)
     {
         settings = BuildUncheckedSettings(item);
+        var requirements = GetTroopEvasionSettingsRequirements(item, settings);
+        if (requirements.Count > 0)
+        {
+            error = $"Complete the following:\n• {string.Join("\n• ", requirements)}";
+            return false;
+        }
+        settings = settings with
+        {
+            TargetX = int.Parse(item.TargetX, NumberStyles.Integer, CultureInfo.InvariantCulture),
+            TargetY = int.Parse(item.TargetY, NumberStyles.Integer, CultureInfo.InvariantCulture),
+        };
+        error = string.Empty;
+        return true;
+    }
+
+    private static IReadOnlyList<string> GetTroopEvasionSettingsRequirements(
+        TroopEvasionVillageItem item,
+        TroopEvasionVillageSettings settings)
+    {
+        var requirements = new List<string>();
         if (!int.TryParse(item.TargetX, NumberStyles.Integer, CultureInfo.InvariantCulture, out var x)
             || !int.TryParse(item.TargetY, NumberStyles.Integer, CultureInfo.InvariantCulture, out var y)
             || x is < -400 or > 400 || y is < -400 or > 400)
-        { error = "Enter valid X/Y coordinates (-400 to 400)."; return false; }
+        {
+            requirements.Add("Enter valid target X and Y coordinates (-400 to 400).");
+        }
         if (settings.SelectedTroopSlots!.Count == 0 && !settings.IncludeHero)
-        { error = "Select at least one troop or Hero."; return false; }
+        {
+            requirements.Add("Select at least one troop or Hero.");
+        }
         if (!Enum.IsDefined(settings.MovementType))
-        { error = "Select a valid movement type."; return false; }
-        settings = settings with { TargetX = x, TargetY = y };
-        error = string.Empty;
-        return true;
+        {
+            requirements.Add("Select a valid movement type.");
+        }
+        return requirements;
+    }
+
+    private string? ValidateTroopEvasionEnable(TroopEvasionVillageItem item)
+    {
+        var settings = BuildUncheckedSettings(item);
+        var requirements = GetTroopEvasionSettingsRequirements(item, settings).ToList();
+        if (!TroopsHubPanelControl.EvasionPanel.EvadeRaids
+            && !TroopsHubPanelControl.EvasionPanel.EvadeAttacks)
+        {
+            requirements.Add("Select Raids, Attacks, or both under Evade for.");
+        }
+
+        return requirements.Count == 0
+            ? null
+            : $"Complete the following:\n• {string.Join("\n• ", requirements)}";
     }
 
     private static TroopEvasionVillageSettings BuildUncheckedSettings(TroopEvasionVillageItem item) => new(
@@ -126,7 +170,6 @@ public partial class MainWindow
     private void TickTroopEvasion(DateTimeOffset serverNow)
     {
         var active = IsIncomingAttackMonitoringActive();
-        TroopsHubPanelControl.EvasionPanel.SetPaused(!active);
         if (!active)
         {
             _troopEvasionAttemptCts?.Cancel();
@@ -146,13 +189,15 @@ public partial class MainWindow
             {
                 attacks.Add((pending.Key, new IncomingAttack(
                     $"dorf1:{pending.Key}:{arrival.UtcTicks}", pending.Value.VillageName, arrival,
-                    IncomingAttackMovementType.Attack, pending.Key, pending.Value.CoordX, pending.Value.CoordY,
+                    IncomingAttackMovementType.Unknown, pending.Key, pending.Value.CoordX, pending.Value.CoordY,
                     ObservedAtUtc: pending.Value.ObservedAtUtc)));
             }
         }
         var due = TroopEvasionScheduler.SelectMostUrgent(
             attacks, settings, _troopEvasionProtections, _troopEvasionCompletedMilestones, now,
-            _troopEvasionState.LeadTimeMinutes);
+            _troopEvasionState.LeadTimeMinutes,
+            _troopEvasionState.EvadeRaids,
+            _troopEvasionState.EvadeAttacks);
         if (_troopEvasionAttemptInFlight)
         {
             if (_troopEvasionWaitingForSafeReturn
@@ -268,6 +313,8 @@ public partial class MainWindow
             if (!item.Enabled) item.RuntimeStatus = "Disabled";
             else if (!IsIncomingAttackMonitoringEnabled(item.VillageKey)) item.RuntimeStatus = "Incoming monitoring disabled";
             else if (!active) item.RuntimeStatus = "Paused";
+            else if (!_troopEvasionState.EvadeRaids && !_troopEvasionState.EvadeAttacks)
+                item.RuntimeStatus = "No incoming types selected";
             else if (_troopEvasionProtections.TryGetValue(item.VillageKey, out var protection))
                 item.RuntimeStatus = $"Protected through {FormatQueueServerTime(protection.ProtectedThroughUtc)}";
             else item.RuntimeStatus = "Watching incoming attacks";

@@ -24,6 +24,8 @@ public partial class VillageSettingsPanel : UserControl, IDisposable
     private readonly IReadOnlyList<VillageSettingsRow> _gridRows;
     private readonly Action<VillageSettingsRow>? _onEnabledChanged;
     private readonly Action<VillageSettingsRow>? _onNpcTradeChanged;
+    private readonly Action<VillageSettingsRow>? _onAttackScanChanged;
+    private readonly Action<VillageSettingsRow>? _onTroopEvadeChanged;
     private readonly Action<VillageSettingsRow>? _onHeroResourcesChanged;
     private readonly Action<VillageSettingsRow>? _onConstructFasterChanged;
     private readonly Action<VillageSettingsRow>? _onGroupsChanged;
@@ -52,6 +54,8 @@ public partial class VillageSettingsPanel : UserControl, IDisposable
         string section = "Settings",
         Action<VillageSettingsRow>? onEnabledChanged = null,
         Action<VillageSettingsRow>? onNpcTradeChanged = null,
+        Action<VillageSettingsRow>? onAttackScanChanged = null,
+        Action<VillageSettingsRow>? onTroopEvadeChanged = null,
         Action<VillageSettingsRow>? onHeroResourcesChanged = null,
         Action<VillageSettingsRow>? onConstructFasterChanged = null,
         Action<VillageSettingsRow>? onGroupsChanged = null,
@@ -76,6 +80,8 @@ public partial class VillageSettingsPanel : UserControl, IDisposable
         _gridRows = rows.Count == 0 ? rows : [CreateCheckAllRow(rows), .. rows];
         _onEnabledChanged = onEnabledChanged;
         _onNpcTradeChanged = onNpcTradeChanged;
+        _onAttackScanChanged = onAttackScanChanged;
+        _onTroopEvadeChanged = onTroopEvadeChanged;
         _onHeroResourcesChanged = onHeroResourcesChanged;
         _onConstructFasterChanged = onConstructFasterChanged;
         _onGroupsChanged = onGroupsChanged;
@@ -88,6 +94,7 @@ public partial class VillageSettingsPanel : UserControl, IDisposable
         _overviewProjectionProvider = overviewProjectionProvider;
         _overviewSourceVersionProvider = overviewSourceVersionProvider;
         BuildGroupColumns(rows);
+        BuildProtectionColumns();
         BuildOverviewColumns();
         ApplyTribeColumnVisibility(rows);
         VillageSettingsDataGrid.ItemsSource = _gridRows;
@@ -165,6 +172,12 @@ public partial class VillageSettingsPanel : UserControl, IDisposable
                 break;
             case nameof(VillageSettingsRow.NpcTrade):
                 _onNpcTradeChanged?.Invoke(row);
+                break;
+            case nameof(VillageSettingsRow.AttackScanEnabled):
+                _onAttackScanChanged?.Invoke(row);
+                break;
+            case nameof(VillageSettingsRow.TroopEvadeEnabled):
+                _onTroopEvadeChanged?.Invoke(row);
                 break;
             case nameof(VillageSettingsRow.HeroResourcesEnabled):
                 _onHeroResourcesChanged?.Invoke(row);
@@ -383,6 +396,44 @@ public partial class VillageSettingsPanel : UserControl, IDisposable
             ? 1
             : 0;
         NpcTradeColumn.DisplayIndex = 3 + groupsBeforeNpc.Count() + constructFasterColumnBeforeNpc;
+    }
+
+    private void BuildProtectionColumns()
+    {
+        var townHallEntry = VillageSettingsDataGrid.Columns
+            .Select((column, index) => (Column: column, Index: index))
+            .FirstOrDefault(entry => string.Equals(
+                (entry.Column.Header as TextBlock)?.Text,
+                "Town Hall",
+                StringComparison.OrdinalIgnoreCase));
+        var insertIndex = townHallEntry.Column is null
+            ? VillageSettingsDataGrid.Columns.Count
+            : townHallEntry.Index + 1;
+
+        VillageSettingsDataGrid.Columns.Insert(insertIndex, new DataGridTemplateColumn
+        {
+            Header = BuildColumnHeader(
+                "Attack scan",
+                "Monitor this village for incoming attacks. Disabling it also prevents troop evasion from running there."),
+            Width = DataGridLength.Auto,
+            CellTemplate = BuildToggleCellTemplate(
+                nameof(VillageSettingsRow.AttackScanEnabled),
+                (_, _) => ToggleAllRows(
+                    row => row.AttackScanEnabled,
+                    (row, isEnabled) => row.AttackScanEnabled = isEnabled)),
+        });
+        VillageSettingsDataGrid.Columns.Insert(insertIndex + 1, new DataGridTemplateColumn
+        {
+            Header = BuildColumnHeader(
+                "Troop evade",
+                "Enable troop evasion for this village when its complete evasion settings are valid."),
+            Width = DataGridLength.Auto,
+            CellTemplate = BuildToggleCellTemplate(
+                nameof(VillageSettingsRow.TroopEvadeEnabled),
+                (_, _) => ToggleAllRows(
+                    row => row.TroopEvadeEnabled,
+                    (row, isEnabled) => row.TroopEvadeEnabled = isEnabled)),
+        });
     }
 
     // Builds the per-village overview columns in code so every status cell shares one color-coded template

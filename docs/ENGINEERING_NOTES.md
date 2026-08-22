@@ -523,21 +523,33 @@ Published artifacts belong under `artifacts/`, never beside source files.
   subcategories 2/3 are separate navigations and must be verified against fresh DOM after each click. A late Rally
   Point result must not restore state cleared by a newer Dorf1 read.
   Filter/read failures never clear known attacks. Exact movements persist per account+world, use the Travian
-  movement id when available, and expire at their server-derived absolute arrival before a safe recheck. An
-  unchanged Dorf1 signal must not cause minute-by-minute Rally Point navigation: a changed red-arrival set is read
-  immediately, while an unchanged signal receives only a ten-minute safety refresh. In each Rally Point movement,
+  movement id when available, and expire at their server-derived absolute arrival. After a successful Rally Point
+  read, retain the confirmed movement-count high-water mark until an authoritative clear Dorf1 read. Countdown drift,
+  landed movements, Plus marker repeats, and periodic timers must not reopen Rally Point; read details again only when
+  the live red Dorf1 movement count exceeds that mark. Only an unconfirmed/failed signal receives the bounded
+  ten-minute retry. In each Rally Point movement,
   `td.role` names the source village; the leading text of `td.troopHeadline` before `raids/attacks <target>` names
   the source player. Monitoring enablement defaults on for every village and persists per account+world by canonical
-  village key. A disabled village ignores Dorf1 signals and Rally Point results, clears its displayed warning state,
-  and is ineligible for Troop Evasion until monitoring is enabled again.
+  village key. A disabled village ignores new Dorf1 signals and Rally Point results and is ineligible for Troop
+  Evasion, but its already-confirmed rows remain visible and persisted until their arrival. Persist the confirmed
+  movement-count high-water mark separately from visible rows, including after the user presses `Clear list`, so the
+  same movements are not fetched again after a restart or manual list clear.
+  The Incoming attacks village toggles and Dashboard > Village settings `Attack scan` column are two views of the
+  same per-account/world setting; bulk changes must persist once and refresh both views without clearing confirmed rows.
 - Troop Evasion consumes Incoming Attack state; it must never introduce a parallel signal source. Target Dorf1 is
   re-read before Rally Point details: only red `img.att1` rows qualify, their timers are the fallback if Rally Point
   fails, and a clear target Dorf1 read cancels pending evasion and skips Rally Point. Evasion settings and successful
   protection windows persist atomically per account+world by coordinate key; corrupt files are quarantined. Automatic
   dispatch is high-priority safe-boundary work gated by Continuous Loop or Auto Queue but independent of Village Auto.
   Destination coordinates and movement type are global per account+world; village enablement, troop slots, and Hero
-  selection remain per village. Sync settings copies every troop-slot and Hero choice from one village to explicitly
-  selected target villages, but never changes their individual enabled state.
+  selection remain per village. The global `Evade for` filters default to both Raid and Attack, persist per
+  account+world, and gate scheduler candidates by authoritative movement type; an unknown Dorf1 fallback is eligible
+  only while both filters are enabled. Enabling an incomplete village is rejected with the themed warning dialog and
+  a concrete list of missing coordinates, troop/Hero selection, movement type, or incoming-type selection. Sync
+  settings copies every troop-slot and Hero choice from one village to explicitly selected target villages, but never
+  changes their individual enabled state.
+  Dashboard > Village settings `Troop evade` is a projection of the same per-village evasion setting and must use the
+  normal completeness validation, themed warning, immediate persistence, and bidirectional UI synchronization.
   The first `#ok` and final `#confirmSendTroops` are separate one-shot state changes. Reinforcements confirm immediately;
   Raid/Attack confirms only when a round trip cannot return before the triggering arrival plus 15 seconds, and never at
   or after that arrival. Cancellation before final Confirm creates no protection state.

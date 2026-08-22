@@ -17,11 +17,11 @@ public sealed class TroopEvasionSchedulerTests
         };
         var completed = new HashSet<string>();
 
-        var lead = TroopEvasionScheduler.SelectMostUrgent([("xy:1|2", attack)], settings, new Dictionary<string, TroopEvasionProtectionState>(), completed, now, 5);
+        var lead = TroopEvasionScheduler.SelectMostUrgent([("xy:1|2", attack)], settings, new Dictionary<string, TroopEvasionProtectionState>(), completed, now, 5, true, true);
         Assert.Equal("lead", lead?.Milestone);
         completed.Add(TroopEvasionScheduler.MilestoneKey("xy:1|2", attack, "lead"));
-        Assert.Null(TroopEvasionScheduler.SelectMostUrgent([("xy:1|2", attack)], settings, new Dictionary<string, TroopEvasionProtectionState>(), completed, now, 5));
-        Assert.Equal("retry-1m", TroopEvasionScheduler.SelectMostUrgent([("xy:1|2", attack)], settings, new Dictionary<string, TroopEvasionProtectionState>(), completed, now.AddMinutes(4), 5)?.Milestone);
+        Assert.Null(TroopEvasionScheduler.SelectMostUrgent([("xy:1|2", attack)], settings, new Dictionary<string, TroopEvasionProtectionState>(), completed, now, 5, true, true));
+        Assert.Equal("retry-1m", TroopEvasionScheduler.SelectMostUrgent([("xy:1|2", attack)], settings, new Dictionary<string, TroopEvasionProtectionState>(), completed, now.AddMinutes(4), 5, true, true)?.Milestone);
     }
 
     [Fact]
@@ -33,7 +33,7 @@ public sealed class TroopEvasionSchedulerTests
         {
             ["xy:1|2"] = new("xy:1|2", "A", null, true, 3, 4, SelectedTroopSlots: [1]),
         };
-        var due = TroopEvasionScheduler.SelectMostUrgent([("xy:1|2", attack)], settings, new Dictionary<string, TroopEvasionProtectionState>(), new HashSet<string>(), now, 5);
+        var due = TroopEvasionScheduler.SelectMostUrgent([("xy:1|2", attack)], settings, new Dictionary<string, TroopEvasionProtectionState>(), new HashSet<string>(), now, 5, true, true);
         Assert.Equal("retry-1m", due?.Milestone);
     }
 
@@ -51,7 +51,37 @@ public sealed class TroopEvasionSchedulerTests
         var due = TroopEvasionScheduler.SelectMostUrgent(
             [("xy:1|2", first), ("xy:1|2", later)], settings,
             new Dictionary<string, TroopEvasionProtectionState> { ["xy:1|2"] = protection },
-            new HashSet<string>(), now.AddMinutes(6), 5);
+            new HashSet<string>(), now.AddMinutes(6), 5, true, true);
         Assert.Equal("b", due?.Attack.Id);
+    }
+
+    [Fact]
+    public void MovementFilters_SelectOnlyEnabledIncomingType()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var raid = new IncomingAttack("raid", "A", now.AddMinutes(5), IncomingAttackMovementType.Raid, "xy:1|2");
+        var attack = new IncomingAttack("attack", "A", now.AddMinutes(5), IncomingAttackMovementType.Attack, "xy:1|2");
+        var settings = new Dictionary<string, TroopEvasionVillageSettings>
+        {
+            ["xy:1|2"] = new("xy:1|2", "A", null, true, 3, 4, SelectedTroopSlots: [1]),
+        };
+
+        var attackOnly = TroopEvasionScheduler.SelectMostUrgent(
+            [("xy:1|2", raid), ("xy:1|2", attack)], settings, new Dictionary<string, TroopEvasionProtectionState>(),
+            new HashSet<string>(), now, 5, evadeRaids: false, evadeAttacks: true);
+        var raidOnly = TroopEvasionScheduler.SelectMostUrgent(
+            [("xy:1|2", raid), ("xy:1|2", attack)], settings, new Dictionary<string, TroopEvasionProtectionState>(),
+            new HashSet<string>(), now, 5, evadeRaids: true, evadeAttacks: false);
+
+        Assert.Equal("attack", attackOnly?.Attack.Id);
+        Assert.Equal("raid", raidOnly?.Attack.Id);
+
+        var unknown = new IncomingAttack("unknown", "A", now.AddMinutes(5), IncomingAttackMovementType.Unknown, "xy:1|2");
+        Assert.Null(TroopEvasionScheduler.SelectMostUrgent(
+            [("xy:1|2", unknown)], settings, new Dictionary<string, TroopEvasionProtectionState>(),
+            new HashSet<string>(), now, 5, evadeRaids: false, evadeAttacks: true));
+        Assert.Equal("unknown", TroopEvasionScheduler.SelectMostUrgent(
+            [("xy:1|2", unknown)], settings, new Dictionary<string, TroopEvasionProtectionState>(),
+            new HashSet<string>(), now, 5, evadeRaids: true, evadeAttacks: true)?.Attack.Id);
     }
 }

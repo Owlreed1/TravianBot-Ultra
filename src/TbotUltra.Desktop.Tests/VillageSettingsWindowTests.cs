@@ -104,6 +104,53 @@ public sealed class VillageSettingsPanelTests
     }
 
     [Fact]
+    public void ProtectionColumns_FollowTownHallAndPublishChanges()
+    {
+        _wpf.Run(() =>
+        {
+            var row = new VillageSettingsRow
+            {
+                Name = "BRO",
+                AttackScanEnabled = true,
+                TroopEvadeEnabled = false,
+                GroupToggles =
+                [
+                    new VillageGroupToggle
+                    {
+                        GroupKey = "town_hall_celebration",
+                        Title = "Town Hall",
+                        CanToggle = true,
+                    },
+                    new VillageGroupToggle
+                    {
+                        GroupKey = "resource_transfer",
+                        Title = "Resource Transfer",
+                        CanToggle = true,
+                    },
+                ],
+            };
+            var attackScanChanges = 0;
+            var troopEvadeChanges = 0;
+            var panel = new VillageSettingsPanel(
+                [row],
+                onAttackScanChanged: _ => attackScanChanges++,
+                onTroopEvadeChanged: _ => troopEvadeChanges++);
+            var grid = Assert.IsType<DataGrid>(panel.FindName("VillageSettingsDataGrid"));
+            var headers = grid.Columns.OrderBy(column => column.DisplayIndex).Select(HeaderTitle).ToList();
+            var townHallIndex = headers.IndexOf("Town Hall");
+
+            Assert.Equal("Attack scan", headers[townHallIndex + 1]);
+            Assert.Equal("Troop evade", headers[townHallIndex + 2]);
+
+            row.AttackScanEnabled = false;
+            row.TroopEvadeEnabled = true;
+
+            Assert.Equal(1, attackScanChanges);
+            Assert.Equal(1, troopEvadeChanges);
+        });
+    }
+
+    [Fact]
     public void CheckAll_PersistsEveryChangedRowAndPublishesOnce()
     {
         _wpf.Run(() =>

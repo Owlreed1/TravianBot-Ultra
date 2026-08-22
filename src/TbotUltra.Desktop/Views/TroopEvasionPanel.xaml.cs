@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Worker.Domain;
 
@@ -12,6 +13,7 @@ public partial class TroopEvasionPanel : UserControl
     public ObservableCollection<TroopEvasionVillageItem> Villages { get; } = [];
     public event Action? SettingsChanged;
     public event Action<TroopEvasionVillageItem>? ValidateRequested;
+    public event Func<TroopEvasionVillageItem, string?>? EnableValidationRequested;
 
     public TroopEvasionPanel()
     {
@@ -29,8 +31,17 @@ public partial class TroopEvasionPanel : UserControl
     public TroopEvasionMovementType MovementType => MovementTypeComboBox.SelectedItem is TroopEvasionMovementType value
         ? value
         : TroopEvasionMovementType.Reinforcement;
+    public bool EvadeRaids => EvadeRaidsCheckBox.IsChecked == true;
+    public bool EvadeAttacks => EvadeAttacksCheckBox.IsChecked == true;
 
-    public void SetGlobalSettings(int lead, int protection, int? targetX, int? targetY, TroopEvasionMovementType movementType)
+    public void SetGlobalSettings(
+        int lead,
+        int protection,
+        int? targetX,
+        int? targetY,
+        TroopEvasionMovementType movementType,
+        bool evadeRaids,
+        bool evadeAttacks)
     {
         _loading = true;
         LeadTimeComboBox.SelectedItem = lead;
@@ -38,12 +49,11 @@ public partial class TroopEvasionPanel : UserControl
         TargetXTextBox.Text = targetX?.ToString() ?? string.Empty;
         TargetYTextBox.Text = targetY?.ToString() ?? string.Empty;
         MovementTypeComboBox.SelectedItem = movementType;
+        EvadeRaidsCheckBox.IsChecked = evadeRaids;
+        EvadeAttacksCheckBox.IsChecked = evadeAttacks;
         _loading = false;
         ApplyGlobalDispatchSettingsToVillages();
     }
-
-    public void SetPaused(bool paused) =>
-        PausedTextBlock.Text = paused ? "Paused — start Continuous Loop or Auto Queue" : string.Empty;
 
     private void GlobalSetting_Changed(object sender, SelectionChangedEventArgs e)
     {
@@ -55,6 +65,11 @@ public partial class TroopEvasionPanel : UserControl
         if (_loading) return;
         ApplyGlobalDispatchSettingsToVillages();
         SettingsChanged?.Invoke();
+    }
+
+    private void GlobalEvadeForSetting_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_loading) SettingsChanged?.Invoke();
     }
 
     private void ApplyGlobalDispatchSettingsToVillages()
@@ -70,8 +85,61 @@ public partial class TroopEvasionPanel : UserControl
     private void VillageSetting_Changed(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
-        if ((sender as FrameworkElement)?.Tag is TroopEvasionVillageItem village) village.RefreshDerived();
+        if ((sender as FrameworkElement)?.Tag is TroopEvasionVillageItem village)
+        {
+            village.RefreshDerived();
+            if (sender is ToggleButton { IsChecked: true })
+            {
+                ValidateEnabledVillage(village);
+            }
+        }
         SettingsChanged?.Invoke();
+    }
+
+    internal bool SetVillageEnabled(string villageKey, bool enabled)
+    {
+        var village = Villages.FirstOrDefault(item => string.Equals(
+            item.VillageKey,
+            villageKey,
+            StringComparison.OrdinalIgnoreCase));
+        if (village is null)
+        {
+            return false;
+        }
+
+        village.Enabled = enabled;
+        village.RefreshDerived();
+        if (enabled)
+        {
+            ValidateEnabledVillage(village);
+        }
+
+        SettingsChanged?.Invoke();
+        return village.Enabled;
+    }
+
+    private bool ValidateEnabledVillage(TroopEvasionVillageItem village)
+    {
+        var error = EnableValidationRequested?.Invoke(village);
+        if (string.IsNullOrWhiteSpace(error))
+        {
+            return true;
+        }
+
+        _loading = true;
+        village.Enabled = false;
+        village.RuntimeStatus = error;
+        _loading = false;
+        AppDialog.ShowCustom(
+            Window.GetWindow(this),
+            $"Troop evasion cannot be enabled for {village.VillageName}.\n\n{error}",
+            "Complete troop evasion settings",
+            [("OK", MessageBoxResult.OK)],
+            MessageBoxImage.Warning,
+            MessageBoxResult.OK,
+            MessageBoxResult.OK,
+            successResult: MessageBoxResult.OK);
+        return false;
     }
 
     private void Validate_Click(object sender, RoutedEventArgs e)

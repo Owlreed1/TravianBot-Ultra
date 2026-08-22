@@ -239,27 +239,41 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-          <TextBlock Text="Incoming attacks" FontSize="22" FontWeight="SemiBold"
-                     Foreground="{DynamicResource TextPrimaryBrush}" />
-          <TextBlock x:Name="IncomingAttacksInfoIcon"
-                     Text="&#xE946;"
-                     FontFamily="Segoe MDL2 Assets"
-                     FontSize="15"
-                     Margin="8,0,0,0"
-                     VerticalAlignment="Center"
-                     Foreground="{DynamicResource TextSubtleBrush}"
-                     Cursor="Help"
-                     ToolTipService.InitialShowDelay="200"
-                     ToolTip="Incoming attacks and raids detected on Dorf1 and verified in Rally Point. Times use the Travian server clock." />
-        </StackPanel>
+        <Grid Margin="0,0,0,12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Incoming attacks" FontSize="22" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <ContentControl x:Name="IncomingAttacksInfoIcon"
+                            Style="{DynamicResource InfoTooltipIconStyle}"
+                            Margin="8,0,0,0"
+                            ToolTip="Incoming attacks and raids detected on Dorf1 and verified in Rally Point. Times use the Travian server clock." />
+          </StackPanel>
+          <Button x:Name="ClearIncomingAttackListButton"
+                  Grid.Column="1"
+                  Content="Clear list"
+                  Padding="12,5"
+                  Background="{DynamicResource DangerBgBrush}"
+                  BorderBrush="{DynamicResource DangerBorderBrush}"
+                  Foreground="{DynamicResource DangerTextBrush}"
+                  Click="ClearIncomingAttackListButton_Click" />
+        </Grid>
         <Border x:Name="IncomingAttackMonitoringPanel"
                 Grid.Row="1" Margin="0,0,0,12" Padding="10,9" MinHeight="66" CornerRadius="6"
                 Background="{DynamicResource ControlBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
           <StackPanel>
-            <TextBlock Text="Villages monitored" FontWeight="SemiBold" Margin="0,0,0,7"
-                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,7">
+              <TextBlock Text="Villages monitored" FontWeight="SemiBold" VerticalAlignment="Center"
+                         Foreground="{DynamicResource TextPrimaryBrush}" />
+              <Button x:Name="ToggleAllIncomingAttackMonitoringButton"
+                      Content="Toggle all" Margin="10,0,0,0" Padding="8,2" MinHeight="0"
+                      FontSize="10" Click="ToggleAllIncomingAttackMonitoringButton_Click"
+                      ToolTip="Enable all villages if any are off; otherwise disable all villages" />
+            </StackPanel>
             <ItemsControl x:Name="IncomingAttackMonitoringVillageItemsControl">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
@@ -336,35 +350,10 @@
                        FontSize="22"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource TextPrimaryBrush}" />
-            <Border Width="14"
-                    Height="14"
-                    CornerRadius="7"
-                    Background="{DynamicResource ControlBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1"
-                    Margin="8,5,0,0"
-                    VerticalAlignment="Center"
-                    ToolTipService.InitialShowDelay="0">
-              <Border.ToolTip>
-                <ToolTip MaxWidth="360">
-                  <StackPanel Width="320">
-                    <TextBlock Text="Catapult waves"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TooltipForegroundBrush}"
-                               Margin="0,0,0,6" />
-                    <TextBlock TextWrapping="Wrap"
-                               Text="Reads available troops from Rally Point, prepares one first attack and multiple attack waves. Catapult targets use Random automatically when catapults are included." />
-                  </StackPanel>
-                </ToolTip>
-              </Border.ToolTip>
-              <TextBlock Text="i"
-                         FontSize="10"
-                         FontWeight="SemiBold"
-                         Foreground="{DynamicResource TextMutedBrush}"
-                         HorizontalAlignment="Center"
-                         VerticalAlignment="Center"
-                         TextAlignment="Center" />
-            </Border>
+            <ContentControl x:Name="CatapultWavesInfoIcon"
+                            Style="{DynamicResource InfoTooltipIconStyle}"
+                            Margin="8,0,0,0"
+                            ToolTip="Reads available troops from Rally Point, prepares one first attack and multiple attack waves. Catapult targets use Random automatically when catapults are included." />
           </StackPanel>
           <TextBlock Text="Prepare one first attack followed by multiple precisely timed attack waves."
                      Foreground="{DynamicResource TextSubtleBrush}"

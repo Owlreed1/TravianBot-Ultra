@@ -16,10 +16,18 @@ public static class TroopEvasionScheduler
         IReadOnlyDictionary<string, TroopEvasionProtectionState> protections,
         IReadOnlySet<string> completedMilestones,
         DateTimeOffset nowUtc,
-        int leadTimeMinutes)
+        int leadTimeMinutes,
+        bool evadeRaids,
+        bool evadeAttacks)
     {
         return attacks
             .Where(item => item.Attack.ArrivalAtUtc > nowUtc)
+            .Where(item => item.Attack.MovementType switch
+            {
+                IncomingAttackMovementType.Raid => evadeRaids,
+                IncomingAttackMovementType.Attack => evadeAttacks,
+                _ => evadeRaids && evadeAttacks,
+            })
             .Where(item => settings.TryGetValue(item.VillageKey, out var config) && config.Enabled)
             .Where(item => !protections.TryGetValue(item.VillageKey, out var protection)
                            || item.Attack.ArrivalAtUtc > protection.ProtectedThroughUtc)

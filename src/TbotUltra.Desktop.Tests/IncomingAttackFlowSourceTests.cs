@@ -79,6 +79,36 @@ public sealed class IncomingAttackFlowSourceTests
         Assert.Contains("Incoming monitoring disabled", evasionSource, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DisablingVillageMonitoring_PreservesConfirmedAttackRows()
+    {
+        var source = Read("TbotUltra.Desktop", "MainWindow.IncomingAttacks.cs");
+        var start = source.IndexOf("internal void OnIncomingAttackMonitoringChanged", StringComparison.Ordinal);
+        var handler = source[start..];
+
+        Assert.DoesNotContain("ClearIncomingAttacksAfterAuthoritativeDorf1Read", handler, StringComparison.Ordinal);
+        Assert.Contains("CancelTroopEvasionForClearedVillage", handler, StringComparison.Ordinal);
+
+        var restoreStart = source.IndexOf("foreach (var attack in state.Attacks)", StringComparison.Ordinal);
+        var restoreEnd = source.IndexOf("_incomingAttackPendingSignals.Clear()", restoreStart, StringComparison.Ordinal);
+        var confirmedAttackRestore = source[restoreStart..restoreEnd];
+        Assert.DoesNotContain("IsIncomingAttackMonitoringEnabled", confirmedAttackRestore, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InvalidEvasionEnable_UsesThemedWarningWithSoftGreenOk()
+    {
+        var panelSource = Read("TbotUltra.Desktop", "Views", "TroopEvasionPanel.xaml.cs");
+        var mainSource = Read("TbotUltra.Desktop", "MainWindow.TroopEvasion.cs");
+
+        Assert.Contains("EnableValidationRequested?.Invoke(village)", panelSource, StringComparison.Ordinal);
+        Assert.Contains("AppDialog.ShowCustom", panelSource, StringComparison.Ordinal);
+        Assert.Contains("successResult: MessageBoxResult.OK", panelSource, StringComparison.Ordinal);
+        Assert.Contains("Complete the following:", mainSource, StringComparison.Ordinal);
+        Assert.Contains("Enter valid target X and Y coordinates", mainSource, StringComparison.Ordinal);
+        Assert.Contains("Select at least one troop or Hero", mainSource, StringComparison.Ordinal);
+    }
+
     private static string Read(params string[] parts)
     {
         var root = ProjectRootLocator.FindProjectRoot();
