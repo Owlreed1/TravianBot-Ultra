@@ -486,8 +486,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   the user made in the UI while the task was waiting.
 - Hero runtime state is published as one structured Worker update (`HeroRuntimeStatus`). The Hero page and the
   Village overview icon must consume that same update so away/dead/reviving state cannot diverge between views.
-- Explicit Hero attribute refreshes are live-authoritative; the persisted snapshot only seeds startup UI. Successful
-  point allocation invalidates memory and disk, and incomplete attribute DOM reads never overwrite a valid snapshot.
+- Hero Attributes navigation is required only when the sidebar signals new points or no known attribute snapshot
+  exists. Successful point allocation invalidates memory and disk, and incomplete DOM reads never overwrite a valid
+  snapshot. Hero HP uses the global SVG first and opens Attributes only when that live signal is unavailable.
 - Hero inventory resources are an account+server persisted last-known snapshot. Quick re-login, process restart,
   and account switching restore it; incomplete inventory reads never replace it with fabricated zeroes. When no
   snapshot has ever been captured, construction/resource actions may open their existing resource-transfer dialog,

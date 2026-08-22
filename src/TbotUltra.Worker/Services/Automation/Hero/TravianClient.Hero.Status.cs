@@ -635,6 +635,12 @@ public sealed partial class TravianClient
             forceDorf1Reload: false,
             cancellationToken);
         var adventureCount = TryResolveAdventureCount(quick);
+        var cachedSnapshot = TryGetCachedHeroAttributeSnapshot();
+        if (cachedSnapshot is not null && !quick.HasUnassignedPointsSignal)
+        {
+            Notify("[hero:verbose] known hero attributes reused; no new points signal");
+            return cachedSnapshot with { AdventureCount = adventureCount };
+        }
 
         Notify("[hero:verbose] reading live hero attributes");
         await GotoAsync(Paths.HeroAttributes, cancellationToken);

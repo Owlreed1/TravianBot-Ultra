@@ -6,7 +6,7 @@ namespace TbotUltra.Worker.Tests;
 public sealed class HeroAttributePageSnapshotTests
 {
     [Fact]
-    public void ExplicitAttributeRead_NavigatesToLivePageWithoutCacheShortcut()
+    public void AttributeRead_UsesKnownSnapshotUnlessNewPointsAreSignalled()
     {
         var source = File.ReadAllText(Path.Combine(
             ProjectRootLocator.FindProjectRoot(),
@@ -26,11 +26,14 @@ public sealed class HeroAttributePageSnapshotTests
         Assert.True(methodStart >= 0 && methodEnd > methodStart);
 
         var method = source[methodStart..methodEnd];
+        var cacheRead = method.IndexOf("TryGetCachedHeroAttributeSnapshot", StringComparison.Ordinal);
+        var knownWithoutNewPoints = method.IndexOf(
+            "cachedSnapshot is not null && !quick.HasUnassignedPointsSignal",
+            StringComparison.Ordinal);
         var navigation = method.IndexOf("GotoAsync(Paths.HeroAttributes", StringComparison.Ordinal);
-        var liveRead = method.IndexOf("ReadHeroInventorySnapshotAsync", StringComparison.Ordinal);
 
-        Assert.True(navigation >= 0 && liveRead > navigation);
-        Assert.DoesNotContain("TryGetCachedHeroAttributeSnapshot", method, StringComparison.Ordinal);
+        Assert.True(cacheRead >= 0 && knownWithoutNewPoints > cacheRead && navigation > knownWithoutNewPoints,
+            "Known Hero attributes must avoid navigation unless the sidebar signals new points.");
     }
 
     [Fact]
