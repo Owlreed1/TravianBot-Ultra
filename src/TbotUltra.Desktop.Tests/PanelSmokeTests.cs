@@ -152,6 +152,7 @@ public sealed class PanelSmokeTests
             var attacks = Assert.IsType<TabItem>(panel.FindName("IncomingAttacksTabItem"));
             var grid = Assert.IsType<DataGrid>(panel.FindName("IncomingAttackDataGrid"));
             var monitoredVillages = Assert.IsType<ItemsControl>(panel.FindName("IncomingAttackMonitoringVillageItemsControl"));
+            var monitoredVillagesPanel = Assert.IsType<Border>(panel.FindName("IncomingAttackMonitoringPanel"));
             var infoIcon = Assert.IsType<TextBlock>(panel.FindName("IncomingAttacksInfoIcon"));
 
             Assert.Equal(3, tabs.Items.Count);
@@ -174,7 +175,9 @@ public sealed class PanelSmokeTests
                 FindVisualChildren<ToggleButton>(panel),
                 toggle => ReferenceEquals(toggle.Tag, monitored));
             Assert.True(monitoringToggle.IsChecked);
-            Assert.Equal(34, monitoringToggle.Width);
+            Assert.Equal(38, monitoringToggle.Width);
+            Assert.Equal(22, monitoringToggle.Height);
+            Assert.Equal(66, monitoredVillagesPanel.MinHeight);
             var typeColumn = Assert.IsType<DataGridTemplateColumn>(grid.Columns[1]);
             var raidType = Assert.IsType<TextBlock>(typeColumn.CellTemplate.LoadContent());
             raidType.DataContext = new IncomingAttackRowItem

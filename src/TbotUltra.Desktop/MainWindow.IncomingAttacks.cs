@@ -436,6 +436,10 @@ public partial class MainWindow
             _accountStore.ActiveAccountName(),
             LoadBotOptions().BaseUrl,
             DateTimeOffset.UtcNow);
+        if (state.Attacks.Count > 0 || state.PendingSignals.Count > 0)
+        {
+            AppendLog($"[incoming-attacks] restored {state.Attacks.Count} active movement(s) and {state.PendingSignals.Count} pending signal(s) from snapshot.");
+        }
         _incomingAttacksByVillage.Clear();
         foreach (var attack in state.Attacks)
         {

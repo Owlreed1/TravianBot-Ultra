@@ -26,6 +26,27 @@ public sealed class IncomingAttackStoreTests : IDisposable
     }
 
     [Fact]
+    public void Load_AfterRestartKeepsConfirmedAttackUntilAbsoluteArrival()
+    {
+        var now = new DateTimeOffset(2026, 8, 22, 18, 0, 0, TimeSpan.Zero);
+        var arrival = now.AddHours(2);
+        new IncomingAttackStore(_root).Save(
+            "account",
+            "https://ts1.example",
+            [new IncomingAttack("confirmed", "BRO", arrival, TargetVillageKey: "xy:25|-196")],
+            []);
+
+        var restored = new IncomingAttackStore(_root).Load(
+            "account",
+            "https://ts1.example",
+            now.AddMinutes(30));
+
+        var attack = Assert.Single(restored.Attacks);
+        Assert.Equal("confirmed", attack.Id);
+        Assert.Equal(arrival, attack.ArrivalAtUtc);
+    }
+
+    [Fact]
     public void Load_CorruptSnapshotReturnsEmptyState()
     {
         var path = TbotUltra.Core.Accounts.AccountStoragePaths.IncomingAttacksSnapshotPath(

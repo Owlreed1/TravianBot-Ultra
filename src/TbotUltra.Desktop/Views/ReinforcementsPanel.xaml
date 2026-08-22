@@ -253,7 +253,8 @@
                      ToolTipService.InitialShowDelay="200"
                      ToolTip="Incoming attacks and raids detected on Dorf1 and verified in Rally Point. Times use the Travian server clock." />
         </StackPanel>
-        <Border Grid.Row="1" Margin="0,0,0,12" Padding="10,8" CornerRadius="6"
+        <Border x:Name="IncomingAttackMonitoringPanel"
+                Grid.Row="1" Margin="0,0,0,12" Padding="10,9" MinHeight="66" CornerRadius="6"
                 Background="{DynamicResource ControlBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
           <StackPanel>
@@ -267,7 +268,7 @@
                 <DataTemplate>
                   <Border Margin="0,0,16,4">
                     <StackPanel Orientation="Horizontal">
-                      <ToggleButton Width="34" Height="18" Style="{StaticResource AutomationToggleStyle}"
+                      <ToggleButton Width="38" Height="22" Style="{StaticResource AutomationToggleStyle}"
                                     IsChecked="{Binding Enabled}" Tag="{Binding}"
                                     Click="IncomingAttackMonitoring_Changed"
                                     ToolTip="Enable incoming attack monitoring and evasion for this village" />
