@@ -384,7 +384,7 @@
             </StackPanel>
         </Border>
 
-        <!-- Villages overview (top, row 0). Columns: Name, Buildings, Queue, Smithy,
+        <!-- Villages overview (top, row 0). Columns: Attack, Name, Buildings, Queue, Smithy,
              Troops, Hero, Pop, Coords. -->
         <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="12">
                 <DockPanel>
@@ -400,7 +400,20 @@
                             <ColumnDefinition Width="56" />
                             <ColumnDefinition Width="84" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Village overview" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock x:Name="IncomingAttackColumnHeaderIcon"
+                                       Text="&#x2694;"
+                                       FontFamily="Segoe UI Symbol"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Width="20"
+                                       Margin="4,0,4,0"
+                                       TextAlignment="Center"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       ToolTip="Incoming attacks" />
+                            <TextBlock Text="Village overview" FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
                         <TextBlock Grid.Column="1" Text="Buildings" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="4,0,0,0" />
                         <TextBlock Grid.Column="2" Text="Queue" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="2,0,0,0" />
                         <TextBlock Grid.Column="3" Text="Smithy" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="4,0,0,0" />

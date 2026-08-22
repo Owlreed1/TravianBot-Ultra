@@ -32,4 +32,16 @@ public sealed class IncomingAttackIndicatorSourceTests
     {
         Assert.Equal("No incoming attacks", new VillageSelectionItem().IncomingAttackTooltip);
     }
+
+    [Fact]
+    public void VillageIndicator_UsesCompactCrossedSwordsColumnHeader()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "Views", "DashboardPanel.xaml"));
+
+        Assert.Contains("x:Name=\"IncomingAttackColumnHeaderIcon\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"&#x2694;\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("FontSize=\"13\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"Incoming attacks\"", xaml, StringComparison.Ordinal);
+    }
 }
