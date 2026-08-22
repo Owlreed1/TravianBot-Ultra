@@ -160,10 +160,6 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <TextBlock Text="{Binding HeroStatusText}"
-                                           FontSize="11"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                           Margin="0,2,0,0" />
                             </StackPanel>
                         </Border>
                     </Grid>

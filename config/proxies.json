@@ -413,7 +413,9 @@
     "isWorking": true,
     "lastFailureUtc": null,
     "assignedAccount": "fetmamm_hotmail_com_lobby_legends_travian_com_f9e5d8124878bd48",
-    "usedByAccounts": [],
+    "usedByAccounts": [
+      "fetmamm_hotmail_com_lobby_legends_travian_com_f9e5d8124878bd48"
+    ],
     "createdAtUtc": "2026-08-22T21:53:15.8635673Z"
   },
   {
