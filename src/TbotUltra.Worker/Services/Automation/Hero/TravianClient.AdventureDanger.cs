@@ -715,7 +715,7 @@ public sealed partial class TravianClient
         return null;
     }
 
-    private async Task MuteBonusVideoAsync(string label, string logPrefix, CancellationToken cancellationToken)
+    private async Task<bool> MuteBonusVideoAsync(string label, string logPrefix, CancellationToken cancellationToken)
     {
         try
         {
@@ -728,7 +728,7 @@ public sealed partial class TravianClient
                     if (await disabled.CountAsync() > 0 && await disabled.IsVisibleAsync())
                     {
                         Notify($"{logPrefix} {label}: video audio is muted.");
-                        return;
+                        return true;
                     }
 
                     var enabled = frame.Locator(".atg-gima-audio-button:has(.atg-gima-audio-button-enabled:not(.atg-gima-hidden))").First;
@@ -744,22 +744,24 @@ public sealed partial class TravianClient
                         if (await disabled.CountAsync() > 0 && await disabled.IsVisibleAsync())
                         {
                             Notify($"{logPrefix} {label}: clicked the audio control and confirmed the video is muted.");
-                            return;
+                            return true;
                         }
                     }
 
                     Notify($"{logPrefix} {label}: clicked the audio control, but muted state was not confirmed.");
-                    return;
+                    return false;
                 }
 
                 await Task.Delay(300, cancellationToken);
             }
 
             Notify($"{logPrefix} {label}: audio control was not found; continuing the video.");
+            return false;
         }
-        catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Notify($"{logPrefix} {label}: audio mute skipped ({ex.Message}); continuing the video.");
+            return false;
         }
     }
 
@@ -911,11 +913,19 @@ public sealed partial class TravianClient
         var consecutiveProviderFailures = 0;
         var earlyRewardLogged = false;
         var ignoredProviderLogged = false;
+        var muteConfirmed = false;
         while (DateTimeOffset.UtcNow < deadlineUtc)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await Task.Delay(AdventureVideoPollIntervalMs, cancellationToken);
             await TryClickBonusVideoSkipAdAsync(label, "[adventure-video:verbose]", cancellationToken);
+            if (!muteConfirmed)
+            {
+                muteConfirmed = await MuteBonusVideoAsync(
+                    label,
+                    "[adventure-video:verbose]",
+                    cancellationToken);
+            }
 
             var now = DateTimeOffset.UtcNow;
             var elapsedSeconds = (now - playClickedAtUtc).TotalSeconds;

@@ -564,11 +564,19 @@ public sealed partial class TravianClient
         var earlyCompletionLogged = false;
         var ignoredProviderLogged = false;
         var videoWasActive = false;
+        var muteConfirmed = false;
         while (DateTimeOffset.UtcNow < deadlineUtc)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await Task.Delay(ConstructFasterVideoPollIntervalMs, cancellationToken);
             await TryClickBonusVideoSkipAdAsync("construct-faster", "[construct-faster:verbose]", cancellationToken);
+            if (!muteConfirmed)
+            {
+                muteConfirmed = await MuteBonusVideoAsync(
+                    "construct-faster",
+                    "[construct-faster:verbose]",
+                    cancellationToken);
+            }
 
             string rawJson;
             try

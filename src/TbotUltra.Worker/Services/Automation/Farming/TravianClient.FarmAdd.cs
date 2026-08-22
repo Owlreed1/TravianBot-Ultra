@@ -127,6 +127,7 @@ public sealed partial class TravianClient
         // When a coordinate is skipped before Save the Add-target form is left open (see TryFillAddRaidFormAndSaveAsync),
         // so the next coordinate is typed straight into it instead of closing + reopening the dialog every miss.
         var reuseOpenForm = false;
+        var reuseOpenFormAfterInvalidCoordinates = false;
         // Consecutive fill/save exceptions. A single failure is skipped, but a run of them means the session
         // itself is broken, so the batch aborts instead of churning through every remaining candidate.
         var consecutiveFillExceptions = 0;
@@ -166,6 +167,7 @@ public sealed partial class TravianClient
                     lid,
                     useDefaultTroops,
                     coordinate.RequireUnoccupiedOasis,
+                    reuseAfterInvalidCoordinates: reuseOpenFormAfterInvalidCoordinates,
                     cancellationToken);
                 consecutiveFillExceptions = 0;
             }
@@ -180,6 +182,7 @@ public sealed partial class TravianClient
                 // as failed, and continue. Too many in a row means the session is broken, so bail out then.
                 failed++;
                 reuseOpenForm = false;
+                reuseOpenFormAfterInvalidCoordinates = false;
                 Notify($"{stepPrefix} Add target for ({coordinate.X}|{coordinate.Y}) failed and was skipped: {ex.Message}");
                 progress?.Report(new FarmAddProgress(farmListName, attempted, targetAddedCount, added, notFound, OccupiedOasisSkippedCount: occupiedSkipped));
                 await CloseAnyOpenAddTargetDialogAsync(cancellationToken);
@@ -194,6 +197,7 @@ public sealed partial class TravianClient
 
             // Saved/already/failed outcomes close or abandon the form. Pre-save skips keep it open for the next attempt.
             reuseOpenForm = false;
+            reuseOpenFormAfterInvalidCoordinates = false;
 
             if (saveOutcome == AddRaidSaveOutcome.Added)
             {
@@ -224,6 +228,7 @@ public sealed partial class TravianClient
                 progress?.Report(new FarmAddProgress(farmListName, attempted, targetAddedCount, added, notFound, coordinate, occupiedSkipped));
                 // Keep the open form and type the next coordinate straight into it.
                 reuseOpenForm = true;
+                reuseOpenFormAfterInvalidCoordinates = true;
                 continue;
             }
 
@@ -363,6 +368,7 @@ public sealed partial class TravianClient
         string lid,
         bool useDefaultTroops,
         bool requireUnoccupiedOasis,
+        bool reuseAfterInvalidCoordinates,
         CancellationToken cancellationToken)
     {
         var troopIndex = TroopCatalog.ResolveTroopIndex(troopType);
@@ -432,11 +438,14 @@ public sealed partial class TravianClient
             return AddRaidSaveOutcome.Failed;
         }
 
-        await Task.Delay(Random.Shared.Next(200, 400), cancellationToken);
+        if (!reuseAfterInvalidCoordinates)
+        {
+            await Task.Delay(Random.Shared.Next(200, 400), cancellationToken);
 
-        // The Add-target box is now open. Pause with the action-pacing click delay before typing the
-        // coordinates, so the bot doesn't fill the freshly-loaded form instantly (more human-like).
-        await DelayBeforeClickAsync(cancellationToken, "add farm: enter coordinates");
+            // The Add-target box is now open. Pause with the action-pacing click delay before typing the
+            // coordinates, so the bot doesn't fill the freshly-loaded form instantly (more human-like).
+            await DelayBeforeClickAsync(cancellationToken, "add farm: enter coordinates");
+        }
 
         if (!await FillAndVerifyFarmCoordinatesAsync(x, y, farmListName, cancellationToken))
         {

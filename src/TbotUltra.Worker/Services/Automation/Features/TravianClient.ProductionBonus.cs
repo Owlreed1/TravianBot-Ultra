@@ -452,11 +452,19 @@ public sealed partial class TravianClient
         var earlyRewardLogged = false;
         var ignoredProviderLogged = false;
         var ignoredClosedPlayerLogged = false;
+        var muteConfirmed = false;
         while (DateTimeOffset.UtcNow < deadlineUtc)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await Task.Delay(ProductionBonusVideoPollIntervalMs, cancellationToken);
             await TryClickBonusVideoSkipAdAsync("production bonus", "[production-bonus:verbose]", cancellationToken);
+            if (!muteConfirmed)
+            {
+                muteConfirmed = await MuteBonusVideoAsync(
+                    "production bonus",
+                    "[production-bonus:verbose]",
+                    cancellationToken);
+            }
 
             string rawJson;
             try

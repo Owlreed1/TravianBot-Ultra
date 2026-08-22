@@ -4,6 +4,27 @@ using TbotUltra.Core.Configuration;
 
 namespace TbotUltra.Worker.Services;
 
+internal enum BulkMessageSendOutcomeKind
+{
+    Pending = 0,
+    MissingPlayer = 1,
+    Sent = 2,
+    Error = 3,
+}
+
+internal sealed record BulkMessageSendSnapshot(
+    bool IsWritePage,
+    bool IsWriteFormVisible,
+    string? DialogText,
+    string? ValidationError);
+
+internal sealed record BulkMessageSendOutcome(BulkMessageSendOutcomeKind Kind, string? Detail = null);
+
+internal sealed record BulkMessageSendDomState(
+    bool IsWriteFormVisible,
+    string? DialogText,
+    string? ValidationError);
+
 public sealed partial class TravianClient
 {
     private static readonly string[] BulkMessageRecipientSelectors =
@@ -147,19 +168,31 @@ public sealed partial class TravianClient
             cancellationToken.ThrowIfCancellationRequested();
             if (currentPlayerNames.Count == 0)
             {
-                throw new InvalidOperationException("Bulk message batch has no valid recipients left after removing missing players.");
+                Notify("[bulk-messages] current batch has no valid recipients left; continuing with the next batch.");
+                return currentPlayerNames;
             }
 
             await DelayBeforeClickAsync(cancellationToken, "bulk messages send");
             await sendButton.ClickAsync(new LocatorClickOptions { Timeout = _config.TimeoutMs }).WaitAsync(cancellationToken);
-            var missingPlayerName = await TryHandleBulkMessageMissingPlayerDialogAsync(currentPlayerNames, cancellationToken);
-            if (missingPlayerName is null)
+            var outcome = await WaitForBulkMessageSendOutcomeAsync(cancellationToken);
+            if (outcome.Kind == BulkMessageSendOutcomeKind.Sent)
             {
-                await WaitAfterBulkMessageSendAsync(cancellationToken);
                 Notify($"[bulk-messages] sent batch to {currentPlayerNames.Count} recipient(s).");
                 return currentPlayerNames;
             }
 
+            if (outcome.Kind == BulkMessageSendOutcomeKind.Error)
+            {
+                throw new InvalidOperationException($"Bulk message send failed: {outcome.Detail}");
+            }
+
+            var missingPlayerName = outcome.Detail;
+            if (outcome.Kind != BulkMessageSendOutcomeKind.MissingPlayer || string.IsNullOrWhiteSpace(missingPlayerName))
+            {
+                throw new InvalidOperationException("Bulk message send ended without a verified outcome.");
+            }
+
+            await DismissBulkMessageMissingPlayerDialogAsync(cancellationToken);
             var removed = RemoveBulkMessageRecipient(currentPlayerNames, missingPlayerName);
             if (!removed)
             {
@@ -170,6 +203,12 @@ public sealed partial class TravianClient
             if (retryGuard > safePlayerNames.Count)
             {
                 throw new InvalidOperationException("Bulk message missing-player retry guard reached.");
+            }
+
+            if (currentPlayerNames.Count == 0)
+            {
+                Notify("[bulk-messages] removed the final missing recipient from the current batch; continuing with the next batch.");
+                return currentPlayerNames;
             }
 
             Notify($"[bulk-messages] removed missing recipient '{missingPlayerName}' and retrying batch with {currentPlayerNames.Count} recipient(s).");
@@ -305,35 +344,89 @@ public sealed partial class TravianClient
         return match.Success ? match.Groups[1].Value.Trim() : null;
     }
 
-    private async Task<string?> TryHandleBulkMessageMissingPlayerDialogAsync(
-        IReadOnlyCollection<string> attemptedPlayerNames,
-        CancellationToken cancellationToken)
+    internal static BulkMessageSendOutcome ClassifyBulkMessageSendOutcome(BulkMessageSendSnapshot snapshot)
     {
-        var content = _page.Locator(".dialogOverlay.dialogVisible #dialogContent").First;
-        try
+        if (!string.IsNullOrWhiteSpace(snapshot.DialogText))
         {
-            await content.WaitForAsync(new LocatorWaitForOptions
+            var missingPlayerName = TryExtractBulkMessageMissingPlayerName(snapshot.DialogText);
+            return missingPlayerName is null
+                ? new BulkMessageSendOutcome(BulkMessageSendOutcomeKind.Error, $"Unexpected dialog: {snapshot.DialogText.Trim()}")
+                : new BulkMessageSendOutcome(BulkMessageSendOutcomeKind.MissingPlayer, missingPlayerName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(snapshot.ValidationError))
+        {
+            return new BulkMessageSendOutcome(BulkMessageSendOutcomeKind.Error, snapshot.ValidationError.Trim());
+        }
+
+        if (!snapshot.IsWritePage || !snapshot.IsWriteFormVisible)
+        {
+            return new BulkMessageSendOutcome(BulkMessageSendOutcomeKind.Sent);
+        }
+
+        return new BulkMessageSendOutcome(BulkMessageSendOutcomeKind.Pending);
+    }
+
+    private async Task<BulkMessageSendOutcome> WaitForBulkMessageSendOutcomeAsync(CancellationToken cancellationToken)
+    {
+        var timeoutMs = Math.Clamp(_config.TimeoutMs, 5000, 15000);
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
             {
-                State = WaitForSelectorState.Visible,
-                Timeout = 1200,
-            }).WaitAsync(cancellationToken);
-        }
-        catch (TimeoutException)
-        {
-            return null;
-        }
-        catch (PlaywrightException)
-        {
-            return null;
+                var state = await _page.EvaluateAsync<BulkMessageSendDomState>(
+                    """
+                    () => {
+                      const isVisible = element => {
+                        if (!element) return false;
+                        const style = window.getComputedStyle(element);
+                        const rect = element.getBoundingClientRect();
+                        return style.display !== 'none'
+                          && style.visibility !== 'hidden'
+                          && rect.width > 0
+                          && rect.height > 0;
+                      };
+                      const clean = value => (value || '').replace(/\s+/g, ' ').trim();
+                      const dialog = document.querySelector('.dialogOverlay.dialogVisible #dialogContent');
+                      const writeForm = document.querySelector('#messageForm');
+                      const validationError = Array.from(document.querySelectorAll(
+                        '#messageForm .error, #messageForm .errors, #messageForm .alert, #messageForm .warning, ' +
+                        '#messageForm [class*="error" i], #messageForm [class*="warning" i]'))
+                        .find(node => isVisible(node) && clean(node.textContent).length > 0);
+                      return {
+                        isWriteFormVisible: isVisible(writeForm),
+                        dialogText: isVisible(dialog) ? clean(dialog.textContent) : null,
+                        validationError: validationError ? clean(validationError.textContent) : null,
+                      };
+                    }
+                    """).WaitAsync(cancellationToken);
+                var outcome = ClassifyBulkMessageSendOutcome(new BulkMessageSendSnapshot(
+                    IsCurrentUrlForPath(Paths.MessagesWrite),
+                    state.IsWriteFormVisible,
+                    state.DialogText,
+                    state.ValidationError));
+                if (outcome.Kind != BulkMessageSendOutcomeKind.Pending)
+                {
+                    return outcome;
+                }
+            }
+            catch (PlaywrightException ex) when (IsTransientExecutionContextError(ex))
+            {
+                // A successful classic form submit replaces the execution context. Re-read the new page.
+            }
+
+            await Task.Delay(Random.Shared.Next(100, 180), cancellationToken);
         }
 
-        var dialogText = await content.InnerTextAsync(new LocatorInnerTextOptions { Timeout = 2000 }).WaitAsync(cancellationToken);
-        var missingPlayerName = TryExtractBulkMessageMissingPlayerName(dialogText);
-        if (missingPlayerName is null)
-        {
-            return null;
-        }
+        return new BulkMessageSendOutcome(
+            BulkMessageSendOutcomeKind.Error,
+            $"No success, missing-player dialog, or validation error appeared within {timeoutMs} ms.");
+    }
 
+    private async Task DismissBulkMessageMissingPlayerDialogAsync(CancellationToken cancellationToken)
+    {
         var okButton = _page.Locator(".dialogOverlay.dialogVisible button.dialogButtonOk, .dialogOverlay.dialogVisible button.ok").First;
         await DelayBeforeClickAsync(cancellationToken, "bulk messages missing player dialog ok");
         await okButton.ClickAsync(new LocatorClickOptions { Timeout = _config.TimeoutMs }).WaitAsync(cancellationToken);
@@ -352,13 +445,6 @@ public sealed partial class TravianClient
         {
             // The next field fill will fail clearly if the dialog still blocks the page.
         }
-
-        var matchedName = attemptedPlayerNames.FirstOrDefault(name =>
-            string.Equals(
-                MapSqlPlayerParser.NormalizeNameKey(name),
-                MapSqlPlayerParser.NormalizeNameKey(missingPlayerName),
-                StringComparison.Ordinal));
-        return string.IsNullOrWhiteSpace(matchedName) ? missingPlayerName : matchedName;
     }
 
     private static bool RemoveBulkMessageRecipient(List<string> playerNames, string missingPlayerName)
@@ -369,37 +455,4 @@ public sealed partial class TravianClient
         return removed > 0;
     }
 
-    private async Task WaitAfterBulkMessageSendAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await WaitForPageReadyAsync(cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Notify($"[bulk-messages:verbose] message send page-ready wait failed or no navigation occurred: {ex.Message}");
-        }
-
-
-        var hasVisibleError = await _page.EvaluateAsync<bool>(
-            """
-            () => {
-              const nodes = Array.from(document.querySelectorAll('.error, .errors, .alert, .warning, [class*="error" i], [class*="warning" i]'));
-              return nodes.some(node => {
-                const style = window.getComputedStyle(node);
-                if (style.display === 'none' || style.visibility === 'hidden') return false;
-                const text = (node.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-                return text.includes('recipient') || text.includes('receiver') || text.includes('subject') || text.includes('message');
-              });
-            }
-            """).WaitAsync(cancellationToken);
-        if (hasVisibleError)
-        {
-            throw new InvalidOperationException("Message send appears to have failed: the page shows a visible validation error.");
-        }
-    }
 }

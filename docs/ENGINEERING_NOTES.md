@@ -130,6 +130,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   verified login, missing speed is expected and silently uses 1x; only an unparseable logged-in account alarms.
 - Detailed browser logging is development-only and off by default. Trace semantic operations, emit exactly one
   end event per flow, and sanitize all secrets. Navigation/mutations use the traced adapters.
+- Bonus-video audio muting is best-effort and retried during playback polling because provider controls may render
+  after play starts; a missing, detached, or unactionable audio control must never fail the video flow.
 
 ## Browser, login and account access
 
@@ -442,6 +444,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Map SQL `Skip own villages` resolves the in-game owner name from the active page's `.content > .playerName`;
   never substitute the login email/account key. Add the resolved name to the normalized ignored-player filter so
   every village owned by that player is excluded, and fail the import safely when the checked filter cannot resolve it.
+- Bulk messages must classify every Send as verified sent, one missing player, or a visible/timeout error. Remove
+  missing players one at a time and retry the same batch; an emptied batch continues to later batches. Cache only
+  recipients from a verified send. The analysis preview shows the summed map.sql village population per player in
+  the exact selected send order.
 - Farm-list exact timers get a 5-15s render margin; unreadable disabled timers use an estimated 60s wait.
 - "Send toggled lists" sends selected farm lists ONE AT A TIME via `SendFarmListsSequentiallyAsync`: click each list's Start,
   then wait for that list's `.farmListStatus` "N/M being raided" numerator to rise (or its Start to disable)
