@@ -26,15 +26,18 @@ public sealed record TroopEvasionState(
     int LeadTimeMinutes,
     int ProtectionWindowMinutes,
     IReadOnlyList<TroopEvasionVillageSettings> Villages,
-    IReadOnlyList<TroopEvasionProtectionState> Protections)
+    IReadOnlyList<TroopEvasionProtectionState> Protections,
+    int? TargetX = null,
+    int? TargetY = null,
+    TroopEvasionMovementType MovementType = TroopEvasionMovementType.Reinforcement)
 {
-    public static TroopEvasionState Default { get; } = new(5, 5, [], []);
+    public static TroopEvasionState Default { get; } = new(5, 5, [], [], null, null, TroopEvasionMovementType.Reinforcement);
 }
 
 public sealed class TroopEvasionStore(string projectRoot, Action<string>? log = null)
 {
     private sealed record FileModel(int SchemaVersion, TroopEvasionState State);
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
     private static readonly object IoLock = new();
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -51,14 +54,21 @@ public sealed class TroopEvasionStore(string projectRoot, Action<string>? log = 
         {
             FileModel? file;
             lock (IoLock) file = JsonSerializer.Deserialize<FileModel>(File.ReadAllText(path), JsonOptions);
-            if (file is null || file.SchemaVersion != SchemaVersion) throw new JsonException("Unsupported troop-evasion schema.");
+            if (file is null || file.SchemaVersion is not (1 or SchemaVersion)) throw new JsonException("Unsupported troop-evasion schema.");
             var state = file.State ?? TroopEvasionState.Default;
+            var legacyDispatch = (state.Villages ?? []).FirstOrDefault(village => village.TargetX.HasValue && village.TargetY.HasValue)
+                                 ?? (state.Villages ?? []).FirstOrDefault();
             return state with
             {
                 LeadTimeMinutes = NormalizeMinutes(state.LeadTimeMinutes),
                 ProtectionWindowMinutes = NormalizeMinutes(state.ProtectionWindowMinutes),
                 Villages = (state.Villages ?? []).Select(NormalizeVillage).ToList(),
                 Protections = (state.Protections ?? []).Where(item => item.ProtectedThroughUtc > nowUtc).ToList(),
+                TargetX = file.SchemaVersion == 1 ? legacyDispatch?.TargetX : NormalizeCoordinate(state.TargetX),
+                TargetY = file.SchemaVersion == 1 ? legacyDispatch?.TargetY : NormalizeCoordinate(state.TargetY),
+                MovementType = file.SchemaVersion == 1
+                    ? legacyDispatch?.MovementType ?? TroopEvasionMovementType.Reinforcement
+                    : Enum.IsDefined(state.MovementType) ? state.MovementType : TroopEvasionMovementType.Reinforcement,
             };
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
@@ -100,6 +110,7 @@ public sealed class TroopEvasionStore(string projectRoot, Action<string>? log = 
     };
 
     private static int NormalizeMinutes(int value) => value is 1 or 2 or 5 or 10 ? value : 5;
+    private static int? NormalizeCoordinate(int? value) => value is >= -400 and <= 400 ? value : null;
 
     private static void Quarantine(string path)
     {

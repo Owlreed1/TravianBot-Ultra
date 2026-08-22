@@ -283,6 +283,7 @@ public sealed partial class TravianClient
             activeCoords.X,
             activeCoords.Y,
             cancellationToken);
+        var hasTroopsAtHome = await ReadTroopPresenceOnCurrentDorf1Async(cancellationToken);
         var activePopulation = await ReadActiveVillagePopulationFromCurrentPageAsync(cancellationToken);
         if (activePopulation.HasValue)
         {
@@ -357,7 +358,9 @@ public sealed partial class TravianClient
             ActiveConstructionsFromOverview: _lastActiveConstructionsFromOverview,
             ActiveVillageCoordX: activeCoords.X,
             ActiveVillageCoordY: activeCoords.Y,
-            IncomingAttackSignals: incomingAttackSignals);
+            IncomingAttackSignals: incomingAttackSignals,
+            HasTroopsAtHome: hasTroopsAtHome,
+            TroopPresenceObservedAtUtc: hasTroopsAtHome.HasValue ? CurrentTravianServerTimeUtc() : null);
     }
 
     private async Task<(

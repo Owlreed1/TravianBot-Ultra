@@ -9,8 +9,9 @@ namespace TbotUltra.Desktop;
 
 public partial class MainWindow
 {
-    private static readonly TimeSpan IncomingAttackRefreshCooldown = TimeSpan.FromMinutes(1);
     private readonly ObservableCollection<IncomingAttackRowItem> _incomingAttackRows = [];
+    private readonly ObservableCollection<IncomingAttackMonitoringVillageItem> _incomingAttackMonitoringVillages = [];
+    private readonly HashSet<string> _incomingAttackMonitoringDisabledKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<IncomingAttack>> _incomingAttacksByVillage = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IncomingAttackSignal> _incomingAttackPendingSignals = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTimeOffset> _incomingAttackLastReadUtc = new(StringComparer.OrdinalIgnoreCase);
@@ -47,6 +48,7 @@ public partial class MainWindow
 
         var activeKey = VillageStatusCache.TryResolveCoordinateKey(status.ActiveVillage, status);
         if (activeKey is not null
+            && IsIncomingAttackMonitoringEnabled(activeKey)
             && resolvedSignals.All(signal => !string.Equals(signal.Key, activeKey, StringComparison.OrdinalIgnoreCase)))
         {
             ClearIncomingAttacksAfterAuthoritativeDorf1Read(activeKey, status.ActiveVillage);
@@ -54,9 +56,23 @@ public partial class MainWindow
 
         foreach (var (villageKey, normalizedSignal) in resolvedSignals)
         {
+            if (!IsIncomingAttackMonitoringEnabled(villageKey))
+            {
+                continue;
+            }
+            _incomingAttackPendingSignals.TryGetValue(villageKey, out var previousSignal);
+            var knownAttacks = _incomingAttacksByVillage.GetValueOrDefault(villageKey) ?? [];
+            var nowUtc = DateTimeOffset.UtcNow;
+            DateTimeOffset? lastReadUtc = _incomingAttackLastReadUtc.TryGetValue(villageKey, out var lastRead)
+                ? lastRead
+                : null;
+            var shouldRead = IncomingAttackObservationPolicy.ShouldReadDetails(
+                normalizedSignal,
+                previousSignal,
+                knownAttacks,
+                lastReadUtc,
+                nowUtc);
             _incomingAttackPendingSignals[villageKey] = normalizedSignal;
-            var shouldRead = !_incomingAttackLastReadUtc.TryGetValue(villageKey, out var lastRead)
-                             || DateTimeOffset.UtcNow - lastRead >= IncomingAttackRefreshCooldown;
             if (shouldRead)
             {
                 QueueIncomingAttackDetailsRead(villageKey, normalizedSignal);
@@ -128,6 +144,10 @@ public partial class MainWindow
 
     private void QueueIncomingAttackDetailsRead(string villageKey, IncomingAttackSignal signal)
     {
+        if (!IsIncomingAttackMonitoringEnabled(villageKey))
+        {
+            return;
+        }
         if (!_incomingAttackReadsInFlight.Add(villageKey))
         {
             return;
@@ -164,6 +184,11 @@ public partial class MainWindow
                 if (_incomingAttackDorf1ClearVersions.GetValueOrDefault(villageKey) != dorf1ClearVersion)
                 {
                     AppendLog($"[incoming-attacks] discarded stale Rally Point result for '{signal.VillageName}' after a clear Dorf1 read.");
+                    return;
+                }
+                if (!IsIncomingAttackMonitoringEnabled(villageKey))
+                {
+                    AppendLog($"[incoming-attacks] discarded result for disabled village '{signal.VillageName}'.");
                     return;
                 }
 
@@ -255,8 +280,20 @@ public partial class MainWindow
         {
             foreach (var pending in _incomingAttackPendingSignals.ToList())
             {
-                if (!_incomingAttackLastReadUtc.TryGetValue(pending.Key, out var lastAttempt)
-                    || nowUtc - lastAttempt >= IncomingAttackRefreshCooldown)
+                if (!IsIncomingAttackMonitoringEnabled(pending.Key))
+                {
+                    continue;
+                }
+                var knownAttacks = _incomingAttacksByVillage.GetValueOrDefault(pending.Key) ?? [];
+                DateTimeOffset? lastReadUtc = _incomingAttackLastReadUtc.TryGetValue(pending.Key, out var lastRead)
+                    ? lastRead
+                    : null;
+                if (IncomingAttackObservationPolicy.ShouldReadDetails(
+                        pending.Value,
+                        pending.Value,
+                        knownAttacks,
+                        lastReadUtc,
+                        nowUtc))
                 {
                     QueueIncomingAttackDetailsRead(pending.Key, pending.Value);
                 }
@@ -271,10 +308,7 @@ public partial class MainWindow
                 continue;
             }
 
-            var remaining = arrival - nowUtc;
-            row.CountdownText = remaining <= TimeSpan.Zero
-                ? "Arrived"
-                : $"{(int)remaining.TotalHours:00}:{remaining.Minutes:00}:{remaining.Seconds:00}";
+            row.CountdownText = FormatIncomingAttackCountdown(arrival, nowUtc);
         }
     }
 
@@ -333,7 +367,16 @@ public partial class MainWindow
             SourceCoordinatesText = sourceCoordinates,
             ArrivalAtUtc = attack.ArrivalAtUtc,
             ArrivalText = FormatQueueServerTime(attack.ArrivalAtUtc),
+            CountdownText = FormatIncomingAttackCountdown(attack.ArrivalAtUtc, GetServerNow().ToUniversalTime()),
         };
+    }
+
+    private static string FormatIncomingAttackCountdown(DateTimeOffset arrivalAtUtc, DateTimeOffset nowUtc)
+    {
+        var remaining = arrivalAtUtc - nowUtc;
+        return remaining <= TimeSpan.Zero
+            ? "Arrived"
+            : $"{(int)remaining.TotalHours:00}:{remaining.Minutes:00}:{remaining.Seconds:00}";
     }
 
     private void RefreshIncomingAttackVillageIndicators()
@@ -388,6 +431,7 @@ public partial class MainWindow
 
     private void LoadIncomingAttacksForActiveAccount()
     {
+        LoadIncomingAttackMonitoringSettings();
         var state = _incomingAttackStore.Load(
             _accountStore.ActiveAccountName(),
             LoadBotOptions().BaseUrl,
@@ -399,6 +443,10 @@ public partial class MainWindow
                       ?? (attack.TargetCoordX.HasValue && attack.TargetCoordY.HasValue
                           ? $"xy:{attack.TargetCoordX.Value}|{attack.TargetCoordY.Value}"
                           : attack.TargetVillageName);
+            if (!IsIncomingAttackMonitoringEnabled(key))
+            {
+                continue;
+            }
             if (!_incomingAttacksByVillage.TryGetValue(key, out var attacks))
             {
                 attacks = [];
@@ -413,8 +461,13 @@ public partial class MainWindow
             var key = signal.CoordX.HasValue && signal.CoordY.HasValue
                 ? $"xy:{signal.CoordX.Value}|{signal.CoordY.Value}"
                 : signal.VillageName;
+            if (!IsIncomingAttackMonitoringEnabled(key))
+            {
+                continue;
+            }
             _incomingAttackPendingSignals[key] = signal;
         }
+        SyncIncomingAttackMonitoringVillages();
         RefreshIncomingAttackUi();
         LoadTroopEvasionForActiveAccount();
     }
@@ -436,6 +489,79 @@ public partial class MainWindow
         _incomingAttackReadsInFlight.Clear();
         _incomingAttackDorf1ClearVersions.Clear();
         _incomingAttackRows.Clear();
+        _incomingAttackMonitoringVillages.Clear();
+        _incomingAttackMonitoringDisabledKeys.Clear();
         ClearTroopEvasionUiState();
+    }
+
+    private bool IsIncomingAttackMonitoringEnabled(string villageKey) =>
+        !_incomingAttackMonitoringDisabledKeys.Contains(villageKey);
+
+    private void LoadIncomingAttackMonitoringSettings()
+    {
+        _incomingAttackMonitoringDisabledKeys.Clear();
+        foreach (var key in _incomingAttackMonitoringStore.Load(
+                     _accountStore.ActiveAccountName(), LoadBotOptions().BaseUrl))
+        {
+            _incomingAttackMonitoringDisabledKeys.Add(key);
+        }
+    }
+
+    private void SyncIncomingAttackMonitoringVillages()
+    {
+        if (TroopsHubPanelControl?.IncomingAttackMonitoringVillages is null) return;
+        var villages = ((DashboardVillageList.ItemsSource as IEnumerable<VillageSelectionItem>)
+                        ?? (VillageComboBox.ItemsSource as IEnumerable<VillageSelectionItem>)
+                        ?? [])
+            .Where(village => !string.IsNullOrWhiteSpace(village.Name) && village.Name != "-")
+            .ToList();
+        var existing = _incomingAttackMonitoringVillages.ToDictionary(item => item.VillageKey, StringComparer.OrdinalIgnoreCase);
+        foreach (var village in villages)
+        {
+            var key = GetVillageKey(village);
+            if (existing.TryGetValue(key, out var item))
+            {
+                item.VillageName = village.Name;
+                item.Enabled = IsIncomingAttackMonitoringEnabled(key);
+                continue;
+            }
+
+            _incomingAttackMonitoringVillages.Add(new IncomingAttackMonitoringVillageItem
+            {
+                VillageKey = key,
+                VillageName = village.Name,
+                Enabled = IsIncomingAttackMonitoringEnabled(key),
+            });
+        }
+
+        foreach (var stale in _incomingAttackMonitoringVillages
+                     .Where(item => villages.All(village => !string.Equals(GetVillageKey(village), item.VillageKey, StringComparison.OrdinalIgnoreCase)))
+                     .ToList())
+        {
+            _incomingAttackMonitoringVillages.Remove(stale);
+        }
+    }
+
+    internal void OnIncomingAttackMonitoringChanged(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not IncomingAttackMonitoringVillageItem village) return;
+        if (village.Enabled)
+        {
+            _incomingAttackMonitoringDisabledKeys.Remove(village.VillageKey);
+            _incomingAttackLastReadUtc.Remove(village.VillageKey);
+        }
+        else
+        {
+            _incomingAttackMonitoringDisabledKeys.Add(village.VillageKey);
+            ClearIncomingAttacksAfterAuthoritativeDorf1Read(village.VillageKey, village.VillageName);
+        }
+
+        _incomingAttackMonitoringStore.Save(
+            _accountStore.ActiveAccountName(),
+            LoadBotOptions().BaseUrl,
+            _incomingAttackMonitoringDisabledKeys);
+        SaveIncomingAttackState();
+        RefreshIncomingAttackUi();
+        UpdateTroopEvasionRuntimeStatuses();
     }
 }

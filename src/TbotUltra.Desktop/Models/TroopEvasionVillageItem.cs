@@ -70,6 +70,17 @@ public sealed class TroopEvasionVillageItem : INotifyPropertyChanged
         OnPropertyChanged(nameof(TroopSummary));
         OnPropertyChanged(nameof(HeroRiskWarning));
     }
+
+    public void CopyTroopSelectionFrom(TroopEvasionVillageItem source)
+    {
+        var selectedSlots = source.Units.Where(unit => unit.IsSelected).Select(unit => unit.Slot).ToHashSet();
+        foreach (var unit in Units)
+        {
+            unit.IsSelected = selectedSlots.Contains(unit.Slot);
+        }
+        IncludeHero = source.IncludeHero;
+        RefreshDerived();
+    }
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;

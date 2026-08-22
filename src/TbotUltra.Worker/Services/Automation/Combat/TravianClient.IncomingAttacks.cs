@@ -92,21 +92,23 @@ public sealed partial class TravianClient
             activeCoordX,
             activeCoordY,
             observedAtUtc);
-        if (signals.Count > 0)
-        {
-            Notify($"[incoming-attacks] Dorf1 signaled {signals.Count} attacked village(s).");
-        }
-
         return signals;
+    }
+
+    private async Task<bool?> ReadTroopPresenceOnCurrentDorf1Async(CancellationToken cancellationToken)
+    {
+        if (!IsCurrentUrlForPath(Paths.Resources)) return null;
+        cancellationToken.ThrowIfCancellationRequested();
+        return IncomingAttackDomParser.ParseDorf1HasTroopsAtHome(await _page.ContentAsync());
     }
 
     private async Task EnsureIncomingAttackFilterAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var incoming = _page.Locator("button.iconFilter:has(img.subFilterCategory1)").First;
+        var category = _page.Locator("button.iconFilter:has(img.filterCategory1)").First;
         try
         {
-            await incoming.WaitForAsync(new LocatorWaitForOptions
+            await category.WaitForAsync(new LocatorWaitForOptions
             {
                 State = WaitForSelectorState.Visible,
                 Timeout = 5000,
@@ -115,29 +117,36 @@ public sealed partial class TravianClient
         catch (PlaywrightException)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            throw new InvalidOperationException("Rally Point incoming filter control was not found after waiting for the overview to render.");
+            throw new InvalidOperationException("Rally Point incoming category control was not found after waiting for the overview to render.");
         }
 
-        for (var attempt = 0; attempt < 4; attempt++)
+        for (var attempt = 0; attempt < 5; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var html = await _page.ContentAsync();
-            if (IncomingAttackDomParser.HasOnlyIncomingFilterActive(html))
+            var action = IncomingAttackDomParser.GetRequiredFilterAction(html);
+            if (action == IncomingAttackFilterAction.Verified)
             {
                 return;
             }
 
-            var activeNonIncoming = _page.Locator("button.iconFilter.iconFilterActive:has(img.filterCategory:not(.subFilterCategory1))").First;
-            if (await activeNonIncoming.CountAsync() > 0)
+            var (selector, reason, traceName) = action switch
             {
-                await DelayBeforeClickAsync(cancellationToken, "incoming attacks: disable extra filter");
-                await ClickLocatorAsync(activeNonIncoming, "incoming-attacks-disable-extra-filter", cancellationToken);
-                await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-                continue;
-            }
+                IncomingAttackFilterAction.EnableIncomingCategory =>
+                    ("button.iconFilter:has(img.filterCategory1)", "enable incoming category", "incoming-attacks-enable-category"),
+                IncomingAttackFilterAction.EnableIncomingSubfilter =>
+                    ("button.iconFilter:has(img.subFilterCategory1)", "enable incoming attacks", "incoming-attacks-enable-subfilter"),
+                IncomingAttackFilterAction.DisableReinforcementsSubfilter =>
+                    ("button.iconFilter.iconFilterActive:has(img.subFilterCategory2)", "disable reinforcements", "incoming-attacks-disable-reinforcements"),
+                IncomingAttackFilterAction.DisableReturningSubfilter =>
+                    ("button.iconFilter.iconFilterActive:has(img.subFilterCategory3)", "disable returning troops", "incoming-attacks-disable-returning"),
+                _ => throw new InvalidOperationException("Unsupported Rally Point filter action."),
+            };
 
-            await DelayBeforeClickAsync(cancellationToken, "incoming attacks: enable incoming filter");
-            await ClickLocatorAsync(incoming, "incoming-attacks-enable-filter", cancellationToken);
+            var control = _page.Locator(selector).First;
+            await control.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 5000 });
+            await DelayBeforeClickAsync(cancellationToken, $"incoming attacks: {reason}");
+            await ClickLocatorAsync(control, traceName, cancellationToken);
             await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
         }
 

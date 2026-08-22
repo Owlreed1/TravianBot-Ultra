@@ -74,6 +74,7 @@ public partial class AppDialog : Window
         MessageBoxResult? successResult = null,
         MessageBoxResult? accentResult = null,
         MessageBoxResult? warningResult = null,
+        MessageBoxResult? dangerResult = null,
         bool hideIcon = false)
         : this(
             owner,
@@ -87,6 +88,7 @@ public partial class AppDialog : Window
             successResult: successResult,
             accentResult: accentResult,
             warningResult: warningResult,
+            dangerResult: dangerResult,
             hideIcon: hideIcon)
     {
         MessageContentControl.Content = content;
@@ -204,7 +206,8 @@ public partial class AppDialog : Window
         MessageBoxResult? warningResult = null,
         MessageBoxResult? successResult = null,
         double? width = null,
-        bool hideIcon = false)
+        bool hideIcon = false,
+        MessageBoxResult? dangerResult = null)
     {
         var dialog = new AppDialog(
             owner,
@@ -218,6 +221,7 @@ public partial class AppDialog : Window
             successResult,
             accentResult,
             warningResult,
+            dangerResult: dangerResult,
             hideIcon: hideIcon);
         if (width is > 0)
         {

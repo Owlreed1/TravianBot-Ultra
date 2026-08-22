@@ -859,6 +859,10 @@ public partial class MainWindow
                 FarmLists = status.FarmLists ?? existing.FarmLists,
                 HeroStatus = status.HeroStatus ?? existing.HeroStatus,
                 IncomingAttackSignals = status.IncomingAttackSignals ?? existing.IncomingAttackSignals,
+                HasTroopsAtHome = status.HasTroopsAtHome ?? existing.HasTroopsAtHome,
+                TroopPresenceObservedAtUtc = status.HasTroopsAtHome.HasValue
+                    ? status.TroopPresenceObservedAtUtc
+                    : existing.TroopPresenceObservedAtUtc,
             };
 
             if ((status.Buildings is null || status.Buildings.Count == 0) && existing.Buildings is { Count: > 0 })

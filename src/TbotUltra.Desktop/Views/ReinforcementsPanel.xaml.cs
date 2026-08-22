@@ -57,6 +57,7 @@ public partial class ReinforcementsPanel : UserControl
     internal TabControl SendTroopsTabs => SendTroopsTabControl;
     internal TabItem IncomingAttacksTab => IncomingAttacksTabItem;
     internal DataGrid IncomingAttacksGrid => IncomingAttackDataGrid;
+    internal ItemsControl IncomingAttackMonitoringVillages => IncomingAttackMonitoringVillageItemsControl;
 
     private void ReinforcementSetting_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
         Host?.OnReinforcementSettingSelectionChanged(sender, e);
@@ -75,4 +76,7 @@ public partial class ReinforcementsPanel : UserControl
 
     private void StartCatapultWavesButton_Click(object sender, RoutedEventArgs e) =>
         Host?.OnStartCatapultWavesClicked(sender, e);
+
+    private void IncomingAttackMonitoring_Changed(object sender, RoutedEventArgs e) =>
+        Host?.OnIncomingAttackMonitoringChanged(sender, e);
 }

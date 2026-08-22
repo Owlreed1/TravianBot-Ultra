@@ -111,6 +111,7 @@ public sealed partial class TravianClient
             activeCoords.X,
             activeCoords.Y,
             cancellationToken);
+        var hasTroopsAtHome = await ReadTroopPresenceOnCurrentDorf1Async(cancellationToken);
         var cachedSnapshot = TryGetCachedVillageResourceSnapshot(activeVillage, activeCoords);
         var capacities = (
             Warehouse: snapshot.Capacities.Warehouse ?? cachedSnapshot?.WarehouseCapacity,
@@ -180,7 +181,9 @@ public sealed partial class TravianClient
             ActiveConstructionsFromOverview: _lastActiveConstructionsFromOverview,
             ActiveVillageCoordX: activeCoords.X,
             ActiveVillageCoordY: activeCoords.Y,
-            IncomingAttackSignals: incomingAttackSignals);
+            IncomingAttackSignals: incomingAttackSignals,
+            HasTroopsAtHome: hasTroopsAtHome,
+            TroopPresenceObservedAtUtc: hasTroopsAtHome.HasValue ? CurrentTravianServerTimeUtc() : null);
         trace.Complete(
             "success",
             $"village={result.ActiveVillage} resources={result.Resources.Count} fields={result.ResourceFields.Count} buildings={result.Buildings.Count} queue={result.BuildQueue.Count} activeConstructions={result.ActiveConstructions?.Count ?? 0}");

@@ -28,7 +28,11 @@ public partial class MainWindow
             foreach (var protection in _troopEvasionState.Protections)
                 _troopEvasionProtections[protection.VillageKey] = protection;
             TroopsHubPanelControl.EvasionPanel.SetGlobalSettings(
-                _troopEvasionState.LeadTimeMinutes, _troopEvasionState.ProtectionWindowMinutes);
+                _troopEvasionState.LeadTimeMinutes,
+                _troopEvasionState.ProtectionWindowMinutes,
+                _troopEvasionState.TargetX,
+                _troopEvasionState.TargetY,
+                _troopEvasionState.MovementType);
             SyncTroopEvasionVillages();
         }
         finally { _suppressTroopEvasionSave = false; }
@@ -48,7 +52,13 @@ public partial class MainWindow
             if (existing.ContainsKey(key)) continue;
             var settings = saved.GetValueOrDefault(key) ?? new TroopEvasionVillageSettings(
                 key, village.Name, village.Url, SelectedTroopSlots: Enumerable.Range(1, 10).ToList());
-            TroopsHubPanelControl.EvasionPanel.Villages.Add(TroopEvasionVillageItem.Create(village, settings));
+            var item = TroopEvasionVillageItem.Create(village, settings with
+            {
+                TargetX = TroopsHubPanelControl.EvasionPanel.TargetX,
+                TargetY = TroopsHubPanelControl.EvasionPanel.TargetY,
+                MovementType = TroopsHubPanelControl.EvasionPanel.MovementType,
+            });
+            TroopsHubPanelControl.EvasionPanel.Villages.Add(item);
         }
         foreach (var stale in TroopsHubPanelControl.EvasionPanel.Villages.Where(item => villages.All(v => !string.Equals(GetVillageKey(v), item.VillageKey, StringComparison.OrdinalIgnoreCase))).ToList())
             TroopsHubPanelControl.EvasionPanel.Villages.Remove(stale);
@@ -82,7 +92,10 @@ public partial class MainWindow
             TroopsHubPanelControl.EvasionPanel.LeadTimeMinutes,
             TroopsHubPanelControl.EvasionPanel.ProtectionWindowMinutes,
             settings,
-            _troopEvasionProtections.Values.ToList());
+            _troopEvasionProtections.Values.ToList(),
+            TroopsHubPanelControl.EvasionPanel.TargetX,
+            TroopsHubPanelControl.EvasionPanel.TargetY,
+            TroopsHubPanelControl.EvasionPanel.MovementType);
         _troopEvasionStore.Save(_accountStore.ActiveAccountName(), LoadBotOptions().BaseUrl, _troopEvasionState);
     }
 
@@ -122,9 +135,13 @@ public partial class MainWindow
         }
         var now = serverNow.ToUniversalTime();
         var settings = _troopEvasionState.Villages.ToDictionary(item => item.VillageKey, StringComparer.OrdinalIgnoreCase);
-        var attacks = _incomingAttacksByVillage.SelectMany(pair => pair.Value.Select(attack => (pair.Key, attack))).ToList();
+        var attacks = _incomingAttacksByVillage
+            .Where(pair => IsIncomingAttackMonitoringEnabled(pair.Key))
+            .SelectMany(pair => pair.Value.Select(attack => (pair.Key, attack)))
+            .ToList();
         foreach (var pending in _incomingAttackPendingSignals)
         {
+            if (!IsIncomingAttackMonitoringEnabled(pending.Key)) continue;
             foreach (var arrival in pending.Value.Dorf1ArrivalTimesUtc ?? [])
             {
                 attacks.Add((pending.Key, new IncomingAttack(
@@ -148,7 +165,26 @@ public partial class MainWindow
             }
             return;
         }
-        if (due is not null) _ = RunTroopEvasionAttemptAsync(due);
+        if (due is not null)
+        {
+            var village = ((DashboardVillageList.ItemsSource as IEnumerable<VillageSelectionItem>) ?? [])
+                .FirstOrDefault(candidate => string.Equals(GetVillageKey(candidate), due.VillageKey, StringComparison.OrdinalIgnoreCase));
+            if (due.Milestone == "lead"
+                && village is not null
+                && TryGetCachedVillageStatus(village, out var cachedStatus)
+                && cachedStatus.HasTroopsAtHome == false
+                && cachedStatus.TroopPresenceObservedAtUtc is { } observedAt
+                && now - observedAt.ToUniversalTime() <= TimeSpan.FromMinutes(2))
+            {
+                _troopEvasionCompletedMilestones.Add(
+                    TroopEvasionScheduler.MilestoneKey(due.VillageKey, due.Attack, due.Milestone));
+                var row = TroopsHubPanelControl.EvasionPanel.Villages.FirstOrDefault(item =>
+                    string.Equals(item.VillageKey, due.VillageKey, StringComparison.OrdinalIgnoreCase));
+                if (row is not null) row.RuntimeStatus = "No troops at home — Rally Point skipped";
+                return;
+            }
+            _ = RunTroopEvasionAttemptAsync(due);
+        }
     }
 
     private async Task RunTroopEvasionAttemptAsync(TroopEvasionDueWork due)
@@ -230,6 +266,7 @@ public partial class MainWindow
         foreach (var item in TroopsHubPanelControl.EvasionPanel.Villages)
         {
             if (!item.Enabled) item.RuntimeStatus = "Disabled";
+            else if (!IsIncomingAttackMonitoringEnabled(item.VillageKey)) item.RuntimeStatus = "Incoming monitoring disabled";
             else if (!active) item.RuntimeStatus = "Paused";
             else if (_troopEvasionProtections.TryGetValue(item.VillageKey, out var protection))
                 item.RuntimeStatus = $"Protected through {FormatQueueServerTime(protection.ProtectedThroughUtc)}";

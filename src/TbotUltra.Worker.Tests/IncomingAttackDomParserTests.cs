@@ -7,6 +7,31 @@ namespace TbotUltra.Worker.Tests;
 public sealed class IncomingAttackDomParserTests
 {
     [Fact]
+    public void ParseDorf1HasTroopsAtHome_ReadsNoTroopsAsAuthoritativeEmpty()
+    {
+        const string html = """
+            <div class="villageInfobox units">
+              <table id="troops"><tbody><tr><td class="noTroops">none</td></tr></tbody></table>
+            </div>
+            """;
+
+        Assert.False(IncomingAttackDomParser.ParseDorf1HasTroopsAtHome(html));
+    }
+
+    [Fact]
+    public void ParseDorf1HasTroopsAtHome_DistinguishesPresentFromUnread()
+    {
+        const string withTroops = """
+            <div class="villageInfobox units">
+              <table id="troops"><tbody><tr><td class="unit"><img class="unit u61"></td><td class="num">12</td></tr></tbody></table>
+            </div>
+            """;
+
+        Assert.True(IncomingAttackDomParser.ParseDorf1HasTroopsAtHome(withTroops));
+        Assert.Null(IncomingAttackDomParser.ParseDorf1HasTroopsAtHome("<main>not dorf1 units</main>"));
+    }
+
+    [Fact]
     public void ParseDorf1Signals_DetectsActiveAndPlusOverviewVillages()
     {
         const string html = """
@@ -119,8 +144,8 @@ public sealed class IncomingAttackDomParserTests
         const string html = """
             <table class="troop_details inRaid">
               <thead><tr>
-                <td class="role"><a href="/karte.php?d=74907">Enemy player</a></td>
-                <td class="troopHeadline"><a class="markAttack"><img id="markSymbol_27254877"></a><a href="/karte.php?d=74508">Enemy village</a></td>
+                <td class="role"><a href="/karte.php?d=74907">005</a></td>
+                <td class="troopHeadline"><a class="markAttack"><img id="markSymbol_27254877"></a><a href="/karte.php?d=74508">Count Duckula raids A4</a></td>
               </tr></thead>
               <tbody>
                 <tr><th class="coords"><span class="coordinateX">(-12</span>|<span class="coordinateY">34)</span></th></tr>
@@ -136,8 +161,8 @@ public sealed class IncomingAttackDomParserTests
         var attack = Assert.Single(attacks);
         Assert.Equal("27254877", attack.Id);
         Assert.Equal(IncomingAttackMovementType.Raid, attack.MovementType);
-        Assert.Equal("Enemy player", attack.SourcePlayerName);
-        Assert.Equal("Enemy village", attack.SourceVillageName);
+        Assert.Equal("Count Duckula", attack.SourcePlayerName);
+        Assert.Equal("005", attack.SourceVillageName);
         Assert.Equal(-12, attack.SourceCoordX);
         Assert.Equal(34, attack.SourceCoordY);
         Assert.Equal(new DateTimeOffset(2026, 8, 23, 0, 1, 0, TimeSpan.Zero), attack.ArrivalAtUtc);
@@ -163,16 +188,53 @@ public sealed class IncomingAttackDomParserTests
     public void HasOnlyIncomingFilterActive_RejectsMultipleActiveFilters()
     {
         const string correct = """
+            <button class="iconFilter iconFilterActive"><img class="filterCategory filterCategory1"></button>
             <button class="iconFilter iconFilterActive"><img class="filterCategory subFilterCategory1"></button>
             <button class="iconFilter"><img class="filterCategory subFilterCategory2"></button>
             <button class="iconFilter"><img class="filterCategory subFilterCategory3"></button>
             """;
         const string incorrect = """
+            <button class="iconFilter iconFilterActive"><img class="filterCategory filterCategory1"></button>
             <button class="iconFilter iconFilterActive"><img class="filterCategory subFilterCategory1"></button>
             <button class="iconFilter iconFilterActive"><img class="filterCategory subFilterCategory2"></button>
             """;
 
         Assert.True(IncomingAttackDomParser.HasOnlyIncomingFilterActive(correct));
         Assert.False(IncomingAttackDomParser.HasOnlyIncomingFilterActive(incorrect));
+    }
+
+    [Fact]
+    public void HasOnlyIncomingFilterActive_AcceptsActiveIncomingCategoryAndOnlyIncomingSubfilter()
+    {
+        const string html = """
+            <button type="button" class="iconFilter iconFilterActive"><img class="filterCategory filterCategory1"></button>
+            <div class="filterContainer">
+              <button type="button" class="iconFilter iconFilterActive"><img class="filterCategory subFilterCategory1"></button>
+              <button type="button" class="iconFilter"><img class="filterCategory subFilterCategory2"></button>
+              <button type="button" class="iconFilter"><img class="filterCategory subFilterCategory3"></button>
+            </div>
+            """;
+
+        Assert.True(IncomingAttackDomParser.HasOnlyIncomingFilterActive(html));
+    }
+
+    [Fact]
+    public void GetRequiredFilterAction_EnablesIncomingBeforeDisablingOtherSubfilters()
+    {
+        const string initial = """
+            <button class="iconFilter iconFilterActive"><img class="filterCategory filterCategory1"></button>
+            <button class="iconFilter"><img class="filterCategory subFilterCategory1"></button>
+            <button class="iconFilter iconFilterActive"><img class="filterCategory subFilterCategory2"></button>
+            <button class="iconFilter iconFilterActive"><img class="filterCategory subFilterCategory3"></button>
+            """;
+        const string incomingEnabled = """
+            <button class="iconFilter iconFilterActive"><img class="filterCategory filterCategory1"></button>
+            <button class="iconFilter iconFilterActive"><img class="filterCategory subFilterCategory1"></button>
+            <button class="iconFilter iconFilterActive"><img class="filterCategory subFilterCategory2"></button>
+            <button class="iconFilter iconFilterActive"><img class="filterCategory subFilterCategory3"></button>
+            """;
+
+        Assert.Equal(IncomingAttackFilterAction.EnableIncomingSubfilter, IncomingAttackDomParser.GetRequiredFilterAction(initial));
+        Assert.Equal(IncomingAttackFilterAction.DisableReinforcementsSubfilter, IncomingAttackDomParser.GetRequiredFilterAction(incomingEnabled));
     }
 }

@@ -7,6 +7,15 @@ using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Worker.Services;
 
+internal enum IncomingAttackFilterAction
+{
+    EnableIncomingCategory,
+    EnableIncomingSubfilter,
+    DisableReinforcementsSubfilter,
+    DisableReturningSubfilter,
+    Verified,
+}
+
 internal static class IncomingAttackDomParser
 {
     private static readonly Regex VillageRowRegex = new(
@@ -20,6 +29,21 @@ internal static class IncomingAttackDomParser
     private static readonly Regex Dorf1MovementTableRegex = new(
         @"<div\b[^>]*\bclass\s*=\s*[\""'][^\""']*\bvillageInfobox\b[^\""']*\bmovements\b[^\""']*[\""'][^>]*>[\s\S]*?<table\b[^>]*\bid\s*=\s*[\""']movements[\""'][^>]*>(?<body>.*?)</table>",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+
+    private static readonly Regex Dorf1UnitsTableRegex = new(
+        @"<div\b[^>]*\bclass\s*=\s*[\""'][^\""']*\bvillageInfobox\b[^\""']*\bunits\b[^\""']*[\""'][^>]*>[\s\S]*?<table\b[^>]*\bid\s*=\s*[\""']troops[\""'][^>]*>(?<body>.*?)</table>",
+        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+
+    internal static bool? ParseDorf1HasTroopsAtHome(string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return null;
+        var table = Dorf1UnitsTableRegex.Match(html);
+        if (!table.Success) return null;
+        return !Regex.IsMatch(
+            table.Groups["body"].Value,
+            @"<td\b[^>]*\bclass\s*=\s*[\""'][^\""']*\bnoTroops\b[^\""']*[\""']",
+            RegexOptions.IgnoreCase);
+    }
 
     internal static IReadOnlyList<IncomingAttackSignal> ParseDorf1Signals(
         string? html,
@@ -128,8 +152,9 @@ internal static class IncomingAttackDomParser
             var arrival = observedAtUtc.AddSeconds(Math.Max(0, remaining.Value));
             var id = ReadFirstGroup(body, @"markSymbol_(?<value>\d+)")
                      ?? ReadFirstGroup(body, @"markAttackSymbol\((?<value>\d+)\)");
-            var role = ReadFirstGroup(body, @"<td\b[^>]*\bclass\s*=\s*[\""'][^\""']*\brole\b[^\""']*[\""'][^>]*>[\s\S]*?<a\b[^>]*>(?<value>.*?)</a>");
-            var headline = ReadFirstGroup(body, @"<td\b[^>]*\bclass\s*=\s*[\""'][^\""']*\btroopHeadline\b[^\""']*[\""'][^>]*>[\s\S]*?<a\b(?![^>]*\bmarkAttack\b)[^>]*>(?<value>.*?)</a>");
+            var sourceVillage = ReadFirstGroup(body, @"<td\b[^>]*\bclass\s*=\s*[\""'][^\""']*\brole\b[^\""']*[\""'][^>]*>[\s\S]*?<a\b[^>]*>(?<value>.*?)</a>");
+            var movementHeadline = ReadFirstGroup(body, @"<td\b[^>]*\bclass\s*=\s*[\""'][^\""']*\btroopHeadline\b[^\""']*[\""'][^>]*>[\s\S]*?<a\b(?![^>]*\bmarkAttack\b)[^>]*>(?<value>.*?)</a>");
+            var sourcePlayer = ParseSourcePlayerName(movementHeadline, targetVillageName);
             var sourceCoords = ParseCoordinates(body);
             var movementType = HasCssClass(attrs, "inRaid")
                 ? IncomingAttackMovementType.Raid
@@ -137,7 +162,7 @@ internal static class IncomingAttackDomParser
                     ? IncomingAttackMovementType.Attack
                     : IncomingAttackMovementType.Unknown;
 
-            id ??= CreateFallbackId(targetVillageKey, targetVillageName, role, headline, movementType, arrival);
+            id ??= CreateFallbackId(targetVillageKey, targetVillageName, sourcePlayer, sourceVillage, movementType, arrival);
             attacks.Add(new IncomingAttack(
                 id,
                 targetVillageName,
@@ -146,8 +171,8 @@ internal static class IncomingAttackDomParser
                 targetVillageKey,
                 targetCoordX,
                 targetCoordY,
-                role,
-                headline,
+                sourcePlayer,
+                sourceVillage,
                 sourceCoords.X,
                 sourceCoords.Y,
                 observedAtUtc));
@@ -158,20 +183,34 @@ internal static class IncomingAttackDomParser
 
     internal static bool HasOnlyIncomingFilterActive(string? html)
     {
-        if (string.IsNullOrWhiteSpace(html))
-        {
-            return false;
-        }
+        return GetRequiredFilterAction(html) == IncomingAttackFilterAction.Verified;
+    }
 
-        var active = Regex.Matches(
+    internal static IncomingAttackFilterAction GetRequiredFilterAction(string? html)
+    {
+        if (!IsFilterActive(html, "filterCategory1"))
+            return IncomingAttackFilterAction.EnableIncomingCategory;
+        if (!IsFilterActive(html, "subFilterCategory1"))
+            return IncomingAttackFilterAction.EnableIncomingSubfilter;
+        if (IsFilterActive(html, "subFilterCategory2"))
+            return IncomingAttackFilterAction.DisableReinforcementsSubfilter;
+        if (IsFilterActive(html, "subFilterCategory3"))
+            return IncomingAttackFilterAction.DisableReturningSubfilter;
+        return IncomingAttackFilterAction.Verified;
+    }
+
+    private static bool IsFilterActive(string? html, string imageClass)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return false;
+        return Regex.Matches(
                 html,
-                @"<button\b(?<attrs>[^>]*\bclass\s*=\s*[\""'][^\""']*\biconFilterActive\b[^\""']*[\""'][^>]*)>(?<body>.*?)</button>",
+                @"<button\b[^>]*\bclass\s*=\s*[\""'][^\""']*\biconFilterActive\b[^\""']*[\""'][^>]*>(?<body>.*?)</button>",
                 RegexOptions.IgnoreCase | RegexOptions.Singleline)
             .Cast<Match>()
-            .Select(match => match.Groups["body"].Value)
-            .ToList();
-        return active.Count == 1
-               && Regex.IsMatch(active[0], @"\bsubFilterCategory1\b", RegexOptions.IgnoreCase);
+            .Any(button => Regex.IsMatch(
+                button.Groups["body"].Value,
+                $@"<img\b[^>]*\bclass\s*=\s*[\""'][^\""']*\b{Regex.Escape(imageClass)}\b[^\""']*[\""']",
+                RegexOptions.IgnoreCase));
     }
 
     private static int? ParseRemainingSeconds(string html)
@@ -213,6 +252,18 @@ internal static class IncomingAttackDomParser
         text = Regex.Replace(text, @"[\u202A-\u202E\u2066-\u2069]", string.Empty);
         text = Regex.Replace(text, @"\s+", " ").Trim();
         return string.IsNullOrWhiteSpace(text) ? null : text;
+    }
+
+    private static string? ParseSourcePlayerName(string? movementHeadline, string targetVillageName)
+    {
+        if (string.IsNullOrWhiteSpace(movementHeadline))
+        {
+            return null;
+        }
+
+        var movementSuffix = $@"\s+(?:raids|attacks)\s+{Regex.Escape(targetVillageName)}\s*$";
+        var playerName = Regex.Replace(movementHeadline, movementSuffix, string.Empty, RegexOptions.IgnoreCase).Trim();
+        return string.IsNullOrWhiteSpace(playerName) ? movementHeadline : playerName;
     }
 
     private static bool HasCssClass(string attrs, string className) =>

@@ -33,6 +33,14 @@ public sealed partial class TravianClient
         progress?.Report(new TroopEvasionProgress(TroopEvasionProgressState.Preparing, "Opening Rally Point."));
         Notify($"[troop-evasion] preparing '{request.VillageName}' for ({request.TargetX}|{request.TargetY}).");
         await SwitchToVillageByIdentityAsync(request.VillageName, request.VillageUrl, request.VillageKey, cancellationToken, skipFeatureRefresh: true);
+        var hasTroopsAtHome = await ReadTroopPresenceOnCurrentDorf1Async(cancellationToken);
+        if (hasTroopsAtHome == false)
+        {
+            const string message = "Dorf1 confirms that no troops are currently at home; Rally Point was skipped.";
+            Notify($"[troop-evasion] {message}");
+            var emptyValidation = new TroopEvasionValidationResult(false, message, new Dictionary<int, long>(), false);
+            return (emptyValidation, new TroopEvasionResult(TroopEvasionOutcome.NoTroops, message, new Dictionary<int, long>()));
+        }
         await EnsureRallyPointAndOpenSendTroopsPageAsync(cancellationToken, allowReuseCurrentPage: false);
         await EnsureLoggedInAsync(cancellationToken: cancellationToken);
 

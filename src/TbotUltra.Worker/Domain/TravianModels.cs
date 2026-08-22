@@ -306,7 +306,11 @@ public sealed record VillageStatus(
     int? ActiveVillageCoordY = null,
     // Null means this page was not an authoritative Dorf1 observation. An empty list means Dorf1 was
     // inspected and no incoming-attack signal was visible. Partial reads must preserve prior signals.
-    IReadOnlyList<IncomingAttackSignal>? IncomingAttackSignals = null);
+    IReadOnlyList<IncomingAttackSignal>? IncomingAttackSignals = null,
+    // Null means the Dorf1 unit infobox was not inspected. False is authoritative only for that live
+    // Dorf1 read and means Travian rendered #troops td.noTroops (no units currently at home).
+    bool? HasTroopsAtHome = null,
+    DateTimeOffset? TroopPresenceObservedAtUtc = null);
 
 public enum IncomingAttackMovementType
 {

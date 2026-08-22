@@ -269,6 +269,14 @@ public static class AccountStoragePaths
             $"{NormalizeServerKey(serverUrl)}.json");
     }
 
+    public static string IncomingAttackMonitoringSettingsPath(string projectRoot, string accountName, string? serverUrl = null)
+    {
+        return Path.Combine(
+            AccountDirectory(projectRoot, accountName),
+            "incoming-attack-monitoring",
+            $"{NormalizeServerKey(serverUrl)}.json");
+    }
+
     public static string TroopEvasionSettingsPath(string projectRoot, string accountName, string? serverUrl = null)
     {
         return Path.Combine(

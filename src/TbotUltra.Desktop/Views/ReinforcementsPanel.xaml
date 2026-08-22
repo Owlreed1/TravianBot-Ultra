@@ -236,6 +236,7 @@
       <Grid>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
           <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -252,8 +253,35 @@
                      ToolTipService.InitialShowDelay="200"
                      ToolTip="Incoming attacks and raids detected on Dorf1 and verified in Rally Point. Times use the Travian server clock." />
         </StackPanel>
+        <Border Grid.Row="1" Margin="0,0,0,12" Padding="10,8" CornerRadius="6"
+                Background="{DynamicResource ControlBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+          <StackPanel>
+            <TextBlock Text="Villages monitored" FontWeight="SemiBold" Margin="0,0,0,7"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <ItemsControl x:Name="IncomingAttackMonitoringVillageItemsControl">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Margin="0,0,16,4">
+                    <StackPanel Orientation="Horizontal">
+                      <ToggleButton Width="34" Height="18" Style="{StaticResource AutomationToggleStyle}"
+                                    IsChecked="{Binding Enabled}" Tag="{Binding}"
+                                    Click="IncomingAttackMonitoring_Changed"
+                                    ToolTip="Enable incoming attack monitoring and evasion for this village" />
+                      <TextBlock Text="{Binding VillageName}" Margin="7,0,0,0" VerticalAlignment="Center"
+                                 Foreground="{DynamicResource TextPrimaryBrush}" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
         <DataGrid x:Name="IncomingAttackDataGrid"
-                  Grid.Row="1"
+                  Grid.Row="2"
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
                   CanUserAddRows="False"
@@ -262,9 +290,29 @@
                   SelectionUnit="FullRow">
           <DataGrid.Columns>
             <DataGridTextColumn Header="Target village" Binding="{Binding TargetVillageName}" Width="*" />
-            <DataGridTextColumn Header="Type" Binding="{Binding TypeText}" Width="90" />
-            <DataGridTextColumn Header="Source player" Binding="{Binding SourcePlayerName}" Width="*" />
-            <DataGridTextColumn Header="Source village" Binding="{Binding SourceVillageName}" Width="*" />
+            <DataGridTemplateColumn Header="Type" Width="90">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding TypeText}">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding TypeText}" Value="Raid">
+                            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding TypeText}" Value="Attack">
+                            <Setter Property="Foreground" Value="{DynamicResource DangerTextBrush}" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTextColumn Header="Player" Binding="{Binding SourcePlayerName}" Width="*" />
+            <DataGridTextColumn Header="Village" Binding="{Binding SourceVillageName}" Width="*" />
             <DataGridTextColumn Header="Coords" Binding="{Binding SourceCoordinatesText}" Width="90" />
             <DataGridTextColumn Header="Arrival (server)" Binding="{Binding ArrivalText}" Width="155" />
             <DataGridTextColumn Header="Countdown" Binding="{Binding CountdownText}" Width="110" />

@@ -517,18 +517,35 @@ Published artifacts belong under `artifacts/`, never beside source files.
   prior signals; a completed Dorf1 read without an active-village signal is authoritative for that village and
   immediately clears both pending and confirmed attack rows for it, even if Plus signals another village. Rally
   Point details open `gid=16&tt=1&filter=1&subfilters=1`, wait for the
-  filter controls, and are read only after exactly `button.iconFilterActive img.subFilterCategory1` is active and
-  categories 2/3 are inactive. A late Rally Point result must not restore state cleared by a newer Dorf1 read.
+  filter controls, and are read only after the parent `button.iconFilterActive img.filterCategory1` and exactly
+  `button.iconFilterActive img.subFilterCategory1` are active while subcategories 2/3 are inactive. Never treat the
+  parent `filterCategory1` as an extra subfilter: enabling the parent, enabling subcategory 1, and disabling
+  subcategories 2/3 are separate navigations and must be verified against fresh DOM after each click. A late Rally
+  Point result must not restore state cleared by a newer Dorf1 read.
   Filter/read failures never clear known attacks. Exact movements persist per account+world, use the Travian
-  movement id when available, and expire at their server-derived absolute arrival before a safe recheck.
+  movement id when available, and expire at their server-derived absolute arrival before a safe recheck. An
+  unchanged Dorf1 signal must not cause minute-by-minute Rally Point navigation: a changed red-arrival set is read
+  immediately, while an unchanged signal receives only a ten-minute safety refresh. In each Rally Point movement,
+  `td.role` names the source village; the leading text of `td.troopHeadline` before `raids/attacks <target>` names
+  the source player. Monitoring enablement defaults on for every village and persists per account+world by canonical
+  village key. A disabled village ignores Dorf1 signals and Rally Point results, clears its displayed warning state,
+  and is ineligible for Troop Evasion until monitoring is enabled again.
 - Troop Evasion consumes Incoming Attack state; it must never introduce a parallel signal source. Target Dorf1 is
   re-read before Rally Point details: only red `img.att1` rows qualify, their timers are the fallback if Rally Point
   fails, and a clear target Dorf1 read cancels pending evasion and skips Rally Point. Evasion settings and successful
   protection windows persist atomically per account+world by coordinate key; corrupt files are quarantined. Automatic
   dispatch is high-priority safe-boundary work gated by Continuous Loop or Auto Queue but independent of Village Auto.
+  Destination coordinates and movement type are global per account+world; village enablement, troop slots, and Hero
+  selection remain per village. Sync settings copies every troop-slot and Hero choice from one village to explicitly
+  selected target villages, but never changes their individual enabled state.
   The first `#ok` and final `#confirmSendTroops` are separate one-shot state changes. Reinforcements confirm immediately;
   Raid/Attack confirms only when a round trip cannot return before the triggering arrival plus 15 seconds, and never at
   or after that arrival. Cancellation before final Confirm creates no protection state.
+  A live Dorf1 `.villageInfobox.units #troops td.noTroops` observation is authoritative evidence that no troops are at
+  home: a jitter/status observation no older than two minutes may skip only the initial lead-time milestone. The
+  one-minute and thirty-second retries always switch to the source Dorf1 and recheck live before Rally Point, so troops
+  that returned after the initial observation are still considered. Missing unit markup means unknown, not empty.
+  Troop presence and its own observation timestamp must be merged together and are not restored across process restart.
 - Construction timers shown in the village overview are Travian's raw slot finishes. Scheduling, loop wake-up,
   and `Next task` use the effective availability time: raw finish plus the already persisted construction-humanize
   delay (and existing race buffer). Forecasts must reuse the live selector without mutating queue, rotation, or

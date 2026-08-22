@@ -250,6 +250,7 @@ public partial class MainWindow
 
         // The list was rebuilt with fresh items; re-apply the active-village border.
         ApplyActiveVillageHighlight();
+        SyncIncomingAttackMonitoringVillages();
         RefreshIncomingAttackVillageIndicators();
     }
 

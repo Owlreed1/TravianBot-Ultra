@@ -485,8 +485,6 @@
                                                                         <BeginStoryboard x:Name="IncomingAttackPulse">
                                                                             <Storyboard RepeatBehavior="Forever" AutoReverse="True">
                                                                                 <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.35" Duration="0:0:0.65" />
-                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="1" To="1.25" Duration="0:0:0.65" />
-                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="1" To="1.25" Duration="0:0:0.65" />
                                                                             </Storyboard>
                                                                         </BeginStoryboard>
                                                                     </DataTrigger.EnterActions>
@@ -497,9 +495,6 @@
                                                             </Style.Triggers>
                                                         </Style>
                                                     </Ellipse.Style>
-                                                    <Ellipse.RenderTransform>
-                                                        <ScaleTransform CenterX="6" CenterY="6" />
-                                                    </Ellipse.RenderTransform>
                                                 </Ellipse>
                                             </Button>
                                             <!-- Enabled indicator: green = village is processed by the bot, grey = skipped. -->

@@ -243,6 +243,8 @@ public sealed class VillageCacheStore
             // Incoming-attack persistence has its own account+world store. Keeping Dorf1 signals here
             // would turn a stale browser marker into a fresh observation after restart.
             IncomingAttackSignals = null,
+            HasTroopsAtHome = null,
+            TroopPresenceObservedAtUtc = null,
         };
     }
 

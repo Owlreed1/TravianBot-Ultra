@@ -7,54 +7,87 @@
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
-    <StackPanel>
+
+    <StackPanel Orientation="Horizontal">
       <TextBlock Text="Troop evasion" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-      <TextBlock Text="Sends selected troops shortly before a confirmed incoming red attack." Foreground="{DynamicResource TextMutedBrush}" />
+      <TextBlock x:Name="TroopEvasionInfoIcon" Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="15"
+                 Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSubtleBrush}"
+                 Cursor="Help" ToolTipService.InitialShowDelay="200"
+                 ToolTip="Sends selected troops shortly before a confirmed incoming red attack." />
     </StackPanel>
-    <Border Grid.Row="1" Margin="0,12,0,10" Padding="12" CornerRadius="7" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-      <StackPanel Orientation="Horizontal">
-        <TextBlock Text="Lead time" VerticalAlignment="Center" Margin="0,0,6,0" />
-        <ComboBox x:Name="LeadTimeComboBox" Width="80" SelectionChanged="GlobalSetting_Changed" />
-        <TextBlock Text="min" VerticalAlignment="Center" Margin="5,0,20,0" />
-        <TextBlock Text="Protection window" VerticalAlignment="Center" Margin="0,0,6,0" />
-        <ComboBox x:Name="ProtectionWindowComboBox" Width="80" SelectionChanged="GlobalSetting_Changed" />
-        <TextBlock Text="min" VerticalAlignment="Center" Margin="5,0,20,0" />
-        <TextBlock x:Name="PausedTextBlock" VerticalAlignment="Center" Foreground="{DynamicResource WarningBrush}" />
-      </StackPanel>
+
+    <Border Grid.Row="1" Margin="0,12,0,10" Padding="12" CornerRadius="7"
+            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+      <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <StackPanel Orientation="Horizontal">
+          <TextBlock Text="Lead time" VerticalAlignment="Center" />
+          <TextBlock x:Name="LeadTimeInfoIcon" Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                     Margin="5,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSubtleBrush}"
+                     Cursor="Help" ToolTipService.InitialShowDelay="200"
+                     ToolTip="How many minutes before the incoming attack the evasion attempt starts." />
+          <ComboBox x:Name="LeadTimeComboBox" Width="80" SelectionChanged="GlobalSetting_Changed" />
+          <TextBlock Text="min" VerticalAlignment="Center" Margin="5,0,20,0" />
+          <TextBlock Text="Protection window" VerticalAlignment="Center" />
+          <TextBlock x:Name="ProtectionWindowInfoIcon" Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                     Margin="5,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSubtleBrush}"
+                     Cursor="Help" ToolTipService.InitialShowDelay="200"
+                     ToolTip="How long after the first triggering arrival another evasion send is suppressed." />
+          <ComboBox x:Name="ProtectionWindowComboBox" Width="80" SelectionChanged="GlobalSetting_Changed" />
+          <TextBlock Text="min" VerticalAlignment="Center" Margin="5,0,20,0" />
+          <TextBlock x:Name="PausedTextBlock" VerticalAlignment="Center" Foreground="{DynamicResource WarningBrush}" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0">
+          <TextBlock Text="Target coordinates" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <TextBlock Text="X" VerticalAlignment="Center" Margin="12,0,0,0" />
+          <TextBox x:Name="TargetXTextBox" Width="70" Margin="6,0,12,0" TextChanged="GlobalDispatchSetting_Changed" />
+          <TextBlock Text="Y" VerticalAlignment="Center" />
+          <TextBox x:Name="TargetYTextBox" Width="70" Margin="6,0,20,0" TextChanged="GlobalDispatchSetting_Changed" />
+          <TextBlock Text="Movement" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <ComboBox x:Name="MovementTypeComboBox" Width="140" Margin="8,0,0,0" SelectionChanged="GlobalDispatchSetting_Changed" />
+        </StackPanel>
+      </Grid>
     </Border>
+
     <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
       <ItemsControl x:Name="VillageItemsControl">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Expander Margin="0,0,0,8" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="10">
+            <Expander Margin="0,0,0,8" Padding="10" Background="{DynamicResource SurfaceBrush}"
+                      BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
               <Expander.Header>
-                <Grid Width="820">
+                <Grid Width="840" Margin="14,0,0,0">
                   <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="28"/><ColumnDefinition Width="150"/><ColumnDefinition Width="120"/><ColumnDefinition Width="110"/><ColumnDefinition Width="140"/><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="52" /><ColumnDefinition Width="165" /><ColumnDefinition Width="160" />
+                    <ColumnDefinition Width="112" /><ColumnDefinition Width="92" /><ColumnDefinition Width="*" />
                   </Grid.ColumnDefinitions>
-                  <CheckBox IsChecked="{Binding Enabled}" Tag="{Binding}" Checked="VillageSetting_Changed" Unchecked="VillageSetting_Changed" VerticalAlignment="Center" />
+                  <ToggleButton Width="36" Height="20" Style="{StaticResource AutomationToggleStyle}"
+                                IsChecked="{Binding Enabled}" Tag="{Binding}" Click="VillageSetting_Changed"
+                                VerticalAlignment="Center" ToolTip="Enable troop evasion for this village" />
                   <TextBlock Grid.Column="1" Text="{Binding VillageName}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="2" Text="{Binding Destination}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="3" Text="{Binding MovementType}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="4" Text="{Binding TroopSummary}" VerticalAlignment="Center" />
-                  <Button Grid.Column="5" Content="Validate" Tag="{Binding}" Click="Validate_Click" Margin="4,0" />
-                  <TextBlock Grid.Column="6" Text="{Binding RuntimeStatus}" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
+                  <TextBlock Grid.Column="2" Text="{Binding TroopSummary}" VerticalAlignment="Center" />
+                  <Button Grid.Column="3" Content="Sync settings" Tag="{Binding}" Click="SyncSettings_Click" Margin="4,0" />
+                  <Button Grid.Column="4" Content="Validate" Tag="{Binding}" Click="Validate_Click" Margin="4,0" />
+                  <TextBlock Grid.Column="5" Text="{Binding RuntimeStatus}" VerticalAlignment="Center"
+                             Margin="8,0,0,0" Foreground="{DynamicResource TextMutedBrush}" />
                 </Grid>
               </Expander.Header>
-              <StackPanel Margin="28,12,0,4">
-                <StackPanel Orientation="Horizontal">
-                  <TextBlock Text="Target X" VerticalAlignment="Center" />
-                  <TextBox Width="70" Margin="6,0,12,0" Text="{Binding TargetX, UpdateSourceTrigger=PropertyChanged}" Tag="{Binding}" TextChanged="VillageSetting_Changed" />
-                  <TextBlock Text="Y" VerticalAlignment="Center" />
-                  <TextBox Width="70" Margin="6,0,16,0" Text="{Binding TargetY, UpdateSourceTrigger=PropertyChanged}" Tag="{Binding}" TextChanged="VillageSetting_Changed" />
-                  <TextBlock Text="Movement" VerticalAlignment="Center" />
-                  <ComboBox Width="130" Margin="6,0,0,0" ItemsSource="{Binding MovementTypes}" SelectedItem="{Binding MovementType}" Tag="{Binding}" SelectionChanged="VillageSetting_Changed" />
-                </StackPanel>
-                <ItemsControl ItemsSource="{Binding Units}" Margin="0,10,0,0">
+
+              <StackPanel Margin="42,12,0,4">
+                <TextBlock Text="Troops to evade" FontWeight="SemiBold" Margin="0,0,0,8" />
+                <ItemsControl ItemsSource="{Binding Units}">
                   <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate><DataTemplate><CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected}" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Expander}}" Checked="VillageSetting_Changed" Unchecked="VillageSetting_Changed" Margin="0,0,16,6" /></DataTemplate></ItemsControl.ItemTemplate>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected}"
+                                Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Expander}}"
+                                Checked="VillageSetting_Changed" Unchecked="VillageSetting_Changed" Margin="0,0,16,7" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <CheckBox Content="Hero" IsChecked="{Binding IncludeHero}" Tag="{Binding}" Checked="VillageSetting_Changed" Unchecked="VillageSetting_Changed" />
+                <CheckBox Content="Hero" IsChecked="{Binding IncludeHero}" Tag="{Binding}"
+                          Checked="VillageSetting_Changed" Unchecked="VillageSetting_Changed" />
                 <TextBlock Text="{Binding HeroRiskWarning}" Foreground="{DynamicResource WarningBrush}" Margin="0,6,0,0" />
               </StackPanel>
             </Expander>

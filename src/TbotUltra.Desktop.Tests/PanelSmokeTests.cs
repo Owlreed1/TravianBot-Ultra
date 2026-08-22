@@ -2,10 +2,14 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Threading;
 using TbotUltra.Desktop.Models;
+using TbotUltra.Desktop.Services;
 using TbotUltra.Desktop.Views;
+using TbotUltra.Worker.Domain;
 using Xunit;
 
 namespace TbotUltra.Desktop.Tests;
@@ -98,6 +102,31 @@ public sealed class PanelSmokeTests
     }
 
     [Fact]
+    public void DashboardPanel_RendersIncomingAttackPulseWithoutAnimatingFrozenTransform()
+    {
+        _wpf.Run(() =>
+        {
+            var panel = new DashboardPanel();
+            var villages = Assert.IsType<ItemsControl>(panel.FindName("DashboardVillageList"));
+            villages.ItemsSource = new[]
+            {
+                new VillageSelectionItem
+                {
+                    Name = "BRE",
+                    Url = "dorf1.php?newdid=1",
+                    CoordX = 25,
+                    CoordY = -197,
+                    HasIncomingAttack = true,
+                },
+            };
+
+            panel.Measure(new Size(1280, 900));
+            panel.Arrange(new Rect(0, 0, 1280, 900));
+            panel.UpdateLayout();
+        });
+    }
+
+    [Fact]
     public void FarmingPanel_ContainsFarmingAndInactiveOasisScanTabsInOrder()
     {
         _wpf.Run(() =>
@@ -122,11 +151,58 @@ public sealed class PanelSmokeTests
             var tabs = Assert.IsType<TabControl>(panel.FindName("SendTroopsTabControl"));
             var attacks = Assert.IsType<TabItem>(panel.FindName("IncomingAttacksTabItem"));
             var grid = Assert.IsType<DataGrid>(panel.FindName("IncomingAttackDataGrid"));
+            var monitoredVillages = Assert.IsType<ItemsControl>(panel.FindName("IncomingAttackMonitoringVillageItemsControl"));
             var infoIcon = Assert.IsType<TextBlock>(panel.FindName("IncomingAttacksInfoIcon"));
 
             Assert.Equal(3, tabs.Items.Count);
             Assert.Equal("Incoming attacks", attacks.Header);
             Assert.Equal(7, grid.Columns.Count);
+            Assert.Equal("Player", grid.Columns[2].Header);
+            Assert.Equal("Village", grid.Columns[3].Header);
+            var monitored = new IncomingAttackMonitoringVillageItem
+            {
+                VillageKey = "xy:1|2",
+                VillageName = "BRO",
+            };
+            monitoredVillages.ItemsSource = new[] { monitored };
+            tabs.SelectedItem = attacks;
+            panel.Measure(new Size(1000, 700));
+            panel.Arrange(new Rect(0, 0, 1000, 700));
+            panel.UpdateLayout();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
+            var monitoringToggle = Assert.Single(
+                FindVisualChildren<ToggleButton>(panel),
+                toggle => ReferenceEquals(toggle.Tag, monitored));
+            Assert.True(monitoringToggle.IsChecked);
+            Assert.Equal(34, monitoringToggle.Width);
+            var typeColumn = Assert.IsType<DataGridTemplateColumn>(grid.Columns[1]);
+            var raidType = Assert.IsType<TextBlock>(typeColumn.CellTemplate.LoadContent());
+            raidType.DataContext = new IncomingAttackRowItem
+            {
+                Id = "raid",
+                VillageKey = "xy:1|2",
+                TargetVillageName = "BRE",
+                MovementType = IncomingAttackMovementType.Raid,
+            };
+            raidType.Measure(new Size(100, 30));
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
+            Assert.Equal(
+                Assert.IsType<SolidColorBrush>(Application.Current.FindResource("WarningTextBrush")).Color,
+                Assert.IsType<SolidColorBrush>(raidType.Foreground).Color);
+
+            var attackType = Assert.IsType<TextBlock>(typeColumn.CellTemplate.LoadContent());
+            attackType.DataContext = new IncomingAttackRowItem
+            {
+                Id = "attack",
+                VillageKey = "xy:1|2",
+                TargetVillageName = "BRE",
+                MovementType = IncomingAttackMovementType.Attack,
+            };
+            attackType.Measure(new Size(100, 30));
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
+            Assert.Equal(
+                Assert.IsType<SolidColorBrush>(Application.Current.FindResource("DangerTextBrush")).Color,
+                Assert.IsType<SolidColorBrush>(attackType.Foreground).Color);
             Assert.Equal(
                 "Incoming attacks and raids detected on Dorf1 and verified in Rally Point. Times use the Travian server clock.",
                 infoIcon.ToolTip);
@@ -155,11 +231,42 @@ public sealed class PanelSmokeTests
             var panel = new TroopEvasionPanel();
             var lead = Assert.IsType<ComboBox>(panel.FindName("LeadTimeComboBox"));
             var protection = Assert.IsType<ComboBox>(panel.FindName("ProtectionWindowComboBox"));
+            var targetX = Assert.IsType<TextBox>(panel.FindName("TargetXTextBox"));
+            var targetY = Assert.IsType<TextBox>(panel.FindName("TargetYTextBox"));
+            var movement = Assert.IsType<ComboBox>(panel.FindName("MovementTypeComboBox"));
             var villages = Assert.IsType<ItemsControl>(panel.FindName("VillageItemsControl"));
+            var descriptionInfo = Assert.IsType<TextBlock>(panel.FindName("TroopEvasionInfoIcon"));
+            var leadInfo = Assert.IsType<TextBlock>(panel.FindName("LeadTimeInfoIcon"));
+            var protectionInfo = Assert.IsType<TextBlock>(panel.FindName("ProtectionWindowInfoIcon"));
 
             Assert.Equal(new[] { 1, 2, 5, 10 }, lead.Items.Cast<int>().ToArray());
             Assert.Equal(new[] { 1, 2, 5, 10 }, protection.Items.Cast<int>().ToArray());
+            Assert.Equal(Enum.GetValues<TroopEvasionMovementType>(), movement.Items.Cast<TroopEvasionMovementType>());
+            Assert.NotNull(descriptionInfo.ToolTip);
+            Assert.NotNull(leadInfo.ToolTip);
+            Assert.NotNull(protectionInfo.ToolTip);
             Assert.Same(panel.Villages, villages.ItemsSource);
+
+            var village = TroopEvasionVillageItem.Create(
+                new VillageSelectionItem { Name = "BRO", Url = "dorf1.php?newdid=1", Tribe = "Huns" },
+                new TroopEvasionVillageSettings("xy:1|2", "BRO", "dorf1.php?newdid=1"));
+            panel.Villages.Add(village);
+            panel.SetGlobalSettings(5, 5, 12, -13, TroopEvasionMovementType.Raid);
+            panel.SetPaused(false);
+            panel.Measure(new Size(1000, 700));
+            panel.Arrange(new Rect(0, 0, 1000, 700));
+            panel.UpdateLayout();
+
+            Assert.Equal("12", targetX.Text);
+            Assert.Equal("-13", targetY.Text);
+            Assert.Equal("12", village.TargetX);
+            Assert.Equal("-13", village.TargetY);
+            Assert.Equal(TroopEvasionMovementType.Raid, village.MovementType);
+            Assert.Equal(string.Empty, Assert.IsType<TextBlock>(panel.FindName("PausedTextBlock")).Text);
+            var toggle = Assert.Single(FindVisualChildren<ToggleButton>(panel), item => ReferenceEquals(item.Tag, village));
+            Assert.Equal(36, toggle.Width);
+            Assert.Contains(FindVisualChildren<Button>(panel), button => Equals(button.Content, "Sync settings"));
+            Assert.Contains(FindVisualChildren<Button>(panel), button => Equals(button.Content, "Validate"));
         });
     }
 
