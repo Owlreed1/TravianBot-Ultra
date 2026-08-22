@@ -62,7 +62,8 @@ public sealed partial class TravianClient
 
         Notify(
             $"[farm-list-create] starting: requested={names.Count}, existing={existingListCount}, " +
-            $"village='{request.VillageName}', troop={request.TroopCount} {request.TroopType}.");
+            $"village='{request.VillageName}', troop={request.TroopCount} {request.TroopType}, " +
+            $"onlyLosses={request.OnlyCreateReportsWithLosses.ToString().ToLowerInvariant()}.");
         var created = new List<string>();
         for (var index = 0; index < names.Count; index++)
         {
@@ -82,6 +83,7 @@ public sealed partial class TravianClient
                     request.VillageId,
                     troopIndex.Value,
                     request.TroopCount,
+                    request.OnlyCreateReportsWithLosses,
                     cancellationToken);
 
                 verified = await WaitForOfficialFarmListNameAsync(name, cancellationToken);
@@ -189,6 +191,7 @@ public sealed partial class TravianClient
         string? villageId,
         int troopIndex,
         int troopCount,
+        bool onlyCreateReportsWithLosses,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -248,6 +251,8 @@ public sealed partial class TravianClient
                     await input.FillAsync(string.Empty).WaitAsync(cancellationToken);
                 }
             }
+
+            await TryApplyOnlyLossesSettingAsync(form, onlyCreateReportsWithLosses, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -326,6 +331,64 @@ public sealed partial class TravianClient
         catch (TimeoutException)
         {
             Notify($"[farm-list-create] dialog remained visible after saving '{name}'.");
+        }
+    }
+
+    private async Task TryApplyOnlyLossesSettingAsync(
+        ILocator form,
+        bool desired,
+        CancellationToken cancellationToken)
+    {
+        const string InputSelector = "input[type='checkbox'][name='onlyLosses']";
+        try
+        {
+            var input = form.Locator(InputSelector).First;
+            if (await input.CountAsync() == 0)
+            {
+                Notify(
+                    $"[farm-list-create] WARNING onlyLosses checkbox was not found; "
+                    + $"continuing creation with requested={desired.ToString().ToLowerInvariant()}.");
+                return;
+            }
+
+            var actual = await input.IsCheckedAsync().WaitAsync(cancellationToken);
+            if (actual != desired)
+            {
+                var clicked = await TryClickFirstVisibleEnabledAsync(
+                    "#createFarmListForm label.checkbox:has(input[name='onlyLosses']), "
+                    + "#createFarmListForm input[type='checkbox'][name='onlyLosses']",
+                    cancellationToken,
+                    reason: "create farm list: only losses");
+                if (!clicked)
+                {
+                    Notify(
+                        $"[farm-list-create] WARNING onlyLosses control was not actionable; "
+                        + $"requested={desired.ToString().ToLowerInvariant()}; continuing creation.");
+                    return;
+                }
+            }
+
+            actual = await input.IsCheckedAsync().WaitAsync(cancellationToken);
+            if (actual != desired)
+            {
+                Notify(
+                    $"[farm-list-create] WARNING onlyLosses verification failed; "
+                    + $"requested={desired.ToString().ToLowerInvariant()} actual={actual.ToString().ToLowerInvariant()}; continuing creation.");
+            }
+            else
+            {
+                Notify($"[farm-list-create] onlyLosses verified={actual.ToString().ToLowerInvariant()}.");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Notify(
+                $"[farm-list-create] WARNING could not apply onlyLosses={desired.ToString().ToLowerInvariant()}: "
+                + $"{ex.Message}; continuing creation.");
         }
     }
 

@@ -5,10 +5,10 @@
       "name": "New_village",
       "createdByTribe": "Gauls",
       "createdAtUtc": "2026-07-29T19:31:30.0528193+00:00",
-      "updatedAtUtc": "2026-08-20T19:33:42.2817171+00:00",
+      "updatedAtUtc": "2026-08-21T14:50:33.3862877+00:00",
       "rows": [
         {
-          "id": "a941d7c3-1c8d-487e-9317-95b3d6494e9a",
+          "id": "8357eb28-4711-4c43-8627-f3a715dae0ce",
           "kind": "Building",
           "gid": 15,
           "buildingName": "Main Building",
@@ -18,7 +18,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "410d4dfb-95d7-45bc-8a52-2f099badd5b1",
+          "id": "b5c53687-2435-4c46-9a55-cf8aecca0208",
           "kind": "Building",
           "gid": 16,
           "buildingName": "Rally Point",
@@ -28,7 +28,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "1f1ee6b9-c831-4614-bd47-6ae12c80d021",
+          "id": "6e805059-613e-4506-be74-c23978c79772",
           "kind": "Building",
           "gid": 10,
           "buildingName": "Warehouse",
@@ -38,7 +38,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "d483563b-b37b-41b3-9d1f-d05f1f924562",
+          "id": "d313213c-3ec9-465b-ad16-c3c3229e97dd",
           "kind": "Building",
           "gid": 11,
           "buildingName": "Granary",
@@ -48,7 +48,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "d0a3353d-0734-49fa-b926-48e71c453dbc",
+          "id": "ec732678-af2d-4ce1-a406-102ee253ff5b",
           "kind": "Building",
           "gid": 17,
           "buildingName": "Marketplace",
@@ -58,7 +58,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "fd12f9e5-c66e-4dd7-b805-660e22348335",
+          "id": "47e4329d-d5c2-43d0-ab46-ca330872fc9f",
           "kind": "AllResources",
           "gid": null,
           "buildingName": "All resources",
@@ -68,7 +68,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "fa75f9cc-a5b0-4be1-b90e-b30544d4037c",
+          "id": "a039d20f-9704-47cb-9705-128f71742654",
           "kind": "Building",
           "gid": 19,
           "buildingName": "Barracks",
@@ -78,7 +78,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "e34174e0-2265-48ea-a8f3-4f70ffccba17",
+          "id": "abbcd326-356b-4ceb-8a70-ecdc3de98d71",
           "kind": "Building",
           "gid": 10,
           "buildingName": "Warehouse",
@@ -88,7 +88,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "de86d50b-5150-43db-ab61-5288cc4c0ce4",
+          "id": "57fab60d-357d-4c2a-8035-0c995a539a34",
           "kind": "Building",
           "gid": 11,
           "buildingName": "Granary",
@@ -98,7 +98,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "023327b4-644c-4f74-9ac6-d161e61b39ad",
+          "id": "09d35d6e-00d8-4014-a539-1e66d231a37c",
           "kind": "AllResources",
           "gid": null,
           "buildingName": "All resources",
@@ -108,7 +108,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "35096945-0daa-43ba-8c7d-7cf94ee2c1f7",
+          "id": "3754ef40-8f14-45af-b70f-d0f7195c1cf8",
           "kind": "Building",
           "gid": 33,
           "buildingName": "Palisade",
@@ -118,7 +118,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "8a904308-24ca-415c-942e-ef62e03988f5",
+          "id": "6e3c594f-3f82-4213-8a3b-30b52494b1af",
           "kind": "Building",
           "gid": 22,
           "buildingName": "Academy",
@@ -128,7 +128,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "c4fa51dd-b467-4c9f-812e-52b640576055",
+          "id": "9cd68c99-ac42-4651-a2fa-1e352fc82600",
           "kind": "Building",
           "gid": 13,
           "buildingName": "Smithy",
@@ -138,7 +138,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "116495c7-dcb7-439b-ba76-3fd6f2e8c449",
+          "id": "dc9ad039-c092-4202-94e5-0679645f829b",
           "kind": "Building",
           "gid": 20,
           "buildingName": "Stable",
@@ -148,7 +148,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "6577e4a1-6336-4c4a-a896-202b6cffcaa7",
+          "id": "20adf481-18df-4e4f-bcb5-1dba0875f2da",
           "kind": "Building",
           "gid": 15,
           "buildingName": "Main Building",
@@ -158,7 +158,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "207ab664-251f-4a62-a9b3-dfa21e7c3300",
+          "id": "065cc19a-a186-4a45-8dd4-26058574b937",
           "kind": "Building",
           "gid": 10,
           "buildingName": "Warehouse",
@@ -168,7 +168,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "0770d43b-c332-4a15-aa65-228fdf7c6773",
+          "id": "a71d331c-825f-4d42-8580-53d746ad22ee",
           "kind": "Building",
           "gid": 11,
           "buildingName": "Granary",
@@ -178,7 +178,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "a6f53e3c-c628-4690-aaab-bf3d9cdcade8",
+          "id": "f6123d7f-e262-4378-9bf4-32a5a5cc6cda",
           "kind": "Building",
           "gid": 25,
           "buildingName": "Residence",
@@ -188,7 +188,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "8e191f2e-5579-4a1a-84d3-5e855027f3f9",
+          "id": "66fdd61b-fdbc-4472-8d4a-b2a148cecfd8",
           "kind": "Building",
           "gid": 17,
           "buildingName": "Marketplace",
@@ -198,7 +198,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "c67538bb-d878-4c9a-b94b-0021b0875026",
+          "id": "2d18a263-61d9-4350-b5db-8fdc09042cb1",
           "kind": "AllResources",
           "gid": null,
           "buildingName": "All resources",
@@ -208,7 +208,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "48c0956e-9eb8-49b9-b2e5-ec2e08a16176",
+          "id": "8f9fc503-c38d-41a2-a0d1-1ada316d16b2",
           "kind": "Building",
           "gid": 15,
           "buildingName": "Main Building",
@@ -218,7 +218,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "aa26f42d-ae33-466d-ac5a-6989acd2871e",
+          "id": "243beaa6-04f9-4909-86c9-dd168d93a788",
           "kind": "Building",
           "gid": 19,
           "buildingName": "Barracks",
@@ -228,7 +228,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "5088b6d1-65a9-4c8f-a310-e91dd6524f45",
+          "id": "a6712597-a5d4-476b-9eec-6698ddecfacd",
           "kind": "Building",
           "gid": 10,
           "buildingName": "Warehouse",
@@ -238,7 +238,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "5539835d-9901-4d6a-b412-16bb979f1241",
+          "id": "815c7efe-5e25-4338-8d7d-1be87ee0ee47",
           "kind": "Building",
           "gid": 11,
           "buildingName": "Granary",
@@ -248,7 +248,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "7466d245-0499-4d33-be10-5d32c5060196",
+          "id": "106ea14a-efa5-453c-9672-25d503a874a1",
           "kind": "Building",
           "gid": 22,
           "buildingName": "Academy",
@@ -258,7 +258,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "b399e94a-cce5-45d6-98af-2c2c75bc305b",
+          "id": "61717901-b4c2-4f74-9209-bc4e64080514",
           "kind": "Building",
           "gid": 24,
           "buildingName": "Town Hall",
@@ -268,7 +268,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "b3e9f13e-cd96-4550-adad-b18a64b854a7",
+          "id": "aa69c905-3a30-4fc8-b767-95edf0dda7f5",
           "kind": "Building",
           "gid": 17,
           "buildingName": "Marketplace",
@@ -278,7 +278,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "df9b9cb9-ae98-4078-9afb-78717bfc14b1",
+          "id": "8ff2a30b-6878-4c7e-8783-8c0eb2d87266",
           "kind": "Building",
           "gid": 23,
           "buildingName": "Cranny",
@@ -288,7 +288,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "8b612bec-69d8-4196-a8a0-3898f00dd532",
+          "id": "86c40ed9-f4e9-44ba-8136-e4c894637b16",
           "kind": "AllResources",
           "gid": null,
           "buildingName": "All resources",
@@ -298,7 +298,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "ce7ec7f0-8ad2-406c-be0a-1980134eeeb4",
+          "id": "fb8748e0-bd31-4968-a756-3b44b39e3b39",
           "kind": "Building",
           "gid": 33,
           "buildingName": "Palisade",
@@ -314,10 +314,10 @@
       "name": "New_village_1",
       "createdByTribe": "Huns",
       "createdAtUtc": "2026-08-17T15:41:32.5268831+00:00",
-      "updatedAtUtc": "2026-08-20T19:34:20.8797009+00:00",
+      "updatedAtUtc": "2026-08-21T14:50:41.9646678+00:00",
       "rows": [
         {
-          "id": "1299dbd7-ab09-4c99-a0c2-b4d55575ce6e",
+          "id": "9849ba45-4ed1-4688-a336-5ef476d9b43d",
           "kind": "AllResources",
           "gid": null,
           "buildingName": "All resources",
@@ -327,7 +327,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "d97f5e01-3a3a-4c06-a18a-5d1f0c48aa7a",
+          "id": "715f0f68-7638-4da5-b1f1-37b422e1b00e",
           "kind": "Building",
           "gid": 16,
           "buildingName": "Rally Point",
@@ -337,7 +337,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "9fa69e8f-26f5-4f59-8ddc-ef843330bbf4",
+          "id": "89d1b889-a5c0-4f86-bcd6-e119f5c2f4b8",
           "kind": "Building",
           "gid": 10,
           "buildingName": "Warehouse",
@@ -347,7 +347,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "43d50140-ff9d-414b-af49-186f503c6b30",
+          "id": "b0e4da36-cb94-417a-aac4-4e2568abc624",
           "kind": "Building",
           "gid": 11,
           "buildingName": "Granary",
@@ -357,7 +357,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "355d04b4-31c7-47b5-911a-a78ba6ea32d8",
+          "id": "ba496e6a-eb32-434f-80a8-da91142635f8",
           "kind": "Building",
           "gid": 43,
           "buildingName": "Makeshift Wall",
@@ -367,7 +367,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "3fee4252-f17b-4366-b30b-6c29307c15ac",
+          "id": "273848d4-f984-4efd-84be-3a5e3170e45f",
           "kind": "Building",
           "gid": 15,
           "buildingName": "Main Building",
@@ -377,7 +377,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "c0d65534-95b9-4c93-bee2-2c8d019d7ffc",
+          "id": "94fd3408-375c-4c0c-aca4-4fbcfe62756f",
           "kind": "Building",
           "gid": 17,
           "buildingName": "Marketplace",
@@ -387,7 +387,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "af904780-6f78-41d7-85a7-fe5f007d1a40",
+          "id": "3a16b313-d7aa-4171-b105-ffc313214846",
           "kind": "Building",
           "gid": 19,
           "buildingName": "Barracks",
@@ -397,7 +397,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "56a48fff-10d0-420d-af42-172bd9c37048",
+          "id": "22f27300-ab0d-481e-98e4-127958af54c8",
           "kind": "AllResources",
           "gid": null,
           "buildingName": "All resources",
@@ -407,7 +407,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "8a227ae5-743e-4655-b6f8-7e8e0274b36d",
+          "id": "748231b1-6e38-4dff-a066-d66cd17f60cf",
           "kind": "Building",
           "gid": 10,
           "buildingName": "Warehouse",
@@ -417,7 +417,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "a48720a1-1e8f-41d1-8872-101eec174fdc",
+          "id": "d09c3f29-9b10-4c94-8945-9a1cb04ded55",
           "kind": "Building",
           "gid": 11,
           "buildingName": "Granary",
@@ -427,7 +427,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "80d50239-c11a-40fe-b1fb-3f1131a92bf9",
+          "id": "d522228b-5d15-402f-9a14-0c2a148803d4",
           "kind": "Building",
           "gid": 15,
           "buildingName": "Main Building",
@@ -437,7 +437,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "ce50e8ff-4cb8-4e7b-9a80-be204b85b414",
+          "id": "8eff7e42-43b3-49ce-abf5-2a1e8eca5fa6",
           "kind": "Building",
           "gid": 22,
           "buildingName": "Academy",
@@ -447,7 +447,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "de00cc17-d14f-425c-8a03-e6b6d1b9d4e7",
+          "id": "7b99c8b9-d446-409f-b886-a2da8b0cdab1",
           "kind": "Building",
           "gid": 13,
           "buildingName": "Smithy",
@@ -457,7 +457,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "28d2f246-9a0f-4c2f-910b-777bb37ea090",
+          "id": "cc381cba-810d-4328-92a5-a7d58bb413cd",
           "kind": "Building",
           "gid": 20,
           "buildingName": "Stable",
@@ -467,7 +467,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "a34b0e46-c3ff-4293-a361-ffb613452f0d",
+          "id": "2803f4a4-d4a4-4b4a-a8d9-0f7c72d5e975",
           "kind": "Building",
           "gid": 44,
           "buildingName": "Command Center",
@@ -477,7 +477,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "7e475cb9-60de-4f76-8109-f4e6838d9aac",
+          "id": "e9bc06a2-c556-4431-8e86-a903d686c2ea",
           "kind": "AllResources",
           "gid": null,
           "buildingName": "All resources",
@@ -487,7 +487,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "6cdc7c9d-80e3-4590-ab72-5cc9915d737d",
+          "id": "51d49084-a5ed-45fe-8ffd-f67f7e4c913d",
           "kind": "Building",
           "gid": 10,
           "buildingName": "Warehouse",
@@ -497,7 +497,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "b2cc8056-db60-49c8-8c45-1d89be799aa3",
+          "id": "6c9d69fe-bb6f-4c77-b778-fdb242c81784",
           "kind": "Building",
           "gid": 11,
           "buildingName": "Granary",
@@ -507,7 +507,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "c8fc4e8c-e504-4a59-882c-b2d9b3c28cc8",
+          "id": "31cd1bd1-ca3e-4a32-a5cf-d1784b5ff5bf",
           "kind": "Building",
           "gid": 44,
           "buildingName": "Command Center",
@@ -517,7 +517,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "e7650125-8fa7-42a4-91a7-921946afe5cd",
+          "id": "6aa285f5-6e49-4f99-ae6c-05ff2f19f9dc",
           "kind": "Building",
           "gid": 17,
           "buildingName": "Marketplace",
@@ -527,7 +527,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "0df5dba5-06f4-4e10-8d08-40b10cbd0bbb",
+          "id": "b7efe284-fc28-4b6b-a6c3-fab1f2161a10",
           "kind": "Building",
           "gid": 19,
           "buildingName": "Barracks",
@@ -537,7 +537,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "2e506d11-4871-4e76-8a80-c4ba7fc77ba7",
+          "id": "c6e3ef64-f131-4369-a74f-4fb2b76b9707",
           "kind": "Building",
           "gid": 15,
           "buildingName": "Main Building",
@@ -547,7 +547,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "32bbb9b5-da46-431f-a9bb-41d800026853",
+          "id": "7ca5f9a5-ac47-4fec-9e8d-f1ffbc759945",
           "kind": "AllResources",
           "gid": null,
           "buildingName": "All resources",
@@ -557,7 +557,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "5d6a4655-7956-4109-8902-a43f24e8714a",
+          "id": "94600777-f213-4433-a67f-07474015e61d",
           "kind": "Building",
           "gid": 10,
           "buildingName": "Warehouse",
@@ -567,7 +567,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "bc5de9cd-3122-41e2-8a58-0c100f2c7991",
+          "id": "0b44414a-ce48-40bd-a737-e8e89f87e1b0",
           "kind": "Building",
           "gid": 11,
           "buildingName": "Granary",
@@ -577,7 +577,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "8828f1e0-0f61-4ecd-8028-01fb429632ee",
+          "id": "bb7db44e-576a-40c6-a832-a7a6d1aa4059",
           "kind": "AllResources",
           "gid": null,
           "buildingName": "All resources",
@@ -587,7 +587,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "bd0cdf5b-546d-48ac-a490-6f59e10ddbc7",
+          "id": "93bf916e-8b7d-4113-b812-b40fe6237936",
           "kind": "Building",
           "gid": 5,
           "buildingName": "Sawmill",
@@ -597,7 +597,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "3634fcd7-ddc6-4bde-81ad-1ec1b3f05f4b",
+          "id": "69212b30-0fbe-4639-9f2c-6bcbfd7285f8",
           "kind": "Building",
           "gid": 6,
           "buildingName": "Brickyard",
@@ -607,7 +607,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "3f40de9c-170c-49d4-9767-fcd2f1572675",
+          "id": "724d22c0-ad8b-4862-8edf-ed560df76d76",
           "kind": "Building",
           "gid": 7,
           "buildingName": "Iron Foundry",
@@ -617,7 +617,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "058ba47c-61fc-476e-a3f7-cd742eab390b",
+          "id": "6d9ffa62-99d3-426e-bc4d-5b395dd2e202",
           "kind": "Building",
           "gid": 8,
           "buildingName": "Grain Mill",
@@ -627,7 +627,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "d0171413-43ff-4cf8-a308-6520b684aff1",
+          "id": "1106d04a-9b4e-49db-8ba9-72610a6570d7",
           "kind": "Building",
           "gid": 9,
           "buildingName": "Bakery",
@@ -637,7 +637,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "7a337262-2b07-433c-87dc-1bca0f9dd0e2",
+          "id": "2bf698d8-3200-425b-a74c-e8e7d0eb2035",
           "kind": "Building",
           "gid": 10,
           "buildingName": "Warehouse",
@@ -647,7 +647,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "4e64b329-f87e-4cbe-86ce-bb3ebbbdaa59",
+          "id": "4cb19999-45f7-4e15-9a77-bc84455ace78",
           "kind": "Building",
           "gid": 11,
           "buildingName": "Granary",
@@ -657,7 +657,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "3ab42163-b122-4f5b-9ae4-5bebb5b19fb3",
+          "id": "4e53070b-e6b6-41d8-aa9d-2dab537fdb2b",
           "kind": "Building",
           "gid": 22,
           "buildingName": "Academy",
@@ -667,7 +667,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "712e6297-6c18-48c5-86e4-3170d2e469c8",
+          "id": "63a937b3-2030-4c9e-a7a1-e2d458d40536",
           "kind": "Building",
           "gid": 46,
           "buildingName": "Hospital",
@@ -677,7 +677,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "ce3729da-da77-4ce8-bc57-24b544882f01",
+          "id": "c71d146a-1150-42f9-ac3e-7e1b277bbbc3",
           "kind": "Building",
           "gid": 19,
           "buildingName": "Barracks",
@@ -687,7 +687,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "49618cf3-f701-4880-a421-f0d00556621f",
+          "id": "b63424aa-7325-4f69-b9b2-d29c3c0bb2eb",
           "kind": "Building",
           "gid": 13,
           "buildingName": "Smithy",
@@ -697,7 +697,7 @@
           "resourceStrategy": "lowest"
         },
         {
-          "id": "d0cf0e43-5ec3-4e52-b517-4661af845231",
+          "id": "11e5ba69-e868-42b8-9082-1cebfd9067e0",
           "kind": "Building",
           "gid": 20,
           "buildingName": "Stable",

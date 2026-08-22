@@ -16,7 +16,8 @@ public sealed class VillageSelectionItem : INotifyPropertyChanged
     public string Tribe { get; init; } = "Unknown";
 
     // Dashboard overview indicators, filled from the per-village status cache. Build slots reflect the
-    // construction queue (2 normally, 3 for Romans); troop slots are Barracks/Stable/Workshop. Settable
+    // construction queue (2 normally, 3 for Romans); troop slots reflect each village's effective
+    // Barracks/Stable/Workshop Build troops settings. Settable
     // so they can be refreshed in place when a village is rescanned without rebuilding the whole list.
     private IReadOnlyList<VillageActivitySlot> _buildingSlots = System.Array.Empty<VillageActivitySlot>();
     public IReadOnlyList<VillageActivitySlot> BuildingSlots

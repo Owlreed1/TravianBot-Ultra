@@ -64,6 +64,7 @@ public sealed class BotConfigStore
         BotOptionPayloadKeys.ContinuousFarmDispatchDelayMinMinutes,
         BotOptionPayloadKeys.ContinuousFarmDispatchDelayMaxMinutes,
         BotOptionPayloadKeys.ContinuousFarmSendMode,
+        BotOptionPayloadKeys.FarmListOnlyCreateReportsWithLosses,
         BotOptionPayloadKeys.ShowFarmListLastSentTimer,
         BotOptionPayloadKeys.FarmListLastSentLimitEnabled,
         BotOptionPayloadKeys.FarmListLastSentLimitHours,

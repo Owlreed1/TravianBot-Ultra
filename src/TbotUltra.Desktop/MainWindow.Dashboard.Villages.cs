@@ -662,6 +662,7 @@ public partial class MainWindow
         _villageSettingsStore.SetEnabled(row.KeyInfo, row.IsEnabledForAutomation);
         // Repaint the dashboard enabled indicator (green/grey dot) right away.
         RefreshVillageEnabledStateOnDashboard();
+        RequestDashboardVillageProjectionRefresh();
     }
 
     // Effective NPC trade flag for a village: the account-wide master (Auto settings NPC toggle, stored as
@@ -1151,6 +1152,7 @@ public partial class MainWindow
     {
         InvalidateVillageOverview();
         RefreshVillageEnabledStateOnDashboard();
+        RequestDashboardVillageProjectionRefresh();
         RefreshAutomationLoopDashboardUi();
         SaveConstructFasterMasterFlag();
 

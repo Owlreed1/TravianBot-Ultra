@@ -93,6 +93,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <TextBlock Text="Village" VerticalAlignment="Center" />
                             <ComboBox x:Name="VillageComboBox"
@@ -120,6 +121,13 @@
                                      Margin="0,10,0,0"
                                      Text="1"
                                      TextChanged="InputChanged" />
+                            <CheckBox x:Name="OnlyCreateReportsWithLossesCheckBox"
+                                      Grid.Row="3"
+                                      Grid.Column="1"
+                                      Margin="0,12,0,0"
+                                      Content="Only create reports with losses"
+                                      Checked="OnlyCreateReportsWithLosses_Changed"
+                                      Unchecked="OnlyCreateReportsWithLosses_Changed" />
                         </Grid>
                     </Border>
 

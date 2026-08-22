@@ -74,6 +74,14 @@ public sealed class BotOptionsFromConfigurationCoverageTests
     }
 
     [Fact]
+    public void FarmListOnlyLossReportsSetting_IsAccountScoped()
+    {
+        Assert.Contains(
+            BotOptionPayloadKeys.FarmListOnlyCreateReportsWithLosses,
+            BotConfigStore.AccountScopedKeyValues);
+    }
+
+    [Fact]
     public void FromConfiguration_defaults_village_scan_to_enabled_every_10_to_30_minutes()
     {
         var options = BotOptionsFactory.FromConfiguration(new AccessRecordingConfiguration());

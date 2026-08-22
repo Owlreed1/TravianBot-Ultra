@@ -579,6 +579,7 @@ public partial class MainWindow : Window
         _resourceSnapshotRefreshTimer.Tick += async (_, _) =>
         {
             await HandleResourceSnapshotRefreshTickAsync();
+            ActivateDueHeroCropAntiStarveObservations();
             // Jitter the next tick (15–35s) so the dashboard refresh isn't a perfectly periodic 20s heartbeat.
             _resourceSnapshotRefreshTimer.Interval = TimeSpan.FromSeconds(Random.Shared.Next(15, 36));
         };

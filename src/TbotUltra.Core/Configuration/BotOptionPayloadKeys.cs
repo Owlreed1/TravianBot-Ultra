@@ -151,6 +151,7 @@ public static class BotOptionPayloadKeys
     public const string ContinuousFarmDispatchDelayMinMinutes = "continuous_farm_dispatch_delay_min_minutes";
     public const string ContinuousFarmDispatchDelayMaxMinutes = "continuous_farm_dispatch_delay_max_minutes";
     public const string ContinuousFarmSendMode = "continuous_farm_send_mode";
+    public const string FarmListOnlyCreateReportsWithLosses = "farm_list_only_create_reports_with_losses";
     public const string ShowFarmListLastSentTimer = "show_farm_list_last_sent_timer";
     public const string FarmListLastSentLimitEnabled = "farm_list_last_sent_limit_enabled";
     public const string FarmListLastSentLimitHours = "farm_list_last_sent_limit_hours";

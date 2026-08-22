@@ -1000,6 +1000,7 @@ public partial class MainWindow
         // Drop the in-memory per-village buildings/fields cache so the next account doesn't show the
         // previous account's villages. The on-disk village_cache.json per account is kept.
         _villageStatusCache.Clear();
+        ResetHeroCropAntiStarveObservations();
         _buildingRows.Clear();
         _buildingCatalogOptions.Clear();
         _demolishableBuildings.Clear();

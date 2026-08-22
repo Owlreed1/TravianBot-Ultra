@@ -25,6 +25,9 @@ public static class BotOptionsFactory
         var continuousFarmDispatchDelayVariationPercent = FarmingDefaults.NormalizeDispatchDelayMaxMinutes(
             configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmDispatchDelayMaxMinutes, FarmingDefaults.DefaultDispatchDelayMaxMinutes));
         var continuousFarmSendMode = FarmingDefaults.NormalizeSendMode(configuration[BotOptionPayloadKeys.ContinuousFarmSendMode]);
+        var farmListOnlyCreateReportsWithLosses = configuration.GetValue(
+            BotOptionPayloadKeys.FarmListOnlyCreateReportsWithLosses,
+            FarmingDefaults.OnlyCreateReportsWithLosses);
         var showFarmListLastSentTimer = configuration.GetValue(BotOptionPayloadKeys.ShowFarmListLastSentTimer, FarmingDefaults.ShowLastSentTimer);
         var farmListLastSentLimitEnabled = configuration.GetValue(BotOptionPayloadKeys.FarmListLastSentLimitEnabled, FarmingDefaults.LastSentLimitEnabled);
         var farmListLastSentLimitHours = FarmingDefaults.NormalizeLastSentLimitHours(
@@ -69,6 +72,7 @@ public static class BotOptionsFactory
             ContinuousFarmDispatchDelayMinMinutes = continuousFarmDispatchDelayMinutes,
             ContinuousFarmDispatchDelayMaxMinutes = continuousFarmDispatchDelayVariationPercent,
             ContinuousFarmSendMode = continuousFarmSendMode,
+            FarmListOnlyCreateReportsWithLosses = farmListOnlyCreateReportsWithLosses,
             ShowFarmListLastSentTimer = showFarmListLastSentTimer,
             FarmListLastSentLimitEnabled = farmListLastSentLimitEnabled,
             FarmListLastSentLimitHours = farmListLastSentLimitHours,

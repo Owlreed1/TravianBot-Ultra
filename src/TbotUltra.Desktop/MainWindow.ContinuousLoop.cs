@@ -1145,56 +1145,9 @@ public partial class MainWindow
                 ? [onlyVillage]
                 : [];
 
-        if (options.HeroCropAntiStarveEnabled)
-        {
-            var antiStarveAccount = _accountStore.ActiveAccountName();
-            var antiStarveVillages = onlyVillage is null ? GetAllKnownVillages() : [onlyVillage];
-            foreach (var village in antiStarveVillages)
-            {
-                var villageKey = GetVillageKey(village);
-                var antiStarvePriority = 100;
-                if (_villageStatusCache.TryGetByKey(villageKey, out var antiStarveStatus))
-                {
-                    var eta = antiStarveStatus.ResourceStorageForecasts?
-                        .FirstOrDefault(forecast => string.Equals(forecast.ResourceKey, "crop", StringComparison.OrdinalIgnoreCase))?
-                        .SecondsToEmpty;
-                    if (eta is int secondsToEmpty)
-                    {
-                        antiStarvePriority += Math.Clamp(
-                            options.HeroCropAntiStarveTriggerMinutes * 60 - secondsToEmpty,
-                            0,
-                            100_000);
-                    }
-                }
-
-                if (!HeroCropAntiStarveSettingsStore.IsEnabled(
-                        _projectRoot,
-                        antiStarveAccount,
-                        options.BaseUrl,
-                        villageKey,
-                        defaultIfMissing: true))
-                {
-                    continue;
-                }
-
-                var antiStarve = runtimeItems.Ensure(new AutomationRuntimeItemSpec(
-                    "anti_starve_hero_crop",
-                    "Anti-starve hero crop",
-                    BuildVillageRuntimePayload(village),
-                    antiStarvePriority,
-                    0,
-                    villageKey,
-                    RefreshPendingPriority: true));
-                if (antiStarve.Change == AutomationRuntimeItemChange.Added)
-                {
-                    AppendLog($"[anti-starve] monitoring enabled for village='{village.Name}'.");
-                }
-            }
-        }
-        else
-        {
-            RemoveDisabledHeroCropAntiStarveTasks(options);
-        }
+        RemoveDisabledHeroCropAntiStarveTasks(options);
+        SeedHeroCropAntiStarveObservations(options);
+        ActivateDueHeroCropAntiStarveObservations(options);
 
         if (onlyVillage is null && heroPollingEnabled && !HasActiveTask("hero_manage"))
         {

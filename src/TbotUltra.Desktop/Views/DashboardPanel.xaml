@@ -546,7 +546,8 @@
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
 
-                                        <!-- Troops: Barracks/Stable/Workshop. Dark = idle, green = training. -->
+                                        <!-- Troops: per-village Build troops configuration. Green = enabled and built,
+                                             amber = enabled but missing/unknown, dark = effectively disabled. -->
                                         <ItemsControl Grid.Column="4" ItemsSource="{Binding TroopSlots}" VerticalAlignment="Center" Margin="4,0,0,0">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>

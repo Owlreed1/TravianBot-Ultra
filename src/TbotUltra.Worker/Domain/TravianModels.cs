@@ -400,7 +400,8 @@ public sealed record FarmListCreateRequest(
     string? VillageId,
     string TroopType,
     int TroopCount,
-    int? TroopIndexOverride = null);
+    int? TroopIndexOverride = null,
+    bool OnlyCreateReportsWithLosses = true);
 
 public sealed record FarmListCreateProgress(
     string Phase,

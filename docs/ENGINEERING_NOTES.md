@@ -236,7 +236,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   button, and the periodic tick all clear a stale regen-estimate countdown, not just the background tick.
 - Hero crop anti-starve is account-configured but selected per coordinate-keyed village and runs only while the
   continuous bot is Running. A missing per-village entry defaults enabled; the account master defaults disabled.
-  Negative crop production uses the fresh dorf1 stock/production snapshot to calculate time to empty. Transfers
+  It is observation-driven: trusted resource snapshots from the existing jitter read and village scan cancel the
+  action for non-negative production or schedule a local no-browser deadline for negative production. Only when
+  that deadline reaches the configured trigger may one deduplicated live-confirmation task enter the queue; never
+  create permanent per-village polling tasks. The live confirmation uses dorf1 stock/production. Transfers
   navigate through `/hero/inventory`, open the visible `.heroItem` containing `.item.item148`, fill only
   `input[name="crop"]`, and click the enabled dialog action whose normalized text is exactly `Transfer` (never
   `Transfer maximum`). The configured minimum hero crop is an absolute post-transfer reserve: transferable crop is
@@ -433,6 +436,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Build troops `maximum` amount mode must click Travian's numeric `.details .cta a[href='#']` shortcut beside the
   selected troop input and verify Travian filled the advertised amount; do not type that maximum manually. The
   existing paced Train-button click remains the submit action after the shortcut succeeds.
+- Dashboard B/S/W troop indicators represent effective per-village Build troops configuration, never training
+  queue activity: green means Auto + Build troops + that building toggle are enabled and the building exists;
+  amber means effectively enabled but the building is missing or its status is unknown; muted means disabled.
 - Map SQL `Skip own villages` resolves the in-game owner name from the active page's `.content > .playerName`;
   never substitute the login email/account key. Add the resolved name to the normalized ignored-player filter so
   every village owned by that player is excluded, and fail the import safely when the checked filter cannot resolve it.
@@ -466,6 +472,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Reused Add-target dialogs must replace X/Y through the traced input path and re-read both fresh fields as an exact
   pair before validation. Retry replacement only a bounded number of times and never click Save while either
   coordinate differs from the requested value.
+- Program-created farm lists carry the account-scoped Create-popup preference `Only create reports with losses`,
+  defaulting enabled when absent. Before Create, set and verify `#createFarmListForm input[name='onlyLosses']` with
+  a real label/input click; a missing or unverifiable checkbox is logged but must not block list creation.
 - Hero attribute priority is execution-authoritative from the latest saved account settings. A queued
   `hero_manage` or `spend_hero_attribute_points` payload is only a snapshot and must never overwrite a reorder
   the user made in the UI while the task was waiting.

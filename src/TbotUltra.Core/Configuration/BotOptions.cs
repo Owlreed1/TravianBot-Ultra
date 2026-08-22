@@ -46,6 +46,9 @@ public sealed record BotOptions
     [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmSendMode)]
     public string ContinuousFarmSendMode { get; init; } = FarmingDefaults.SendModeListPerList;
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.FarmListOnlyCreateReportsWithLosses)]
+    public bool FarmListOnlyCreateReportsWithLosses { get; init; } = FarmingDefaults.OnlyCreateReportsWithLosses;
+
     [ConfigurationKeyName(BotOptionPayloadKeys.ShowFarmListLastSentTimer)]
     public bool ShowFarmListLastSentTimer { get; init; } = FarmingDefaults.ShowLastSentTimer;
 
