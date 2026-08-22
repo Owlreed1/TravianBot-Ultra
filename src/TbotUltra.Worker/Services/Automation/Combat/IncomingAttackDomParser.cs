@@ -17,6 +17,10 @@ internal static class IncomingAttackDomParser
         @"<table\b(?<attrs>[^>]*\bclass\s*=\s*[\""'][^\""']*\btroop_details\b[^\""']*[\""'][^>]*)>(?<body>.*?)</table>",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
 
+    private static readonly Regex Dorf1MovementTableRegex = new(
+        @"<div\b[^>]*\bclass\s*=\s*[\""'][^\""']*\bvillageInfobox\b[^\""']*\bmovements\b[^\""']*[\""'][^>]*>[\s\S]*?<table\b[^>]*\bid\s*=\s*[\""']movements[\""'][^>]*>(?<body>.*?)</table>",
+        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+
     internal static IReadOnlyList<IncomingAttackSignal> ParseDorf1Signals(
         string? html,
         string activeVillageName,
@@ -31,9 +35,11 @@ internal static class IncomingAttackDomParser
         }
 
         var signals = new List<IncomingAttackSignal>();
-        if (Regex.IsMatch(
-                html,
-                @"<div\b[^>]*\bclass\s*=\s*[\""'][^\""']*\bvillageInfobox\b[^\""']*\bmovements\b[^\""']*[\""'][^>]*>[\s\S]*?<table\b[^>]*\bid\s*=\s*[\""']movements[\""'][^>]*>[\s\S]*?(?:class\s*=\s*[\""']att1[\""']|\bAttack\b|\bRaid\b)",
+        var movementTable = Dorf1MovementTableRegex.Match(html);
+        if (movementTable.Success
+            && Regex.IsMatch(
+                movementTable.Groups["body"].Value,
+                @"<img\b[^>]*\bclass\s*=\s*[\""'][^\""']*\batt1\b[^\""']*[\""']",
                 RegexOptions.IgnoreCase))
         {
             signals.Add(new IncomingAttackSignal(
@@ -158,8 +164,13 @@ internal static class IncomingAttackDomParser
 
     private static (int? X, int? Y) ParseCoordinates(string html)
     {
-        var x = ReadFirstGroup(html, @"coordinateX[^>]*>[^\d-]*(?<value>-?\d+)");
-        var y = ReadFirstGroup(html, @"coordinateY[^>]*>[^\d-]*(?<value>-?\d+)");
+        var normalizedHtml = Regex.Replace(html, @"[\u202A-\u202E\u2066-\u2069]", string.Empty)
+            .Replace('\u2212', '-')
+            .Replace('\u2012', '-')
+            .Replace('\u2013', '-')
+            .Replace('\u2014', '-');
+        var x = ReadFirstGroup(normalizedHtml, @"coordinateX[^>]*>[^\d-]*(?<value>-?\d+)");
+        var y = ReadFirstGroup(normalizedHtml, @"coordinateY[^>]*>[^\d-]*(?<value>-?\d+)");
         return (
             int.TryParse(x, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedX) ? parsedX : null,
             int.TryParse(y, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedY) ? parsedY : null);

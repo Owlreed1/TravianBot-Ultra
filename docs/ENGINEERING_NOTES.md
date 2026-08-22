@@ -504,8 +504,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   partial output as a successful archive. Screenshots may contain visible game data.
 - The Dashboard active-village border represents verified live browser state only. Queue selection/Running state
   must never pre-mark a task's target village; update it only after a successful browser village verification.
-- Incoming Attack monitoring observes only real Dorf1 reads: the active village uses
-  `.villageInfobox.movements #movements`, while a Plus village overview uses
+- Incoming Attack monitoring observes only real Dorf1 reads: the active village requires the hostile red
+  `img.att1` marker inside `.villageInfobox.movements #movements` (movement labels and `def1`/`att2` must never
+  signal an attack), while a Plus village overview uses
   `.listEntry.village.attack[data-did]`. A nullable signal list means "Dorf1 was not read" and must preserve
   prior signals; an empty list is authoritative only for the active Dorf1 village. Rally Point details are read
   only after exactly `button.iconFilterActive img.subFilterCategory1` is active and categories 2/3 are inactive.

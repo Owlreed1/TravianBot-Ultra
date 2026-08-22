@@ -29,6 +29,73 @@ public sealed class IncomingAttackDomParserTests
     }
 
     [Fact]
+    public void ParseDorf1Signals_IgnoresReturningReinforcementsAndOutgoingAttacks()
+    {
+        const string html = """
+            <div class="villageInfobox movements">
+              <table id="movements" cellspacing="1" cellpadding="1">
+                <tbody>
+                  <tr><th class="troopMovements header" colspan="3">Incoming troops:</th></tr>
+                  <tr>
+                    <td class="typ"><a href="/build.php?gid=16&amp;tt=1&amp;filter=1&amp;subfilters=2,3"><img class="def1" src="/img/x.gif"></a></td>
+                    <td><div class="mov"><span class="d1">3 Reinf.</span></div><div class="dur_r">in <span class="timer" value="1044">0:17:24</span> hrs.</div></td>
+                  </tr>
+                  <tr><th class="troopMovements header" colspan="3">Outgoing troops:</th></tr>
+                  <tr>
+                    <td class="typ"><a href="/build.php?gid=16&amp;tt=1&amp;filter=2&amp;subfilters=4"><img class="att2" src="/img/x.gif"></a></td>
+                    <td><div class="mov"><span class="a2">1 Attack</span></div><div class="dur_r">in <span class="timer" value="444">0:07:24</span> hrs.</div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            """;
+
+        var signals = IncomingAttackDomParser.ParseDorf1Signals(
+            html,
+            "BRO",
+            "dorf1.php?newdid=34875",
+            120,
+            14,
+            new DateTimeOffset(2026, 8, 22, 14, 29, 29, TimeSpan.Zero));
+
+        Assert.Empty(signals);
+    }
+
+    [Fact]
+    public void ParseDorf1Signals_DetectsOnlyVillageRowMarkedAsAttack()
+    {
+        const string html = """
+            <div class="villageList">
+              <div class="dropContainer" data-sortid="village22087">
+                <div class="listEntry village" data-did="22087">
+                  <a href="#"><div class="iconAndNameWrapper"><span class="incomingTroops"><svg class="attack"></svg></span><span class="name" data-did="22087">ABC</span></div></a>
+                  <span class="coordinatesGrid"><span class="coordinateX">(61</span>|<span class="coordinateY">22)</span></span>
+                </div>
+              </div>
+              <div class="dropContainer" data-sortid="village32735">
+                <div class="listEntry village active attack" data-did="32735">
+                  <a href="#" class="active"><div class="iconAndNameWrapper"><span class="incomingTroops"><svg class="attack"></svg></span><span class="name" data-did="32735">BRE</span></div></a>
+                  <span class="coordinatesGrid"><span class="coordinateX">(25</span>|<span class="coordinateY">−197)</span></span>
+                </div>
+              </div>
+            </div>
+            """;
+
+        var signal = Assert.Single(IncomingAttackDomParser.ParseDorf1Signals(
+            html,
+            "BRE",
+            "dorf1.php?newdid=32735",
+            25,
+            -197,
+            new DateTimeOffset(2026, 8, 22, 15, 0, 0, TimeSpan.Zero)));
+
+        Assert.Equal("BRE", signal.VillageName);
+        Assert.Equal(32735, signal.VillageId);
+        Assert.Equal(25, signal.CoordX);
+        Assert.Equal(-197, signal.CoordY);
+    }
+
+    [Fact]
     public void ParseIncomingAttacks_ReadsRaidIdentitySourceAndArrivalAcrossMidnight()
     {
         const string html = """
