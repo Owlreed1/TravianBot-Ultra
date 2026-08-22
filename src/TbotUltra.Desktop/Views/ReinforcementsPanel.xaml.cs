@@ -32,9 +32,12 @@ public partial class ReinforcementsPanel : UserControl
             return;
         }
 
-        SendTroopsTabControl.SelectedItem = string.Equals(Section, "Incoming", StringComparison.OrdinalIgnoreCase)
-            ? IncomingAttacksTabItem
-            : ReinforcementsTabItem;
+        SendTroopsTabControl.SelectedItem = Section.ToUpperInvariant() switch
+        {
+            "INCOMING" => IncomingAttacksTabItem,
+            "CATAPULT" => CatapultWavesTabItem,
+            _ => ReinforcementsTabItem,
+        };
         SendTroopsTabControl.Template = (ControlTemplate)FindResource("ContentOnlyTabControlTemplate");
     }
 

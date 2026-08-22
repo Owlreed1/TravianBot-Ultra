@@ -835,6 +835,7 @@ public partial class MainWindow
 
     private void RefreshAfterActiveAccountChanged(string accountName)
     {
+        ClearDashboardVillagePanels();
         RefreshBrowserStatisticsUi();
         RecoverAndRefreshActiveAccountQueue();
         AppendLog($"Active account changed to '{accountName}'. Previous session closed and state reset.");

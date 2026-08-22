@@ -13,7 +13,6 @@ public partial class DashboardPanel : UserControl
 
     private MainWindow? Host => _host ??= Window.GetWindow(this) as MainWindow;
 
-    internal Button ResetButton => ResetProgramButton;
     internal TextBlock VillagesInfo => VillagesInfoTextBlock;
     internal TextBlock LastScanInfo => LastScanInfoTextBlock;
     internal Ellipse AutomationRunStateDot => AutomationLoopRunStateDot;
@@ -25,7 +24,6 @@ public partial class DashboardPanel : UserControl
     internal CheckBox VillageStatusSweep => VillageStatusSweepCheckBox;
     internal ItemsControl VillageList => DashboardVillageList;
 
-    private void ResetProgramButton_Click(object sender, RoutedEventArgs e) => Host?.OnResetProgramClicked(sender, e);
     private void DashboardClearTimersButton_Click(object sender, RoutedEventArgs e) => Host?.OnDashboardClearTimersClicked(sender, e);
     private void AutomationLoopToggleButton_Click(object sender, RoutedEventArgs e) => Host?.OnAutomationLoopToggleClicked(sender, e);
     private void AutomationLoopListBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) => Host?.OnAutomationLoopPreviewMouseLeftButtonDown(sender, e);

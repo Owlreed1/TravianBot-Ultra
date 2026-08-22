@@ -11,13 +11,13 @@ using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
 using TbotUltra.Worker.Services;
 
-namespace TbotUltra.Desktop;
+namespace TbotUltra.Desktop.Views;
 
-// Central per-village settings window. Lists the villages with their population plus per-village toggles.
+// Central per-village settings panel. Lists the villages with their population plus per-village toggles.
 // "Auto" turns the village on/off (green); "NPC" gates NPC trade; the per-group columns mirror the
 // dashboard automation-loop cards per village (all blue). Changes are buffered in the bound rows and only
-// written to VillageSettingsStore (via the callbacks) when the user clicks "Save & close"; "Close" discards.
-public partial class VillageSettingsWindow : Window
+// written to VillageSettingsStore (via the callbacks) when the user clicks Save.
+public partial class VillageSettingsPanel : UserControl, IDisposable
 {
     private readonly IReadOnlyList<VillageSettingsRow> _rows;
     private readonly IReadOnlyList<VillageSettingsRow> _gridRows;
@@ -39,12 +39,13 @@ public partial class VillageSettingsWindow : Window
     private VillageOverviewProjection? _overviewProjection;
     private long _appliedOverviewSourceVersion = -1;
     private long _requestedOverviewSourceVersion = -1;
-    private bool _overviewClosed;
+    private bool _overviewDisposed;
     private readonly ObservableCollection<UpcomingTaskRow> _upcomingTaskRows = [];
     private readonly ObservableCollection<VillageOverviewRow> _overviewVillageRows = [];
 
-    internal VillageSettingsWindow(
+    internal VillageSettingsPanel(
         IReadOnlyList<VillageSettingsRow> rows,
+        string section = "Settings",
         Action<VillageSettingsRow>? onEnabledChanged = null,
         Action<VillageSettingsRow>? onNpcTradeChanged = null,
         Action<VillageSettingsRow>? onHeroResourcesChanged = null,
@@ -60,7 +61,14 @@ public partial class VillageSettingsWindow : Window
         Func<long>? overviewSourceVersionProvider = null)
     {
         InitializeComponent();
-        ThemeChrome.EnableEarlyDarkTitleBar(this);
+        VillageSettingsTabControl.SelectedItem = string.Equals(section, "Overview", StringComparison.OrdinalIgnoreCase)
+            ? OverviewTabItem
+            : SettingsTabItem;
+        VillageSettingsTabControl.Template = (ControlTemplate)FindResource("ContentOnlyTabControlTemplate");
+        var showingOverview = ReferenceEquals(VillageSettingsTabControl.SelectedItem, OverviewTabItem);
+        SectionTitleTextBlock.Text = showingOverview ? "Village overview" : "Village settings";
+        VillageSettingsInfoIcon.Visibility = showingOverview ? Visibility.Collapsed : Visibility.Visible;
+        SettingsFooter.Visibility = showingOverview ? Visibility.Collapsed : Visibility.Visible;
         _rows = rows;
         _gridRows = rows.Count == 0 ? rows : [CreateCheckAllRow(rows), .. rows];
         _onEnabledChanged = onEnabledChanged;
@@ -92,18 +100,28 @@ public partial class VillageSettingsWindow : Window
             {
                 await Dispatcher.Yield(DispatcherPriority.ContextIdle);
                 await RefreshOverviewAsync(force: true);
-                if (!_overviewClosed)
+                if (!_overviewDisposed)
                 {
                     _overviewRefreshTimer.Start();
                 }
             };
-            Closed += (_, _) =>
+            Unloaded += (_, _) =>
             {
-                _overviewClosed = true;
                 _overviewRefreshTimer.Stop();
-                _overviewCoordinator.Dispose();
             };
         }
+    }
+
+    public void Dispose()
+    {
+        if (_overviewDisposed)
+        {
+            return;
+        }
+
+        _overviewDisposed = true;
+        _overviewRefreshTimer?.Stop();
+        _overviewCoordinator.Dispose();
     }
 
     private static VillageSettingsRow CreateCheckAllRow(IReadOnlyList<VillageSettingsRow> rows) => new()
@@ -565,9 +583,9 @@ public partial class VillageSettingsWindow : Window
         _onConstructFasterSettingsRequested?.Invoke(_rows);
     }
 
-    // Persists every row's current state via the callbacks, then closes. The persist callbacks no-op when
-    // a value is unchanged, so writing all rows is cheap.
-    private void SaveAndCloseButton_Click(object sender, RoutedEventArgs e)
+    // Persists every row's current state via the callbacks. The persist callbacks no-op when a value is
+    // unchanged, so writing all rows is cheap.
+    private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
         foreach (var row in _rows)
         {
@@ -579,12 +597,5 @@ public partial class VillageSettingsWindow : Window
         }
 
         _onSaved?.Invoke();
-        Close();
-    }
-
-    private void CloseButton_Click(object sender, RoutedEventArgs e)
-    {
-        // Discard: nothing was written, and the rows are rebuilt from the store next time the window opens.
-        Close();
     }
 }

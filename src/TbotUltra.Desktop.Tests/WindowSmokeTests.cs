@@ -249,7 +249,7 @@ public sealed class WindowSmokeTests
     }
 
     [Fact]
-    public void VillageSettingsWindow_HidesTribeColumnWhenEveryVillageSharesOneTribe()
+    public void VillageSettingsPanel_HidesTribeColumnWhenEveryVillageSharesOneTribe()
     {
         AssertTribeColumnVisibility(
             [BuildRow("Capital", "Egyptians"), BuildRow("Second", "Egyptians")],
@@ -257,7 +257,7 @@ public sealed class WindowSmokeTests
     }
 
     [Fact]
-    public void VillageSettingsWindow_HidesTribeColumnWhenNoTribeIsKnown()
+    public void VillageSettingsPanel_HidesTribeColumnWhenNoTribeIsKnown()
     {
         AssertTribeColumnVisibility(
             [BuildRow("Capital", string.Empty), BuildRow("Second", string.Empty)],
@@ -265,7 +265,7 @@ public sealed class WindowSmokeTests
     }
 
     [Fact]
-    public void VillageSettingsWindow_ShowsTribeColumnOnASpecialServerWithMixedTribes()
+    public void VillageSettingsPanel_ShowsTribeColumnOnASpecialServerWithMixedTribes()
     {
         AssertTribeColumnVisibility(
             [BuildRow("Capital", "Spartans"), BuildRow("Second", "Egyptians"), BuildRow("Third", "Huns")],
@@ -276,7 +276,7 @@ public sealed class WindowSmokeTests
     {
         _wpf.Run(() =>
         {
-            var window = new VillageSettingsWindow(
+            var panel = new Views.VillageSettingsPanel(
                 rows,
                 onEnabledChanged: _ => { },
                 onNpcTradeChanged: _ => { },
@@ -289,15 +289,8 @@ public sealed class WindowSmokeTests
                 onHeroResourceSettingsRequested: _ => { },
                 onConstructFasterSettingsRequested: _ => { },
                 onSaved: () => { });
-            try
-            {
-                var column = Assert.IsType<DataGridTextColumn>(window.FindName("TribeColumn"));
-                Assert.Equal(expected, column.Visibility);
-            }
-            finally
-            {
-                window.Close();
-            }
+            var column = Assert.IsType<DataGridTextColumn>(panel.FindName("TribeColumn"));
+            Assert.Equal(expected, column.Visibility);
         });
     }
 

@@ -48,14 +48,11 @@ public partial class MainWindow
                 else if (ReferenceEquals(targetTab, ResourcesTabItem))
                 {
                     _resourcesViewModel.TickLiveForecasts();
+                    TickResourceTransferVillageForecasts();
                 }
                 else if (ReferenceEquals(targetTab, TroopsTabItem))
                 {
                     UpdateReinforcementStatus();
-                }
-                else if (ReferenceEquals(targetTab, NpcTradeTabItem))
-                {
-                    TickResourceTransferVillageForecasts();
                 }
                 else if (ReferenceEquals(targetTab, QueueTabItem))
                 {

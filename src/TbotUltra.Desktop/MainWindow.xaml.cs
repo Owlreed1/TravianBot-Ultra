@@ -545,7 +545,7 @@ public partial class MainWindow : Window
                     RefreshTravianSmithyQueueUi();
                 }
 
-                if (IsMainTabSelected(NpcTradeTabItem))
+                if (IsMainTabSelected(ResourcesTabItem))
                 {
                     TickResourceTransferVillageForecasts();
                 }
@@ -836,7 +836,7 @@ public partial class MainWindow : Window
         var hasExplicitAutoCelebrationSetting = storedAutoCelebration.HasValue;
         LoadAutomationLoopTasks(options);
         // Settings saves reload the account/global config. Keep the dashboard group toggles on the
-        // selected village's saved state so they do not drift from the Village settings popup.
+        // selected village's saved state so they do not drift from the Village settings panel.
         if (_isLoggedIn)
         {
             ApplyAutomationLoopGroupsForSelectedVillage();
@@ -1237,7 +1237,7 @@ public partial class MainWindow : Window
         ReconcileConfirmedVillageList(status.Villages, "post_login");
         // Apply the landing village's per-village automation-group override to the dashboard cards. Without
         // this the cards keep the global default loaded by LoadAutomationLoopTasks, so on login they could
-        // disagree with the per-village toggles shown in the Village settings window (e.g. Construction on
+        // disagree with the per-village toggles shown in the Village settings panel (e.g. Construction on
         // there but off in the dashboard).
         ApplyAutomationLoopGroupsForSelectedVillage();
 

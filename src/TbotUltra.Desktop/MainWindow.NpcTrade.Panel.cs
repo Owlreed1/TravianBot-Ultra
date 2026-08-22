@@ -5,21 +5,23 @@ namespace TbotUltra.Desktop;
 
 public partial class MainWindow
 {
+    private Views.NpcTradePanel NpcTradePanelControl => NpcTradeHubPanelControl.NpcPanel;
+    private Views.NpcTradePanel ResourceTradingPanelControl => ResourcesHubPanelControl.TradingPanel;
     private TextBlock NpcTradeGoldSpentTextBlock => NpcTradePanelControl.GoldSpent;
     private TextBlock NpcTradeTroopsTextBlock => NpcTradePanelControl.TroopsCount;
     private TextBlock NpcTradeBuildingsTextBlock => NpcTradePanelControl.BuildingsCount;
-    private ComboBox ResourceTransferTargetVillageComboBox => NpcTradePanelControl.TransferTargetVillage;
-    private ItemsControl ResourceTransferSourceVillagesItemsControl => NpcTradePanelControl.TransferSourceVillages;
-    private ComboBox ResourceTransferSourceThresholdComboBox => NpcTradePanelControl.SourceThreshold;
-    private ComboBox ResourceTransferSourceKeepComboBox => NpcTradePanelControl.SourceKeep;
-    private ComboBox ResourceTransferTargetFillComboBox => NpcTradePanelControl.TargetFill;
-    private CheckBox ResourceTransferWoodCheckBox => NpcTradePanelControl.TransferWood;
-    private CheckBox ResourceTransferClayCheckBox => NpcTradePanelControl.TransferClay;
-    private CheckBox ResourceTransferIronCheckBox => NpcTradePanelControl.TransferIron;
-    private CheckBox ResourceTransferCropCheckBox => NpcTradePanelControl.TransferCrop;
-    private TextBlock ResourceTransferStatusTextBlock => NpcTradePanelControl.TransferStatus;
-    private Button ResourceTransferQueueNowButton => NpcTradePanelControl.TransferQueueNow;
-    private Button ResourceTransferScanVillagesButton => NpcTradePanelControl.TransferScanVillages;
+    private ComboBox ResourceTransferTargetVillageComboBox => ResourceTradingPanelControl.TransferTargetVillage;
+    private ItemsControl ResourceTransferSourceVillagesItemsControl => ResourceTradingPanelControl.TransferSourceVillages;
+    private ComboBox ResourceTransferSourceThresholdComboBox => ResourceTradingPanelControl.SourceThreshold;
+    private ComboBox ResourceTransferSourceKeepComboBox => ResourceTradingPanelControl.SourceKeep;
+    private ComboBox ResourceTransferTargetFillComboBox => ResourceTradingPanelControl.TargetFill;
+    private CheckBox ResourceTransferWoodCheckBox => ResourceTradingPanelControl.TransferWood;
+    private CheckBox ResourceTransferClayCheckBox => ResourceTradingPanelControl.TransferClay;
+    private CheckBox ResourceTransferIronCheckBox => ResourceTradingPanelControl.TransferIron;
+    private CheckBox ResourceTransferCropCheckBox => ResourceTradingPanelControl.TransferCrop;
+    private TextBlock ResourceTransferStatusTextBlock => ResourceTradingPanelControl.TransferStatus;
+    private Button ResourceTransferQueueNowButton => ResourceTradingPanelControl.TransferQueueNow;
+    private Button ResourceTransferScanVillagesButton => ResourceTradingPanelControl.TransferScanVillages;
 
     internal void OnResourceTransferSettingChanged(object sender, RoutedEventArgs e) => ResourceTransferSetting_Changed(sender, e);
     internal void OnResourceTransferSettingSelectionChanged(object sender, SelectionChangedEventArgs e) => ResourceTransferSetting_SelectionChanged(sender, e);

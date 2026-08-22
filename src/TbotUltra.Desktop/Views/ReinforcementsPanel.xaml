@@ -222,64 +222,6 @@
                         Margin="0,12,0,0"
                         Click="QueueReinforcementsNowButton_Click" />
 
-                <Border Background="{DynamicResource SurfaceAltBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="12"
-                        Margin="0,18,0,0">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                            <TextBlock Text="Catapult waves"
-                                       FontSize="22"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextPrimaryBrush}" />
-                            <Border Width="14"
-                                    Height="14"
-                                    CornerRadius="7"
-                                    Background="{DynamicResource ControlBackgroundBrush}"
-                                    BorderBrush="{DynamicResource BorderBrush}"
-                                    BorderThickness="1"
-                                    Margin="8,5,0,0"
-                                    VerticalAlignment="Center"
-                                    ToolTipService.InitialShowDelay="0">
-                                <Border.ToolTip>
-                                    <ToolTip MaxWidth="360">
-                                        <StackPanel Width="320">
-                                            <TextBlock Text="Catapult waves"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource TooltipForegroundBrush}"
-                                                       Margin="0,0,0,6" />
-                                            <TextBlock TextWrapping="Wrap"
-                                                       Text="Reads available troops from Rally Point, prepares one first attack and multiple attack waves. Catapult targets use Random automatically when catapults are included." />
-                                        </StackPanel>
-                                    </ToolTip>
-                                </Border.ToolTip>
-                                <TextBlock Text="i"
-                                           FontSize="10"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextMutedBrush}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           TextAlignment="Center" />
-                            </Border>
-                        </StackPanel>
-                        <Button x:Name="StartCatapultWavesButton"
-                                Content="Start catapult waves"
-                                Width="180"
-                                HorizontalAlignment="Left"
-                                ToolTip="Opens Catapult Waves for the active village."
-                                Background="{DynamicResource SuccessBgBrush}"
-                                Foreground="{DynamicResource SuccessTextBrush}"
-                                BorderBrush="{DynamicResource SuccessBorderBrush}"
-                                Click="StartCatapultWavesButton_Click" />
-                        <TextBlock x:Name="CatapultWavesStatusTextBlock"
-                                   Text="No catapult waves running."
-                                   Foreground="{DynamicResource TextMutedBrush}"
-                                   Margin="0,10,0,0"
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-                </Border>
             </StackPanel>
         </Grid>
     </Border>
@@ -330,6 +272,72 @@
         </DataGrid>
       </Grid>
     </Border>
+  </TabItem>
+  <TabItem x:Name="CatapultWavesTabItem" Header="Catapult waves">
+    <Grid Background="{DynamicResource AppBackgroundBrush}">
+      <Border Background="{DynamicResource SurfaceBrush}"
+              BorderBrush="{DynamicResource BorderBrush}"
+              BorderThickness="1"
+              CornerRadius="8"
+              Padding="16"
+              VerticalAlignment="Top">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Catapult waves"
+                       FontSize="22"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <Border Width="14"
+                    Height="14"
+                    CornerRadius="7"
+                    Background="{DynamicResource ControlBackgroundBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    Margin="8,5,0,0"
+                    VerticalAlignment="Center"
+                    ToolTipService.InitialShowDelay="0">
+              <Border.ToolTip>
+                <ToolTip MaxWidth="360">
+                  <StackPanel Width="320">
+                    <TextBlock Text="Catapult waves"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TooltipForegroundBrush}"
+                               Margin="0,0,0,6" />
+                    <TextBlock TextWrapping="Wrap"
+                               Text="Reads available troops from Rally Point, prepares one first attack and multiple attack waves. Catapult targets use Random automatically when catapults are included." />
+                  </StackPanel>
+                </ToolTip>
+              </Border.ToolTip>
+              <TextBlock Text="i"
+                         FontSize="10"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource TextMutedBrush}"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         TextAlignment="Center" />
+            </Border>
+          </StackPanel>
+          <TextBlock Text="Prepare one first attack followed by multiple precisely timed attack waves."
+                     Foreground="{DynamicResource TextSubtleBrush}"
+                     FontSize="12"
+                     Margin="0,0,0,14" />
+          <Button x:Name="StartCatapultWavesButton"
+                  Content="Start catapult waves"
+                  Width="180"
+                  HorizontalAlignment="Left"
+                  ToolTip="Opens Catapult Waves for the active village."
+                  Background="{DynamicResource SuccessBgBrush}"
+                  Foreground="{DynamicResource SuccessTextBrush}"
+                  BorderBrush="{DynamicResource SuccessBorderBrush}"
+                  Click="StartCatapultWavesButton_Click" />
+          <TextBlock x:Name="CatapultWavesStatusTextBlock"
+                     Text="No catapult waves running."
+                     Foreground="{DynamicResource TextMutedBrush}"
+                     Margin="0,10,0,0"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+    </Grid>
   </TabItem>
 </TabControl>
 </UserControl>

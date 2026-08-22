@@ -1,14 +1,14 @@
 <UserControl x:Class="TbotUltra.Desktop.Views.NpcTradePanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-<Grid Background="{DynamicResource AppBackgroundBrush}">
+<Grid x:Name="SectionsGrid" Background="{DynamicResource AppBackgroundBrush}">
     <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="16" />
-        <ColumnDefinition Width="*" />
+        <ColumnDefinition x:Name="NpcColumn" Width="*" />
+        <ColumnDefinition x:Name="SectionSpacerColumn" Width="16" />
+        <ColumnDefinition x:Name="TradingColumn" Width="*" />
     </Grid.ColumnDefinitions>
 
-    <StackPanel Grid.Column="0">
+    <StackPanel x:Name="NpcSection" Grid.Column="0">
         <Border VerticalAlignment="Top"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
@@ -246,7 +246,7 @@
 
     </StackPanel>
 
-    <StackPanel Grid.Column="2">
+    <StackPanel x:Name="TradingSection" Grid.Column="2">
         <Border VerticalAlignment="Top"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"

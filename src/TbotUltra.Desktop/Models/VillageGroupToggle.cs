@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace TbotUltra.Desktop.Models;
 
-// One per-village automation-group toggle shown in the Village settings popup. Mirrors a dashboard
+// One per-village automation-group toggle shown in the Village settings panel. Mirrors a dashboard
 // automation-loop "card" (GroupKey == the card's group key). Two-way bound; the popup persists the
 // village's enabled-group set to VillageSettingsStore whenever IsEnabled flips.
 public sealed class VillageGroupToggle : INotifyPropertyChanged

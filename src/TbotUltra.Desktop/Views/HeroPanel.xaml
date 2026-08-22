@@ -8,324 +8,295 @@
              d:DataContext="{d:DesignInstance Type=vm:HeroViewModel}"
              d:DesignHeight="600"
              d:DesignWidth="800">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource AppBackgroundBrush}">
+    <ScrollViewer x:Name="RootScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource AppBackgroundBrush}">
         <StackPanel>
             <!-- Header -->
             <DockPanel Margin="2,2,2,12">
                 <StackPanel DockPanel.Dock="Left">
-                    <TextBlock Text="Hero / Adventures"
+                    <TextBlock x:Name="SectionTitle" Text="Hero / Adventures"
                                FontSize="22"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}" />
-                    <TextBlock Text="Configure hero behaviour and queue adventures."
+                    <TextBlock x:Name="SectionDescription" Text="Configure hero behaviour and queue adventures."
                                Foreground="{DynamicResource TextSubtleBrush}"
                                FontSize="12"
                                Margin="0,4,0,0" />
                 </StackPanel>
             </DockPanel>
 
-            <!-- Settings card -->
-            <Border Background="{DynamicResource SurfaceBrush}"
+            <!-- Adventure controls: live state first, then grouped decisions. -->
+            <Border x:Name="SettingsCard"
+                    Background="{DynamicResource SurfaceBrush}"
                     BorderBrush="{DynamicResource BorderSubtleBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="14"
                     Margin="2,0,2,12">
                 <StackPanel>
-                    <TextBlock Text="Settings"
-                               FontSize="14"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimaryBrush}"
-                               Margin="0,0,0,10" />
+                    <StackPanel Margin="0,0,0,12">
+                        <TextBlock Text="Adventure control"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="Check readiness, choose when to leave, and configure optional automation."
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextSubtleBrush}"
+                                   Margin="0,3,0,0" />
+                    </StackPanel>
+
                     <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="210" />
-                            <ColumnDefinition Width="12" />
-                            <ColumnDefinition Width="230" />
-                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Hero min HP for adventure" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
-                            <TextBox Text="{Binding MinHpForAdventure, UpdateSourceTrigger=PropertyChanged}"
-                                     Margin="0,4,12,0"
-                                     Padding="6,4"
-                                     BorderBrush="{DynamicResource BorderSubtleBrush}" />
-                        </StackPanel>
-                        <Grid Grid.Column="2">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0"
-                                       Text="Automation"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                       FontSize="12"
-                                       Margin="0,0,0,8" />
-                            <Border Grid.Row="1"
-                                    Background="{DynamicResource SurfaceBrush}"
-                                    BorderBrush="{DynamicResource BorderSubtleBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="6"
-                                    Padding="10">
-                                <StackPanel>
-                                    <CheckBox Content="Auto revive" IsChecked="{Binding AutoRevive}" Margin="0,0,0,6" />
-                                    <CheckBox Content="Auto assign attribute points" IsChecked="{Binding AutoAssignPoints}" Margin="0,0,0,6" />
-                                    <CheckBox Content="Auto use ointments" IsChecked="{Binding AutoUseOintments}" Margin="0,0,0,6" />
-                                    <CheckBox Content="Increase adventures to hard"
-                                              IsChecked="{Binding IncreaseAdventuresToHard}"
-                                              Margin="0,0,0,6"
-                                              ToolTip="When on, the adventure function may watch the bonus video to raise the next adventure's danger to hard. The percentage is rolled independently for every Hard and -25% video invocation." />
-                                    <CheckBox Content="Reduce adventure time 25%"
-                                              IsChecked="{Binding ReduceAdventureTime}"
-                                              ToolTip="When on, the adventure function also watches the bonus video to reduce the next adventure's duration by 25% (after the increase-danger step). Official Travian only. Skipped automatically if it is already active." />
-                                    <StackPanel Orientation="Horizontal" Margin="22,5,0,0">
-                                        <TextBlock Text="Random:"
-                                                   Margin="0,0,6,0"
-                                                   VerticalAlignment="Center" />
-                                        <TextBox Width="42"
-                                                 Padding="5,2"
-                                                 TextAlignment="Right"
-                                                 Text="{Binding AdventureVideoChancePercent, UpdateSourceTrigger=PropertyChanged}" />
-                                        <TextBlock Text="%"
-                                                   Margin="4,0,0,0"
-                                                   VerticalAlignment="Center" />
-                                        <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                        ToolTip="Chance to run each enabled Hero Adventure bonus video. Applies independently to Hard and Reduce adventure time 25%. Default: 70%." />
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                        <Border Grid.Column="4"
-                                Background="{DynamicResource SurfaceBrush}"
+
+                        <Border Grid.Column="0"
+                                Background="{DynamicResource AppBackgroundBrush}"
                                 BorderBrush="{DynamicResource BorderSubtleBrush}"
                                 BorderThickness="1"
                                 CornerRadius="6"
-                                Padding="10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="18" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="18" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                    <TextBlock Text="Adventures"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimaryBrush}"
-                                               FontSize="12"
-                                               VerticalAlignment="Center" />
-                                    <Button x:Name="RefreshAdventuresButton"
-                                            Style="{StaticResource RefreshIconButtonStyle}"
-                                            ToolTip="Refresh adventure count"
-                                            Command="{Binding RefreshAdventuresCommand}" />
-                                </StackPanel>
-                                <StackPanel Margin="0,0,0,10">
-                                    <Border BorderThickness="1"
-                                            CornerRadius="6"
-                                            Padding="10,6"
-                                            HorizontalAlignment="Left">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Background" Value="{DynamicResource HeroAdvBgBrush}" />
-                                                <Setter Property="BorderBrush" Value="{DynamicResource HeroAdvBorderBrush}" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding AdventureCountText}" Value="0">
-                                                        <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
-                                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="Available:"
-                                                       VerticalAlignment="Center"
-                                                       Margin="0,0,6,0">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Foreground" Value="{DynamicResource SuccessTextStrongBrush}" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding AdventureCountText}" Value="0">
-                                                                <Setter Property="Foreground" Value="{DynamicResource TextSubtleBrush}" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
-                                            <TextBlock Text="{Binding AdventureCountText}"
-                                                       FontWeight="SemiBold"
-                                                       FontSize="15"
-                                                       VerticalAlignment="Center">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Foreground" Value="{DynamicResource SuccessTextStrongBrush}" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding AdventureCountText}" Value="0">
-                                                                <Setter Property="Foreground" Value="{DynamicResource TextSubtleBrush}" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
-                                        </StackPanel>
-                                    </Border>
-                                </StackPanel>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                        <TextBlock Text="Hero HP"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                                   FontSize="12"
-                                                   VerticalAlignment="Center" />
-                                        <Button x:Name="RefreshHeroHpButton"
-                                                Style="{StaticResource RefreshIconButtonStyle}"
-                                                ToolTip="Refresh hero HP"
-                                                Command="{Binding RefreshHpCommand}" />
-                                    </StackPanel>
-                                    <StackPanel>
-                                        <Border Background="{DynamicResource HeroAdvBgBrush}"
-                                                BorderBrush="{DynamicResource HeroAdvBorderBrush}"
-                                                BorderThickness="1"
-                                                CornerRadius="6"
-                                                MinWidth="64"
-                                                Padding="10,6"
-                                                HorizontalAlignment="Left">
-                                            <TextBlock Text="{Binding HeroHpText}"
-                                                       Foreground="{DynamicResource SuccessTextStrongBrush}"
-                                                       FontWeight="SemiBold"
-                                                       FontSize="15"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center" />
-                                        </Border>
-                                    </StackPanel>
-                                </StackPanel>
-                                <StackPanel Grid.Column="4">
-                                    <TextBlock Text="Hero status"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimaryBrush}"
-                                               FontSize="12"
-                                               Margin="0,0,0,8" />
-                                    <Border BorderThickness="1"
-                                            CornerRadius="6"
-                                            MinWidth="84"
-                                            Padding="10,6"
-                                            HorizontalAlignment="Left"
-                                            Margin="0,0,0,6">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
-                                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding HeroStatusText}" Value="Ready">
-                                                        <Setter Property="Background" Value="{DynamicResource HeroAdvBgBrush}" />
-                                                        <Setter Property="BorderBrush" Value="{DynamicResource HeroAdvBorderBrush}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding HeroLoopTask.HasCountdown}" Value="True">
-                                                        <Setter Property="Background" Value="{DynamicResource WarningBgBrush}" />
-                                                        <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <TextBlock FontWeight="SemiBold"
-                                                   FontSize="15"
-                                                   HorizontalAlignment="Center">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Text" Value="--" />
-                                                    <Setter Property="Foreground" Value="{DynamicResource TextSubtleBrush}" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HeroStatusText}" Value="Ready">
-                                                            <Setter Property="Text" Value="{Binding HeroReadyText}" />
-                                                            <Setter Property="Foreground" Value="{DynamicResource SuccessTextStrongBrush}" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding HeroLoopTask.HasCountdown}" Value="True">
-                                                            <Setter Property="Text" Value="{Binding HeroLoopTask.TimerText}" />
-                                                            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                    </Border>
-                                    <TextBlock Text="{Binding HeroStatusText}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                    </Grid>
-                    <Grid>
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                <TextBlock Text="Adventure pick order"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                           FontSize="12"
-                                           FontWeight="SemiBold"
-                                           VerticalAlignment="Center" />
-                                <Border Width="14"
-                                        Height="14"
-                                        Margin="6,0,0,0"
-                                        CornerRadius="7"
-                                        Background="{DynamicResource ControlBackgroundBrush}"
-                                        BorderBrush="{DynamicResource BorderBrush}"
-                                        BorderThickness="1"
-                                        VerticalAlignment="Center"
-                                        ToolTipService.InitialShowDelay="0">
-                                    <Border.ToolTip>
-                                        <ToolTip MaxWidth="340">
-                                            <StackPanel Width="300">
-                                                <TextBlock Text="Adventure pick order"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource TooltipForegroundBrush}"
-                                                           Margin="0,0,0,6" />
-                                                <TextBlock TextWrapping="Wrap"
-                                                           Text="Shortest adventure first queues the nearest adventure. Top adventure first queues the first adventure shown in the Travian list." />
-                                            </StackPanel>
-                                        </ToolTip>
-                                    </Border.ToolTip>
-                                    <TextBlock Text="i"
+                                Padding="12,10">
+                            <DockPanel>
+                                <Button x:Name="RefreshAdventuresButton"
+                                        DockPanel.Dock="Right"
+                                        Style="{StaticResource RefreshIconButtonStyle}"
+                                        ToolTip="Refresh adventure count"
+                                        Command="{Binding RefreshAdventuresCommand}" />
+                                <StackPanel>
+                                    <TextBlock Text="AVAILABLE ADVENTURES"
                                                FontSize="10"
                                                FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextMutedBrush}"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center" />
-                                </Border>
-                            </StackPanel>
-                            <Border Background="{DynamicResource SurfaceBrush}"
-                                    BorderBrush="{DynamicResource BorderSubtleBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="6"
-                                    Padding="10">
-                                <StackPanel Orientation="Vertical">
-                                    <RadioButton Content="Shortest adventure first"
-                                                 GroupName="HeroAdventureOrder"
-                                                 IsChecked="{Binding IsAdventurePickShortest}"
-                                                 Margin="0,0,0,4" />
-                                    <RadioButton Content="Top adventure first"
-                                                 GroupName="HeroAdventureOrder"
-                                                 IsChecked="{Binding IsAdventurePickTop}" />
+                                               Foreground="{DynamicResource TextSubtleBrush}" />
+                                    <TextBlock Text="{Binding AdventureCountText}"
+                                               FontSize="22"
+                                               FontWeight="SemiBold"
+                                               Margin="0,4,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{DynamicResource SuccessTextStrongBrush}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding AdventureCountText}" Value="0">
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextSubtleBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </StackPanel>
-                            </Border>
-                        </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Grid.Column="2"
+                                Background="{DynamicResource AppBackgroundBrush}"
+                                BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="12,10">
+                            <DockPanel>
+                                <Button x:Name="RefreshHeroHpButton"
+                                        DockPanel.Dock="Right"
+                                        Style="{StaticResource RefreshIconButtonStyle}"
+                                        ToolTip="Refresh hero HP"
+                                        Command="{Binding RefreshHpCommand}" />
+                                <StackPanel>
+                                    <TextBlock Text="HERO HEALTH"
+                                               FontSize="10"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSubtleBrush}" />
+                                    <TextBlock Text="{Binding HeroHpText}"
+                                               FontSize="22"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource SuccessTextStrongBrush}"
+                                               Margin="0,4,0,0" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Grid.Column="4"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="12,10">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HeroStatusText}" Value="Ready">
+                                            <Setter Property="Background" Value="{DynamicResource HeroAdvBgBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource HeroAdvBorderBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding HeroLoopTask.HasCountdown}" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource WarningBgBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel>
+                                <TextBlock Text="HERO STATUS"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextSubtleBrush}" />
+                                <TextBlock FontSize="22"
+                                           FontWeight="SemiBold"
+                                           Margin="0,4,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="--" />
+                                            <Setter Property="Foreground" Value="{DynamicResource TextSubtleBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HeroStatusText}" Value="Ready">
+                                                    <Setter Property="Text" Value="{Binding HeroReadyText}" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessTextStrongBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding HeroLoopTask.HasCountdown}" Value="True">
+                                                    <Setter Property="Text" Value="{Binding HeroLoopTask.TimerText}" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="{Binding HeroStatusText}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Border>
                     </Grid>
 
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0"
+                                Background="{DynamicResource AppBackgroundBrush}"
+                                BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="12">
+                            <StackPanel>
+                                <TextBlock Text="Run conditions"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Limits used before an adventure is queued."
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSubtleBrush}"
+                                           Margin="0,3,0,12" />
+                                <TextBlock Text="Minimum hero HP"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBox Width="110"
+                                         HorizontalAlignment="Left"
+                                         Text="{Binding MinHpForAdventure, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,4,0,12"
+                                         Padding="6,4"
+                                         BorderBrush="{DynamicResource BorderSubtleBrush}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,7">
+                                    <TextBlock Text="Pick order"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               VerticalAlignment="Center" />
+                                    <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                    ToolTip="Shortest adventure first queues the nearest adventure. Top adventure first queues the first adventure shown in the Travian list." />
+                                </StackPanel>
+                                <RadioButton Content="Shortest adventure first"
+                                             GroupName="HeroAdventureOrder"
+                                             IsChecked="{Binding IsAdventurePickShortest}"
+                                             Margin="0,0,0,6" />
+                                <RadioButton Content="Top adventure first"
+                                             GroupName="HeroAdventureOrder"
+                                             IsChecked="{Binding IsAdventurePickTop}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="2"
+                                Background="{DynamicResource AppBackgroundBrush}"
+                                BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="12">
+                            <StackPanel>
+                                <TextBlock Text="Hero automation"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Keep the hero prepared between adventures."
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSubtleBrush}"
+                                           Margin="0,3,0,12" />
+                                <CheckBox Content="Auto revive"
+                                          IsChecked="{Binding AutoRevive}"
+                                          Margin="0,0,0,8" />
+                                <CheckBox Content="Auto assign attribute points"
+                                          IsChecked="{Binding AutoAssignPoints}"
+                                          Margin="0,0,0,8" />
+                                <CheckBox Content="Auto use ointments"
+                                          IsChecked="{Binding AutoUseOintments}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="4"
+                                Background="{DynamicResource AppBackgroundBrush}"
+                                BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="12">
+                            <StackPanel>
+                                <TextBlock Text="Bonus videos"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Optional boosts applied before departure."
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSubtleBrush}"
+                                           Margin="0,3,0,12" />
+                                <CheckBox Content="Increase adventures to hard"
+                                          IsChecked="{Binding IncreaseAdventuresToHard}"
+                                          Margin="0,0,0,8"
+                                          ToolTip="When on, the adventure function may watch the bonus video to raise the next adventure's danger to hard. The percentage is rolled independently for every Hard and -25% video invocation." />
+                                <CheckBox Content="Reduce adventure time 25%"
+                                          IsChecked="{Binding ReduceAdventureTime}"
+                                          ToolTip="When on, the adventure function also watches the bonus video to reduce the next adventure's duration by 25% (after the increase-danger step). Official Travian only. Skipped automatically if it is already active." />
+                                <StackPanel Orientation="Horizontal" Margin="22,10,0,0">
+                                    <TextBlock Text="Chance"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center" />
+                                    <TextBox Width="42"
+                                             Padding="5,2"
+                                             TextAlignment="Right"
+                                             Text="{Binding AdventureVideoChancePercent, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Text="%"
+                                               Margin="4,0,0,0"
+                                               VerticalAlignment="Center" />
+                                    <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                    ToolTip="Chance to run each enabled Hero Adventure bonus video. Applies independently to Hard and Reduce adventure time 25%. Default: 70%." />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                 </StackPanel>
             </Border>
 
             <!-- Attribute priority + Hero inventory side by side -->
-            <Grid Margin="2,0,2,2">
+            <Grid x:Name="AttributeInventoryGrid" Margin="2,0,2,2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition x:Name="AttributeColumn" Width="*" />
+                    <ColumnDefinition x:Name="InventoryColumn" Width="*" />
                 </Grid.ColumnDefinitions>
 
                 <!-- Attribute priority card -->
-                <Border Grid.Column="0"
+                <Border x:Name="AttributePriorityCard" Grid.Column="0"
                         Background="{DynamicResource SurfaceBrush}"
                         BorderBrush="{DynamicResource BorderSubtleBrush}"
                         BorderThickness="1"
@@ -451,7 +422,7 @@
                 </Border>
 
                 <!-- Hero inventory card (placed where Adventures used to be). -->
-                <Border Grid.Column="1"
+                <Border x:Name="HeroInventoryCard" Grid.Column="1"
                         Background="{DynamicResource SurfaceBrush}"
                         BorderBrush="{DynamicResource BorderSubtleBrush}"
                         BorderThickness="1"

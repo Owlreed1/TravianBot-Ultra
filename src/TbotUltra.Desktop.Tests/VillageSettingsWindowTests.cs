@@ -2,17 +2,18 @@ using Xunit;
 using System.Windows;
 using System.Windows.Controls;
 using TbotUltra.Desktop.Models;
+using TbotUltra.Desktop.Views;
 
 namespace TbotUltra.Desktop.Tests;
 
 // Runs on the shared WPF smoke thread: once any test creates Application.Current, constructing a
-// Window on a second STA thread deadlocks against that Application's dispatcher.
+// Panel tests run on the shared WPF smoke thread so compiled XAML and templates use one dispatcher.
 [Collection(WpfSmokeCollection.Name)]
-public sealed class VillageSettingsWindowTests
+public sealed class VillageSettingsPanelTests
 {
     private readonly WpfSmokeFixture _wpf;
 
-    public VillageSettingsWindowTests(WpfSmokeFixture wpf)
+    public VillageSettingsPanelTests(WpfSmokeFixture wpf)
     {
         _wpf = wpf;
     }
@@ -22,8 +23,8 @@ public sealed class VillageSettingsWindowTests
     {
         _wpf.Run(() =>
         {
-            var window = new VillageSettingsWindow([]);
-            window.Close();
+            var panel = new VillageSettingsPanel([]);
+            Assert.NotNull(panel);
         });
     }
 
@@ -37,10 +38,8 @@ public sealed class VillageSettingsWindowTests
                 BuildRow("First", isAutomationEnabled: true, isNpcTradeEnabled: false, isFarmingEnabled: false, canToggleFarming: true),
                 BuildRow("Second", isAutomationEnabled: true, isNpcTradeEnabled: true, isFarmingEnabled: true, canToggleFarming: false),
             };
-            var window = new VillageSettingsWindow(rows);
-            try
-            {
-                var grid = Assert.IsType<DataGrid>(window.FindName("VillageSettingsDataGrid"));
+            var panel = new VillageSettingsPanel(rows);
+            var grid = Assert.IsType<DataGrid>(panel.FindName("VillageSettingsDataGrid"));
                 var checkAllRow = Assert.IsType<VillageSettingsRow>(grid.Items[0]);
                 Assert.True(checkAllRow.IsCheckAllRow);
 
@@ -58,11 +57,6 @@ public sealed class VillageSettingsWindowTests
 
                 ClickCheckAll(npcColumn, checkAllRow);
                 Assert.All(rows, row => Assert.False(row.NpcTrade));
-            }
-            finally
-            {
-                window.Close();
-            }
         });
     }
 
@@ -99,13 +93,14 @@ public sealed class VillageSettingsWindowTests
     }
 
     [Fact]
-    public void Constructor_DoesNotBuildOverviewBeforeTheWindowIsShown()
+    public void Constructor_DoesNotBuildOverviewBeforeThePanelIsLoaded()
     {
         _wpf.Run(() =>
         {
             var calls = 0;
-            var window = new VillageSettingsWindow(
+            var panel = new VillageSettingsPanel(
                 [],
+                section: "Overview",
                 overviewProjectionProvider: _ =>
                 {
                     calls++;
@@ -114,8 +109,7 @@ public sealed class VillageSettingsWindowTests
                 overviewSourceVersionProvider: () => 1);
 
             Assert.Equal(0, calls);
-            Assert.Equal("Loading overview...", Assert.IsType<TextBlock>(window.FindName("OverviewUpdatedTextBlock")).Text);
-            window.Close();
+            Assert.Equal("Loading overview...", Assert.IsType<TextBlock>(panel.FindName("OverviewUpdatedTextBlock")).Text);
         });
     }
 

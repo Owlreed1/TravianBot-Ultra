@@ -28,9 +28,12 @@ public sealed class PanelSmokeTests
     public static TheoryData<string, Func<UserControl>> Panels() => new()
     {
         { nameof(DashboardPanel), () => new DashboardPanel() },
+        { nameof(DashboardHubPanel), () => new DashboardHubPanel() },
         { nameof(BuildingsPanel), () => new BuildingsPanel() },
         { nameof(ResourcesPanel), () => new ResourcesPanel() },
+        { nameof(ResourcesHubPanel), () => new ResourcesHubPanel() },
         { nameof(HeroPanel), () => new HeroPanel() },
+        { nameof(HeroHubPanel), () => new HeroHubPanel() },
         { nameof(TroopsPanel), () => new TroopsPanel() },
         { nameof(TroopsHubPanel), () => new TroopsHubPanel() },
         { nameof(FarmingPanel), () => new FarmingPanel() },
@@ -38,6 +41,7 @@ public sealed class PanelSmokeTests
         { nameof(LogsPanel), () => new LogsPanel() },
         { nameof(InboxPanel), () => new InboxPanel() },
         { nameof(NpcTradePanel), () => new NpcTradePanel() },
+        { nameof(NpcTradeHubPanel), () => new NpcTradeHubPanel() },
         { nameof(ReinforcementsPanel), () => new ReinforcementsPanel() },
         { nameof(BusyOverlayControl), () => new BusyOverlayControl() },
         { nameof(StoragePreflightPlanView), () => new StoragePreflightPlanView("Preflight", []) },
@@ -80,6 +84,36 @@ public sealed class PanelSmokeTests
     }
 
     [Fact]
+    public void DashboardHubPanel_ContainsRequestedTabsInOrder()
+    {
+        _wpf.Run(() =>
+        {
+            var panel = new DashboardHubPanel();
+            var tabs = Assert.IsType<TabControl>(panel.FindName("DashboardTabControl"));
+
+            Assert.Equal(
+                new[] { "Dashboard", "Village settings", "Village overview" },
+                tabs.Items.Cast<TabItem>().Select(item => item.Header?.ToString() ?? string.Empty).ToArray());
+        });
+    }
+
+    [Fact]
+    public void FarmingPanel_ContainsFarmingAndInactiveOasisScanTabsInOrder()
+    {
+        _wpf.Run(() =>
+        {
+            var panel = new FarmingPanel();
+            var tabs = Assert.IsType<TabControl>(panel.FindName("FarmingTabControl"));
+            var inactiveButton = Assert.IsType<Button>(panel.FindName("TravcoInactiveSearchButton"));
+
+            Assert.Equal(
+                new[] { "Farming", "Inactive / oasis scan" },
+                tabs.Items.Cast<TabItem>().Select(item => item.Header?.ToString() ?? string.Empty).ToArray());
+            Assert.Equal("Inactive / oasis analysis", inactiveButton.Content);
+        });
+    }
+
+    [Fact]
     public void ReinforcementsPanel_ContainsReinforcementsAndIncomingAttackTabs()
     {
         _wpf.Run(() =>
@@ -90,7 +124,7 @@ public sealed class PanelSmokeTests
             var grid = Assert.IsType<DataGrid>(panel.FindName("IncomingAttackDataGrid"));
             var infoIcon = Assert.IsType<TextBlock>(panel.FindName("IncomingAttacksInfoIcon"));
 
-            Assert.Equal(2, tabs.Items.Count);
+            Assert.Equal(3, tabs.Items.Count);
             Assert.Equal("Incoming attacks", attacks.Header);
             Assert.Equal(7, grid.Columns.Count);
             Assert.Equal(
@@ -108,7 +142,49 @@ public sealed class PanelSmokeTests
             var tabs = Assert.IsType<TabControl>(panel.FindName("TroopsTabControl"));
 
             Assert.Equal(
-                new[] { "Build Troops", "Upgrade troops", "Reinforcements", "Incoming attacks", "Brewery celebration" },
+                new[] { "Build Troops", "Upgrade troops", "Reinforcements", "Incoming attacks", "Catapult waves", "Brewery celebration" },
+                tabs.Items.Cast<TabItem>().Select(item => item.Header?.ToString() ?? string.Empty).ToArray());
+        });
+    }
+
+    [Fact]
+    public void ResourcesHubPanel_ContainsResourcesAndTradingTabsInOrder()
+    {
+        _wpf.Run(() =>
+        {
+            var panel = new ResourcesHubPanel();
+            var tabs = Assert.IsType<TabControl>(panel.FindName("ResourcesTabControl"));
+
+            Assert.Equal(
+                new[] { "Resources", "Trading" },
+                tabs.Items.Cast<TabItem>().Select(item => item.Header?.ToString() ?? string.Empty).ToArray());
+        });
+    }
+
+    [Fact]
+    public void NpcTradeHubPanel_ContainsNpcAndSilverTradingTabsInOrder()
+    {
+        _wpf.Run(() =>
+        {
+            var panel = new NpcTradeHubPanel();
+            var tabs = Assert.IsType<TabControl>(panel.FindName("NpcTradeTabControl"));
+
+            Assert.Equal(
+                new[] { "NPC", "Silver trading" },
+                tabs.Items.Cast<TabItem>().Select(item => item.Header?.ToString() ?? string.Empty).ToArray());
+        });
+    }
+
+    [Fact]
+    public void HeroHubPanel_ContainsRequestedTabsInOrder()
+    {
+        _wpf.Run(() =>
+        {
+            var panel = new HeroHubPanel();
+            var tabs = Assert.IsType<TabControl>(panel.FindName("HeroTabControl"));
+
+            Assert.Equal(
+                new[] { "Adventures", "Attributes", "Hero inventory" },
                 tabs.Items.Cast<TabItem>().Select(item => item.Header?.ToString() ?? string.Empty).ToArray());
         });
     }

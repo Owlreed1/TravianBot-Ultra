@@ -5,9 +5,46 @@ namespace TbotUltra.Desktop.Views;
 
 public partial class NpcTradePanel : UserControl
 {
+    public static readonly DependencyProperty SectionProperty = DependencyProperty.Register(
+        nameof(Section),
+        typeof(string),
+        typeof(NpcTradePanel),
+        new PropertyMetadata("All"));
+
+    public string Section
+    {
+        get => (string)GetValue(SectionProperty);
+        set => SetValue(SectionProperty, value);
+    }
+
     private MainWindow? _host;
 
-    public NpcTradePanel() => InitializeComponent();
+    public NpcTradePanel()
+    {
+        InitializeComponent();
+        Loaded += (_, _) => ApplySection();
+    }
+
+    private void ApplySection()
+    {
+        if (string.Equals(Section, "All", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        SectionSpacerColumn.Width = new GridLength(0);
+        if (string.Equals(Section, "Trading", StringComparison.OrdinalIgnoreCase))
+        {
+            NpcSection.Visibility = Visibility.Collapsed;
+            NpcColumn.Width = new GridLength(0);
+            TradingColumn.Width = new GridLength(1, GridUnitType.Star);
+            return;
+        }
+
+        TradingSection.Visibility = Visibility.Collapsed;
+        TradingColumn.Width = new GridLength(0);
+        NpcColumn.Width = new GridLength(1, GridUnitType.Star);
+    }
 
     private MainWindow? Host => _host ??= Window.GetWindow(this) as MainWindow;
 

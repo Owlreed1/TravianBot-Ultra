@@ -6,7 +6,7 @@ using TbotUltra.Desktop.Services;
 
 namespace TbotUltra.Desktop.Models;
 
-// Row for the Village settings window. Village/Pop are read-only display values. The "Auto" toggle
+// Row for the Village settings panel. Village/Pop are read-only display values. The "Auto" toggle
 // (IsEnabledForAutomation) and "NPC" toggle are wired to VillageSettingsStore. GroupToggles mirrors the
 // dashboard automation-loop cards per village (enabled-group set), so the user can turn groups on/off for
 // many villages at once. INotifyPropertyChanged so the window can persist each change immediately.

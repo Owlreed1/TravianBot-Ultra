@@ -18,6 +18,18 @@ namespace TbotUltra.Desktop.Views;
 /// </summary>
 public partial class HeroPanel : UserControl
 {
+    public static readonly DependencyProperty SectionProperty = DependencyProperty.Register(
+        nameof(Section),
+        typeof(string),
+        typeof(HeroPanel),
+        new PropertyMetadata("All"));
+
+    public string Section
+    {
+        get => (string)GetValue(SectionProperty);
+        set => SetValue(SectionProperty, value);
+    }
+
     private Point _dragStart;
     private HeroAttributePriorityItem? _dragSource;
     private MainWindow? _hostCache;
@@ -25,6 +37,40 @@ public partial class HeroPanel : UserControl
     public HeroPanel()
     {
         InitializeComponent();
+        Loaded += (_, _) => ApplySection();
+    }
+
+    private void ApplySection()
+    {
+        if (string.Equals(Section, "All", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        SectionTitle.Text = Section;
+        SectionDescription.Visibility = Visibility.Collapsed;
+        if (string.Equals(Section, "Adventures", StringComparison.OrdinalIgnoreCase))
+        {
+            SectionDescription.Visibility = Visibility.Visible;
+            SectionDescription.Text = "Configure adventure behaviour and queue adventures.";
+            AttributeInventoryGrid.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        SettingsCard.Visibility = Visibility.Collapsed;
+        if (string.Equals(Section, "Attributes", StringComparison.OrdinalIgnoreCase))
+        {
+            HeroInventoryCard.Visibility = Visibility.Collapsed;
+            InventoryColumn.Width = new GridLength(0);
+            AttributeColumn.Width = new GridLength(1, GridUnitType.Star);
+            AttributePriorityCard.Margin = new Thickness(0);
+            return;
+        }
+
+        AttributePriorityCard.Visibility = Visibility.Collapsed;
+        AttributeColumn.Width = new GridLength(0);
+        InventoryColumn.Width = new GridLength(1, GridUnitType.Star);
+        HeroInventoryCard.Margin = new Thickness(0);
     }
 
     /// <summary>

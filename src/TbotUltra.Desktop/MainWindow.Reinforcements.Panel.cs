@@ -6,6 +6,7 @@ namespace TbotUltra.Desktop;
 public partial class MainWindow
 {
     private Views.ReinforcementsPanel ReinforcementsPanelControl => TroopsHubPanelControl.ReinforcementsPanel;
+    private Views.ReinforcementsPanel CatapultWavesPanelControl => TroopsHubPanelControl.CatapultWavesPanel;
     private ComboBox ReinforcementTargetVillageComboBox => ReinforcementsPanelControl.TargetVillage;
     private Button ReinforcementMarkAllTroopsButton => ReinforcementsPanelControl.MarkAllTroopsButton;
     private ItemsControl ReinforcementSourceVillagesItemsControl => ReinforcementsPanelControl.SourceVillages;
@@ -15,8 +16,8 @@ public partial class MainWindow
     private TextBlock ReinforcementTroopsDetailTextBlock => ReinforcementsPanelControl.TroopsDetail;
     private TextBlock ReinforcementStatusTextBlock => ReinforcementsPanelControl.Status;
     private Button ReinforcementQueueNowButton => ReinforcementsPanelControl.QueueNowButton;
-    private Button StartCatapultWavesButton => ReinforcementsPanelControl.CatapultWavesButton;
-    private TextBlock CatapultWavesStatusTextBlock => ReinforcementsPanelControl.CatapultWavesStatus;
+    private Button StartCatapultWavesButton => CatapultWavesPanelControl.CatapultWavesButton;
+    private TextBlock CatapultWavesStatusTextBlock => CatapultWavesPanelControl.CatapultWavesStatus;
 
     internal void OnReinforcementSettingSelectionChanged(object sender, SelectionChangedEventArgs e) =>
         ReinforcementSetting_SelectionChanged(sender, e);
