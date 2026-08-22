@@ -199,71 +199,70 @@ public sealed class JsonQueueStore : IQueueStore
 
     public bool MoveUp(Guid id)
     {
-        lock (_sync)
-        {
-            var items = LoadMutable();
-            var group = items
-                .OrderByDescending(item => item.Priority)
-                .ThenBy(item => item.CreatedAt)
-                .Where(item => item.Group == items.FirstOrDefault(entry => entry.Id == id)?.Group)
-                .ToList();
-
-            var index = group.FindIndex(item => item.Id == id);
-            if (index <= 0)
-            {
-                return false;
-            }
-
-            var current = group[index];
-            var previous = group[index - 1];
-            if (current.Priority != previous.Priority)
-            {
-                return false;
-            }
-
-            var createdAt = current.CreatedAt;
-            current.CreatedAt = previous.CreatedAt;
-            previous.CreatedAt = createdAt;
-            current.UpdatedAt = DateTimeOffset.UtcNow;
-            previous.UpdatedAt = DateTimeOffset.UtcNow;
-            SaveMutable(items);
-            return true;
-        }
+        return Move(id, index => index - 1);
     }
 
     public bool MoveDown(Guid id)
     {
+        return Move(id, index => index + 1);
+    }
+
+    public bool MoveToTop(Guid id)
+    {
+        return Move(id, _ => 0);
+    }
+
+    public bool MoveToBottom(Guid id)
+    {
+        return Move(id, _ => int.MaxValue);
+    }
+
+    private bool Move(Guid id, Func<int, int> resolveDestinationIndex)
+    {
         lock (_sync)
         {
             var items = LoadMutable();
+            var selected = items.FirstOrDefault(item => item.Id == id && IsActiveQueueItem(item));
+            if (selected is null)
+            {
+                return false;
+            }
+
             var group = items
-                .OrderByDescending(item => item.Priority)
-                .ThenBy(item => item.CreatedAt)
-                .Where(item => item.Group == items.FirstOrDefault(entry => entry.Id == id)?.Group)
+                .Where(item => IsActiveQueueItem(item)
+                    && item.Group == selected.Group
+                    && item.Priority == selected.Priority)
+                .OrderBy(item => item.CreatedAt)
                 .ToList();
-
             var index = group.FindIndex(item => item.Id == id);
-            if (index < 0 || index >= group.Count - 1)
+            var destinationIndex = Math.Clamp(resolveDestinationIndex(index), 0, group.Count - 1);
+            if (index < 0 || destinationIndex == index)
             {
                 return false;
             }
 
-            var current = group[index];
-            var next = group[index + 1];
-            if (current.Priority != next.Priority)
+            var reordered = group.ToList();
+            var moved = reordered[index];
+            reordered.RemoveAt(index);
+            reordered.Insert(destinationIndex, moved);
+
+            var nextOrder = group.Min(item => item.CreatedAt);
+            var now = DateTimeOffset.UtcNow;
+            foreach (var item in reordered)
             {
-                return false;
+                item.CreatedAt = nextOrder;
+                item.UpdatedAt = now;
+                nextOrder = nextOrder.AddTicks(1);
             }
 
-            var createdAt = current.CreatedAt;
-            current.CreatedAt = next.CreatedAt;
-            next.CreatedAt = createdAt;
-            current.UpdatedAt = DateTimeOffset.UtcNow;
-            next.UpdatedAt = DateTimeOffset.UtcNow;
             SaveMutable(items);
             return true;
         }
     }
+
+    private static bool IsActiveQueueItem(QueueItem item) =>
+        item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused
+        || (item.Status == QueueStatus.Failed && !item.IsRuntimeOnly);
 
     public bool Pause(Guid id)
     {

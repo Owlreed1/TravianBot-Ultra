@@ -107,12 +107,16 @@ public sealed class TravianQueueViewModelTests
 
         Assert.False(vm.RemoveCommand.CanExecute(null));
         Assert.False(vm.MoveUpCommand.CanExecute(null));
+        Assert.False(vm.MoveToTopCommand.CanExecute(null));
+        Assert.False(vm.MoveToBottomCommand.CanExecute(null));
         Assert.True(vm.RefreshCommand.CanExecute(null));
 
         vm.SelectedActiveQueueRow = new QueueItemRow { DisplayName = "Upgrade" };
 
         Assert.True(vm.RemoveCommand.CanExecute(null));
         Assert.True(vm.MoveUpCommand.CanExecute(null));
+        Assert.True(vm.MoveToTopCommand.CanExecute(null));
+        Assert.True(vm.MoveToBottomCommand.CanExecute(null));
     }
 
     [Fact]
@@ -127,6 +131,8 @@ public sealed class TravianQueueViewModelTests
 
         Assert.False(vm.RemoveCommand.CanExecute(null));
         Assert.False(vm.MoveDownCommand.CanExecute(null));
+        Assert.False(vm.MoveToTopCommand.CanExecute(null));
+        Assert.False(vm.MoveToBottomCommand.CanExecute(null));
         Assert.False(vm.RefreshCommand.CanExecute(null));
         Assert.False(vm.ClearAccountCommand.CanExecute(null));
         Assert.True(vm.PopOutCommand.CanExecute(null));

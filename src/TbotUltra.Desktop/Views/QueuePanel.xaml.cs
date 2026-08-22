@@ -18,6 +18,8 @@ public partial class QueuePanel : UserControl
     internal Button RemoveButton => QueueRemoveButton;
     internal Button MoveUpButton => QueueMoveUpButton;
     internal Button MoveDownButton => QueueMoveDownButton;
+    internal Button MoveToTopButton => QueueMoveToTopButton;
+    internal Button MoveToBottomButton => QueueMoveToBottomButton;
     internal Button RefreshButton => QueueRefreshButton;
     internal DataGrid ActiveQueue => QueueDataGrid;
     internal TextBlock TotalWood => QueueTotalWoodTextBlock;

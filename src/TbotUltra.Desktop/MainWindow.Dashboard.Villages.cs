@@ -753,7 +753,7 @@ public partial class MainWindow
             CropFields = cropFields ?? existing?.CropFields,
             Tribe = TroopCatalog.IsKnownTribe(tribe) ? tribe! : existing?.Tribe ?? "Unknown",
             HasIncomingAttack = existing?.HasIncomingAttack ?? false,
-            IncomingAttackTooltip = existing?.IncomingAttackTooltip ?? "Incoming attack details are being read",
+            IncomingAttackTooltip = existing?.IncomingAttackTooltip ?? "No incoming attacks",
         };
     }
 

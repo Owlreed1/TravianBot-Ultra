@@ -25,12 +25,14 @@ public sealed class PanelServiceContractTests : IDisposable
         Assert.True(service.Remove(id));
         Assert.True(service.MoveUp(id));
         Assert.True(service.MoveDown(id));
+        Assert.True(service.MoveToTop(id));
+        Assert.True(service.MoveToBottom(id));
         Assert.True(service.Pause(id));
         Assert.True(service.Resume(id));
         Assert.True(service.Retry(id));
         var queued = service.Enqueue("send_farmlists", payload, priority: 7, maxRetries: 4);
 
-        Assert.Equal(["get", "remove", "up", "down", "pause", "resume", "retry", "enqueue"], client.Calls);
+        Assert.Equal(["get", "remove", "up", "down", "top", "bottom", "pause", "resume", "retry", "enqueue"], client.Calls);
         Assert.All(client.ItemIds, actual => Assert.Equal(id, actual));
         Assert.Same(payload, client.EnqueuedPayload);
         Assert.Equal(("send_farmlists", 7, 4), (client.EnqueuedTaskName, client.EnqueuedPriority, client.EnqueuedMaxRetries));
@@ -308,6 +310,8 @@ public sealed class PanelServiceContractTests : IDisposable
         public bool Remove(Guid id) => Record("remove", id);
         public bool MoveUp(Guid id) => Record("up", id);
         public bool MoveDown(Guid id) => Record("down", id);
+        public bool MoveToTop(Guid id) => Record("top", id);
+        public bool MoveToBottom(Guid id) => Record("bottom", id);
         public bool Pause(Guid id) => Record("pause", id);
         public bool Resume(Guid id) => Record("resume", id);
         public bool Retry(Guid id) => Record("retry", id);

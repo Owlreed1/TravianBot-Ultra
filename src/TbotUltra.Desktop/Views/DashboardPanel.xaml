@@ -443,34 +443,47 @@
                                              separate "Capital" badge. Padding is kept on non-capital rows
                                              too (transparent box) so names stay vertically aligned. -->
                                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button Width="18" Height="18" Margin="0,0,4,0" Padding="0"
+                                            <Button Width="20" Height="20" MinHeight="0" Margin="0,0,4,0" Padding="0"
                                                     Tag="{Binding}" ToolTip="{Binding IncomingAttackTooltip}"
                                                     Click="IncomingAttackButton_Click">
                                                 <Button.Style>
-                                                    <Style TargetType="Button">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                        <Setter Property="Background" Value="Transparent" />
-                                                        <Setter Property="BorderThickness" Value="0" />
+                                                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+                                                        <Setter Property="BorderThickness" Value="1" />
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding HasIncomingAttack}" Value="True">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                            </DataTrigger>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource BorderHoverBrush}" />
+                                                            </Trigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Button.Style>
-                                                <Ellipse Width="12" Height="12" Fill="{DynamicResource DangerBrush}"
-                                                         Stroke="{DynamicResource DangerTextBrush}" StrokeThickness="1">
-                                                    <Ellipse.Triggers>
-                                                        <EventTrigger RoutedEvent="FrameworkElement.Loaded">
-                                                            <BeginStoryboard>
-                                                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.35" Duration="0:0:0.65" />
-                                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="1" To="1.25" Duration="0:0:0.65" />
-                                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="1" To="1.25" Duration="0:0:0.65" />
-                                                                </Storyboard>
-                                                            </BeginStoryboard>
-                                                        </EventTrigger>
-                                                    </Ellipse.Triggers>
+                                                <Ellipse Width="12" Height="12" StrokeThickness="1">
+                                                    <Ellipse.Style>
+                                                        <Style TargetType="Ellipse">
+                                                            <Setter Property="Fill" Value="{DynamicResource BorderMutedBrush}" />
+                                                            <Setter Property="Stroke" Value="{DynamicResource BorderSubtleBrush}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HasIncomingAttack}" Value="True">
+                                                                    <Setter Property="Fill" Value="{DynamicResource DangerBrush}" />
+                                                                    <Setter Property="Stroke" Value="{DynamicResource DangerTextBrush}" />
+                                                                    <DataTrigger.EnterActions>
+                                                                        <BeginStoryboard x:Name="IncomingAttackPulse">
+                                                                            <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.35" Duration="0:0:0.65" />
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="1" To="1.25" Duration="0:0:0.65" />
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="1" To="1.25" Duration="0:0:0.65" />
+                                                                            </Storyboard>
+                                                                        </BeginStoryboard>
+                                                                    </DataTrigger.EnterActions>
+                                                                    <DataTrigger.ExitActions>
+                                                                        <RemoveStoryboard BeginStoryboardName="IncomingAttackPulse" />
+                                                                    </DataTrigger.ExitActions>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Ellipse.Style>
                                                     <Ellipse.RenderTransform>
                                                         <ScaleTransform CenterX="6" CenterY="6" />
                                                     </Ellipse.RenderTransform>

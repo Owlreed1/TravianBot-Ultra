@@ -17,5 +17,7 @@ public sealed class QueuePanelSourceTests
         Assert.Contains("DataGridTextColumn Header=\"Village\"", xaml, StringComparison.Ordinal);
         Assert.Contains("DataGridTextColumn Header=\"Task\"", xaml, StringComparison.Ordinal);
         Assert.Contains("DataGridTextColumn Header=\"Time\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"QueueMoveToTopButton\" Content=\"Move to top\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"QueueMoveToBottomButton\" Content=\"Move to bottom\"", xaml, StringComparison.Ordinal);
     }
 }

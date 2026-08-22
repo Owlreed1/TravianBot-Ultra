@@ -27,7 +27,7 @@ public sealed class VillageSelectionItem : INotifyPropertyChanged
         }
     }
 
-    private string _incomingAttackTooltip = "Incoming attack details are being read";
+    private string _incomingAttackTooltip = "No incoming attacks";
     public string IncomingAttackTooltip
     {
         get => _incomingAttackTooltip;

@@ -59,6 +59,46 @@ public sealed class QueueStoreAndSchedulerTests : IDisposable
     }
 
     [Fact]
+    public void MoveOperations_ChangeThePersistedExecutionOrder()
+    {
+        var store = new JsonQueueStore(_queuePath);
+        var scheduler = new PriorityFifoQueueScheduler();
+        var first = store.Add("status", null, priority: 0, maxRetries: 3);
+        Thread.Sleep(5);
+        var second = store.Add("scan_all_villages", null, priority: 0, maxRetries: 3);
+        Thread.Sleep(5);
+        var third = store.Add("account_snapshot", null, priority: 0, maxRetries: 3);
+
+        Assert.True(store.MoveDown(first.Id));
+        Assert.Equal(second.Id, scheduler.SelectNext(store.GetAll())!.Id);
+
+        Assert.True(store.MoveToTop(third.Id));
+        Assert.Equal(third.Id, scheduler.SelectNext(store.GetAll())!.Id);
+
+        Assert.True(store.MoveToBottom(third.Id));
+        Assert.Equal([second.Id, first.Id, third.Id],
+            scheduler.OrderForDisplay(store.GetAll()).Select(item => item.Id));
+    }
+
+    [Fact]
+    public void MoveUp_IgnoresCompletedItemsThatAreNotInTheActiveQueue()
+    {
+        var store = new JsonQueueStore(_queuePath);
+        var completed = store.Add("status", null, priority: 0, maxRetries: 3);
+        Assert.True(store.MarkRunning(completed.Id));
+        Assert.True(store.MarkSucceeded(completed.Id));
+        var firstActive = store.Add("scan_all_villages", null, priority: 0, maxRetries: 3);
+        var secondActive = store.Add("account_snapshot", null, priority: 0, maxRetries: 3);
+
+        Assert.True(store.MoveUp(secondActive.Id));
+
+        var activeOrder = new PriorityFifoQueueScheduler().OrderForDisplay(store.GetAll())
+            .Where(item => item.Status == QueueStatus.Pending)
+            .Select(item => item.Id);
+        Assert.Equal([secondActive.Id, firstActive.Id], activeOrder);
+    }
+
+    [Fact]
     public void UpdatePending_ChangesPayloadPriorityAndDueTime()
     {
         var store = new JsonQueueStore(_queuePath);

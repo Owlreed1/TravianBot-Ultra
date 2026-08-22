@@ -81,7 +81,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Interruptible writes use the atomic file helper. Retry bounded transient lock/sharing failures.
 - Quarantine and log corrupt queue/state files instead of silently overwriting them.
 - New settings require the complete pipeline: model, defaults, load/save, ViewModel, UI, and tests.
-- Demolition is a village-scoped queue group: start one Official `table#demolish` step, persist the server timer plus its random delay as `NextAttemptAt`, and never poll or sleep through it in the browser.
+- Embedded Village settings have no Save step: persist each row or group-toggle change immediately; bulk
+  "Check all" changes persist each affected row and publish one consolidated settings-changed notification.
+- Demolition is a village-scoped queue group: start one Official `table#demolish` step, persist the server timer plus its random delay as `NextAttemptAt`, and never poll or sleep through it in the browser. It has no per-village group toggle; an explicitly queued demolition is always group-enabled, while the village's master Auto toggle still controls automation.
 - Persist village identity by coordinates/key, not display name. Names may collide or change; queue items retain
   their target village identity.
 - Duplicate village names are valid. Fresh Official sidebar `data-did` plus `.coordinateX/.coordinateY` values
@@ -93,6 +95,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   lookup is valid only when exactly one cached village has that name; duplicate names never use last-write-wins.
 - Queue status transitions are gated. `MarkDeferred` accepts only RUNNING items; Pending items use
   `UpdateDeferred`/`UpdatePending`. Check the returned boolean.
+- Manual queue reordering persists through `CreatedAt` and therefore controls FIFO selection in both Auto Queue
+  and Continuous Loop. Up/down/top/bottom operate only inside the selected item's queue group and priority and
+  ignore history rows. A move that places a known construction requirement after its dependent task must require
+  an explicit `Move anyway` confirmation; the runtime construction guard remains the final safety net.
 - New villages default to Auto enabled. The version-1 migration enables existing villages once; later manual
   Auto-off choices persist.
 
@@ -508,8 +514,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
   `img.att1` marker inside `.villageInfobox.movements #movements` (movement labels and `def1`/`att2` must never
   signal an attack), while a Plus village overview uses
   `.listEntry.village.attack[data-did]`. A nullable signal list means "Dorf1 was not read" and must preserve
-  prior signals; an empty list is authoritative only for the active Dorf1 village. Rally Point details are read
-  only after exactly `button.iconFilterActive img.subFilterCategory1` is active and categories 2/3 are inactive.
+  prior signals; a completed Dorf1 read without an active-village signal is authoritative for that village and
+  immediately clears both pending and confirmed attack rows for it, even if Plus signals another village. Rally
+  Point details open `gid=16&tt=1&filter=1&subfilters=1`, wait for the
+  filter controls, and are read only after exactly `button.iconFilterActive img.subFilterCategory1` is active and
+  categories 2/3 are inactive. A late Rally Point result must not restore state cleared by a newer Dorf1 read.
   Filter/read failures never clear known attacks. Exact movements persist per account+world, use the Travian
   movement id when available, and expire at their server-derived absolute arrival before a safe recheck.
 - Construction timers shown in the village overview are Travian's raw slot finishes. Scheduling, loop wake-up,

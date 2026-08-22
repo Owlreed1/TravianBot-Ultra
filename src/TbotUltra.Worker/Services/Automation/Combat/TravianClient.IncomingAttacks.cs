@@ -24,7 +24,8 @@ public sealed partial class TravianClient
         var coords = await TryReadActiveVillageCoordsFromCurrentPageAsync(cancellationToken);
         var resolvedKey = coords.X.HasValue && coords.Y.HasValue ? $"xy:{coords.X.Value}|{coords.Y.Value}" : villageKey;
 
-        await GotoAsync("/build.php?gid=16&tt=1", cancellationToken);
+        Notify("[incoming-attacks] opening Rally Point incoming-only overview.");
+        await GotoAsync("/build.php?gid=16&tt=1&filter=1&subfilters=1", cancellationToken);
         await EnsureIncomingAttackFilterAsync(cancellationToken);
         var html = await _page.ContentAsync();
         if (!IncomingAttackDomParser.HasOnlyIncomingFilterActive(html))
@@ -77,6 +78,22 @@ public sealed partial class TravianClient
 
     private async Task EnsureIncomingAttackFilterAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        var incoming = _page.Locator("button.iconFilter:has(img.subFilterCategory1)").First;
+        try
+        {
+            await incoming.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 5000,
+            });
+        }
+        catch (PlaywrightException)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new InvalidOperationException("Rally Point incoming filter control was not found after waiting for the overview to render.");
+        }
+
         for (var attempt = 0; attempt < 4; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -93,12 +110,6 @@ public sealed partial class TravianClient
                 await ClickLocatorAsync(activeNonIncoming, "incoming-attacks-disable-extra-filter", cancellationToken);
                 await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
                 continue;
-            }
-
-            var incoming = _page.Locator("button.iconFilter:has(img.subFilterCategory1)").First;
-            if (await incoming.CountAsync() == 0)
-            {
-                throw new InvalidOperationException("Rally Point incoming filter control was not found.");
             }
 
             await DelayBeforeClickAsync(cancellationToken, "incoming attacks: enable incoming filter");

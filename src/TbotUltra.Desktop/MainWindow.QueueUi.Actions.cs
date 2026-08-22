@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Models;
+using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Desktop;
@@ -121,84 +122,86 @@ public partial class MainWindow
 
     private void MoveSelectedQueueItemUp()
     {
-        if (_travianQueueViewModel.SelectedActiveQueueRow is not { } selected)
-        {
-            AppendLog("Select a queue item first.");
-            return;
-        }
-
-        if (WouldMoveBuildingUpgradeBeforeConstruct(selected.Id))
-        {
-            AppendLog("Building upgrades must stay after their construction item.");
-            return;
-        }
-
-        if (_queuePanelService.MoveUp(selected.Id))
-        {
-            RefreshQueueUi(selectId: selected.Id);
-            return;
-        }
-
-        AppendLog("Move up is only available within the same priority group.");
+        MoveSelectedQueueItem(QueueMoveTarget.Up);
     }
 
     private void MoveSelectedQueueItemDown()
     {
+        MoveSelectedQueueItem(QueueMoveTarget.Down);
+    }
+
+    private void MoveSelectedQueueItemToTop()
+    {
+        MoveSelectedQueueItem(QueueMoveTarget.Top);
+    }
+
+    private void MoveSelectedQueueItemToBottom()
+    {
+        MoveSelectedQueueItem(QueueMoveTarget.Bottom);
+    }
+
+    private void MoveSelectedQueueItem(QueueMoveTarget target)
+    {
         if (_travianQueueViewModel.SelectedActiveQueueRow is not { } selected)
         {
             AppendLog("Select a queue item first.");
             return;
         }
 
-        if (WouldMoveBuildingConstructAfterUpgrade(selected.Id))
+        var preview = QueueMoveSafety.Preview(_queuePanelService.GetItems(), selected.Id, target);
+        if (!preview.CanMove)
         {
-            AppendLog("Building construction must stay before its queued upgrades.");
+            AppendLog("The queue item cannot move farther within its group and priority.");
             return;
         }
 
-        if (_queuePanelService.MoveDown(selected.Id))
+        if (preview.Warnings.Count > 0 && !ConfirmUnsafeQueueMove(preview.Warnings))
         {
-            RefreshQueueUi(selectId: selected.Id);
             return;
         }
 
-        AppendLog("Move down is only available within the same priority group.");
-    }
-
-    private bool WouldMoveBuildingUpgradeBeforeConstruct(Guid selectedId)
-    {
-        var ordered = _queuePanelService.GetItems().ToList();
-        var index = ordered.FindIndex(item => item.Id == selectedId);
-        if (index <= 0)
+        var moved = target switch
         {
-            return false;
+            QueueMoveTarget.Up => _queuePanelService.MoveUp(selected.Id),
+            QueueMoveTarget.Down => _queuePanelService.MoveDown(selected.Id),
+            QueueMoveTarget.Top => _queuePanelService.MoveToTop(selected.Id),
+            QueueMoveTarget.Bottom => _queuePanelService.MoveToBottom(selected.Id),
+            _ => false,
+        };
+        if (!moved)
+        {
+            AppendLog("The queue item could not be moved.");
+            return;
         }
 
-        var current = ordered[index];
-        var previous = ordered[index - 1];
-        return current.Group == previous.Group
-            && current.Priority == previous.Priority
-            && IsBuildingUpgradeForSlot(current, out var upgradeSlotId)
-            && IsBuildingConstructForSlot(previous, out var constructSlotId)
-            && upgradeSlotId == constructSlotId;
+        AppendLog($"Queue item moved {target.ToString().ToLowerInvariant()} within its group and priority.");
+        RefreshQueueUi(selectId: selected.Id);
     }
 
-    private bool WouldMoveBuildingConstructAfterUpgrade(Guid selectedId)
+    private bool ConfirmUnsafeQueueMove(IReadOnlyList<string> warnings)
     {
-        var ordered = _queuePanelService.GetItems().ToList();
-        var index = ordered.FindIndex(item => item.Id == selectedId);
-        if (index < 0 || index >= ordered.Count - 1)
+        const int maxListed = 6;
+        var details = string.Join("\n", warnings.Take(maxListed).Select(warning => $"  • {warning}"));
+        if (warnings.Count > maxListed)
         {
-            return false;
+            details += $"\n  • … and {warnings.Count - maxListed} more";
         }
 
-        var current = ordered[index];
-        var next = ordered[index + 1];
-        return current.Group == next.Group
-            && current.Priority == next.Priority
-            && IsBuildingConstructForSlot(current, out var constructSlotId)
-            && IsBuildingUpgradeForSlot(next, out var upgradeSlotId)
-            && constructSlotId == upgradeSlotId;
+        var choice = AppDialog.ShowCustom(
+            this,
+            "This move places required construction after a task that depends on it. The dependent task may wait or fail until the requirement is completed:\n\n"
+            + details
+            + "\n\nMove anyway?",
+            "Queue requirement warning",
+            new (string, MessageBoxResult)[]
+            {
+                ("Move anyway", MessageBoxResult.Yes),
+                ("Cancel", MessageBoxResult.Cancel),
+            },
+            MessageBoxImage.Warning,
+            MessageBoxResult.Cancel,
+            MessageBoxResult.Cancel);
+        return choice == MessageBoxResult.Yes;
     }
 
     private void ClearQueueOrHistory()

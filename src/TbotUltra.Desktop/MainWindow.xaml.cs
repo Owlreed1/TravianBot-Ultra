@@ -490,6 +490,8 @@ public partial class MainWindow : Window
         _travianQueueViewModel.RestoreRequested += RestoreRemovedQueueItems;
         _travianQueueViewModel.MoveUpRequested += MoveSelectedQueueItemUp;
         _travianQueueViewModel.MoveDownRequested += MoveSelectedQueueItemDown;
+        _travianQueueViewModel.MoveToTopRequested += MoveSelectedQueueItemToTop;
+        _travianQueueViewModel.MoveToBottomRequested += MoveSelectedQueueItemToBottom;
         _travianQueueViewModel.RefreshRequested += () => RefreshQueueUi();
         _travianQueueViewModel.ClearVillageRequested += ClearVillageQueue;
         _travianQueueViewModel.ClearAccountRequested += ClearQueueOrHistory;

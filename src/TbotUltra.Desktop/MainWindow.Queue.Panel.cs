@@ -11,6 +11,8 @@ public partial class MainWindow
     private Button QueueRemoveButton => QueuePanelControl.RemoveButton;
     private Button QueueMoveUpButton => QueuePanelControl.MoveUpButton;
     private Button QueueMoveDownButton => QueuePanelControl.MoveDownButton;
+    private Button QueueMoveToTopButton => QueuePanelControl.MoveToTopButton;
+    private Button QueueMoveToBottomButton => QueuePanelControl.MoveToBottomButton;
     private Button QueueRefreshButton => QueuePanelControl.RefreshButton;
     private DataGrid QueueDataGrid => QueuePanelControl.ActiveQueue;
     private TextBlock QueueTotalWoodTextBlock => QueuePanelControl.TotalWood;

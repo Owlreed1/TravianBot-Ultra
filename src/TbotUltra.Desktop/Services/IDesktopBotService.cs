@@ -17,6 +17,8 @@ public interface IDesktopBotService
     bool RemoveQueueItem(Guid id);
     bool MoveQueueItemUp(Guid id);
     bool MoveQueueItemDown(Guid id);
+    bool MoveQueueItemToTop(Guid id);
+    bool MoveQueueItemToBottom(Guid id);
     bool PauseQueueItem(Guid id);
     bool ResumeQueueItem(Guid id);
     bool RetryQueueItem(Guid id);

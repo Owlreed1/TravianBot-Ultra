@@ -20,6 +20,8 @@ public sealed class TravianQueueViewModel : BaseViewModel
     private readonly RelayCommand _removeCommand;
     private readonly RelayCommand _moveUpCommand;
     private readonly RelayCommand _moveDownCommand;
+    private readonly RelayCommand _moveToTopCommand;
+    private readonly RelayCommand _moveToBottomCommand;
     private readonly RelayCommand _refreshCommand;
     private readonly RelayCommand _clearVillageCommand;
     private readonly RelayCommand _clearAccountCommand;
@@ -31,6 +33,8 @@ public sealed class TravianQueueViewModel : BaseViewModel
         _removeCommand = new RelayCommand(() => RemoveRequested?.Invoke(), () => _canUsePrimaryCommands && SelectedActiveQueueRow is not null);
         _moveUpCommand = new RelayCommand(() => MoveUpRequested?.Invoke(), () => _canUsePrimaryCommands && SelectedActiveQueueRow is not null);
         _moveDownCommand = new RelayCommand(() => MoveDownRequested?.Invoke(), () => _canUsePrimaryCommands && SelectedActiveQueueRow is not null);
+        _moveToTopCommand = new RelayCommand(() => MoveToTopRequested?.Invoke(), () => _canUsePrimaryCommands && SelectedActiveQueueRow is not null);
+        _moveToBottomCommand = new RelayCommand(() => MoveToBottomRequested?.Invoke(), () => _canUsePrimaryCommands && SelectedActiveQueueRow is not null);
         RestoreCommand = new RelayCommand(() => RestoreRequested?.Invoke());
         _refreshCommand = new RelayCommand(() => RefreshRequested?.Invoke(), () => _canUsePrimaryCommands);
         _clearVillageCommand = new RelayCommand(() => ClearVillageRequested?.Invoke());
@@ -42,6 +46,8 @@ public sealed class TravianQueueViewModel : BaseViewModel
     public event Action? RestoreRequested;
     public event Action? MoveUpRequested;
     public event Action? MoveDownRequested;
+    public event Action? MoveToTopRequested;
+    public event Action? MoveToBottomRequested;
     public event Action? RefreshRequested;
     public event Action? ClearVillageRequested;
     public event Action? ClearAccountRequested;
@@ -51,6 +57,8 @@ public sealed class TravianQueueViewModel : BaseViewModel
     public ICommand RestoreCommand { get; }
     public ICommand MoveUpCommand => _moveUpCommand;
     public ICommand MoveDownCommand => _moveDownCommand;
+    public ICommand MoveToTopCommand => _moveToTopCommand;
+    public ICommand MoveToBottomCommand => _moveToBottomCommand;
     public ICommand RefreshCommand => _refreshCommand;
     public ICommand ClearVillageCommand => _clearVillageCommand;
     public ICommand ClearAccountCommand => _clearAccountCommand;
@@ -67,6 +75,8 @@ public sealed class TravianQueueViewModel : BaseViewModel
         _removeCommand.RaiseCanExecuteChanged();
         _moveUpCommand.RaiseCanExecuteChanged();
         _moveDownCommand.RaiseCanExecuteChanged();
+        _moveToTopCommand.RaiseCanExecuteChanged();
+        _moveToBottomCommand.RaiseCanExecuteChanged();
         _refreshCommand.RaiseCanExecuteChanged();
         _clearAccountCommand.RaiseCanExecuteChanged();
     }
@@ -84,6 +94,8 @@ public sealed class TravianQueueViewModel : BaseViewModel
             _removeCommand.RaiseCanExecuteChanged();
             _moveUpCommand.RaiseCanExecuteChanged();
             _moveDownCommand.RaiseCanExecuteChanged();
+            _moveToTopCommand.RaiseCanExecuteChanged();
+            _moveToBottomCommand.RaiseCanExecuteChanged();
         }
     }
     /// <summary>

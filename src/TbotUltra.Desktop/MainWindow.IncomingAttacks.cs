@@ -15,6 +15,7 @@ public partial class MainWindow
     private readonly Dictionary<string, IncomingAttackSignal> _incomingAttackPendingSignals = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTimeOffset> _incomingAttackLastReadUtc = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _incomingAttackReadsInFlight = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, long> _incomingAttackDorf1ClearVersions = new(StringComparer.OrdinalIgnoreCase);
 
     private bool IsIncomingAttackMonitoringActive() => IsContinuousLoopRunning() || _autoQueueRunning;
 
@@ -31,19 +32,7 @@ public partial class MainWindow
             return;
         }
 
-        if (status.IncomingAttackSignals.Count == 0)
-        {
-            var activeKey = VillageStatusCache.TryResolveCoordinateKey(status.ActiveVillage, status);
-            if (activeKey is not null
-                && (!_incomingAttacksByVillage.TryGetValue(activeKey, out var knownAttacks) || knownAttacks.Count == 0))
-            {
-                _incomingAttackPendingSignals.Remove(activeKey);
-                RefreshIncomingAttackUi();
-                SaveIncomingAttackState();
-            }
-            return;
-        }
-
+        var resolvedSignals = new List<(string Key, IncomingAttackSignal Signal)>();
         foreach (var signal in status.IncomingAttackSignals)
         {
             var resolved = ResolveIncomingAttackSignal(signal, status);
@@ -53,7 +42,18 @@ public partial class MainWindow
                 continue;
             }
 
-            var (villageKey, normalizedSignal) = resolved.Value;
+            resolvedSignals.Add(resolved.Value);
+        }
+
+        var activeKey = VillageStatusCache.TryResolveCoordinateKey(status.ActiveVillage, status);
+        if (activeKey is not null
+            && resolvedSignals.All(signal => !string.Equals(signal.Key, activeKey, StringComparison.OrdinalIgnoreCase)))
+        {
+            ClearIncomingAttacksAfterAuthoritativeDorf1Read(activeKey, status.ActiveVillage);
+        }
+
+        foreach (var (villageKey, normalizedSignal) in resolvedSignals)
+        {
             _incomingAttackPendingSignals[villageKey] = normalizedSignal;
             var shouldRead = !_incomingAttackLastReadUtc.TryGetValue(villageKey, out var lastRead)
                              || DateTimeOffset.UtcNow - lastRead >= IncomingAttackRefreshCooldown;
@@ -65,6 +65,19 @@ public partial class MainWindow
 
         RefreshIncomingAttackUi();
         SaveIncomingAttackState();
+    }
+
+    private void ClearIncomingAttacksAfterAuthoritativeDorf1Read(string villageKey, string villageName)
+    {
+        _incomingAttackDorf1ClearVersions[villageKey] =
+            _incomingAttackDorf1ClearVersions.GetValueOrDefault(villageKey) + 1;
+        var pendingRemoved = _incomingAttackPendingSignals.Remove(villageKey);
+        var attacksRemoved = _incomingAttacksByVillage.Remove(villageKey);
+        _incomingAttackLastReadUtc.Remove(villageKey);
+        if (pendingRemoved || attacksRemoved)
+        {
+            AppendLog($"[incoming-attacks] clear Dorf1 read removed the warning for '{villageName}'.");
+        }
     }
 
     private (string Key, IncomingAttackSignal Signal)? ResolveIncomingAttackSignal(
@@ -121,13 +134,15 @@ public partial class MainWindow
 
         _incomingAttackLastReadUtc[villageKey] = DateTimeOffset.UtcNow;
         var browserGeneration = _botService.BrowserGeneration;
-        _ = ReadIncomingAttackDetailsAsync(villageKey, signal, browserGeneration);
+        var dorf1ClearVersion = _incomingAttackDorf1ClearVersions.GetValueOrDefault(villageKey);
+        _ = ReadIncomingAttackDetailsAsync(villageKey, signal, browserGeneration, dorf1ClearVersion);
     }
 
     private async Task ReadIncomingAttackDetailsAsync(
         string villageKey,
         IncomingAttackSignal signal,
-        long browserGeneration)
+        long browserGeneration,
+        long dorf1ClearVersion)
     {
         try
         {
@@ -143,6 +158,11 @@ public partial class MainWindow
                 if (browserGeneration != _botService.BrowserGeneration)
                 {
                     AppendLog("[incoming-attacks] discarded result from an old browser generation.");
+                    return;
+                }
+                if (_incomingAttackDorf1ClearVersions.GetValueOrDefault(villageKey) != dorf1ClearVersion)
+                {
+                    AppendLog($"[incoming-attacks] discarded stale Rally Point result for '{signal.VillageName}' after a clear Dorf1 read.");
                     return;
                 }
 
@@ -311,6 +331,7 @@ public partial class MainWindow
             village.HasIncomingAttack = activeKeys.Contains(key);
             if (!village.HasIncomingAttack)
             {
+                village.IncomingAttackTooltip = "No incoming attacks";
                 continue;
             }
 
@@ -393,6 +414,7 @@ public partial class MainWindow
         _incomingAttackPendingSignals.Clear();
         _incomingAttackLastReadUtc.Clear();
         _incomingAttackReadsInFlight.Clear();
+        _incomingAttackDorf1ClearVersions.Clear();
         _incomingAttackRows.Clear();
     }
 }
