@@ -12,6 +12,41 @@ namespace TbotUltra.Worker.Services;
 
 public sealed partial class BotTaskRunner
 {
+    public async Task<TroopEvasionResult> SendTroopEvasionAsync(
+        BotOptions options,
+        TroopEvasionRequest request,
+        Action<string> log,
+        IProgress<TroopEvasionProgress>? progress = null,
+        string? accountName = null,
+        CancellationToken cancellationToken = default)
+    {
+        using var priorityRequest = _priorityBrowserWork.EnterPriorityRequest();
+        TroopEvasionResult? result = null;
+        await ExecuteWithClientAsync(options, log, accountName, interactive: false, cancellationToken, async client =>
+        {
+            await client.EnsureAccountAccessAllowedAsync(cancellationToken);
+            result = await new CombatOperation(client).SendTroopEvasionAsync(request, progress, cancellationToken);
+        });
+        return result ?? new TroopEvasionResult(TroopEvasionOutcome.Failed, "Troop evasion did not return a result.");
+    }
+
+    public async Task<TroopEvasionValidationResult> ValidateTroopEvasionAsync(
+        BotOptions options,
+        TroopEvasionRequest request,
+        Action<string> log,
+        string? accountName = null,
+        CancellationToken cancellationToken = default)
+    {
+        using var priorityRequest = _priorityBrowserWork.EnterPriorityRequest();
+        TroopEvasionValidationResult? result = null;
+        await ExecuteWithClientAsync(options, log, accountName, interactive: true, cancellationToken, async client =>
+        {
+            await client.EnsureAccountAccessAllowedAsync(cancellationToken);
+            result = await new CombatOperation(client).ValidateTroopEvasionAsync(request, cancellationToken);
+        });
+        return result ?? new TroopEvasionValidationResult(false, "Troop evasion validation did not return a result.");
+    }
+
     public async Task<IReadOnlyDictionary<string, long>> ReadAvailableTroopsForCatapultWavesAsync(
         BotOptions options,
         Action<string> log,

@@ -344,6 +344,21 @@ public Task ExecuteLoginAsync(BotOptions options, Action<string> log, bool keepB
             cancellationToken);
     }
 
+    public Task<TroopEvasionResult> SendTroopEvasionAsync(
+        BotOptions options,
+        TroopEvasionRequest request,
+        Action<string> log,
+        IProgress<TroopEvasionProgress>? progress,
+        CancellationToken cancellationToken)
+        => _taskRunner.SendTroopEvasionAsync(options, request, log, progress, accountName: null, cancellationToken);
+
+    public Task<TroopEvasionValidationResult> ValidateTroopEvasionAsync(
+        BotOptions options,
+        TroopEvasionRequest request,
+        Action<string> log,
+        CancellationToken cancellationToken)
+        => _taskRunner.ValidateTroopEvasionAsync(options, request, log, accountName: null, cancellationToken);
+
     public Task<IncomingAttackSnapshot> ReadIncomingAttacksAsync(
         BotOptions options,
         Action<string> log,

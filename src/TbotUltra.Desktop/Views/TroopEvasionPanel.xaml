@@ -1,0 +1,66 @@
+<UserControl x:Class="TbotUltra.Desktop.Views.TroopEvasionPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid Background="{DynamicResource AppBackgroundBrush}" Margin="4">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+    <StackPanel>
+      <TextBlock Text="Troop evasion" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+      <TextBlock Text="Sends selected troops shortly before a confirmed incoming red attack." Foreground="{DynamicResource TextMutedBrush}" />
+    </StackPanel>
+    <Border Grid.Row="1" Margin="0,12,0,10" Padding="12" CornerRadius="7" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+      <StackPanel Orientation="Horizontal">
+        <TextBlock Text="Lead time" VerticalAlignment="Center" Margin="0,0,6,0" />
+        <ComboBox x:Name="LeadTimeComboBox" Width="80" SelectionChanged="GlobalSetting_Changed" />
+        <TextBlock Text="min" VerticalAlignment="Center" Margin="5,0,20,0" />
+        <TextBlock Text="Protection window" VerticalAlignment="Center" Margin="0,0,6,0" />
+        <ComboBox x:Name="ProtectionWindowComboBox" Width="80" SelectionChanged="GlobalSetting_Changed" />
+        <TextBlock Text="min" VerticalAlignment="Center" Margin="5,0,20,0" />
+        <TextBlock x:Name="PausedTextBlock" VerticalAlignment="Center" Foreground="{DynamicResource WarningBrush}" />
+      </StackPanel>
+    </Border>
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+      <ItemsControl x:Name="VillageItemsControl">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Expander Margin="0,0,0,8" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="10">
+              <Expander.Header>
+                <Grid Width="820">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="28"/><ColumnDefinition Width="150"/><ColumnDefinition Width="120"/><ColumnDefinition Width="110"/><ColumnDefinition Width="140"/><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <CheckBox IsChecked="{Binding Enabled}" Tag="{Binding}" Checked="VillageSetting_Changed" Unchecked="VillageSetting_Changed" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="{Binding VillageName}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Text="{Binding Destination}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="3" Text="{Binding MovementType}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="4" Text="{Binding TroopSummary}" VerticalAlignment="Center" />
+                  <Button Grid.Column="5" Content="Validate" Tag="{Binding}" Click="Validate_Click" Margin="4,0" />
+                  <TextBlock Grid.Column="6" Text="{Binding RuntimeStatus}" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
+                </Grid>
+              </Expander.Header>
+              <StackPanel Margin="28,12,0,4">
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Target X" VerticalAlignment="Center" />
+                  <TextBox Width="70" Margin="6,0,12,0" Text="{Binding TargetX, UpdateSourceTrigger=PropertyChanged}" Tag="{Binding}" TextChanged="VillageSetting_Changed" />
+                  <TextBlock Text="Y" VerticalAlignment="Center" />
+                  <TextBox Width="70" Margin="6,0,16,0" Text="{Binding TargetY, UpdateSourceTrigger=PropertyChanged}" Tag="{Binding}" TextChanged="VillageSetting_Changed" />
+                  <TextBlock Text="Movement" VerticalAlignment="Center" />
+                  <ComboBox Width="130" Margin="6,0,0,0" ItemsSource="{Binding MovementTypes}" SelectedItem="{Binding MovementType}" Tag="{Binding}" SelectionChanged="VillageSetting_Changed" />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding Units}" Margin="0,10,0,0">
+                  <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate><DataTemplate><CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected}" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Expander}}" Checked="VillageSetting_Changed" Unchecked="VillageSetting_Changed" Margin="0,0,16,6" /></DataTemplate></ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <CheckBox Content="Hero" IsChecked="{Binding IncludeHero}" Tag="{Binding}" Checked="VillageSetting_Changed" Unchecked="VillageSetting_Changed" />
+                <TextBlock Text="{Binding HeroRiskWarning}" Foreground="{DynamicResource WarningBrush}" Margin="0,6,0,0" />
+              </StackPanel>
+            </Expander>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

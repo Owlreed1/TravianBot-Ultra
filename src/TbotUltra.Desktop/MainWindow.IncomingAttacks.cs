@@ -69,6 +69,7 @@ public partial class MainWindow
 
     private void ClearIncomingAttacksAfterAuthoritativeDorf1Read(string villageKey, string villageName)
     {
+        CancelTroopEvasionForClearedVillage(villageKey);
         _incomingAttackDorf1ClearVersions[villageKey] =
             _incomingAttackDorf1ClearVersions.GetValueOrDefault(villageKey) + 1;
         var pendingRemoved = _incomingAttackPendingSignals.Remove(villageKey);
@@ -167,10 +168,27 @@ public partial class MainWindow
                 }
 
                 var resolvedKey = snapshot.TargetVillageKey ?? villageKey;
+                if (!snapshot.RallyPointReadSucceeded)
+                {
+                    _incomingAttackPendingSignals[resolvedKey] = signal with
+                    {
+                        Dorf1ArrivalTimesUtc = snapshot.Dorf1FallbackArrivalTimesUtc,
+                        ObservedAtUtc = snapshot.ObservedAtUtc,
+                    };
+                    _incomingAttackLastReadUtc[resolvedKey] = DateTimeOffset.UtcNow;
+                    RefreshIncomingAttackUi();
+                    SaveIncomingAttackState();
+                    return;
+                }
+
                 _incomingAttacksByVillage[resolvedKey] = snapshot.Attacks
                     .Where(attack => attack.ArrivalAtUtc > DateTimeOffset.UtcNow)
                     .OrderBy(attack => attack.ArrivalAtUtc)
                     .ToList();
+                if (_incomingAttacksByVillage[resolvedKey].Count == 0)
+                {
+                    CancelTroopEvasionForClearedVillage(resolvedKey);
+                }
                 _incomingAttackPendingSignals.Remove(villageKey);
                 if (!string.Equals(resolvedKey, villageKey, StringComparison.OrdinalIgnoreCase))
                 {
@@ -296,6 +314,7 @@ public partial class MainWindow
         }
 
         RefreshIncomingAttackVillageIndicators();
+        SyncTroopEvasionVillages();
     }
 
     private IncomingAttackRowItem CreateIncomingAttackRow(string villageKey, IncomingAttack attack)
@@ -397,6 +416,7 @@ public partial class MainWindow
             _incomingAttackPendingSignals[key] = signal;
         }
         RefreshIncomingAttackUi();
+        LoadTroopEvasionForActiveAccount();
     }
 
     private void SaveIncomingAttackState()
@@ -416,5 +436,6 @@ public partial class MainWindow
         _incomingAttackReadsInFlight.Clear();
         _incomingAttackDorf1ClearVersions.Clear();
         _incomingAttackRows.Clear();
+        ClearTroopEvasionUiState();
     }
 }

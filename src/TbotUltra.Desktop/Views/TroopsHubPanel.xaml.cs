@@ -9,6 +9,7 @@ public partial class TroopsHubPanel : UserControl
     internal ReinforcementsPanel ReinforcementsPanel => ReinforcementsContent;
     internal ReinforcementsPanel CatapultWavesPanel => CatapultWavesContent;
     internal DataGrid IncomingAttacksGrid => IncomingAttacksContent.IncomingAttacksGrid;
+    internal TroopEvasionPanel EvasionPanel => EvasionContent;
 
     internal void SelectIncomingAttacks()
     {

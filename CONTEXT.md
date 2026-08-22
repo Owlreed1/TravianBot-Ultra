@@ -120,6 +120,10 @@ _Avoid_: Village scan loop, village refresh
 One hostile attack or raid movement travelling toward an owned village. A Dorf1 marker is an immediate signal; the movement becomes authoritative only after the Rally Point incoming filter provides its exact arrival.
 _Avoid_: Village under attack, attack history
 
+**Troop Evasion**:
+Deadline-driven protective dispatch of selected at-home troops from a configured village after the existing Incoming Attack monitor confirms a hostile red movement. It is neither a normal queue item nor a second attack detector.
+_Avoid_: Dodge queue, attack scanner
+
 **Automation Pass**:
 One between-actions iteration shared by Continuous Loop and Auto Queue. It may execute at most one eligible queued action before the next selection.
 _Avoid_: Loop tick, Auto Queue iteration

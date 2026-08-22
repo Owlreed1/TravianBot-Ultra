@@ -321,7 +321,8 @@ public sealed record IncomingAttackSignal(
     int? VillageId = null,
     int? CoordX = null,
     int? CoordY = null,
-    DateTimeOffset? ObservedAtUtc = null);
+    DateTimeOffset? ObservedAtUtc = null,
+    IReadOnlyList<DateTimeOffset>? Dorf1ArrivalTimesUtc = null);
 
 public sealed record IncomingAttack(
     string Id,
@@ -343,7 +344,9 @@ public sealed record IncomingAttackSnapshot(
     int? TargetCoordX,
     int? TargetCoordY,
     DateTimeOffset ObservedAtUtc,
-    IReadOnlyList<IncomingAttack> Attacks);
+    IReadOnlyList<IncomingAttack> Attacks,
+    bool RallyPointReadSucceeded = true,
+    IReadOnlyList<DateTimeOffset>? Dorf1FallbackArrivalTimesUtc = null);
 
 public sealed record InboxStatus(
     int UnreadMessages = 0,

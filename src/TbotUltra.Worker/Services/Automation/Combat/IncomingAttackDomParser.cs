@@ -42,13 +42,15 @@ internal static class IncomingAttackDomParser
                 @"<img\b[^>]*\bclass\s*=\s*[\""'][^\""']*\batt1\b[^\""']*[\""']",
                 RegexOptions.IgnoreCase))
         {
+            var arrivals = ParseDorf1RedArrivalTimes(movementTable.Groups["body"].Value, observedAtUtc);
             signals.Add(new IncomingAttackSignal(
                 activeVillageName,
                 activeVillageUrl,
                 TravianUrls.TryParseNewdid(activeVillageUrl),
                 activeCoordX,
                 activeCoordY,
-                observedAtUtc));
+                observedAtUtc,
+                arrivals));
         }
 
         foreach (Match row in VillageRowRegex.Matches(html))
@@ -80,6 +82,23 @@ internal static class IncomingAttackDomParser
                 StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
             .ToList();
+    }
+
+    internal static IReadOnlyList<DateTimeOffset> ParseDorf1RedArrivalTimes(string? html, DateTimeOffset observedAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return [];
+        var arrivals = new List<DateTimeOffset>();
+        foreach (Match row in Regex.Matches(html, @"<tr\b[^>]*>(?<body>.*?)</tr>", RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        {
+            var body = row.Groups["body"].Value;
+            if (!Regex.IsMatch(body, @"<img\b[^>]*\bclass\s*=\s*[\""'](?=[^\""']*\batt1\b)[^\""']*[\""']", RegexOptions.IgnoreCase))
+            {
+                continue;
+            }
+            var seconds = ParseRemainingSeconds(body);
+            if (seconds.HasValue) arrivals.Add(observedAtUtc.AddSeconds(Math.Max(0, seconds.Value)));
+        }
+        return arrivals.Order().ToList();
     }
 
     internal static IReadOnlyList<IncomingAttack> ParseIncomingAttacks(

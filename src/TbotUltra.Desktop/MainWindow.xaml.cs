@@ -97,6 +97,7 @@ public partial class MainWindow : Window
     private readonly AllVillagesImportSettingsStore _allVillagesImportSettingsStore;
     private readonly VillageCacheStore _villageCacheStore;
     private readonly IncomingAttackStore _incomingAttackStore;
+    private readonly TroopEvasionStore _troopEvasionStore;
     private readonly LatestSnapshotWriter<VillageCacheWrite> _villageCacheWriter;
     private sealed record VillageCacheWrite(string AccountName, IReadOnlyDictionary<string, VillageStatus> Snapshot);
     private readonly IAccountProvider _accountProvider;
@@ -441,7 +442,10 @@ public partial class MainWindow : Window
             AppendLog);
         _villageCacheStore = new VillageCacheStore(_projectRoot, () => _accountStore.ActiveAccountName(), AppendLog);
         _incomingAttackStore = new IncomingAttackStore(_projectRoot, AppendLog);
+        _troopEvasionStore = new TroopEvasionStore(_projectRoot, AppendLog);
         TroopsHubPanelControl.IncomingAttacksGrid.ItemsSource = _incomingAttackRows;
+        TroopsHubPanelControl.EvasionPanel.SettingsChanged += TroopEvasionSettingsChanged;
+        TroopsHubPanelControl.EvasionPanel.ValidateRequested += TroopEvasionValidateRequested;
         _villageCacheWriter = new LatestSnapshotWriter<VillageCacheWrite>(write =>
         {
             _villageCacheStore.Save(write.AccountName, write.Snapshot);
@@ -529,6 +533,7 @@ public partial class MainWindow : Window
                 TickFarmListCountdowns();
                 TickAutomationLoopCountdowns();
                 TickIncomingAttacks(serverNow);
+                TickTroopEvasion(serverNow);
 
                 TickBuildQueueCountdown();
                 RefreshDemolishStatusForSelectedVillage();

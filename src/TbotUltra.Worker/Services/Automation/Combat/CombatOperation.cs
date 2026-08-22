@@ -30,4 +30,15 @@ internal sealed class CombatOperation(ICombatClient client)
 
     public Task<string> TestSendReinforcementsBetweenOwnVillagesAsync(CancellationToken cancellationToken)
         => client.TestSendReinforcementsBetweenOwnVillagesAsync(cancellationToken);
+
+    public Task<TroopEvasionResult> SendTroopEvasionAsync(
+        TroopEvasionRequest request,
+        IProgress<TroopEvasionProgress>? progress,
+        CancellationToken cancellationToken)
+        => client.SendTroopEvasionAsync(request, progress, cancellationToken);
+
+    public Task<TroopEvasionValidationResult> ValidateTroopEvasionAsync(
+        TroopEvasionRequest request,
+        CancellationToken cancellationToken)
+        => client.ValidateTroopEvasionAsync(request, cancellationToken);
 }

@@ -720,6 +720,16 @@ public sealed partial class TravianClient
         }
 
         _serverTimeUtc = parsed.ToUniversalTime();
+        _serverTimeObservedAtUtc = DateTimeOffset.UtcNow;
+    }
+
+    private DateTimeOffset CurrentTravianServerTimeUtc()
+    {
+        if (_serverTimeUtc is not { } serverTime || _serverTimeObservedAtUtc is not { } observedAt)
+        {
+            return DateTimeOffset.UtcNow;
+        }
+        return serverTime + (DateTimeOffset.UtcNow - observedAt);
     }
 
 }

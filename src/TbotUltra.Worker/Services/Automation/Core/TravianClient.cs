@@ -39,6 +39,7 @@ public sealed partial class TravianClient
     private readonly Func<LobbyWorldServerResolution, CancellationToken, Task>? _lobbyWorldServerResolved;
     private string? _resolvedServerUrl;
     private DateTimeOffset? _serverTimeUtc;
+    private DateTimeOffset? _serverTimeObservedAtUtc;
     private string? _cachedAccountTribe;
     private readonly TravianSessionCache _session;
     private static readonly TimeSpan ResourceReadLogInterval = TimeSpan.FromMinutes(2);

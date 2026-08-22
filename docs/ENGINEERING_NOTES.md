@@ -521,6 +521,14 @@ Published artifacts belong under `artifacts/`, never beside source files.
   categories 2/3 are inactive. A late Rally Point result must not restore state cleared by a newer Dorf1 read.
   Filter/read failures never clear known attacks. Exact movements persist per account+world, use the Travian
   movement id when available, and expire at their server-derived absolute arrival before a safe recheck.
+- Troop Evasion consumes Incoming Attack state; it must never introduce a parallel signal source. Target Dorf1 is
+  re-read before Rally Point details: only red `img.att1` rows qualify, their timers are the fallback if Rally Point
+  fails, and a clear target Dorf1 read cancels pending evasion and skips Rally Point. Evasion settings and successful
+  protection windows persist atomically per account+world by coordinate key; corrupt files are quarantined. Automatic
+  dispatch is high-priority safe-boundary work gated by Continuous Loop or Auto Queue but independent of Village Auto.
+  The first `#ok` and final `#confirmSendTroops` are separate one-shot state changes. Reinforcements confirm immediately;
+  Raid/Attack confirms only when a round trip cannot return before the triggering arrival plus 15 seconds, and never at
+  or after that arrival. Cancellation before final Confirm creates no protection state.
 - Construction timers shown in the village overview are Travian's raw slot finishes. Scheduling, loop wake-up,
   and `Next task` use the effective availability time: raw finish plus the already persisted construction-humanize
   delay (and existing race buffer). Forecasts must reuse the live selector without mutating queue, rotation, or
@@ -560,6 +568,7 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - [Browser session and login](adr/2026-07-18-browser-session-and-login.md)
 - [Bonus video](adr/2026-07-18-bonus-video.md)
 - [Continuous automation orchestration](adr/2026-08-14-continuous-automation-orchestration.md)
+- [Troop evasion deadlines](adr/2026-08-22-troop-evasion.md)
 
 ## Arkiverad historik
 

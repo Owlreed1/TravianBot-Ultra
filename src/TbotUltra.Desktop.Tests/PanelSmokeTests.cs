@@ -142,8 +142,24 @@ public sealed class PanelSmokeTests
             var tabs = Assert.IsType<TabControl>(panel.FindName("TroopsTabControl"));
 
             Assert.Equal(
-                new[] { "Build Troops", "Upgrade troops", "Reinforcements", "Incoming attacks", "Catapult waves", "Brewery celebration" },
+                new[] { "Build Troops", "Upgrade troops", "Reinforcements", "Incoming attacks", "Evasion", "Catapult waves", "Brewery celebration" },
                 tabs.Items.Cast<TabItem>().Select(item => item.Header?.ToString() ?? string.Empty).ToArray());
+        });
+    }
+
+    [Fact]
+    public void TroopEvasionPanel_OffersLockedTimingChoicesAndExpandableVillageList()
+    {
+        _wpf.Run(() =>
+        {
+            var panel = new TroopEvasionPanel();
+            var lead = Assert.IsType<ComboBox>(panel.FindName("LeadTimeComboBox"));
+            var protection = Assert.IsType<ComboBox>(panel.FindName("ProtectionWindowComboBox"));
+            var villages = Assert.IsType<ItemsControl>(panel.FindName("VillageItemsControl"));
+
+            Assert.Equal(new[] { 1, 2, 5, 10 }, lead.Items.Cast<int>().ToArray());
+            Assert.Equal(new[] { 1, 2, 5, 10 }, protection.Items.Cast<int>().ToArray());
+            Assert.Same(panel.Villages, villages.ItemsSource);
         });
     }
 

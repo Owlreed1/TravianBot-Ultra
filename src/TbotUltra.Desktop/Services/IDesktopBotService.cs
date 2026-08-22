@@ -65,6 +65,8 @@ public interface IDesktopBotService
     Task<IReadOnlyDictionary<string, long>> ReadAvailableTroopsForCatapultWavesAsync(BotOptions options, Action<string> log, bool forceRefresh, CancellationToken cancellationToken);
     Task<CatapultWaveSetupInfo> ReadCatapultWaveSetupInfoAsync(BotOptions options, Action<string> log, bool forceRefresh, CancellationToken cancellationToken);
     Task<CatapultWaveRunResult> StartCatapultWavesAsync(BotOptions options, CatapultWaveRequest request, Action<string> log, CancellationToken cancellationToken);
+    Task<TroopEvasionResult> SendTroopEvasionAsync(BotOptions options, TroopEvasionRequest request, Action<string> log, IProgress<TroopEvasionProgress>? progress, CancellationToken cancellationToken);
+    Task<TroopEvasionValidationResult> ValidateTroopEvasionAsync(BotOptions options, TroopEvasionRequest request, Action<string> log, CancellationToken cancellationToken);
     Task ExecuteLoginAsync(BotOptions options, Action<string> log, bool keepBrowserOpenAfterLogin, CancellationToken cancellationToken);
     Task<PostLoginSnapshot> ExecuteLoginAndLoadPostLoginSnapshotAsync(BotOptions options, Action<string> log, bool keepBrowserOpenAfterLogin, CancellationToken cancellationToken);
     Task<PostLoginSnapshot> LoadPostLoginSnapshotAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken);

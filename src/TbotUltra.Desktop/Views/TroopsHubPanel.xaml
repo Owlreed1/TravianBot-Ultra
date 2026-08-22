@@ -15,6 +15,9 @@
     <TabItem x:Name="IncomingAttacksTabItem" Header="Incoming attacks">
       <views:ReinforcementsPanel x:Name="IncomingAttacksContent" Section="Incoming" />
     </TabItem>
+    <TabItem x:Name="EvasionTabItem" Header="Evasion">
+      <views:TroopEvasionPanel x:Name="EvasionContent" />
+    </TabItem>
     <TabItem x:Name="CatapultWavesTabItem" Header="Catapult waves">
       <views:ReinforcementsPanel x:Name="CatapultWavesContent" Section="Catapult" />
     </TabItem>

@@ -62,6 +62,24 @@ public sealed class IncomingAttackDomParserTests
     }
 
     [Fact]
+    public void ParseDorf1Signals_CapturesOnlyRedAttackFallbackTimers()
+    {
+        const string html = """
+            <div class="villageInfobox movements"><table id="movements">
+              <tr><td><img class="def1"></td><td><span class="timer" value="20">0:00:20</span></td></tr>
+              <tr><td><img class="att2"></td><td><span class="timer" value="30">0:00:30</span></td></tr>
+              <tr><td><img class="att1"></td><td><span class="timer" data-value="142">0:02:22</span></td></tr>
+              <tr><td><img class="att1"></td><td><span class="timer" value="300">0:05:00</span></td></tr>
+            </table></div>
+            """;
+        var observed = new DateTimeOffset(2026, 8, 22, 14, 0, 0, TimeSpan.Zero);
+
+        var signal = Assert.Single(IncomingAttackDomParser.ParseDorf1Signals(html, "BRE", "dorf1.php?newdid=1", 1, 2, observed));
+
+        Assert.Equal([observed.AddSeconds(142), observed.AddSeconds(300)], signal.Dorf1ArrivalTimesUtc);
+    }
+
+    [Fact]
     public void ParseDorf1Signals_DetectsOnlyVillageRowMarkedAsAttack()
     {
         const string html = """

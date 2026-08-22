@@ -24,9 +24,33 @@ public sealed partial class TravianClient
         var coords = await TryReadActiveVillageCoordsFromCurrentPageAsync(cancellationToken);
         var resolvedKey = coords.X.HasValue && coords.Y.HasValue ? $"xy:{coords.X.Value}|{coords.Y.Value}" : villageKey;
 
+        var dorf1Html = await _page.ContentAsync();
+        var dorf1ObservedAtUtc = _serverTimeUtc ?? DateTimeOffset.UtcNow;
+        var dorf1Signals = IncomingAttackDomParser.ParseDorf1Signals(
+            dorf1Html, activeVillage, villageUrl, coords.X, coords.Y, dorf1ObservedAtUtc);
+        var activeSignal = dorf1Signals.FirstOrDefault(signal =>
+            signal.Dorf1ArrivalTimesUtc is not null
+            && ((coords.X.HasValue && coords.Y.HasValue && signal.CoordX == coords.X && signal.CoordY == coords.Y)
+                || string.Equals(signal.VillageName, activeVillage, StringComparison.OrdinalIgnoreCase)));
+        if (activeSignal is null)
+        {
+            Notify($"[incoming-attacks] clear Dorf1 read for '{activeVillage}'; Rally Point was skipped.");
+            return new IncomingAttackSnapshot(activeVillage, resolvedKey, coords.X, coords.Y, dorf1ObservedAtUtc, []);
+        }
+
+        var fallbackArrivals = activeSignal.Dorf1ArrivalTimesUtc ?? [];
+
         Notify("[incoming-attacks] opening Rally Point incoming-only overview.");
-        await GotoAsync("/build.php?gid=16&tt=1&filter=1&subfilters=1", cancellationToken);
-        await EnsureIncomingAttackFilterAsync(cancellationToken);
+        try
+        {
+            await GotoAsync("/build.php?gid=16&tt=1&filter=1&subfilters=1", cancellationToken);
+            await EnsureIncomingAttackFilterAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException && fallbackArrivals.Count > 0)
+        {
+            Notify($"[incoming-attacks] Rally Point read failed; using {fallbackArrivals.Count} red Dorf1 timer(s): {ex.Message}");
+            return new IncomingAttackSnapshot(activeVillage, resolvedKey, coords.X, coords.Y, dorf1ObservedAtUtc, [], false, fallbackArrivals);
+        }
         var html = await _page.ContentAsync();
         if (!IncomingAttackDomParser.HasOnlyIncomingFilterActive(html))
         {
@@ -43,7 +67,7 @@ public sealed partial class TravianClient
             observedAtUtc);
         Notify($"[incoming-attacks] read {attacks.Count} movement(s) for '{activeVillage}'.");
         trace.Complete("success", $"village={activeVillage} count={attacks.Count}");
-        return new IncomingAttackSnapshot(activeVillage, resolvedKey, coords.X, coords.Y, observedAtUtc, attacks);
+        return new IncomingAttackSnapshot(activeVillage, resolvedKey, coords.X, coords.Y, observedAtUtc, attacks, true, fallbackArrivals);
     }
 
     private async Task<IReadOnlyList<IncomingAttackSignal>?> ReadIncomingAttackSignalsOnCurrentDorf1Async(
