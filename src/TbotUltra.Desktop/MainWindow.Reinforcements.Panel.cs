@@ -5,6 +5,7 @@ namespace TbotUltra.Desktop;
 
 public partial class MainWindow
 {
+    private Views.ReinforcementsPanel ReinforcementsPanelControl => TroopsHubPanelControl.ReinforcementsPanel;
     private ComboBox ReinforcementTargetVillageComboBox => ReinforcementsPanelControl.TargetVillage;
     private Button ReinforcementMarkAllTroopsButton => ReinforcementsPanelControl.MarkAllTroopsButton;
     private ItemsControl ReinforcementSourceVillagesItemsControl => ReinforcementsPanelControl.SourceVillages;

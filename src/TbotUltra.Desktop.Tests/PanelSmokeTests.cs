@@ -32,6 +32,7 @@ public sealed class PanelSmokeTests
         { nameof(ResourcesPanel), () => new ResourcesPanel() },
         { nameof(HeroPanel), () => new HeroPanel() },
         { nameof(TroopsPanel), () => new TroopsPanel() },
+        { nameof(TroopsHubPanel), () => new TroopsHubPanel() },
         { nameof(FarmingPanel), () => new FarmingPanel() },
         { nameof(QueuePanel), () => new QueuePanel() },
         { nameof(LogsPanel), () => new LogsPanel() },
@@ -87,10 +88,28 @@ public sealed class PanelSmokeTests
             var tabs = Assert.IsType<TabControl>(panel.FindName("SendTroopsTabControl"));
             var attacks = Assert.IsType<TabItem>(panel.FindName("IncomingAttacksTabItem"));
             var grid = Assert.IsType<DataGrid>(panel.FindName("IncomingAttackDataGrid"));
+            var infoIcon = Assert.IsType<TextBlock>(panel.FindName("IncomingAttacksInfoIcon"));
 
             Assert.Equal(2, tabs.Items.Count);
             Assert.Equal("Incoming attacks", attacks.Header);
             Assert.Equal(7, grid.Columns.Count);
+            Assert.Equal(
+                "Incoming attacks and raids detected on Dorf1 and verified in Rally Point. Times use the Travian server clock.",
+                infoIcon.ToolTip);
+        });
+    }
+
+    [Fact]
+    public void TroopsHubPanel_ContainsRequestedTabsInOrder()
+    {
+        _wpf.Run(() =>
+        {
+            var panel = new TroopsHubPanel();
+            var tabs = Assert.IsType<TabControl>(panel.FindName("TroopsTabControl"));
+
+            Assert.Equal(
+                new[] { "Build Troops", "Upgrade troops", "Reinforcements", "Incoming attacks", "Brewery celebration" },
+                tabs.Items.Cast<TabItem>().Select(item => item.Header?.ToString() ?? string.Empty).ToArray());
         });
     }
 

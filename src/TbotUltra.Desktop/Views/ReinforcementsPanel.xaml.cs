@@ -5,9 +5,38 @@ namespace TbotUltra.Desktop.Views;
 
 public partial class ReinforcementsPanel : UserControl
 {
+    public static readonly DependencyProperty SectionProperty = DependencyProperty.Register(
+        nameof(Section),
+        typeof(string),
+        typeof(ReinforcementsPanel),
+        new PropertyMetadata("All"));
+
+    public string Section
+    {
+        get => (string)GetValue(SectionProperty);
+        set => SetValue(SectionProperty, value);
+    }
+
     private MainWindow? _host;
 
-    public ReinforcementsPanel() => InitializeComponent();
+    public ReinforcementsPanel()
+    {
+        InitializeComponent();
+        Loaded += (_, _) => ApplySection();
+    }
+
+    private void ApplySection()
+    {
+        if (string.Equals(Section, "All", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        SendTroopsTabControl.SelectedItem = string.Equals(Section, "Incoming", StringComparison.OrdinalIgnoreCase)
+            ? IncomingAttacksTabItem
+            : ReinforcementsTabItem;
+        SendTroopsTabControl.Template = (ControlTemplate)FindResource("ContentOnlyTabControlTemplate");
+    }
 
     private MainWindow? Host => _host ??= Window.GetWindow(this) as MainWindow;
 

@@ -441,7 +441,7 @@ public partial class MainWindow : Window
             AppendLog);
         _villageCacheStore = new VillageCacheStore(_projectRoot, () => _accountStore.ActiveAccountName(), AppendLog);
         _incomingAttackStore = new IncomingAttackStore(_projectRoot, AppendLog);
-        ReinforcementsPanelControl.IncomingAttacksGrid.ItemsSource = _incomingAttackRows;
+        TroopsHubPanelControl.IncomingAttacksGrid.ItemsSource = _incomingAttackRows;
         _villageCacheWriter = new LatestSnapshotWriter<VillageCacheWrite>(write =>
         {
             _villageCacheStore.Save(write.AccountName, write.Snapshot);
@@ -550,7 +550,7 @@ public partial class MainWindow : Window
                     TickResourceTransferVillageForecasts();
                 }
 
-                if (IsMainTabSelected(ReinforcementsTabItem))
+                if (IsMainTabSelected(TroopsTabItem))
                 {
                     UpdateReinforcementStatus();
                 }

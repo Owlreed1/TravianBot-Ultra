@@ -214,9 +214,6 @@
                     <Button x:Name="TroopsNavButton" Style="{StaticResource SidebarNavButtonStyle}" Tag="troops" Click="SidebarNavButton_Click">
                         <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE716;" /><TextBlock Style="{StaticResource NavText}" Text="Troops" /></StackPanel>
                     </Button>
-                    <Button x:Name="ReinforcementsNavButton" Style="{StaticResource SidebarNavButtonStyle}" Tag="reinforcements" Click="SidebarNavButton_Click">
-                        <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE724;" /><TextBlock Style="{StaticResource NavText}" Text="Send Troops" /></StackPanel>
-                    </Button>
                     <Button x:Name="NpcTradeNavButton" Style="{StaticResource SidebarNavButtonStyle}" Tag="npc_trade" Click="SidebarNavButton_Click">
                         <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE719;" /><TextBlock Style="{StaticResource NavText}" Text="NPC / Trade" /></StackPanel>
                     </Button>
@@ -734,13 +731,7 @@
 
                 <TabItem x:Name="TroopsTabItem" Header="Troops"
                          DataContext="{Binding TroopTrainingVm, ElementName=RootWindow}">
-                    <!-- All troops UI lives in Views/TroopsPanel.xaml; the TabItem keeps the
-                         DataContext binding so the panel inherits the TroopTrainingViewModel. -->
-                    <views:TroopsPanel />
-                </TabItem>
-
-                <TabItem x:Name="ReinforcementsTabItem" Header="Send Troops">
-                    <views:ReinforcementsPanel x:Name="ReinforcementsPanelControl" />
+                    <views:TroopsHubPanel x:Name="TroopsHubPanelControl" />
                 </TabItem>
 
                 <TabItem x:Name="NpcTradeTabItem" Header="NPC / Trade"

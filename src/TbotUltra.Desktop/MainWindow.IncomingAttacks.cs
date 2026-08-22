@@ -328,8 +328,9 @@ public partial class MainWindow
             return;
         }
 
-        MainTabControl.SelectedItem = ReinforcementsTabItem;
-        ReinforcementsPanelControl.SendTroopsTabs.SelectedItem = ReinforcementsPanelControl.IncomingAttacksTab;
+        MainTabControl.SelectedItem = TroopsTabItem;
+        TroopsHubPanelControl.SelectIncomingAttacks();
+        UpdateSidebarSelection(TroopsNavButton);
         var key = GetVillageKey(village);
         var row = _incomingAttackRows
             .Where(candidate => string.Equals(candidate.VillageKey, key, StringComparison.OrdinalIgnoreCase))
@@ -340,9 +341,9 @@ public partial class MainWindow
             return;
         }
 
-        ReinforcementsPanelControl.IncomingAttacksGrid.SelectedItem = row;
-        ReinforcementsPanelControl.IncomingAttacksGrid.ScrollIntoView(row);
-        ReinforcementsPanelControl.IncomingAttacksGrid.Focus();
+        TroopsHubPanelControl.IncomingAttacksGrid.SelectedItem = row;
+        TroopsHubPanelControl.IncomingAttacksGrid.ScrollIntoView(row);
+        TroopsHubPanelControl.IncomingAttacksGrid.Focus();
     }
 
     private void LoadIncomingAttacksForActiveAccount()
