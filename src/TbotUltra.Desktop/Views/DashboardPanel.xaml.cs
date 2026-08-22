@@ -39,4 +39,5 @@ public partial class DashboardPanel : UserControl
     private void ProductionBonusSettingsButton_Click(object sender, RoutedEventArgs e) => Host?.OnProductionBonusSettingsClicked(sender, e);
     private void VillageStatusSweepSetting_Changed(object sender, RoutedEventArgs e) => Host?.OnVillageStatusSweepSettingChanged(sender, e);
     private void VillageStatusSweepSettingsButton_Click(object sender, RoutedEventArgs e) => Host?.OnVillageStatusSweepSettingsClicked(sender, e);
+    private void IncomingAttackButton_Click(object sender, RoutedEventArgs e) => Host?.OnIncomingAttackClicked(sender, e);
 }

@@ -303,7 +303,47 @@ public sealed record VillageStatus(
     // exact identity of the village this status belongs to — unlike ActiveVillage (a display name),
     // coordinates are unique and survive renames, so caches can key on them without name matching.
     int? ActiveVillageCoordX = null,
-    int? ActiveVillageCoordY = null);
+    int? ActiveVillageCoordY = null,
+    // Null means this page was not an authoritative Dorf1 observation. An empty list means Dorf1 was
+    // inspected and no incoming-attack signal was visible. Partial reads must preserve prior signals.
+    IReadOnlyList<IncomingAttackSignal>? IncomingAttackSignals = null);
+
+public enum IncomingAttackMovementType
+{
+    Unknown,
+    Attack,
+    Raid,
+}
+
+public sealed record IncomingAttackSignal(
+    string VillageName,
+    string? VillageUrl = null,
+    int? VillageId = null,
+    int? CoordX = null,
+    int? CoordY = null,
+    DateTimeOffset? ObservedAtUtc = null);
+
+public sealed record IncomingAttack(
+    string Id,
+    string TargetVillageName,
+    DateTimeOffset ArrivalAtUtc,
+    IncomingAttackMovementType MovementType = IncomingAttackMovementType.Unknown,
+    string? TargetVillageKey = null,
+    int? TargetCoordX = null,
+    int? TargetCoordY = null,
+    string? SourcePlayerName = null,
+    string? SourceVillageName = null,
+    int? SourceCoordX = null,
+    int? SourceCoordY = null,
+    DateTimeOffset? ObservedAtUtc = null);
+
+public sealed record IncomingAttackSnapshot(
+    string TargetVillageName,
+    string? TargetVillageKey,
+    int? TargetCoordX,
+    int? TargetCoordY,
+    DateTimeOffset ObservedAtUtc,
+    IReadOnlyList<IncomingAttack> Attacks);
 
 public sealed record InboxStatus(
     int UnreadMessages = 0,

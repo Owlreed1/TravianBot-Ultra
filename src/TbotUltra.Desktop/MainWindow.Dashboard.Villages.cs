@@ -246,6 +246,7 @@ public partial class MainWindow
 
         // The list was rebuilt with fresh items; re-apply the active-village border.
         ApplyActiveVillageHighlight();
+        RefreshIncomingAttackVillageIndicators();
     }
 
     // A list is "real" when it contains at least one named village that isn't the "-" placeholder.
@@ -747,6 +748,8 @@ public partial class MainWindow
             Population = resolvedPopulation,
             CropFields = cropFields ?? existing?.CropFields,
             Tribe = TroopCatalog.IsKnownTribe(tribe) ? tribe! : existing?.Tribe ?? "Unknown",
+            HasIncomingAttack = existing?.HasIncomingAttack ?? false,
+            IncomingAttackTooltip = existing?.IncomingAttackTooltip ?? "Incoming attack details are being read",
         };
     }
 

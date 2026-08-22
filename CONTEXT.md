@@ -116,6 +116,10 @@ _Avoid_: Blocking demolish loop, demolition sleep
 One randomized pass through every known village that reads the enabled live game state, updates the per-village status cache and lets already-enabled automation react before moving to the next village. It leaves the browser on the final naturally visited village; the next round is scheduled separately.
 _Avoid_: Village scan loop, village refresh
 
+**Incoming Attack**:
+One hostile attack or raid movement travelling toward an owned village. A Dorf1 marker is an immediate signal; the movement becomes authoritative only after the Rally Point incoming filter provides its exact arrival.
+_Avoid_: Village under attack, attack history
+
 **Automation Pass**:
 One between-actions iteration shared by Continuous Loop and Auto Queue. It may execute at most one eligible queued action before the next selection.
 _Avoid_: Loop tick, Auto Queue iteration

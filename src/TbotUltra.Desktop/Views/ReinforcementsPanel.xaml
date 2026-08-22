@@ -1,6 +1,8 @@
 <UserControl x:Class="TbotUltra.Desktop.Views.ReinforcementsPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<TabControl x:Name="SendTroopsTabControl" Background="{DynamicResource AppBackgroundBrush}">
+  <TabItem x:Name="ReinforcementsTabItem" Header="Reinforcements">
 <Grid Background="{DynamicResource AppBackgroundBrush}">
     <Border VerticalAlignment="Stretch"
             HorizontalAlignment="Stretch"
@@ -277,5 +279,46 @@
         </Grid>
     </Border>
 </Grid>
+  </TabItem>
+  <TabItem x:Name="IncomingAttacksTabItem" Header="Incoming attacks">
+    <Border Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="16">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <StackPanel Margin="0,0,0,12">
+          <TextBlock Text="Incoming attacks" FontSize="22" FontWeight="SemiBold"
+                     Foreground="{DynamicResource TextPrimaryBrush}" />
+          <TextBlock Text="Incoming attacks and raids detected on Dorf1 and verified in Rally Point. Times use the Travian server clock."
+                     Margin="0,4,0,0" TextWrapping="Wrap"
+                     Foreground="{DynamicResource TextSubtleBrush}" />
+        </StackPanel>
+        <DataGrid x:Name="IncomingAttackDataGrid"
+                  Grid.Row="1"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  CanUserAddRows="False"
+                  HeadersVisibility="Column"
+                  SelectionMode="Single"
+                  SelectionUnit="FullRow">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Target village" Binding="{Binding TargetVillageName}" Width="*" />
+            <DataGridTextColumn Header="Type" Binding="{Binding TypeText}" Width="90" />
+            <DataGridTextColumn Header="Source player" Binding="{Binding SourcePlayerName}" Width="*" />
+            <DataGridTextColumn Header="Source village" Binding="{Binding SourceVillageName}" Width="*" />
+            <DataGridTextColumn Header="Coords" Binding="{Binding SourceCoordinatesText}" Width="90" />
+            <DataGridTextColumn Header="Arrival (server)" Binding="{Binding ArrivalText}" Width="155" />
+            <DataGridTextColumn Header="Countdown" Binding="{Binding CountdownText}" Width="110" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </Grid>
+    </Border>
+  </TabItem>
+</TabControl>
 </UserControl>
 

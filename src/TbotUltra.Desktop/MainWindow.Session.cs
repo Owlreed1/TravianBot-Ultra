@@ -851,6 +851,7 @@ public partial class MainWindow
     // on the new server). This forces the picker + dashboard list back to the empty placeholder.
     private void ForceClearVillageSelectionUi()
     {
+        ClearIncomingAttackUiState();
         _suppressVillageSelectionChange = true;
         try
         {

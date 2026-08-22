@@ -15,6 +15,30 @@ public sealed class VillageSelectionItem : INotifyPropertyChanged
     public int? CropFields { get; init; }
     public string Tribe { get; init; } = "Unknown";
 
+    private bool _hasIncomingAttack;
+    public bool HasIncomingAttack
+    {
+        get => _hasIncomingAttack;
+        set
+        {
+            if (_hasIncomingAttack == value) return;
+            _hasIncomingAttack = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private string _incomingAttackTooltip = "Incoming attack details are being read";
+    public string IncomingAttackTooltip
+    {
+        get => _incomingAttackTooltip;
+        set
+        {
+            if (string.Equals(_incomingAttackTooltip, value, System.StringComparison.Ordinal)) return;
+            _incomingAttackTooltip = value;
+            OnPropertyChanged();
+        }
+    }
+
     // Dashboard overview indicators, filled from the per-village status cache. Build slots reflect the
     // construction queue (2 normally, 3 for Romans); troop slots reflect each village's effective
     // Barracks/Stable/Workshop Build troops settings. Settable

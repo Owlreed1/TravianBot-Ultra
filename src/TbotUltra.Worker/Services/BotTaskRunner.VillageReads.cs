@@ -12,6 +12,36 @@ namespace TbotUltra.Worker.Services;
 
 public sealed partial class BotTaskRunner
 {
+    public async Task<IncomingAttackSnapshot> ReadIncomingAttacksAsync(
+        BotOptions options,
+        Action<string> log,
+        string villageName,
+        string? villageUrl,
+        string? villageKey,
+        string? accountName = null,
+        CancellationToken cancellationToken = default)
+    {
+        IncomingAttackSnapshot? snapshot = null;
+        await ExecuteWithClientAsync(
+            options,
+            log,
+            accountName,
+            interactive: false,
+            cancellationToken,
+            async client =>
+            {
+                await client.EnsureAccountAccessAllowedAsync(cancellationToken);
+                snapshot = await client.ReadIncomingAttacksAsync(
+                    villageName,
+                    villageUrl,
+                    villageKey,
+                    cancellationToken);
+            },
+            saveStateMode: BrowserStateSaveMode.Skip);
+
+        return snapshot ?? throw new InvalidOperationException("Could not read incoming attacks.");
+    }
+
     public async Task<VillageStatus> ReadVillageStatusAsync(
         BotOptions options,
         Action<string> log,

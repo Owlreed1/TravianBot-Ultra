@@ -96,6 +96,7 @@ public partial class MainWindow : Window
     private readonly TravcoListStore _travcoListStore;
     private readonly AllVillagesImportSettingsStore _allVillagesImportSettingsStore;
     private readonly VillageCacheStore _villageCacheStore;
+    private readonly IncomingAttackStore _incomingAttackStore;
     private readonly LatestSnapshotWriter<VillageCacheWrite> _villageCacheWriter;
     private sealed record VillageCacheWrite(string AccountName, IReadOnlyDictionary<string, VillageStatus> Snapshot);
     private readonly IAccountProvider _accountProvider;
@@ -439,6 +440,8 @@ public partial class MainWindow : Window
             () => LoadBotOptions().BaseUrl,
             AppendLog);
         _villageCacheStore = new VillageCacheStore(_projectRoot, () => _accountStore.ActiveAccountName(), AppendLog);
+        _incomingAttackStore = new IncomingAttackStore(_projectRoot, AppendLog);
+        ReinforcementsPanelControl.IncomingAttacksGrid.ItemsSource = _incomingAttackRows;
         _villageCacheWriter = new LatestSnapshotWriter<VillageCacheWrite>(write =>
         {
             _villageCacheStore.Save(write.AccountName, write.Snapshot);
@@ -523,6 +526,7 @@ public partial class MainWindow : Window
                 HandleBrowserClosedSignal();
                 TickFarmListCountdowns();
                 TickAutomationLoopCountdowns();
+                TickIncomingAttacks(serverNow);
 
                 TickBuildQueueCountdown();
                 RefreshDemolishStatusForSelectedVillage();

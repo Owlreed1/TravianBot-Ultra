@@ -79,6 +79,22 @@ public sealed class PanelSmokeTests
     }
 
     [Fact]
+    public void ReinforcementsPanel_ContainsReinforcementsAndIncomingAttackTabs()
+    {
+        _wpf.Run(() =>
+        {
+            var panel = new ReinforcementsPanel();
+            var tabs = Assert.IsType<TabControl>(panel.FindName("SendTroopsTabControl"));
+            var attacks = Assert.IsType<TabItem>(panel.FindName("IncomingAttacksTabItem"));
+            var grid = Assert.IsType<DataGrid>(panel.FindName("IncomingAttackDataGrid"));
+
+            Assert.Equal(2, tabs.Items.Count);
+            Assert.Equal("Incoming attacks", attacks.Header);
+            Assert.Equal(7, grid.Columns.Count);
+        });
+    }
+
+    [Fact]
     public void FarmingPanel_NextSendDisplay_BindsToHeadersCreatedAfterTheTimerUpdate()
     {
         _wpf.Run(() =>

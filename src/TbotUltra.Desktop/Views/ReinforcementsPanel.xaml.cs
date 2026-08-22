@@ -22,6 +22,9 @@ public partial class ReinforcementsPanel : UserControl
     internal Button QueueNowButton => ReinforcementQueueNowButton;
     internal Button CatapultWavesButton => StartCatapultWavesButton;
     internal TextBlock CatapultWavesStatus => CatapultWavesStatusTextBlock;
+    internal TabControl SendTroopsTabs => SendTroopsTabControl;
+    internal TabItem IncomingAttacksTab => IncomingAttacksTabItem;
+    internal DataGrid IncomingAttacksGrid => IncomingAttackDataGrid;
 
     private void ReinforcementSetting_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
         Host?.OnReinforcementSettingSelectionChanged(sender, e);

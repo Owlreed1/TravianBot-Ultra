@@ -858,6 +858,7 @@ public partial class MainWindow
                 BreweryCelebrationStatus = status.BreweryCelebrationStatus ?? existing.BreweryCelebrationStatus,
                 FarmLists = status.FarmLists ?? existing.FarmLists,
                 HeroStatus = status.HeroStatus ?? existing.HeroStatus,
+                IncomingAttackSignals = status.IncomingAttackSignals ?? existing.IncomingAttackSignals,
             };
 
             if ((status.Buildings is null || status.Buildings.Count == 0) && existing.Buildings is { Count: > 0 })
@@ -873,6 +874,7 @@ public partial class MainWindow
         }
 
         StoreVillageStatusCacheEntry(name, status);
+        ObserveIncomingAttackSignals(status);
         ObserveHeroCropAntiStarveStatus(status, name);
         InvalidateVillageOverview();
 
@@ -1055,6 +1057,7 @@ public partial class MainWindow
             // The store returns canonical (coordinate) keys, migrating legacy name keys on the fly.
             ResetHeroCropAntiStarveObservations();
             _villageStatusCache.LoadFrom(_villageCacheStore.Load());
+            LoadIncomingAttacksForActiveAccount();
 
             if (_villageStatusCache.Count > 0)
             {

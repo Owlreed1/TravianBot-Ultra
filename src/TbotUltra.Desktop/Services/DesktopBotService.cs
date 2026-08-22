@@ -342,6 +342,24 @@ public Task ExecuteLoginAsync(BotOptions options, Action<string> log, bool keepB
             cancellationToken);
     }
 
+    public Task<IncomingAttackSnapshot> ReadIncomingAttacksAsync(
+        BotOptions options,
+        Action<string> log,
+        string villageName,
+        string? villageUrl,
+        string? villageKey,
+        CancellationToken cancellationToken)
+    {
+        return _taskRunner.ReadIncomingAttacksAsync(
+            options,
+            log,
+            villageName,
+            villageUrl,
+            villageKey,
+            accountName: null,
+            cancellationToken);
+    }
+
     public Task<VillageStatus> ReadVillageStatusAsync(BotOptions options, Action<string> log, string? villageName, string? villageUrl, CancellationToken cancellationToken)
     {
         return _taskRunner.ReadVillageStatusAsync(

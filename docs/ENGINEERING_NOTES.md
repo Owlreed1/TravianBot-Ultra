@@ -486,6 +486,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   the user made in the UI while the task was waiting.
 - Hero runtime state is published as one structured Worker update (`HeroRuntimeStatus`). The Hero page and the
   Village overview icon must consume that same update so away/dead/reviving state cannot diverge between views.
+- Explicit Hero attribute refreshes are live-authoritative; the persisted snapshot only seeds startup UI. Successful
+  point allocation invalidates memory and disk, and incomplete attribute DOM reads never overwrite a valid snapshot.
 - Hero inventory resources are an account+server persisted last-known snapshot. Quick re-login, process restart,
   and account switching restore it; incomplete inventory reads never replace it with fabricated zeroes. When no
   snapshot has ever been captured, construction/resource actions may open their existing resource-transfer dialog,
@@ -501,6 +503,13 @@ Published artifacts belong under `artifacts/`, never beside source files.
   partial output as a successful archive. Screenshots may contain visible game data.
 - The Dashboard active-village border represents verified live browser state only. Queue selection/Running state
   must never pre-mark a task's target village; update it only after a successful browser village verification.
+- Incoming Attack monitoring observes only real Dorf1 reads: the active village uses
+  `.villageInfobox.movements #movements`, while a Plus village overview uses
+  `.listEntry.village.attack[data-did]`. A nullable signal list means "Dorf1 was not read" and must preserve
+  prior signals; an empty list is authoritative only for the active Dorf1 village. Rally Point details are read
+  only after exactly `button.iconFilterActive img.subFilterCategory1` is active and categories 2/3 are inactive.
+  Filter/read failures never clear known attacks. Exact movements persist per account+world, use the Travian
+  movement id when available, and expire at their server-derived absolute arrival before a safe recheck.
 - Construction timers shown in the village overview are Travian's raw slot finishes. Scheduling, loop wake-up,
   and `Next task` use the effective availability time: raw finish plus the already persisted construction-humanize
   delay (and existing race buffer). Forecasts must reuse the live selector without mutating queue, rotation, or

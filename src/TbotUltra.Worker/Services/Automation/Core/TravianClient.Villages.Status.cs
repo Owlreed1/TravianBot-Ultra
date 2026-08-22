@@ -101,6 +101,16 @@ public sealed partial class TravianClient
         // to. Read before the resource cache is touched, because duplicate village names cannot be told
         // apart by name and would otherwise share (or skip) a cache entry.
         var activeCoords = await TryReadActiveVillageCoordsFromCurrentPageAsync(cancellationToken);
+        var activeVillageUrl = villages.FirstOrDefault(village =>
+            (activeCoords.X.HasValue && activeCoords.Y.HasValue
+             && village.CoordX == activeCoords.X && village.CoordY == activeCoords.Y)
+            || string.Equals(village.Name, activeVillage, StringComparison.OrdinalIgnoreCase))?.Url;
+        var incomingAttackSignals = await ReadIncomingAttackSignalsOnCurrentDorf1Async(
+            activeVillage,
+            activeVillageUrl,
+            activeCoords.X,
+            activeCoords.Y,
+            cancellationToken);
         var cachedSnapshot = TryGetCachedVillageResourceSnapshot(activeVillage, activeCoords);
         var capacities = (
             Warehouse: snapshot.Capacities.Warehouse ?? cachedSnapshot?.WarehouseCapacity,
@@ -169,7 +179,8 @@ public sealed partial class TravianClient
             HeroStatus: heroStatus,
             ActiveConstructionsFromOverview: _lastActiveConstructionsFromOverview,
             ActiveVillageCoordX: activeCoords.X,
-            ActiveVillageCoordY: activeCoords.Y);
+            ActiveVillageCoordY: activeCoords.Y,
+            IncomingAttackSignals: incomingAttackSignals);
         trace.Complete(
             "success",
             $"village={result.ActiveVillage} resources={result.Resources.Count} fields={result.ResourceFields.Count} buildings={result.Buildings.Count} queue={result.BuildQueue.Count} activeConstructions={result.ActiveConstructions?.Count ?? 0}");

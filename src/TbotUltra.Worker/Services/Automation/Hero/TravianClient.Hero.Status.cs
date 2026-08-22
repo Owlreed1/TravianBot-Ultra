@@ -635,13 +635,8 @@ public sealed partial class TravianClient
             forceDorf1Reload: false,
             cancellationToken);
         var adventureCount = TryResolveAdventureCount(quick);
-        var cachedSnapshot = TryGetCachedHeroAttributeSnapshot();
-        if (cachedSnapshot is not null && !quick.HasUnassignedPointsSignal)
-        {
-            Notify("Hero attribute snapshot served from cache.");
-            return cachedSnapshot with { AdventureCount = adventureCount };
-        }
 
+        Notify("[hero:verbose] reading live hero attributes");
         await GotoAsync(Paths.HeroAttributes, cancellationToken);
         await WaitForPageReadyAsync(cancellationToken); // Wait for page to load
         await EnsureLoggedInAsync(cancellationToken: cancellationToken);

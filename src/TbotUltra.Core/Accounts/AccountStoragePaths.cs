@@ -260,6 +260,15 @@ public static class AccountStoragePaths
             $"{NormalizeServerKey(serverUrl)}.json");
     }
 
+    public static string IncomingAttacksSnapshotPath(string projectRoot, string accountName, string? serverUrl = null)
+    {
+        return Path.Combine(
+            AccountDirectory(projectRoot, accountName),
+            "cache",
+            "incoming-attacks",
+            $"{NormalizeServerKey(serverUrl)}.json");
+    }
+
     public static string BuildingsSnapshotPath(string projectRoot, string accountName)
     {
         return Path.Combine(projectRoot, "temp_build_out", "buildings-snapshots", $"{NormalizeAccountKey(accountName)}.json");
