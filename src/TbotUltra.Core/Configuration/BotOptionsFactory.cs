@@ -105,6 +105,7 @@ public static class BotOptionsFactory
             PostLoginAnalyzeNewAccount = configuration.GetValue(BotOptionPayloadKeys.PostLoginAnalyzeNewAccount, true),
             AutomaticallyCheckLanguage = configuration.GetValue(BotOptionPayloadKeys.AutomaticallyCheckLanguage, true),
             DetailedBrowserLoggingEnabled = configuration.GetValue(BotOptionPayloadKeys.DetailedBrowserLoggingEnabled, false),
+            TurnOffVideoSound = configuration.GetValue(BotOptionPayloadKeys.TurnOffVideoSound, true),
             TroopTrainingBarracksEnabled = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingBarracksEnabled, false),
             TroopTrainingBarracksTroopType = configuration[BotOptionPayloadKeys.TroopTrainingBarracksTroopType] ?? string.Empty,
             TroopTrainingBarracksMaxQueueHours = configuration[BotOptionPayloadKeys.TroopTrainingBarracksMaxQueueHours] ?? "no_limit",

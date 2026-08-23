@@ -108,6 +108,21 @@ public sealed class BotOptionsPayloadApplierTests
     }
 
     [Fact]
+    public void FromConfiguration_VideoSoundMuteDefaultsEnabledAndCanDisable()
+    {
+        var defaults = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        var disabled = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [BotOptionPayloadKeys.TurnOffVideoSound] = "false",
+            })
+            .Build();
+
+        Assert.True(BotOptionsFactory.FromConfiguration(defaults).TurnOffVideoSound);
+        Assert.False(BotOptionsFactory.FromConfiguration(disabled).TurnOffVideoSound);
+    }
+
+    [Fact]
     public void FromConfiguration_DisablesLossMoveWithoutLossDeactivation()
     {
         var configuration = new ConfigurationBuilder()

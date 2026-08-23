@@ -717,6 +717,11 @@ public sealed partial class TravianClient
 
     private async Task<bool> MuteBonusVideoAsync(string label, string logPrefix, CancellationToken cancellationToken)
     {
+        if (!_config.TurnOffVideoSound)
+        {
+            return true;
+        }
+
         try
         {
             for (var attempt = 1; attempt <= 10; attempt++)
@@ -731,10 +736,16 @@ public sealed partial class TravianClient
                         return true;
                     }
 
-                    var enabled = frame.Locator(".atg-gima-audio-button:has(.atg-gima-audio-button-enabled:not(.atg-gima-hidden))").First;
+                    var enabled = frame.Locator(".atg-gima-audio-button-enabled:not(.atg-gima-hidden)").First;
                     if (await enabled.CountAsync() == 0 || !await enabled.IsVisibleAsync())
                     {
                         continue;
+                    }
+
+                    if (!await IsSafeBonusVideoAudioControlAsync(enabled))
+                    {
+                        Notify($"{logPrefix} {label}: audio icon could not be verified safely; continuing the video without clicking it.");
+                        return false;
                     }
 
                     await enabled.ClickAsync(new LocatorClickOptions { Timeout = 3000 });
@@ -763,6 +774,32 @@ public sealed partial class TravianClient
             Notify($"{logPrefix} {label}: audio mute skipped ({ex.Message}); continuing the video.");
             return false;
         }
+    }
+
+    private static Task<bool> IsSafeBonusVideoAudioControlAsync(ILocator control)
+    {
+        return control.EvaluateAsync<bool>(
+            """
+            element => {
+              if (!(element instanceof HTMLElement)) return false;
+              if (!element.classList.contains('atg-gima-audio-button-enabled')
+                  || element.classList.contains('atg-gima-hidden')) return false;
+              if (element.closest('a[href], video, iframe')) return false;
+
+              const owner = element.closest('.atg-gima-audio-button');
+              if (!owner || owner.closest('a[href]')) return false;
+              const style = getComputedStyle(element);
+              if (style.display === 'none' || style.visibility === 'hidden'
+                  || style.pointerEvents === 'none' || Number(style.opacity) <= 0) return false;
+
+              const rect = element.getBoundingClientRect();
+              if (rect.width < 4 || rect.height < 4 || rect.width > 96 || rect.height > 96) return false;
+              const x = Math.max(0, Math.min(innerWidth - 1, rect.left + rect.width / 2));
+              const y = Math.max(0, Math.min(innerHeight - 1, rect.top + rect.height / 2));
+              const hit = document.elementFromPoint(x, y);
+              return !!hit && (hit === element || element.contains(hit));
+            }
+            """);
     }
 
     // The ad provider can reveal Skip Ad at any point after playback starts. It is optional: a

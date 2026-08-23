@@ -148,6 +148,9 @@ public sealed record BotOptions
     [ConfigurationKeyName(BotOptionPayloadKeys.DetailedBrowserLoggingEnabled)]
     public bool DetailedBrowserLoggingEnabled { get; init; }
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.TurnOffVideoSound)]
+    public bool TurnOffVideoSound { get; init; } = true;
+
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingBarracksEnabled)]
     public bool TroopTrainingBarracksEnabled { get; init; }
 

@@ -503,6 +503,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   General/Village tab click; that makes a Collect-to-tab transition effectively instantaneous.
 - Bonus-video failures use shared protected timing, typed cooldowns, account proxy routing, and sanitized logs.
   See [bonus-video ADR](adr/2026-07-18-bonus-video.md).
+  Optional audio muting is strictly best-effort and defaults enabled through General settings. Click only the exact
+  visible `.atg-gima-audio-button-enabled:not(.atg-gima-hidden)` icon after bounded geometry, ancestry, and center
+  hit-testing prove that exact icon owns the click. Never click its wrapper, the video area, use force/JS fallback,
+  or let a missing, unsafe, or failed audio control interrupt or fail the video lifecycle.
 - One `activate_production_bonus` run is a contiguous four-resource batch: after its initial cooldown gate,
   attempt every resource found activatable before returning control to other automation. A failure or newly
   created internal video cooldown for one resource must not stop the remaining resources in that same batch.

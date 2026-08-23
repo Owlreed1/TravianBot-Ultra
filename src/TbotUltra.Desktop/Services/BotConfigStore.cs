@@ -50,6 +50,7 @@ public sealed class BotConfigStore
         BotOptionPayloadKeys.AutoCollectTasksEnabled,
         BotOptionPayloadKeys.AutoCollectDailyQuestsEnabled,
         BotOptionPayloadKeys.ProductionBonusVideoEnabled,
+        BotOptionPayloadKeys.TurnOffVideoSound,
         BotOptionPayloadKeys.CollectStepDelayMinSeconds,
         BotOptionPayloadKeys.CollectStepDelayMaxSeconds,
         BotOptionPayloadKeys.HeroResourceTransferEnabled,
