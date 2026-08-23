@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
+using TbotUltra.Desktop.ViewModels;
 using TbotUltra.Desktop.Views;
 using TbotUltra.Worker.Domain;
 using Xunit;
@@ -310,6 +311,56 @@ public sealed class PanelSmokeTests
             Assert.Equal(
                 new[] { "Adventures", "Attributes", "Hero inventory" },
                 tabs.Items.Cast<TabItem>().Select(item => item.Header?.ToString() ?? string.Empty).ToArray());
+        });
+    }
+
+    [Fact]
+    public void HeroHubPanel_AdventurePickOrderCanBeChanged()
+    {
+        _wpf.Run(() =>
+        {
+            var vm = new HeroViewModel();
+            var hub = new HeroHubPanel { DataContext = vm };
+            var tabs = Assert.IsType<TabControl>(hub.FindName("HeroTabControl"));
+            var panels = tabs.Items.Cast<TabItem>()
+                .Select(item => Assert.IsType<HeroPanel>(item.Content))
+                .ToList();
+            foreach (var panel in panels)
+            {
+                panel.Measure(new Size(1000, 700));
+                panel.Arrange(new Rect(0, 0, 1000, 700));
+                panel.UpdateLayout();
+            }
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
+
+            var adventurePanel = panels.Single(panel => panel.Section == "Adventures");
+            var topFirst = FindVisualChildren<RadioButton>(adventurePanel)
+                .Single(button => Equals(button.Content, "Top adventure first"));
+
+            topFirst.IsChecked = true;
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
+
+            Assert.True(topFirst.IsChecked);
+            Assert.True(vm.IsAdventurePickTop);
+            Assert.False(vm.IsAdventurePickShortest);
+        });
+    }
+
+    [Fact]
+    public void HeroPanel_AutoAssignSettingIsInsideAttributeCard()
+    {
+        _wpf.Run(() =>
+        {
+            var panel = new HeroPanel();
+            var adventureSettings = Assert.IsType<Border>(panel.FindName("SettingsCard"));
+            var attributeAutomation = Assert.IsType<Border>(panel.FindName("AttributeAutomationCard"));
+
+            Assert.DoesNotContain(
+                FindVisualChildren<CheckBox>(adventureSettings),
+                checkBox => Equals(checkBox.Content, "Auto assign attribute points"));
+            Assert.Contains(
+                FindVisualChildren<CheckBox>(attributeAutomation),
+                checkBox => Equals(checkBox.Content, "Auto assign attribute points"));
         });
     }
 
