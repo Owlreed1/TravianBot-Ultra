@@ -7,9 +7,18 @@ public sealed partial class TravianClient
 {
     public const string ExpectedLanguage = TravianLanguageDetector.ExpectedLanguage;
 
+    public static bool IsExpectedLanguage(string? language)
+        => TravianLanguageDetector.IsExpected(language);
+
     public async Task<string?> ReadCurrentLanguageAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!IsTravianLanguageDocument(_page.Url, ServerUrl))
+        {
+            Notify($"[language:verbose] skipped language read outside the configured game origin ('{SanitizeHost(_page.Url)}').");
+            return null;
+        }
+
         try
         {
             var language = await _page.EvaluateAsync<string?>(
@@ -179,5 +188,11 @@ public sealed partial class TravianClient
         => TravianLanguageDetector.ExtractFromHtml(html);
 
     internal static bool IsExpectedLanguageForTests(string? language)
-        => TravianLanguageDetector.IsExpected(language);
+        => IsExpectedLanguage(language);
+
+    internal static bool IsTravianLanguageDocumentForTests(string? pageUrl, string serverUrl)
+        => IsTravianLanguageDocument(pageUrl, serverUrl);
+
+    private static bool IsTravianLanguageDocument(string? pageUrl, string serverUrl)
+        => IsConfiguredGameOrigin(pageUrl, serverUrl);
 }

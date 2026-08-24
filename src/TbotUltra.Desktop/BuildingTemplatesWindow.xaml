@@ -10,6 +10,24 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource AppBackgroundBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}">
+    <Window.Resources>
+        <PathGeometry x:Key="TemplatePlusIconGeometry"
+                      Figures="M 12,5 L 12,19 M 5,12 L 19,12" />
+        <PathGeometry x:Key="TemplateDuplicateIconGeometry"
+                      Figures="M 4,4 L 15,4 L 15,15 L 4,15 Z M 9,9 L 20,9 L 20,20 L 9,20 Z" />
+        <PathGeometry x:Key="TemplateDeleteIconGeometry"
+                      Figures="M 5,7 L 19,7 M 9,4 L 15,4 M 7,7 L 8,20 L 16,20 L 17,7 M 11,10 L 11,17 M 14,10 L 14,17" />
+        <Style x:Key="TemplateActionIconStyle" TargetType="Path">
+            <Setter Property="Width" Value="13" />
+            <Setter Property="Height" Value="13" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+            <Setter Property="StrokeThickness" Value="1.8" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+        </Style>
+    </Window.Resources>
     <Grid Margin="14">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="250" />
@@ -44,21 +62,47 @@
                             Orientation="Horizontal"
                             HorizontalAlignment="Center"
                             Margin="0,10,0,0">
-                    <Button Content="New"
-                            Width="76"
+                    <Button Width="60"
                             Height="28"
+                            Padding="6,3"
                             Margin="0,0,6,0"
+                            ToolTip="Create a new empty template"
                             Background="{DynamicResource SuccessBgBrush}"
                             Foreground="{DynamicResource SuccessTextBrush}"
                             BorderBrush="{DynamicResource SuccessBorderBrush}"
-                            Click="NewTemplateButton_Click" />
-                    <Button Content="Delete"
-                            Width="76"
+                            Click="NewTemplateButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource TemplatePlusIconGeometry}"
+                                  Style="{StaticResource TemplateActionIconStyle}" />
+                            <TextBlock Text="New" Margin="5,0,0,0" />
+                        </StackPanel>
+                    </Button>
+                    <Button Width="88"
                             Height="28"
+                            Padding="6,3"
+                            Margin="0,0,6,0"
+                            ToolTip="Duplicate the selected template"
+                            Click="DuplicateTemplateButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource TemplateDuplicateIconGeometry}"
+                                  Style="{StaticResource TemplateActionIconStyle}" />
+                            <TextBlock Text="Duplicate" Margin="5,0,0,0" />
+                        </StackPanel>
+                    </Button>
+                    <Button Width="66"
+                            Height="28"
+                            Padding="6,3"
+                            ToolTip="Delete the selected template"
                             Background="{DynamicResource DangerBgBrush}"
                             Foreground="{DynamicResource DangerTextBrush}"
                             BorderBrush="{DynamicResource DangerBorderBrush}"
-                            Click="DeleteTemplateButton_Click" />
+                            Click="DeleteTemplateButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource TemplateDeleteIconGeometry}"
+                                  Style="{StaticResource TemplateActionIconStyle}" />
+                            <TextBlock Text="Delete" Margin="5,0,0,0" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>
@@ -135,13 +179,20 @@
                             Height="28"
                             Margin="0,0,6,0"
                             Click="MoveRowBottomButton_Click" />
-                    <Button Content="Remove"
-                            Width="78"
+                    <Button Width="88"
                             Height="28"
+                            Padding="7,3"
+                            ToolTip="Delete the selected row"
                             Background="{DynamicResource DangerBgBrush}"
                             Foreground="{DynamicResource DangerTextBrush}"
                             BorderBrush="{DynamicResource DangerBorderBrush}"
-                            Click="RemoveRowButton_Click" />
+                            Click="RemoveRowButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource TemplateDeleteIconGeometry}"
+                                  Style="{StaticResource TemplateActionIconStyle}" />
+                            <TextBlock Text="Delete row" Margin="5,0,0,0" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
 
                 <DataGrid Grid.Row="2"
@@ -245,16 +296,21 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Action" Width="88">
+                        <DataGridTemplateColumn Header="Action" Width="56">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Button Content="Delete"
+                                    <Button Width="30"
                                             Height="24"
+                                            Padding="0"
                                             Margin="4,0"
+                                            ToolTip="Delete row"
                                             Background="{DynamicResource DangerBgBrush}"
                                             Foreground="{DynamicResource DangerTextBrush}"
                                             BorderBrush="{DynamicResource DangerBorderBrush}"
-                                            Click="DeleteRowButton_Click" />
+                                            Click="DeleteRowButton_Click">
+                                        <Path Data="{StaticResource TemplateDeleteIconGeometry}"
+                                              Style="{StaticResource TemplateActionIconStyle}" />
+                                    </Button>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>

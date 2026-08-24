@@ -216,26 +216,106 @@
                         <ComboBox x:Name="SavedProxyComboBox"
                                   Grid.Column="0"
                                   Margin="0,0,8,0"
+                                  Height="40"
+                                  MaxDropDownHeight="420"
+                                  ScrollViewer.CanContentScroll="True"
                                   IsEnabled="False"
                                   SelectionChanged="SavedProxyComboBox_SelectionChanged">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding DisplayText}">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
+                                    <Border Width="458" Padding="8,5,10,5" Background="Transparent">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Availability}" Value="LockedToOther">
-                                                        <Setter Property="Foreground" Value="{DynamicResource DangerTextBrush}" />
                                                         <Setter Property="ToolTip" Value="Locked to another account — cannot be used here." />
                                                     </DataTrigger>
                                                     <DataTrigger Binding="{Binding Availability}" Value="UsedByOthers">
-                                                        <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
                                                         <Setter Property="ToolTip" Value="Already used by another account, but not locked." />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
+                                        </Border.Style>
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="3" />
+                                                <ColumnDefinition Width="16" />
+                                                <ColumnDefinition Width="112" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="86" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border Grid.RowSpan="2" Width="3" CornerRadius="2">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="{DynamicResource InfoBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Availability}" Value="UsedByOthers">
+                                                                <Setter Property="Background" Value="{DynamicResource WarningBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Availability}" Value="LockedToOther">
+                                                                <Setter Property="Background" Value="{DynamicResource DangerBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Entry}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                            </Border>
+
+                                            <Ellipse Grid.Column="1" Width="7" Height="7" VerticalAlignment="Center">
+                                                <Ellipse.Style>
+                                                    <Style TargetType="Ellipse">
+                                                        <Setter Property="Fill" Value="{DynamicResource StateIdleBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Entry.IsWorking}" Value="True">
+                                                                <Setter Property="Fill" Value="{DynamicResource SuccessBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Entry.IsWorking}" Value="False">
+                                                                <Setter Property="Fill" Value="{DynamicResource DangerBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Entry}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Ellipse.Style>
+                                            </Ellipse>
+
+                                            <TextBlock Grid.Column="2" Text="{Binding CountryText}"
+                                                       FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="3" Text="{Binding EndpointText}"
+                                                       FontFamily="Consolas" FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="4" Text="{Binding PerformanceText}" FontSize="10"
+                                                       HorizontalAlignment="Right">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Entry.IsWorking}" Value="True">
+                                                                <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Entry.IsWorking}" Value="False">
+                                                                <Setter Property="Foreground" Value="{DynamicResource DangerTextBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="3"
+                                                       Margin="0,2,0,0" Text="{Binding ContextText}"
+                                                       FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </Grid>
+                                    </Border>
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>

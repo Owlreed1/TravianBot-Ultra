@@ -8,6 +8,7 @@ namespace TbotUltra.Desktop;
 
 public partial class ProxyLibraryWindow : Window
 {
+    private const string TravianTargetUrl = "https://www.travian.com/";
     private readonly ProxyLibraryStore _store;
     private readonly ProxyListTester _tester = new(log: message => System.Diagnostics.Debug.WriteLine(message));
     private readonly string _activeProxyServer;
@@ -132,8 +133,24 @@ public partial class ProxyLibraryWindow : Window
             return;
         }
 
-        _workingProxies.Remove(entry);
-        ProxyDataGrid.Items.Refresh();
+        try
+        {
+            _store.Remove(entry.Id);
+            _workingProxies.Remove(entry);
+            _savedSnapshot = BuildSnapshot(_store.Load());
+            ApplyActiveState();
+            ProxyDataGrid.Items.Refresh();
+            UpdateActiveProxyText(_activeAccountName);
+        }
+        catch (Exception ex)
+        {
+            AppDialog.Show(
+                this,
+                $"Could not delete proxy: {ex.Message}",
+                "Delete proxy",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void DeleteAllButton_Click(object sender, RoutedEventArgs e)
@@ -216,7 +233,19 @@ public partial class ProxyLibraryWindow : Window
                 .ToList();
             var progress = new Progress<ProxyTestProgress>(p =>
                 BusyOverlay.Text = $"Testing {p.Tested} / {p.Total} - {p.Found} working");
-            var results = await _tester.TestAsync(candidates, maxConcurrency: 100, topCount: candidates.Count, progress, token);
+            var live = await _tester.TestAsync(candidates, maxConcurrency: 100, topCount: candidates.Count, progress, token);
+            token.ThrowIfCancellationRequested();
+
+            BusyOverlay.Show("Checking proxies", $"Checking which of {live.Count} can reach travian.com...");
+            var reachProgress = new Progress<ProxyTestProgress>(p =>
+                BusyOverlay.Text = $"Reaching travian.com {p.Tested} / {p.Total} - {p.Found} reliable");
+            var results = await _tester.FilterReachableAsync(
+                live,
+                TravianTargetUrl,
+                maxConcurrency: 100,
+                topCount: candidates.Count,
+                reachProgress,
+                token);
             token.ThrowIfCancellationRequested();
 
             var resultByServer = results.ToDictionary(item => item.Candidate.Server, StringComparer.OrdinalIgnoreCase);
@@ -255,7 +284,7 @@ public partial class ProxyLibraryWindow : Window
             BusyOverlay.Hide();
             AppDialog.Show(
                 this,
-                $"Checked {_workingProxies.Count} proxies. {results.Count} working.",
+                $"Checked {_workingProxies.Count} proxies. {results.Count} reliable and able to reach Travian.",
                 "Check proxies",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);

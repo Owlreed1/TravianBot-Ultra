@@ -6,6 +6,32 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class ProxyLibraryStoreTests
 {
     [Fact]
+    public void Remove_DeletesOnlyTheRequestedPersistedEntry()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"tbot-proxy-remove-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var path = Path.Combine(root, "proxies.json");
+        try
+        {
+            var store = new ProxyLibraryStore(path);
+            store.Save(
+            [
+                new ProxyLibraryEntry { Id = "first", Name = "First", Host = "1.1.1.1", Port = 80 },
+                new ProxyLibraryEntry { Id = "second", Name = "Second", Host = "2.2.2.2", Port = 80 },
+            ]);
+
+            Assert.True(store.Remove("first"));
+
+            var remaining = Assert.Single(store.Load());
+            Assert.Equal("second", remaining.Id);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Upsert_DeduplicatesByCanonicalServer()
     {
         var entries = new List<ProxyLibraryEntry>();

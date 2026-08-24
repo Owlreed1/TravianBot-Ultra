@@ -54,7 +54,11 @@ public sealed class AccountEditorStateTests
         Assert.Null(options[0].Entry);
         Assert.Equal("Z", options[1].Entry!.Name);
         Assert.Equal(new[] { "B", "A" }, options.Skip(2).Select(option => option.Entry!.Name));
-        Assert.Equal("Unknown · z.example:1080 · player@example.com · Arabia 50 (5x) · 500 ms", options[1].DisplayText);
+        Assert.Equal("Unknown · z.example:1080", options[1].DisplayText);
+        Assert.Equal("player@example.com · Arabia 50 (5x)", options[1].ContextText);
+        Assert.Equal("Unverified", options[1].HealthText);
+        Assert.Equal("500 ms", options[1].LatencyText);
+        Assert.Equal("Unverified · 500 ms", options[1].PerformanceText);
     }
 
     [Fact]
@@ -64,7 +68,11 @@ public sealed class AccountEditorStateTests
 
         var option = AccountEditorState.BuildSavedProxyOptions([entry], "active")[1];
 
-        Assert.Equal("Unknown · shared.example:1080 · Unassigned · — · Not tested", option.DisplayText);
+        Assert.Equal("Unknown · shared.example:1080", option.DisplayText);
+        Assert.Equal("Unassigned", option.ContextText);
+        Assert.Equal("Not tested", option.HealthText);
+        Assert.Equal(string.Empty, option.LatencyText);
+        Assert.Equal("Not tested", option.PerformanceText);
     }
 
     [Fact]

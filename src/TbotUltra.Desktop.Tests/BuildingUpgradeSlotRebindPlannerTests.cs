@@ -118,6 +118,32 @@ public sealed class BuildingUpgradeSlotRebindPlannerTests
     }
 
     [Fact]
+    public void ConstructionQueueReconciliation_RemovesSatisfiedWarehouseUpgradeInExactSlot()
+    {
+        var payload = new BuildingUpgradePayload(19, 6, "Warehouse").ToDictionary();
+        payload[BotOptionPayloadKeys.UpgradeDeferReason] = BotOptionPayloadKeys.UpgradeDeferReasonInProgress;
+        var upgrade = Item("upgrade_building_to_level", payload);
+        var status = Status(new Building(19, "Warehouse", 6, "/build.php?id=19", 10));
+
+        var plan = ConstructionQueueReconciliation.Plan(status, [upgrade]);
+
+        Assert.Contains(upgrade.Id, plan.Removals);
+    }
+
+    [Fact]
+    public void PlanFromLiveStatus_DoesNotRebindWarehouseUpgradeToDifferentDuplicateSlot()
+    {
+        var upgrade = Item(
+            "upgrade_building_to_level",
+            new BuildingUpgradePayload(19, 6, "Warehouse").ToDictionary());
+        var status = Status(new Building(20, "Warehouse", 6, "/build.php?id=20", 10));
+
+        var reconciliation = BuildingUpgradeSlotRebindPlanner.PlanUpgradeFromLiveStatus(status, upgrade);
+
+        Assert.Null(reconciliation);
+    }
+
+    [Fact]
     public void PlanFromLiveStatus_RebindsWrongSlotAcademyUpgradeWhenTargetNotMet()
     {
         var upgrade = Item(

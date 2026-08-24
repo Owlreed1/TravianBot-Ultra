@@ -93,11 +93,11 @@ public partial class TravianLanguageGateWindow : Window
     private void SetCurrentLanguage(string? language)
     {
         var display = string.IsNullOrWhiteSpace(language) ? "unknown" : language.Trim();
-        CurrentLanguageTextBlock.Text = $"Current language: {display}. Required language: {ExpectedLanguage}.";
+        CurrentLanguageTextBlock.Text = $"Current language: {display}. Required language: English (en or {ExpectedLanguage}).";
     }
 
     private static bool IsExpectedLanguage(string? language)
-        => string.Equals(language?.Trim(), ExpectedLanguage, StringComparison.OrdinalIgnoreCase);
+        => TravianClient.IsExpectedLanguage(language);
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {

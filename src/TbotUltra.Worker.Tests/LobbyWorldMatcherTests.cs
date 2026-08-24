@@ -15,6 +15,18 @@ public sealed class LobbyWorldMatcherTests
         Assert.Equal(expected, TravianClient.ShouldAlwaysRequestLobbyWorldSelection(serverName));
     }
 
+    [Theory]
+    [InlineData("Choose in lobby", true)]
+    [InlineData("INTERNATIONAL 100", false)]
+    public void ShouldRequestLobbyWorldSelectionAfterAutomaticAttempts_OnlyAllowsUnresolvedAccounts(
+        string serverName,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            TravianClient.ShouldRequestLobbyWorldSelectionAfterAutomaticAttempts(serverName));
+    }
+
     [Fact]
     public void LobbyWorldOption_DisplayTextIncludesCardDetailsAndStableUidPrefix()
     {

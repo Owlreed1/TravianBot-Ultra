@@ -356,6 +356,57 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         StatusText = "Created template.";
     }
 
+    private void DuplicateTemplateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedTemplate is null)
+        {
+            return;
+        }
+
+        var duplicate = CreateDuplicateTemplate(
+            SelectedTemplate,
+            BuildTemplateRowsFromUi(),
+            Templates);
+        var sourceIndex = Templates.IndexOf(SelectedTemplate);
+        Templates.Insert(sourceIndex + 1, duplicate);
+        SelectedTemplate = duplicate;
+        StatusText = "Duplicated template. Save to keep it.";
+    }
+
+    internal static BuildingTemplate CreateDuplicateTemplate(
+        BuildingTemplate source,
+        IReadOnlyList<BuildingTemplateRow> currentRows,
+        IReadOnlyCollection<BuildingTemplate> existingTemplates)
+    {
+        var sourceName = string.IsNullOrWhiteSpace(source.Name) ? "Template" : source.Name.Trim();
+        var copyName = $"{sourceName} copy";
+        var copyNumber = 2;
+        while (existingTemplates.Any(template =>
+                   string.Equals(template.Name, copyName, StringComparison.OrdinalIgnoreCase)))
+        {
+            copyName = $"{sourceName} copy {copyNumber++}";
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        return new BuildingTemplate
+        {
+            Name = copyName,
+            CreatedByTribe = source.CreatedByTribe,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+            Rows = currentRows.Select(row => new BuildingTemplateRow
+            {
+                Kind = row.Kind,
+                Gid = row.Gid,
+                BuildingName = row.BuildingName,
+                PreferredSlotId = row.PreferredSlotId,
+                TargetLevel = row.TargetLevel,
+                ResourceScope = row.ResourceScope,
+                ResourceStrategy = row.ResourceStrategy,
+            }).ToList(),
+        };
+    }
+
     private void DeleteTemplateButton_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedTemplate is null)

@@ -19,6 +19,20 @@ public sealed class BonusVideoMuteSourceTests
         Assert.DoesNotContain("Force = true", method, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PlaybackStart_NeverClicksTheUnverifiedVideoAreaCenter()
+    {
+        var method = ReadMethod(
+            "Hero",
+            "TravianClient.AdventureDanger.cs",
+            "StartBonusVideoPlayerAsync",
+            "DateTimeOffset?");
+
+        Assert.Contains("IsSafeBonusVideoPlayControlAsync(", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("_page.Mouse.ClickAsync", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("video-area center fallback", method, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("Buildings", "TravianClient.ConstructFaster.cs", "WaitForConstructFasterVideoCompletionAsync")]
     [InlineData("Features", "TravianClient.ProductionBonus.cs", "WaitForProductionBonusVideoCompletionAsync")]
@@ -33,7 +47,11 @@ public sealed class BonusVideoMuteSourceTests
         Assert.Contains("MuteBonusVideoAsync(", method, StringComparison.Ordinal);
     }
 
-    private static string ReadMethod(string area, string fileName, string methodName)
+    private static string ReadMethod(
+        string area,
+        string fileName,
+        string methodName,
+        string returnType = "bool")
     {
         var root = ProjectRootLocator.FindProjectRoot();
         var source = File.ReadAllText(Path.Combine(
@@ -45,7 +63,7 @@ public sealed class BonusVideoMuteSourceTests
             area,
             fileName));
 
-        var methodStart = source.IndexOf($"private async Task<bool> {methodName}(", StringComparison.Ordinal);
+        var methodStart = source.IndexOf($"private async Task<{returnType}> {methodName}(", StringComparison.Ordinal);
         Assert.True(methodStart >= 0, $"Could not find {methodName}.");
 
         var nextMethod = source.IndexOf("\n    private ", methodStart + methodName.Length, StringComparison.Ordinal);

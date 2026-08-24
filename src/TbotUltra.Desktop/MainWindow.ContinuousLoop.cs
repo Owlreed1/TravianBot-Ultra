@@ -974,6 +974,18 @@ public partial class MainWindow
             }
 
             _startContinuousLoopAfterQueueStop = false;
+            if (_restartAutoQueueAfterLanguageGate
+                && _isLoggedIn
+                && !_uiBusy
+                && !_autoQueueRunning
+                && !IsContinuousLoopRunning())
+            {
+                _restartAutoQueueAfterLanguageGate = false;
+                _ = TriggerQueueAutoRunAsync();
+                return;
+            }
+
+            _restartAutoQueueAfterLanguageGate = false;
         });
     }
 

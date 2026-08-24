@@ -23,12 +23,16 @@ Active decision, extracted from `ENGINEERING_NOTES.md` on 2026-07-18.
 
 - Full login always starts at `lobby.legends.travian.com/account`; never probe or submit credentials on the
   configured game server first, and do not use direct game-server login as fallback.
+- `DOMContentLoaded` does not prove that the lobby React application has rendered. Wait for either the owned-world
+  cards or both credential fields, and retry a missing/transient lobby state at most three times. A repeated submit
+  is allowed only after the freshly loaded lobby explicitly shows the complete login form again.
 - Select the owned world by cached lobby wuid when available. Accept any authenticated path on the configured
   game origin and store a newly learned wuid in the per-account analysis snapshot.
 - Automatic matching tolerates a speed label omitted from the lobby world name, while an explicit conflicting
-  speed is never accepted. A missing/stale cached wuid or failed automatic match falls back during interactive
-  login to a chooser containing all owned lobby worlds. The chosen wuid is saved only after `Play now` reaches
-  the configured origin, so a wrong selection is not remembered.
+  speed is never accepted. The interactive chooser is available only while the account is still configured as
+  `Choose in lobby`. After its first verified selection saves the concrete server, missing/stale cached data or a
+  failed landing must keep that server unchanged and fail into normal login retry instead of reopening the chooser.
+  The chosen wuid is saved only after `Play now` reaches the configured origin, so a wrong selection is not remembered.
 - After credentials are submitted, execution-context destruction is an expected navigation transition. Wait
   for the rendered owned-world card before continuing. Both login submit and `Play now` use normal click pacing.
 - After lobby SSO commits navigation to the game origin, do not wait for the old context to prove the game
@@ -36,7 +40,9 @@ Active decision, extracted from `ENGINEERING_NOTES.md` on 2026-07-18.
   clean game context in the same Chromium process, close the lobby context, and verify login in the replacement.
 - Saved state may retain lobby/auth hosts required for SSO, but must remove sibling game-server state and
   consent storage.
-- Login automation requires the supported English UI and fails clearly when required markers are absent.
+- Read account language only on the configured game origin; lobby and browser-error documents are not account-language
+  evidence. Accept Travian's equivalent `en` and `en-US` English codes. A verified language-gate action resumes the
+  automation mode that was running before the pause; an idle account remains idle.
 
 ## Account access and holds
 

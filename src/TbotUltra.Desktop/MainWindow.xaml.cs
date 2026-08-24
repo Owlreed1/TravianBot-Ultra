@@ -348,6 +348,7 @@ public partial class MainWindow : Window
     private bool _logFlushQueued;
     private bool _restartContinuousLoopAfterStop;
     private bool _startContinuousLoopAfterQueueStop;
+    private bool _restartAutoQueueAfterLanguageGate;
 
     /// <summary>
     /// Public accessor so the Buildings panel can bind to the buildings view

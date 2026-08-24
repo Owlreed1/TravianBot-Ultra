@@ -18,8 +18,16 @@ public sealed partial class TravianClient
     internal const string StartPageLoginButtonSelector =
         "header .headerContainerEnd button.gold.buttonSecondary.login.withText";
     internal const string StartPageGoToLobbyButtonSelector = "button.playNowCTAButton";
+    private const int LobbyLoadAttempts = 3;
 
     private sealed record LobbyWorldCard(string WorldUid, string Name, string Details);
+    private enum LobbyEntryState
+    {
+        Missing,
+        WorldList,
+        LoginForm,
+    }
+
     private string? _pendingLobbyWorldUid;
     private LobbyWorldServerResolution? _pendingLobbyWorldServerResolution;
 
@@ -27,33 +35,9 @@ public sealed partial class TravianClient
     {
         try
         {
-            Notify($"[lobby-login] opening lobby for account '{_account.Name}'.");
-            await GotoAsync(Paths.LobbyAccount, cancellationToken);
-            if (await TryRecoverFromUnexpectedLobbyErrorPageAsync(cancellationToken))
+            if (!await PrepareAuthenticatedLobbyAsync(cancellationToken))
             {
-                await TryResumeLobbyFromRecoveredStartPageAsync(cancellationToken);
-            }
-            ThrowIfAccountAccessBlocked(await ReadExplicitLobbyAccessStateAsync());
-
-            if (await _page.Locator(Selectors.LobbyGameWorldCard).CountAsync() == 0)
-            {
-                if (!await HasAnySelectorAsync(Selectors.LoginUsernameField)
-                    || !await HasAnySelectorAsync(Selectors.LoginPasswordField))
-                {
-                    Notify("[lobby-login] neither an authenticated world list nor a login form was found.");
-                    return false;
-                }
-
-                Notify("[lobby-login] lobby session is not authenticated; submitting credentials.");
-                await FillLoginCredentialsWithPacingAsync(cancellationToken);
-                await ClickLoginButtonAsync(cancellationToken);
-                Notify("[lobby-login] credentials submitted; waiting for the loaded lobby world list.");
-                if (!await WaitForLobbyWorldCardsAsync(cancellationToken))
-                {
-                    ThrowIfAccountAccessBlocked(await ReadExplicitLobbyAccessStateAsync());
-                    Notify("[lobby-login] no world cards appeared after lobby credential submission.");
-                    return false;
-                }
+                return false;
             }
 
             var cards = await ReadLobbyWorldCardsAsync(cancellationToken);
@@ -113,6 +97,12 @@ public sealed partial class TravianClient
                 }
             }
 
+            if (!ShouldRequestLobbyWorldSelectionAfterAutomaticAttempts(_config.ServerName))
+            {
+                Notify("[lobby-login] the saved world did not reach its configured origin; keeping the account server unchanged and leaving retry handling to the caller.");
+                return false;
+            }
+
             var manuallyFailedWorlds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             while (manuallyFailedWorlds.Count < cards.Count)
             {
@@ -154,6 +144,102 @@ public sealed partial class TravianClient
         }
     }
 
+    private async Task<bool> PrepareAuthenticatedLobbyAsync(CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; attempt <= LobbyLoadAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                Notify($"[lobby-login] opening lobby for account '{_account.Name}' (attempt {attempt}/{LobbyLoadAttempts}).");
+                await GotoAsync(Paths.LobbyAccount, cancellationToken);
+                if (await TryRecoverFromUnexpectedLobbyErrorPageAsync(cancellationToken))
+                {
+                    await TryResumeLobbyFromRecoveredStartPageAsync(cancellationToken);
+                }
+
+                ThrowIfAccountAccessBlocked(await ReadExplicitLobbyAccessStateAsync());
+                var entryState = await WaitForLobbyEntryStateAsync(cancellationToken);
+                if (entryState == LobbyEntryState.WorldList)
+                {
+                    return true;
+                }
+
+                if (entryState == LobbyEntryState.LoginForm)
+                {
+                    Notify($"[lobby-login] lobby session is not authenticated; submitting credentials (attempt {attempt}/{LobbyLoadAttempts}).");
+                    await FillLoginCredentialsWithPacingAsync(cancellationToken);
+                    await ClickLoginButtonAsync(cancellationToken);
+                    Notify("[lobby-login] credentials submitted; waiting for the loaded lobby world list.");
+                    if (await WaitForLobbyWorldCardsAsync(cancellationToken))
+                    {
+                        return true;
+                    }
+
+                    ThrowIfAccountAccessBlocked(await ReadExplicitLobbyAccessStateAsync());
+                    Notify($"[lobby-login] no world cards appeared after credential submission (attempt {attempt}/{LobbyLoadAttempts}).");
+                }
+                else
+                {
+                    ThrowIfAccountAccessBlocked(await ReadExplicitLobbyAccessStateAsync());
+                    Notify($"[lobby-login] neither an authenticated world list nor a login form rendered (attempt {attempt}/{LobbyLoadAttempts}).");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (AccountAccessException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is PlaywrightException or TimeoutException or InvalidOperationException)
+            {
+                Notify($"[lobby-login] transient lobby attempt {attempt}/{LobbyLoadAttempts} failed: {ex.Message}");
+            }
+
+            if (attempt < LobbyLoadAttempts)
+            {
+                Notify($"[lobby-login] retrying the lobby load ({attempt + 1}/{LobbyLoadAttempts}).");
+                await Task.Delay(TimeSpan.FromSeconds(attempt), cancellationToken);
+            }
+        }
+
+        Notify($"[lobby-login] lobby authentication did not complete after {LobbyLoadAttempts} attempts.");
+        return false;
+    }
+
+    private async Task<LobbyEntryState> WaitForLobbyEntryStateAsync(CancellationToken cancellationToken)
+    {
+        var renderTimeoutMs = Math.Clamp(_config.TimeoutMs, 10_000, 30_000);
+        var deadline = DateTime.UtcNow.AddMilliseconds(renderTimeoutMs);
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (await _page.Locator(Selectors.LobbyGameWorldCard).CountAsync() > 0)
+                {
+                    return LobbyEntryState.WorldList;
+                }
+
+                if (await HasAnySelectorAsync(Selectors.LoginUsernameField)
+                    && await HasAnySelectorAsync(Selectors.LoginPasswordField))
+                {
+                    return LobbyEntryState.LoginForm;
+                }
+            }
+            catch (PlaywrightException ex) when (IsTransientExecutionContextError(ex))
+            {
+                // The lobby may replace its initial document while React is starting; keep polling.
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+        }
+
+        return LobbyEntryState.Missing;
+    }
+
     private async Task<LobbyWorldCard?> RequestLobbyWorldSelectionAsync(
         IReadOnlyList<LobbyWorldCard> cards,
         bool previousSelectionFailed,
@@ -188,6 +274,9 @@ public sealed partial class TravianClient
     }
 
     internal static bool ShouldAlwaysRequestLobbyWorldSelection(string? serverName)
+        => ShouldRequestLobbyWorldSelectionAfterAutomaticAttempts(serverName);
+
+    internal static bool ShouldRequestLobbyWorldSelectionAfterAutomaticAttempts(string? serverName)
         => LobbyWorldSelectionDefaults.IsChooseInLobby(serverName);
 
     private async Task<bool> TryEnterLobbyWorldAsync(

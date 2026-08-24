@@ -640,7 +640,10 @@ public partial class AccountsWindow : Window
     {
         var initialScheme = (ProxySchemeComboBox?.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString();
         var finder = new ProxyFinderWindow(initialScheme) { Owner = this };
-        if (finder.ShowDialog() != true || finder.SelectedProxy is not { } pick)
+        var result = finder.ShowDialog();
+        ReloadProxyLibraryEntries();
+        RefreshSavedProxySelection();
+        if (result != true || finder.SelectedProxy is not { } pick)
         {
             return;
         }

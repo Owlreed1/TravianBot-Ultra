@@ -128,6 +128,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   50–500 ms tab delay between clicks and does not apply general human/action pacing while filling its form.
 - Proxy settings are account-scoped. Browser, HTTP client, tests, and bonus video use the same effective route.
   Never log credentials or place them in user-visible URLs.
+- Proxy Finder and Proxy Library classify a proxy as reliable only after three consecutive neutral HTTPS probes
+  and two consecutive Travian reachability probes. All five probes use fresh connections and the active cancellation
+  token; a single failed probe rejects the proxy. Only HTTP 2xx/3xx responses count as usable; blocked, proxy-auth
+  and gateway/server-error responses do not.
 - Retry only transient failures with bounded attempts. Apply configured pacing; do not add unbounded sleeps.
 - Alarms represent actionable failures. Expected waiting/blocking and an explicitly retrying bounded transient
   attempt are normal status. Deduplicate identical alarms for 30 minutes; repeated occurrences update visible
@@ -155,6 +159,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - `DOMContentLoaded` is sufficient only when followed by a required page-marker check.
 - Full login starts in the Travian lobby and enters the owned world through SSO; never submit credentials to the
   configured game server or add direct-server fallback.
+- Lobby navigation must wait for the delayed React world list or complete login form, then retry a missing/transient
+  lobby state at most three times. Re-submit credentials only after a fresh lobby load confirms the login form.
+- `Choose in lobby` is a one-time account resolution: save the concrete server only after verified game login, then
+  keep it authoritative. Transient proxy/navigation failures must retry or fail without reopening the world picker
+  or changing that account's server.
 - Preserve filtered SSO state only in in-app session transitions. Real process startup and user exit clear every
   account's saved Playwright auth state.
 - After Play now commits navigation to an Official game origin, rotate immediately to the clean in-app context that
@@ -163,7 +172,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - The Official mobile-version dialog can appear after Play now's first navigation wait expires. After confirming it
   with both mobile options off, wait again for the game origin before treating the current lobby URL as a failed SSO.
 - Preserve the intentional headed/maximized anti-detection setup and `ViewportSize.NoViewport`.
-- Login automation requires English UI and fails clearly when required markers are missing.
+- Read account language only on the configured game origin; lobby and browser-error documents are not evidence.
+  Accept Travian's equivalent `en` and `en-US` English codes. After either language-dialog action verifies English,
+  restore the exact automation mode that was running before the pause; do not start an idle bot.
 - The one-time Gold Shop offer is a blocking announcement, not an automation action. Dismiss it after game-page
   navigation/reload only through the visible `data-context="oneTimeOfferAnnouncement"` dialog; never use a broad
   dialog-close selector.
@@ -503,6 +514,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   General/Village tab click; that makes a Collect-to-tab transition effectively instantaneous.
 - Bonus-video failures use shared protected timing, typed cooldowns, account proxy routing, and sanitized logs.
   See [bonus-video ADR](adr/2026-07-18-bonus-video.md).
+  Start playback only through the exact visible provider play control after ancestry, geometry, and center hit-testing;
+  never use a blind video-area/iframe-center click because a partially rendered player may expose an advertiser link.
   Optional audio muting is strictly best-effort and defaults enabled through General settings. Click only the exact
   visible `.atg-gima-audio-button-enabled:not(.atg-gima-hidden)` icon after bounded geometry, ancestry, and center
   hit-testing prove that exact icon owns the click. Never click its wrapper, the video area, use force/JS fallback,
