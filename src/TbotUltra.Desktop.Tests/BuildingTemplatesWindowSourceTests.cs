@@ -52,4 +52,22 @@ public sealed class BuildingTemplatesWindowSourceTests
         Assert.Contains("ToolTip=\"Duplicate the selected template\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ToolTip=\"Delete the selected template\"", xaml, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void SaveAllowsDraftsAndQueueValidationFailureIsShownExplicitly()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var code = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "BuildingTemplatesWindow.xaml.cs"));
+
+        var saveHandlerStart = code.IndexOf("private void SaveButton_Click", StringComparison.Ordinal);
+        var queueHandlerStart = code.IndexOf("private void QueueTemplateButton_Click", StringComparison.Ordinal);
+        var closeHandlerStart = code.IndexOf("private void CloseButton_Click", StringComparison.Ordinal);
+        Assert.True(saveHandlerStart >= 0 && queueHandlerStart > saveHandlerStart && closeHandlerStart > queueHandlerStart);
+
+        var saveHandler = code[saveHandlerStart..queueHandlerStart];
+        var queueHandler = code[queueHandlerStart..closeHandlerStart];
+        Assert.Contains("SaveAllTemplates(skipValidation: true)", saveHandler, StringComparison.Ordinal);
+        Assert.Contains("AppDialog.Show(", queueHandler, StringComparison.Ordinal);
+        Assert.Contains("\"Cannot queue template\"", queueHandler, StringComparison.Ordinal);
+    }
 }

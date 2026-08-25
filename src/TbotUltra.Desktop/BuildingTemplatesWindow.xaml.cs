@@ -540,14 +540,6 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         StatusText = $"Inserted {prerequisitePlan.Rows.Count} prerequisite row(s) before {option.Name}.";
     }
 
-    private void RemoveRowButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (SelectedRow is not null)
-        {
-            RemoveTemplateRow(SelectedRow);
-        }
-    }
-
     private void DeleteRowButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: BuildingTemplateRowView row })
@@ -660,7 +652,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!SaveAllTemplates(skipValidation: false))
+        if (!SaveAllTemplates(skipValidation: true))
         {
             return;
         }
@@ -670,7 +662,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
 
     private void QueueTemplateButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!SaveAllTemplates(skipValidation: false))
+        if (!SaveAllTemplates(skipValidation: true))
         {
             return;
         }
@@ -679,7 +671,14 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         var plan = _planner.Plan(rows, _status, _serverSpeed, _mainBuildingLevel);
         if (plan.Errors.Count > 0)
         {
+            var message = string.Join("\n", plan.Errors);
             StatusText = string.Join(" ", plan.Errors.Take(2));
+            AppDialog.Show(
+                this,
+                message,
+                "Cannot queue template",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             return;
         }
 
@@ -688,6 +687,12 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             StatusText = plan.Warnings.Count > 0
                 ? string.Join(" ", plan.Warnings.Take(2))
                 : "Template has nothing to queue.";
+            AppDialog.Show(
+                this,
+                StatusText,
+                "Cannot queue template",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
