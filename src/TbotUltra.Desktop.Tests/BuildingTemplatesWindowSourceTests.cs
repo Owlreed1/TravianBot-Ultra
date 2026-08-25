@@ -36,4 +36,20 @@ public sealed class BuildingTemplatesWindowSourceTests
         Assert.Contains("Content=\"Top\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Content=\"Bottom\"", xaml, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void TemplateAndRowDeleteActions_UseCompactIconOnlyButtons()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "BuildingTemplatesWindow.xaml"));
+
+        Assert.DoesNotContain("<TextBlock Text=\"New\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<TextBlock Text=\"Duplicate\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<TextBlock Text=\"Delete\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Click=\"RemoveRowButton_Click\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Click=\"DeleteRowButton_Click\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"Create a new empty template\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"Duplicate the selected template\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"Delete the selected template\"", xaml, StringComparison.Ordinal);
+    }
 }
