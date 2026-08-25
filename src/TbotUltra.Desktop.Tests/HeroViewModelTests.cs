@@ -105,6 +105,19 @@ public sealed class HeroViewModelTests
     }
 
     [Fact]
+    public void ApplyAttributeSnapshot_DisplaysResourceAndFreePointsFromSnapshot()
+    {
+        var vm = new HeroViewModel();
+        vm.LoadPriorityFromConfig(null);
+
+        vm.ApplyAttributeSnapshot(new HeroAttributeSnapshot(FreePoints: 4, Resources: 28));
+
+        var resources = Assert.Single(vm.AttributePriorityItems, item => item.Key == "resources");
+        Assert.Equal("28", resources.PointsText);
+        Assert.Equal("Free points: 4", vm.AttributesStatusText);
+    }
+
+    [Fact]
     public void HeroReadyText_SaysNoAdventures_WhenHomeAndReadyWithoutAdventures()
     {
         var vm = new HeroViewModel();

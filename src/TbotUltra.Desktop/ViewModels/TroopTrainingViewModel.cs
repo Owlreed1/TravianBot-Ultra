@@ -421,14 +421,21 @@ public sealed partial class TroopTrainingViewModel : BaseViewModel
     public bool TryValidateMinimumTroopRanges(out string error)
     {
         var invalid = Buildings.FirstOrDefault(option => option.MinimumTroopsEnabled && !option.HasValidMinimumTroopRange);
-        if (invalid is null)
+        if (invalid is not null)
         {
-            error = string.Empty;
-            return true;
+            error = $"{invalid.Title}: minimum troops must use whole numbers from 1 to 10,000 and Max must be at least Min.";
+            return false;
         }
 
-        error = $"{invalid.Title}: minimum troops must use whole numbers from 1 to 10,000 and Max must be at least Min.";
-        return false;
+        var requiresResourceSelection = Buildings.Any(option => option.IsEnabled && option.UsesResourcePercentMode);
+        if (requiresResourceSelection && !CheckWood && !CheckClay && !CheckIron && !CheckCrop)
+        {
+            error = "Select at least one resource when an enabled troop building uses % resources.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
     }
 
     /// <summary>

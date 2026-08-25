@@ -105,8 +105,10 @@ Aktivt beslut, 2026-06-20. Detaljerna bakom de korta reglerna i
   gid 15); okand MB -> default niva 1 (ingen rabatt). Nar byns byggnader skannas anropar
   `PopulateBuildingsTab` en `RequestQueueUiRefresh` (skyddad av `_isRefreshingQueueUi` mot rekursion)
   sa redan kolagda poster rakas om med ratt MB.
-- `ResolveServerSpeed` provar forst servernamnet (`(\d+)x`, t.ex. "10x") och faller annars tillbaka
-  pa server-URL:ens hastighetssubdoman (`\.x(\d+)`, t.ex. `ts100.x10...`). Misslyckas bada -> 1x + engangs-`ALARM:`.
+- `ResolveServerSpeed` provar forst servernamnet i bade `10x`- och lobbyformatet `X10`, och faller annars
+  tillbaka pa server-URL:ens hastighetssubdoman (`\.x(\d+)`, t.ex. `ts100.x10...`). Fore verifierad
+  inloggning ar okand hastighet ett forvantat lobbytillstand och anvander 1x utan alarm; ett inloggat konto
+  med verkligt oparsbar hastighet ger 1x + engangs-`ALARM:`.
 
 ## Loggning
 

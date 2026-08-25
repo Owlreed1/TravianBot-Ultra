@@ -1,21 +1,69 @@
-MIT License
+Source Available Non-Commercial License
 
 Copyright (c) 2026 fetmamm
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+All rights reserved except as expressly granted under this license.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. Permission
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Permission is granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software") to:
+
+View and study the source code.
+Download and run the Software for personal, non-commercial purposes.
+Modify the Software for personal, non-commercial purposes.
+Fork the repository.
+Submit modifications, bug fixes, and other contributions to the original project.
+2. Non-Commercial Use Only
+
+The Software, including modified versions and substantial portions of it, may not be used for commercial purposes without prior written permission from the copyright holder.
+
+Without such permission, you may not:
+
+Sell the Software or modified versions of the Software.
+Sell access to the Software.
+Include the Software or substantial portions of it in a commercial product.
+Offer the Software as part of a paid service.
+Charge users for access to functionality provided by the Software.
+Use the Software primarily to provide a commercial service or generate commercial revenue.
+Repackage, rebrand, or redistribute the Software for commercial purposes.
+
+Commercial licenses or other permissions may be granted separately by the copyright holder.
+
+3. Redistribution
+
+Non-commercial redistribution of the Software or modified versions is permitted provided that:
+
+This license and the original copyright notice are included.
+The original author and project are clearly acknowledged.
+Modified versions are clearly identified as modified.
+The Software is not presented as the original author's official version unless authorized by the copyright holder.
+No additional terms are imposed that would remove the protections or restrictions contained in this license.
+4. Ownership
+
+The Software remains copyrighted by its respective copyright holder(s).
+
+Forking, modifying, or contributing to the Software does not grant ownership of the original Software.
+
+No rights are granted to the project's names, logos, trademarks, branding, or other identifying materials except as necessary to provide attribution.
+
+5. Contributions
+
+Unless otherwise agreed in writing, contributions submitted to the original project may be incorporated into the project and distributed under this license.
+
+Contributors retain copyright in their contributions.
+
+6. No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER(S) OR CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+7. Termination
+
+Any rights granted under this license automatically terminate if you violate its terms.
+
+Upon termination, you must cease any use, distribution, or other activity that is not otherwise permitted by applicable law or separately authorized by the copyright holder.
+
+8. Commercial Licensing
+
+For commercial use, redistribution, integration, or licensing, explicit written permission from the copyright holder is required.

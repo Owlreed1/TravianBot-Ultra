@@ -67,6 +67,7 @@ public sealed class TravianLanguageDetectorTests
     [Theory]
     [InlineData("en-US", true)]
     [InlineData(" en-US ", true)]
+    [InlineData("en", true)]
     [InlineData("sv-SE", false)]
     [InlineData("", false)]
     [InlineData("unknown", false)]
@@ -74,5 +75,18 @@ public sealed class TravianLanguageDetectorTests
     public void IsExpectedLanguage_AllowsOnlyEnglish(string? language, bool expected)
     {
         Assert.Equal(expected, TravianClient.IsExpectedLanguageForTests(language));
+    }
+
+    [Theory]
+    [InlineData("https://ts100.x10.international.travian.com/dorf1.php", true)]
+    [InlineData("https://lobby.legends.travian.com/account", false)]
+    [InlineData("chrome-error://chromewebdata/", false)]
+    public void IsTravianLanguageDocument_AcceptsOnlyTheConfiguredGameOrigin(string pageUrl, bool expected)
+    {
+        Assert.Equal(
+            expected,
+            TravianClient.IsTravianLanguageDocumentForTests(
+                pageUrl,
+                "https://ts100.x10.international.travian.com"));
     }
 }

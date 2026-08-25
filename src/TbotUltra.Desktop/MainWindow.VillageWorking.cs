@@ -197,7 +197,11 @@ public partial class MainWindow
 
             item.BuildingSlots = BuildBuildingActivitySlots(
                 status, buildingSlotCount, deferredGroups?.Contains(QueueGroup.Construction) == true);
-            item.TroopSlots = BuildTroopActivitySlots(status, ResolveTroopTrainingPayloadForVillage(item), GetServerNow());
+            item.TroopSlots = TroopTrainingOverviewIndicatorFactory.Build(
+                status,
+                ResolveTroopTrainingPayloadForVillage(item),
+                item.IsEnabledForAutomation,
+                IsGroupEnabledForVillage(villageKey, QueueGroup.TroopTraining));
             item.SmithySlots = BuildSmithyActivitySlots(status, deferredGroups?.Contains(QueueGroup.Troops) == true);
             item.HasQueue = queuedVillages.Contains(villageKey);
             ApplyDashboardQueueTooltip(item);
@@ -508,57 +512,6 @@ public partial class MainWindow
         return slots;
     }
 
-    private IReadOnlyList<VillageActivitySlot> BuildTroopActivitySlots(
-        VillageStatus? status,
-        TroopTrainingPayload trainingSettings,
-        DateTimeOffset serverNow)
-    {
-        var defs = new (TroopTrainingBuildingType Type, string Letter, string Label)[]
-        {
-            (TroopTrainingBuildingType.Barracks, "B", "Barracks"),
-            (TroopTrainingBuildingType.Stable, "S", "Stable"),
-            (TroopTrainingBuildingType.Workshop, "W", "Workshop"),
-        };
-
-        var queues = status?.TroopTrainingQueues;
-        var slots = new List<VillageActivitySlot>(defs.Length);
-        foreach (var (type, letter, label) in defs)
-        {
-            var queue = queues?.FirstOrDefault(q => q.BuildingType == type);
-            // Judge by the absolute finish time so cached queues expire while the app is closed;
-            // raw RemainingSeconds is only a fallback for legacy entries without a Finish snapshot.
-            var remainingSeconds = TroopTrainingQueueState.RemainingSecondsAt(queue, serverNow);
-            var isActive = remainingSeconds is > 0;
-            var exists = queue is { Exists: true };
-            var maxQueueMode = TroopTrainingQuickSettings.BuildingPayloadFor(trainingSettings, type).MaxQueueHours;
-            var isOverMaxQueue = TroopTrainingQueueState.IsOverMaxQueue(remainingSeconds, maxQueueMode);
-            string tooltip;
-            if (queue is null || !queue.Exists)
-            {
-                tooltip = $"{label}: not built";
-            }
-            else if (isActive)
-            {
-                var suffix = isOverMaxQueue ? ", over max queue" : string.Empty;
-                tooltip = $"{label}: training ({FormatTroopTrainingDuration(remainingSeconds!.Value)}{suffix})";
-            }
-            else
-            {
-                tooltip = $"{label}: idle";
-            }
-
-            slots.Add(new VillageActivitySlot
-            {
-                IsActive = isActive && !isOverMaxQueue,
-                IsWaiting = isActive && isOverMaxQueue,
-                Label = letter,
-                Tooltip = tooltip,
-            });
-        }
-
-        return slots;
-    }
-
     private TroopTrainingPayload ResolveTroopTrainingPayloadForVillage(VillageSelectionItem item)
     {
         var account = _uiActiveAccountName;
@@ -581,14 +534,6 @@ public partial class MainWindow
             ?? TroopTrainingQuickSettings.FromOptions(LoadBotOptions());
         _dashboardTroopTrainingPayloadCache[cacheKey] = payload;
         return payload;
-    }
-
-    private static string FormatTroopTrainingDuration(int seconds)
-    {
-        var span = TimeSpan.FromSeconds(Math.Max(0, seconds));
-        return span.TotalHours >= 1
-            ? $"{(int)span.TotalHours}:{span.Minutes:00}:{span.Seconds:00}"
-            : $"{span.Minutes}:{span.Seconds:00}";
     }
 
     // The village the bot is currently working in (browser's village). Shown with a colored border on
@@ -913,6 +858,11 @@ public partial class MainWindow
                 BreweryCelebrationStatus = status.BreweryCelebrationStatus ?? existing.BreweryCelebrationStatus,
                 FarmLists = status.FarmLists ?? existing.FarmLists,
                 HeroStatus = status.HeroStatus ?? existing.HeroStatus,
+                IncomingAttackSignals = status.IncomingAttackSignals ?? existing.IncomingAttackSignals,
+                HasTroopsAtHome = status.HasTroopsAtHome ?? existing.HasTroopsAtHome,
+                TroopPresenceObservedAtUtc = status.HasTroopsAtHome.HasValue
+                    ? status.TroopPresenceObservedAtUtc
+                    : existing.TroopPresenceObservedAtUtc,
             };
 
             if ((status.Buildings is null || status.Buildings.Count == 0) && existing.Buildings is { Count: > 0 })
@@ -928,6 +878,8 @@ public partial class MainWindow
         }
 
         StoreVillageStatusCacheEntry(name, status);
+        ObserveIncomingAttackSignals(status);
+        ObserveHeroCropAntiStarveStatus(status, name);
         InvalidateVillageOverview();
 
         // An empty queue is confirmed only by a current dorf1/dorf2 overview read. Treat that visit as
@@ -1107,7 +1059,9 @@ public partial class MainWindow
         try
         {
             // The store returns canonical (coordinate) keys, migrating legacy name keys on the fly.
+            ResetHeroCropAntiStarveObservations();
             _villageStatusCache.LoadFrom(_villageCacheStore.Load());
+            LoadIncomingAttacksForActiveAccount();
 
             if (_villageStatusCache.Count > 0)
             {
@@ -1364,7 +1318,10 @@ public partial class MainWindow
             ClearVillageDetailUiForUncachedSelection(selected.Name);
         }
 
-        ApplyCachedQueueRowsForSelectedVillage();
+        // Rebuild from the authoritative queue after this village's building levels have been applied.
+        // Reusing the previous aggregate here briefly showed another/stale estimate until the debounced
+        // queue timer ran. This synchronous projection is local only (no browser work).
+        MeasureUiWork("village queue refresh", () => RefreshQueueUi());
         // Show this village's auto-loop group toggles + construction timer.
         ApplyAutomationLoopGroupsForSelectedVillage();
         // Load this village's troop-training override into the Troops tab so it tracks the selection.

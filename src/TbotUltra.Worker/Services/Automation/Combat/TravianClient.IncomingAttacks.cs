@@ -1,0 +1,155 @@
+using Microsoft.Playwright;
+using TbotUltra.Worker.Domain;
+
+namespace TbotUltra.Worker.Services;
+
+public sealed partial class TravianClient
+{
+    public async Task<IncomingAttackSnapshot> ReadIncomingAttacksAsync(
+        string villageName,
+        string? villageUrl,
+        string? villageKey,
+        CancellationToken cancellationToken = default)
+    {
+        using var trace = _browserTrace.BeginOperation("READ", "incoming-attacks", $"village={villageName} source=rally-point");
+        Notify($"[incoming-attacks] reading Rally Point for '{villageName}'.");
+        await SwitchToVillageByIdentityAsync(villageName, villageUrl, villageKey, cancellationToken, skipFeatureRefresh: true);
+        if (!IsCurrentUrlForPath(Paths.Resources))
+        {
+            await GotoAsync(Paths.Resources, cancellationToken);
+        }
+
+        await EnsureLoggedInAsync(cancellationToken: cancellationToken);
+        var activeVillage = await ReadActiveVillageNameAsync(cancellationToken);
+        var coords = await TryReadActiveVillageCoordsFromCurrentPageAsync(cancellationToken);
+        var resolvedKey = coords.X.HasValue && coords.Y.HasValue ? $"xy:{coords.X.Value}|{coords.Y.Value}" : villageKey;
+
+        var dorf1Html = await _page.ContentAsync();
+        var dorf1ObservedAtUtc = _serverTimeUtc ?? DateTimeOffset.UtcNow;
+        var dorf1Signals = IncomingAttackDomParser.ParseDorf1Signals(
+            dorf1Html, activeVillage, villageUrl, coords.X, coords.Y, dorf1ObservedAtUtc);
+        var activeSignal = dorf1Signals.FirstOrDefault(signal =>
+            signal.Dorf1ArrivalTimesUtc is not null
+            && ((coords.X.HasValue && coords.Y.HasValue && signal.CoordX == coords.X && signal.CoordY == coords.Y)
+                || string.Equals(signal.VillageName, activeVillage, StringComparison.OrdinalIgnoreCase)));
+        if (activeSignal is null)
+        {
+            Notify($"[incoming-attacks] clear Dorf1 read for '{activeVillage}'; Rally Point was skipped.");
+            return new IncomingAttackSnapshot(activeVillage, resolvedKey, coords.X, coords.Y, dorf1ObservedAtUtc, []);
+        }
+
+        var fallbackArrivals = activeSignal.Dorf1ArrivalTimesUtc ?? [];
+
+        Notify("[incoming-attacks] opening Rally Point incoming-only overview.");
+        try
+        {
+            await GotoAsync("/build.php?gid=16&tt=1&filter=1&subfilters=1", cancellationToken);
+            await EnsureIncomingAttackFilterAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException && fallbackArrivals.Count > 0)
+        {
+            Notify($"[incoming-attacks] Rally Point read failed; using {fallbackArrivals.Count} red Dorf1 timer(s): {ex.Message}");
+            return new IncomingAttackSnapshot(activeVillage, resolvedKey, coords.X, coords.Y, dorf1ObservedAtUtc, [], false, fallbackArrivals);
+        }
+        var html = await _page.ContentAsync();
+        if (!IncomingAttackDomParser.HasOnlyIncomingFilterActive(html))
+        {
+            throw new InvalidOperationException("Rally Point incoming filter could not be verified; previous attack data was kept.");
+        }
+
+        var observedAtUtc = _serverTimeUtc ?? DateTimeOffset.UtcNow;
+        var attacks = IncomingAttackDomParser.ParseIncomingAttacks(
+            html,
+            activeVillage,
+            resolvedKey,
+            coords.X,
+            coords.Y,
+            observedAtUtc);
+        Notify($"[incoming-attacks] read {attacks.Count} movement(s) for '{activeVillage}'.");
+        trace.Complete("success", $"village={activeVillage} count={attacks.Count}");
+        return new IncomingAttackSnapshot(activeVillage, resolvedKey, coords.X, coords.Y, observedAtUtc, attacks, true, fallbackArrivals);
+    }
+
+    private async Task<IReadOnlyList<IncomingAttackSignal>?> ReadIncomingAttackSignalsOnCurrentDorf1Async(
+        string activeVillage,
+        string? activeVillageUrl,
+        int? activeCoordX,
+        int? activeCoordY,
+        CancellationToken cancellationToken)
+    {
+        if (!IsCurrentUrlForPath(Paths.Resources))
+        {
+            return null;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var html = await _page.ContentAsync();
+        var observedAtUtc = _serverTimeUtc ?? DateTimeOffset.UtcNow;
+        var signals = IncomingAttackDomParser.ParseDorf1Signals(
+            html,
+            activeVillage,
+            activeVillageUrl,
+            activeCoordX,
+            activeCoordY,
+            observedAtUtc);
+        return signals;
+    }
+
+    private async Task<bool?> ReadTroopPresenceOnCurrentDorf1Async(CancellationToken cancellationToken)
+    {
+        if (!IsCurrentUrlForPath(Paths.Resources)) return null;
+        cancellationToken.ThrowIfCancellationRequested();
+        return IncomingAttackDomParser.ParseDorf1HasTroopsAtHome(await _page.ContentAsync());
+    }
+
+    private async Task EnsureIncomingAttackFilterAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var category = _page.Locator("button.iconFilter:has(img.filterCategory1)").First;
+        try
+        {
+            await category.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 5000,
+            });
+        }
+        catch (PlaywrightException)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new InvalidOperationException("Rally Point incoming category control was not found after waiting for the overview to render.");
+        }
+
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var html = await _page.ContentAsync();
+            var action = IncomingAttackDomParser.GetRequiredFilterAction(html);
+            if (action == IncomingAttackFilterAction.Verified)
+            {
+                return;
+            }
+
+            var (selector, reason, traceName) = action switch
+            {
+                IncomingAttackFilterAction.EnableIncomingCategory =>
+                    ("button.iconFilter:has(img.filterCategory1)", "enable incoming category", "incoming-attacks-enable-category"),
+                IncomingAttackFilterAction.EnableIncomingSubfilter =>
+                    ("button.iconFilter:has(img.subFilterCategory1)", "enable incoming attacks", "incoming-attacks-enable-subfilter"),
+                IncomingAttackFilterAction.DisableReinforcementsSubfilter =>
+                    ("button.iconFilter.iconFilterActive:has(img.subFilterCategory2)", "disable reinforcements", "incoming-attacks-disable-reinforcements"),
+                IncomingAttackFilterAction.DisableReturningSubfilter =>
+                    ("button.iconFilter.iconFilterActive:has(img.subFilterCategory3)", "disable returning troops", "incoming-attacks-disable-returning"),
+                _ => throw new InvalidOperationException("Unsupported Rally Point filter action."),
+            };
+
+            var control = _page.Locator(selector).First;
+            await control.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 5000 });
+            await DelayBeforeClickAsync(cancellationToken, $"incoming attacks: {reason}");
+            await ClickLocatorAsync(control, traceName, cancellationToken);
+            await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+        }
+
+        throw new InvalidOperationException("Rally Point incoming filter could not be isolated.");
+    }
+}

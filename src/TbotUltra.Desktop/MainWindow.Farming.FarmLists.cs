@@ -914,6 +914,8 @@ public partial class MainWindow
             var dialog = new CreateFarmListsWindow(
                 ResolveCurrentTribeForFarming(),
                 villages,
+                options.FarmListOnlyCreateReportsWithLosses,
+                SaveFarmListOnlyCreateReportsWithLosses,
                 RunAsync,
                 operationToken)
             {
@@ -1726,7 +1728,8 @@ public partial class MainWindow
             village.Name,
             villageIdMatch.Success ? villageIdMatch.Groups[1].Value : null,
             troopType,
-            1);
+            1,
+            OnlyCreateReportsWithLosses: options.FarmListOnlyCreateReportsWithLosses);
 
         BusyOverlay.ShowCancel = true;
         ShowBusyOverlay("Creating loss farmlist", $"Creating '{listName}'...");
@@ -1842,6 +1845,21 @@ public partial class MainWindow
         catch (Exception ex)
         {
             AppendLog($"Could not save add-farms troop count: {ex.Message}");
+        }
+    }
+
+    private void SaveFarmListOnlyCreateReportsWithLosses(bool enabled)
+    {
+        try
+        {
+            var config = _botConfigStore.Load();
+            config[BotOptionPayloadKeys.FarmListOnlyCreateReportsWithLosses] = JsonValue.Create(enabled);
+            _botConfigStore.Save(config);
+            AppendLog($"[farm-list-create] Only create reports with losses set to {enabled}.");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Could not save farm-list report preference: {ex.Message}");
         }
     }
 

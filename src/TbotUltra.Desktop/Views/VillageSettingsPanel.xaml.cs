@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -11,18 +12,20 @@ using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
 using TbotUltra.Worker.Services;
 
-namespace TbotUltra.Desktop;
+namespace TbotUltra.Desktop.Views;
 
-// Central per-village settings window. Lists the villages with their population plus per-village toggles.
+// Central per-village settings panel. Lists the villages with their population plus per-village toggles.
 // "Auto" turns the village on/off (green); "NPC" gates NPC trade; the per-group columns mirror the
-// dashboard automation-loop cards per village (all blue). Changes are buffered in the bound rows and only
-// written to VillageSettingsStore (via the callbacks) when the user clicks "Save & close"; "Close" discards.
-public partial class VillageSettingsWindow : Window
+// dashboard automation-loop cards per village (all blue). Bound-row changes are written immediately to
+// VillageSettingsStore through the supplied callbacks.
+public partial class VillageSettingsPanel : UserControl, IDisposable
 {
     private readonly IReadOnlyList<VillageSettingsRow> _rows;
     private readonly IReadOnlyList<VillageSettingsRow> _gridRows;
     private readonly Action<VillageSettingsRow>? _onEnabledChanged;
     private readonly Action<VillageSettingsRow>? _onNpcTradeChanged;
+    private readonly Action<VillageSettingsRow>? _onAttackScanChanged;
+    private readonly Action<VillageSettingsRow>? _onTroopEvadeChanged;
     private readonly Action<VillageSettingsRow>? _onHeroResourcesChanged;
     private readonly Action<VillageSettingsRow>? _onConstructFasterChanged;
     private readonly Action<VillageSettingsRow>? _onGroupsChanged;
@@ -39,14 +42,20 @@ public partial class VillageSettingsWindow : Window
     private VillageOverviewProjection? _overviewProjection;
     private long _appliedOverviewSourceVersion = -1;
     private long _requestedOverviewSourceVersion = -1;
-    private bool _overviewClosed;
+    private bool _overviewDisposed;
     private readonly ObservableCollection<UpcomingTaskRow> _upcomingTaskRows = [];
     private readonly ObservableCollection<VillageOverviewRow> _overviewVillageRows = [];
+    private readonly Dictionary<VillageGroupToggle, VillageSettingsRow> _toggleOwners = [];
+    private bool _isApplyingBulkChange;
+    private bool _bulkChangeOccurred;
 
-    internal VillageSettingsWindow(
+    internal VillageSettingsPanel(
         IReadOnlyList<VillageSettingsRow> rows,
+        string section = "Settings",
         Action<VillageSettingsRow>? onEnabledChanged = null,
         Action<VillageSettingsRow>? onNpcTradeChanged = null,
+        Action<VillageSettingsRow>? onAttackScanChanged = null,
+        Action<VillageSettingsRow>? onTroopEvadeChanged = null,
         Action<VillageSettingsRow>? onHeroResourcesChanged = null,
         Action<VillageSettingsRow>? onConstructFasterChanged = null,
         Action<VillageSettingsRow>? onGroupsChanged = null,
@@ -60,11 +69,19 @@ public partial class VillageSettingsWindow : Window
         Func<long>? overviewSourceVersionProvider = null)
     {
         InitializeComponent();
-        ThemeChrome.EnableEarlyDarkTitleBar(this);
+        VillageSettingsTabControl.SelectedItem = string.Equals(section, "Overview", StringComparison.OrdinalIgnoreCase)
+            ? OverviewTabItem
+            : SettingsTabItem;
+        VillageSettingsTabControl.Template = (ControlTemplate)FindResource("ContentOnlyTabControlTemplate");
+        var showingOverview = ReferenceEquals(VillageSettingsTabControl.SelectedItem, OverviewTabItem);
+        SectionTitleTextBlock.Text = showingOverview ? "Village overview" : "Village settings";
+        VillageSettingsInfoIcon.Visibility = showingOverview ? Visibility.Collapsed : Visibility.Visible;
         _rows = rows;
         _gridRows = rows.Count == 0 ? rows : [CreateCheckAllRow(rows), .. rows];
         _onEnabledChanged = onEnabledChanged;
         _onNpcTradeChanged = onNpcTradeChanged;
+        _onAttackScanChanged = onAttackScanChanged;
+        _onTroopEvadeChanged = onTroopEvadeChanged;
         _onHeroResourcesChanged = onHeroResourcesChanged;
         _onConstructFasterChanged = onConstructFasterChanged;
         _onGroupsChanged = onGroupsChanged;
@@ -77,11 +94,13 @@ public partial class VillageSettingsWindow : Window
         _overviewProjectionProvider = overviewProjectionProvider;
         _overviewSourceVersionProvider = overviewSourceVersionProvider;
         BuildGroupColumns(rows);
+        BuildProtectionColumns();
         BuildOverviewColumns();
         ApplyTribeColumnVisibility(rows);
         VillageSettingsDataGrid.ItemsSource = _gridRows;
         UpcomingTasksDataGrid.ItemsSource = _upcomingTaskRows;
         VillageOverviewDataGrid.ItemsSource = _overviewVillageRows;
+        SubscribeToSettingsChanges();
 
         if (_overviewProjectionProvider is not null)
         {
@@ -92,18 +111,109 @@ public partial class VillageSettingsWindow : Window
             {
                 await Dispatcher.Yield(DispatcherPriority.ContextIdle);
                 await RefreshOverviewAsync(force: true);
-                if (!_overviewClosed)
+                if (!_overviewDisposed)
                 {
                     _overviewRefreshTimer.Start();
                 }
             };
-            Closed += (_, _) =>
+            Unloaded += (_, _) =>
             {
-                _overviewClosed = true;
                 _overviewRefreshTimer.Stop();
-                _overviewCoordinator.Dispose();
             };
         }
+    }
+
+    public void Dispose()
+    {
+        if (_overviewDisposed)
+        {
+            return;
+        }
+
+        _overviewDisposed = true;
+        _overviewRefreshTimer?.Stop();
+        _overviewCoordinator.Dispose();
+        foreach (var row in _rows)
+        {
+            row.PropertyChanged -= SettingsRow_PropertyChanged;
+            foreach (var toggle in row.GroupToggles)
+            {
+                toggle.PropertyChanged -= GroupToggle_PropertyChanged;
+            }
+        }
+
+        _toggleOwners.Clear();
+    }
+
+    private void SubscribeToSettingsChanges()
+    {
+        foreach (var row in _rows)
+        {
+            row.PropertyChanged += SettingsRow_PropertyChanged;
+            foreach (var toggle in row.GroupToggles)
+            {
+                _toggleOwners[toggle] = row;
+                toggle.PropertyChanged += GroupToggle_PropertyChanged;
+            }
+        }
+    }
+
+    private void SettingsRow_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender is not VillageSettingsRow row)
+        {
+            return;
+        }
+
+        switch (e.PropertyName)
+        {
+            case nameof(VillageSettingsRow.IsEnabledForAutomation):
+                _onEnabledChanged?.Invoke(row);
+                break;
+            case nameof(VillageSettingsRow.NpcTrade):
+                _onNpcTradeChanged?.Invoke(row);
+                break;
+            case nameof(VillageSettingsRow.AttackScanEnabled):
+                _onAttackScanChanged?.Invoke(row);
+                break;
+            case nameof(VillageSettingsRow.TroopEvadeEnabled):
+                _onTroopEvadeChanged?.Invoke(row);
+                break;
+            case nameof(VillageSettingsRow.HeroResourcesEnabled):
+                _onHeroResourcesChanged?.Invoke(row);
+                break;
+            case nameof(VillageSettingsRow.ConstructFasterEnabled):
+                _onConstructFasterChanged?.Invoke(row);
+                break;
+            default:
+                return;
+        }
+
+        NotifySettingsChanged();
+    }
+
+    private void GroupToggle_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(VillageGroupToggle.IsEnabled)
+            || sender is not VillageGroupToggle toggle
+            || !_toggleOwners.TryGetValue(toggle, out var row))
+        {
+            return;
+        }
+
+        _onGroupsChanged?.Invoke(row);
+        NotifySettingsChanged();
+    }
+
+    private void NotifySettingsChanged()
+    {
+        if (_isApplyingBulkChange)
+        {
+            _bulkChangeOccurred = true;
+            return;
+        }
+
+        _onSaved?.Invoke();
     }
 
     private static VillageSettingsRow CreateCheckAllRow(IReadOnlyList<VillageSettingsRow> rows) => new()
@@ -207,10 +317,16 @@ public partial class VillageSettingsWindow : Window
         }
 
         var template = rows[0].GroupToggles;
+        var demolishKey = QueueGroupCatalog.GetKey(QueueGroup.Demolish);
         for (var i = 0; i < template.Count; i++)
         {
             var groupIndex = i;
             var toggle = template[i];
+            if (string.Equals(toggle.GroupKey, demolishKey, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             var tooltip = string.IsNullOrWhiteSpace(toggle.Description)
                 ? $"Uncheck to stop \"{toggle.Title}\" running in this village."
                 : $"{toggle.Description} Uncheck to stop it running in this village.";
@@ -270,14 +386,54 @@ public partial class VillageSettingsWindow : Window
 
         var resourceTransferKey = QueueGroupCatalog.GetKey(QueueGroup.ResourceTransfer);
         var reinforcementsKey = QueueGroupCatalog.GetKey(QueueGroup.Reinforcements);
-        var groupsBeforeNpc = template.TakeWhile(toggle =>
-            !string.Equals(toggle.GroupKey, resourceTransferKey, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(toggle.GroupKey, reinforcementsKey, StringComparison.OrdinalIgnoreCase));
+        var groupsBeforeNpc = template
+            .Where(toggle => !string.Equals(toggle.GroupKey, demolishKey, StringComparison.OrdinalIgnoreCase))
+            .TakeWhile(toggle =>
+                !string.Equals(toggle.GroupKey, resourceTransferKey, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(toggle.GroupKey, reinforcementsKey, StringComparison.OrdinalIgnoreCase));
         var constructFasterColumnBeforeNpc = template.Any(toggle =>
             string.Equals(toggle.GroupKey, QueueGroupCatalog.GetKey(QueueGroup.Construction), StringComparison.OrdinalIgnoreCase))
             ? 1
             : 0;
         NpcTradeColumn.DisplayIndex = 3 + groupsBeforeNpc.Count() + constructFasterColumnBeforeNpc;
+    }
+
+    private void BuildProtectionColumns()
+    {
+        var townHallEntry = VillageSettingsDataGrid.Columns
+            .Select((column, index) => (Column: column, Index: index))
+            .FirstOrDefault(entry => string.Equals(
+                (entry.Column.Header as TextBlock)?.Text,
+                "Town Hall",
+                StringComparison.OrdinalIgnoreCase));
+        var insertIndex = townHallEntry.Column is null
+            ? VillageSettingsDataGrid.Columns.Count
+            : townHallEntry.Index + 1;
+
+        VillageSettingsDataGrid.Columns.Insert(insertIndex, new DataGridTemplateColumn
+        {
+            Header = BuildColumnHeader(
+                "Attack scan",
+                "Monitor this village for incoming attacks. Disabling it also prevents troop evasion from running there."),
+            Width = DataGridLength.Auto,
+            CellTemplate = BuildToggleCellTemplate(
+                nameof(VillageSettingsRow.AttackScanEnabled),
+                (_, _) => ToggleAllRows(
+                    row => row.AttackScanEnabled,
+                    (row, isEnabled) => row.AttackScanEnabled = isEnabled)),
+        });
+        VillageSettingsDataGrid.Columns.Insert(insertIndex + 1, new DataGridTemplateColumn
+        {
+            Header = BuildColumnHeader(
+                "Troop evade",
+                "Enable troop evasion for this village when its complete evasion settings are valid."),
+            Width = DataGridLength.Auto,
+            CellTemplate = BuildToggleCellTemplate(
+                nameof(VillageSettingsRow.TroopEvadeEnabled),
+                (_, _) => ToggleAllRows(
+                    row => row.TroopEvadeEnabled,
+                    (row, isEnabled) => row.TroopEvadeEnabled = isEnabled)),
+        });
     }
 
     // Builds the per-village overview columns in code so every status cell shares one color-coded template
@@ -401,9 +557,22 @@ public partial class VillageSettingsWindow : Window
         }
 
         var checkAll = eligibleRows.Any(row => !isChecked(row));
-        foreach (var row in eligibleRows)
+        _isApplyingBulkChange = true;
+        try
         {
-            setChecked(row, checkAll);
+            foreach (var row in eligibleRows)
+            {
+                setChecked(row, checkAll);
+            }
+        }
+        finally
+        {
+            _isApplyingBulkChange = false;
+            if (_bulkChangeOccurred)
+            {
+                _bulkChangeOccurred = false;
+                _onSaved?.Invoke();
+            }
         }
     }
 
@@ -565,26 +734,4 @@ public partial class VillageSettingsWindow : Window
         _onConstructFasterSettingsRequested?.Invoke(_rows);
     }
 
-    // Persists every row's current state via the callbacks, then closes. The persist callbacks no-op when
-    // a value is unchanged, so writing all rows is cheap.
-    private void SaveAndCloseButton_Click(object sender, RoutedEventArgs e)
-    {
-        foreach (var row in _rows)
-        {
-            _onEnabledChanged?.Invoke(row);
-            _onNpcTradeChanged?.Invoke(row);
-            _onHeroResourcesChanged?.Invoke(row);
-            _onConstructFasterChanged?.Invoke(row);
-            _onGroupsChanged?.Invoke(row);
-        }
-
-        _onSaved?.Invoke();
-        Close();
-    }
-
-    private void CloseButton_Click(object sender, RoutedEventArgs e)
-    {
-        // Discard: nothing was written, and the rows are rebuilt from the store next time the window opens.
-        Close();
-    }
 }

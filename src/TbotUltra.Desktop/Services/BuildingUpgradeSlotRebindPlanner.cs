@@ -55,16 +55,22 @@ internal static class BuildingUpgradeSlotRebindPlanner
     {
         if (!BuildingUpgradePayload.TryFromDictionary(candidate.Payload, out var upgrade)
             || upgrade is null
-            || BuildingCatalogService.GidForName(upgrade.Name) is not int gid
-            || !BuildingCatalogService.IsSingleInstance(gid))
+            || BuildingCatalogService.GidForName(upgrade.Name) is not int gid)
         {
             return null;
         }
 
         var liveMatches = FindLiveMatches(status, gid);
-        if (liveMatches.Count != 1
-            || liveMatches[0].SlotId is not int liveSlotId
-            || liveMatches[0].Level is not int liveLevel)
+        var liveMatch = liveMatches.FirstOrDefault(building => building.SlotId == upgrade.SlotId);
+        if (liveMatch is null
+            && BuildingCatalogService.IsSingleInstance(gid)
+            && liveMatches.Count == 1)
+        {
+            liveMatch = liveMatches[0];
+        }
+
+        if (liveMatch?.SlotId is not int liveSlotId
+            || liveMatch.Level is not int liveLevel)
         {
             return null;
         }
@@ -82,7 +88,7 @@ internal static class BuildingUpgradeSlotRebindPlanner
         };
         return new BuildingUpgradeLiveReconciliation(
             candidate.Id,
-            upgrade.Name ?? liveMatches[0].Name,
+            upgrade.Name ?? liveMatch.Name,
             upgrade.SlotId,
             liveSlotId,
             liveLevel,

@@ -228,6 +228,7 @@ public partial class SettingsWindow : Window
         SettingsVm.DontNotifyNewVersion = _config[BotOptionPayloadKeys.DontNotifyNewVersion]?.GetValue<bool>() ?? false;
         SettingsVm.QuickReloginEnabled = _config[BotOptionPayloadKeys.PostLoginQuickReloginEnabled]?.GetValue<bool>() ?? true;
         SettingsVm.AutomaticallyCheckLanguage = _config[BotOptionPayloadKeys.AutomaticallyCheckLanguage]?.GetValue<bool>() ?? true;
+        SettingsVm.TurnOffVideoSound = _config[BotOptionPayloadKeys.TurnOffVideoSound]?.GetValue<bool>() ?? true;
         _suppressDetailedBrowserLoggingConfirmation = true;
         try
         {
@@ -527,6 +528,7 @@ public partial class SettingsWindow : Window
             _config[BotOptionPayloadKeys.PostLoginQuickReloginEnabled] = SettingsVm.QuickReloginEnabled;
             _config[BotOptionPayloadKeys.AutomaticallyCheckLanguage] = SettingsVm.AutomaticallyCheckLanguage;
             _config[BotOptionPayloadKeys.DetailedBrowserLoggingEnabled] = SettingsVm.DetailedBrowserLoggingEnabled;
+            _config[BotOptionPayloadKeys.TurnOffVideoSound] = SettingsVm.TurnOffVideoSound;
             _config["allow_silver_spending"] = SettingsVm.AllowSilverSpending;
             _config[BotOptionPayloadKeys.AllowGoldSpending] = SettingsVm.AllowGoldSpending;
             _config[BotOptionPayloadKeys.GoldLimit] = goldLimit;

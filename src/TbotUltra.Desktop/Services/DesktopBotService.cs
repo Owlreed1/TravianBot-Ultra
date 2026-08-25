@@ -57,6 +57,8 @@ public sealed class DesktopBotService : IDesktopBotService
     public bool RemoveQueueItem(Guid id) => _queueStore.Remove(id);
     public bool MoveQueueItemUp(Guid id) => _queueStore.MoveUp(id);
     public bool MoveQueueItemDown(Guid id) => _queueStore.MoveDown(id);
+    public bool MoveQueueItemToTop(Guid id) => _queueStore.MoveToTop(id);
+    public bool MoveQueueItemToBottom(Guid id) => _queueStore.MoveToBottom(id);
     public bool PauseQueueItem(Guid id) => _queueStore.Pause(id);
     public bool ResumeQueueItem(Guid id) => _queueStore.Resume(id);
     public bool RetryQueueItem(Guid id) => _queueStore.Retry(id);
@@ -339,6 +341,39 @@ public Task ExecuteLoginAsync(BotOptions options, Action<string> log, bool keepB
             villageName,
             villageUrl,
             null,
+            cancellationToken);
+    }
+
+    public Task<TroopEvasionResult> SendTroopEvasionAsync(
+        BotOptions options,
+        TroopEvasionRequest request,
+        Action<string> log,
+        IProgress<TroopEvasionProgress>? progress,
+        CancellationToken cancellationToken)
+        => _taskRunner.SendTroopEvasionAsync(options, request, log, progress, accountName: null, cancellationToken);
+
+    public Task<TroopEvasionValidationResult> ValidateTroopEvasionAsync(
+        BotOptions options,
+        TroopEvasionRequest request,
+        Action<string> log,
+        CancellationToken cancellationToken)
+        => _taskRunner.ValidateTroopEvasionAsync(options, request, log, accountName: null, cancellationToken);
+
+    public Task<IncomingAttackSnapshot> ReadIncomingAttacksAsync(
+        BotOptions options,
+        Action<string> log,
+        string villageName,
+        string? villageUrl,
+        string? villageKey,
+        CancellationToken cancellationToken)
+    {
+        return _taskRunner.ReadIncomingAttacksAsync(
+            options,
+            log,
+            villageName,
+            villageUrl,
+            villageKey,
+            accountName: null,
             cancellationToken);
     }
 

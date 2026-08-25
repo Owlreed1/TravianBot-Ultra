@@ -77,6 +77,15 @@ public sealed class HeroAttributeSnapshotStore
         File.WriteAllText(filePath, JsonSerializer.Serialize(cached, JsonOptions));
     }
 
+    public void Delete(string accountName, string? serverUrl)
+    {
+        var filePath = AccountStoragePaths.HeroAttributeSnapshotPath(_projectRoot, accountName, serverUrl);
+        if (File.Exists(filePath))
+        {
+            File.Delete(filePath);
+        }
+    }
+
     private sealed record CachedHeroAttributeSnapshot(
         string AccountName,
         string ServerUrl,

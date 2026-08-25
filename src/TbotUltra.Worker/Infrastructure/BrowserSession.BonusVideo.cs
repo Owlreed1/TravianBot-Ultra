@@ -11,7 +11,8 @@ public sealed partial class BrowserSession
 {
     public async Task<T> RunInIsolatedBonusVideoBrowserAsync<T>(
         Func<IPage, CancellationToken, Task<T>> action,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool bypassExistingCooldown = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (_playwright is null || _context is null)
@@ -20,10 +21,16 @@ public sealed partial class BrowserSession
         }
 
         var cooldownKey = BuildBonusVideoCooldownKey();
-        if (BonusVideoCooldownByRoute.TryGetValue(cooldownKey, out var cooldown)
+        if (!bypassExistingCooldown
+            && BonusVideoCooldownByRoute.TryGetValue(cooldownKey, out var cooldown)
             && cooldown.UntilUtc > DateTimeOffset.UtcNow)
         {
             throw new BonusVideoCooldownException(cooldown.UntilUtc, cooldown.Kind);
+        }
+
+        if (bypassExistingCooldown)
+        {
+            _log?.Invoke("[browser-video] continuing current production-bonus batch without applying an internal cooldown between resources.");
         }
 
         BonusVideoCooldownByRoute.TryRemove(cooldownKey, out _);

@@ -241,11 +241,17 @@ public partial class MainWindow
         DashboardVillageList.ItemsSource = EnsureVillageSelectionItems(items)
             .OrderByDescending(item => item.IsCapital)
             .ToList();
+        if (DashboardHubPanelControl.IsVillageTabSelected)
+        {
+            EnsureDashboardVillagePanels();
+        }
 
         RefreshFarmListVillageHeaders();
 
         // The list was rebuilt with fresh items; re-apply the active-village border.
         ApplyActiveVillageHighlight();
+        SyncIncomingAttackMonitoringVillages();
+        RefreshIncomingAttackVillageIndicators();
     }
 
     // A list is "real" when it contains at least one named village that isn't the "-" placeholder.
@@ -650,7 +656,7 @@ public partial class MainWindow
             .ToList();
     }
 
-    // Persists a village's automation toggle from the Village settings window. SetEnabled no-ops when the
+    // Persists a village's automation toggle from the Village settings panel. SetEnabled no-ops when the
     // stored value already matches, so seeding the rows never causes redundant writes.
     private void PersistVillageEnabledFromSettingsRow(VillageSettingsRow row)
     {
@@ -662,6 +668,7 @@ public partial class MainWindow
         _villageSettingsStore.SetEnabled(row.KeyInfo, row.IsEnabledForAutomation);
         // Repaint the dashboard enabled indicator (green/grey dot) right away.
         RefreshVillageEnabledStateOnDashboard();
+        RequestDashboardVillageProjectionRefresh();
     }
 
     // Effective NPC trade flag for a village: the account-wide master (Auto settings NPC toggle, stored as
@@ -681,7 +688,7 @@ public partial class MainWindow
         return master && _villageSettingsStore.IsNpcTradeEnabledByKey(villageKey, defaultIfUnknown: false);
     }
 
-    // Persists a village's per-village NPC trade choice from the Village settings window.
+    // Persists a village's per-village NPC trade choice from the Village settings panel.
     private void PersistVillageNpcTradeFromSettingsRow(VillageSettingsRow row)
     {
         if (row?.KeyInfo is null)
@@ -693,7 +700,7 @@ public partial class MainWindow
     }
 
     // Re-applies the persisted enabled state onto the current dashboard village items so the green/grey
-    // enabled dot updates immediately after a toggle in the Village settings window.
+    // enabled dot updates immediately after a toggle in the Village settings panel.
     private void RefreshVillageEnabledStateOnDashboard()
     {
         if (DashboardVillageList.ItemsSource is not IEnumerable<VillageSelectionItem> items)
@@ -746,20 +753,39 @@ public partial class MainWindow
             Population = resolvedPopulation,
             CropFields = cropFields ?? existing?.CropFields,
             Tribe = TroopCatalog.IsKnownTribe(tribe) ? tribe! : existing?.Tribe ?? "Unknown",
+            HasIncomingAttack = existing?.HasIncomingAttack ?? false,
+            IncomingAttackTooltip = existing?.IncomingAttackTooltip ?? "No incoming attacks",
         };
     }
 
-    // Opens the central per-village settings window, seeded with the currently known villages
-    // (name/pop/coords). The first and only village starts with Auto on; later villages start off.
-    // Construction is the only automation group enabled by default.
-    private void VillageSettingsButton_Click(object sender, RoutedEventArgs e)
-    {
-        _ = sender;
-        _ = e;
+    private string? _dashboardVillagePanelsKey;
+    private IReadOnlyList<VillageSettingsRow>? _dashboardVillageSettingsRows;
+    private bool _syncingVillageProtectionSettings;
 
-        var source = (DashboardVillageList.ItemsSource as IEnumerable<VillageSelectionItem>)
+    private void ClearDashboardVillagePanels()
+    {
+        _dashboardVillagePanelsKey = null;
+        _dashboardVillageSettingsRows = null;
+        DashboardHubPanelControl.ClearVillagePanels();
+    }
+
+    // Builds the embedded per-village settings and overview tabs from the currently known villages.
+    // The panels are retained while the account/village set is unchanged so tab switches never discard
+    // buffered settings edits.
+    private void EnsureDashboardVillagePanels()
+    {
+        var source = ((DashboardVillageList.ItemsSource as IEnumerable<VillageSelectionItem>)
             ?? (VillageComboBox.ItemsSource as IEnumerable<VillageSelectionItem>)
-            ?? Enumerable.Empty<VillageSelectionItem>();
+            ?? Enumerable.Empty<VillageSelectionItem>())
+            .Where(village => !string.IsNullOrWhiteSpace(village.Name)
+                && !string.Equals(village.Name, "-", StringComparison.Ordinal))
+            .ToList();
+        var panelKey = $"{_accountStore.ActiveAccountName()}\u001f{string.Join("|", source.Select(village => $"{village.Name}:{village.CoordX}:{village.CoordY}"))}";
+        if (DashboardHubPanelControl.HasVillagePanels
+            && string.Equals(_dashboardVillagePanelsKey, panelKey, StringComparison.Ordinal))
+        {
+            return;
+        }
 
         var popupGroupOrder = new[]
         {
@@ -807,9 +833,7 @@ public partial class MainWindow
             .OrderBy(card => popupGroupOrder.TryGetValue(card.Key, out var index) ? index : int.MaxValue)
             .ToList();
 
-        var rows = source
-            .Where(v => !string.IsNullOrWhiteSpace(v.Name) && !string.Equals(v.Name, "-", StringComparison.Ordinal))
-            .Select(v =>
+        var rows = source.Select(v =>
             {
                 var keyInfo = BuildVillageKeyInfo(v);
                 var enabledGroups = _villageSettingsStore.GetEnabledGroups(keyInfo)
@@ -843,30 +867,108 @@ public partial class MainWindow
                     NpcTrade = _villageSettingsStore.GetNpcTrade(keyInfo),
                     HeroResourcesEnabled = _villageSettingsStore.GetHeroResourcesEnabled(keyInfo),
                     ConstructFasterEnabled = _villageSettingsStore.GetConstructFaster(keyInfo),
+                    AttackScanEnabled = IsIncomingAttackMonitoringEnabled(keyInfo.Key),
+                    TroopEvadeEnabled = TroopsHubPanelControl.EvasionPanel.Villages
+                        .FirstOrDefault(item => string.Equals(item.VillageKey, keyInfo.Key, StringComparison.OrdinalIgnoreCase))
+                        ?.Enabled == true,
                     GroupToggles = toggles,
                 };
             })
             .ToList();
 
-        var window = new VillageSettingsWindow(
+        var settingsPanel = new Views.VillageSettingsPanel(
             rows,
-            PersistVillageEnabledFromSettingsRow,
-            PersistVillageNpcTradeFromSettingsRow,
-            PersistVillageHeroResourcesFromSettingsRow,
-            PersistVillageConstructFasterFromSettingsRow,
-            PersistVillageGroupsFromSettingsRow,
-            OpenTroopSettingsFromVillageSettings,
-            OpenSmithyUpgradeSettingsFromVillageSettings,
-            OpenTownHallSettingsFromVillageSettings,
-            OpenHeroResourceSettingsFromVillageSettings,
-            OpenConstructFasterSettingsFromVillageSettings,
-            OnVillageSettingsSaved,
-            BuildVillageSettingsOverviewProjectionAsync,
-            GetVillageOverviewSourceVersion)
+            section: "Settings",
+            onEnabledChanged: PersistVillageEnabledFromSettingsRow,
+            onNpcTradeChanged: PersistVillageNpcTradeFromSettingsRow,
+            onAttackScanChanged: PersistVillageAttackScanFromSettingsRow,
+            onTroopEvadeChanged: PersistVillageTroopEvadeFromSettingsRow,
+            onHeroResourcesChanged: PersistVillageHeroResourcesFromSettingsRow,
+            onConstructFasterChanged: PersistVillageConstructFasterFromSettingsRow,
+            onGroupsChanged: PersistVillageGroupsFromSettingsRow,
+            onTroopSettingsRequested: OpenTroopSettingsFromVillageSettings,
+            onSmithyUpgradeSettingsRequested: OpenSmithyUpgradeSettingsFromVillageSettings,
+            onTownHallSettingsRequested: OpenTownHallSettingsFromVillageSettings,
+            onHeroResourceSettingsRequested: OpenHeroResourceSettingsFromVillageSettings,
+            onConstructFasterSettingsRequested: OpenConstructFasterSettingsFromVillageSettings,
+            onSaved: OnVillageSettingsSaved);
+        var overviewPanel = new Views.VillageSettingsPanel(
+            rows,
+            section: "Overview",
+            overviewProjectionProvider: BuildVillageSettingsOverviewProjectionAsync,
+            overviewSourceVersionProvider: GetVillageOverviewSourceVersion);
+
+        DashboardHubPanelControl.SetVillagePanels(settingsPanel, overviewPanel);
+        _dashboardVillageSettingsRows = rows;
+        _dashboardVillagePanelsKey = panelKey;
+    }
+
+    private void PersistVillageAttackScanFromSettingsRow(VillageSettingsRow row)
+    {
+        if (_syncingVillageProtectionSettings || row.KeyInfo is null)
         {
-            Owner = this,
-        };
-        window.ShowDialog();
+            return;
+        }
+
+        ApplyIncomingAttackMonitoring(row.KeyInfo.Key, row.AttackScanEnabled);
+        PersistIncomingAttackMonitoringChanges();
+    }
+
+    private void PersistVillageTroopEvadeFromSettingsRow(VillageSettingsRow row)
+    {
+        if (_syncingVillageProtectionSettings || row.KeyInfo is null)
+        {
+            return;
+        }
+
+        var enabled = TroopsHubPanelControl.EvasionPanel.SetVillageEnabled(
+            row.KeyInfo.Key,
+            row.TroopEvadeEnabled);
+        SyncVillageProtectionSettingsRows();
+        if (row.TroopEvadeEnabled != enabled)
+        {
+            _syncingVillageProtectionSettings = true;
+            try
+            {
+                row.TroopEvadeEnabled = enabled;
+            }
+            finally
+            {
+                _syncingVillageProtectionSettings = false;
+            }
+        }
+    }
+
+    private void SyncVillageProtectionSettingsRows()
+    {
+        if (_dashboardVillageSettingsRows is null || _syncingVillageProtectionSettings)
+        {
+            return;
+        }
+
+        _syncingVillageProtectionSettings = true;
+        try
+        {
+            foreach (var row in _dashboardVillageSettingsRows)
+            {
+                if (row.KeyInfo is null)
+                {
+                    continue;
+                }
+
+                row.AttackScanEnabled = IsIncomingAttackMonitoringEnabled(row.KeyInfo.Key);
+                row.TroopEvadeEnabled = TroopsHubPanelControl.EvasionPanel.Villages
+                    .FirstOrDefault(item => string.Equals(
+                        item.VillageKey,
+                        row.KeyInfo.Key,
+                        StringComparison.OrdinalIgnoreCase))
+                    ?.Enabled == true;
+            }
+        }
+        finally
+        {
+            _syncingVillageProtectionSettings = false;
+        }
     }
 
     private long _villageOverviewSourceVersion;
@@ -1116,7 +1218,7 @@ public partial class MainWindow
         }
     }
 
-    // Persists a village's per-village automation-group set from the Village settings window, then keeps the
+    // Persists a village's per-village automation-group set from the Village settings panel, then keeps the
     // dashboard cards in sync when the changed village is the one currently selected.
     private void PersistVillageGroupsFromSettingsRow(VillageSettingsRow row)
     {
@@ -1151,6 +1253,7 @@ public partial class MainWindow
     {
         InvalidateVillageOverview();
         RefreshVillageEnabledStateOnDashboard();
+        RequestDashboardVillageProjectionRefresh();
         RefreshAutomationLoopDashboardUi();
         SaveConstructFasterMasterFlag();
 

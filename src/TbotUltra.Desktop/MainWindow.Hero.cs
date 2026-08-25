@@ -390,14 +390,18 @@ public partial class MainWindow
         Dispatcher.InvokeAsync(() => _heroViewModel.HeroHpText = $"{Math.Clamp(hpPercent, 0, 100)}%");
     }
 
-    private void OnWorkerHeroStatusUpdated(string accountName, string status)
+    private void OnWorkerHeroStatusUpdated(string accountName, HeroRuntimeStatus status)
     {
         if (!string.Equals(accountName, _accountStore.ActiveAccountName(), StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
-        Dispatcher.InvokeAsync(() => _heroViewModel.HeroStatusText = status);
+        RunOrPostToUi(() =>
+        {
+            SetHeroState(null, status.IsAway, status.IsDead, status.IsReviving);
+            _heroViewModel.HeroStatusText = status.DisplayText;
+        });
     }
 
     /// <summary>

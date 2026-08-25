@@ -38,6 +38,8 @@ public interface IQueuePanelClient
     bool Remove(Guid id);
     bool MoveUp(Guid id);
     bool MoveDown(Guid id);
+    bool MoveToTop(Guid id);
+    bool MoveToBottom(Guid id);
     bool Pause(Guid id);
     bool Resume(Guid id);
     bool Retry(Guid id);
@@ -107,6 +109,8 @@ internal sealed class DesktopQueuePanelClient(IDesktopBotService botService) : I
     public bool Remove(Guid id) => botService.RemoveQueueItem(id);
     public bool MoveUp(Guid id) => botService.MoveQueueItemUp(id);
     public bool MoveDown(Guid id) => botService.MoveQueueItemDown(id);
+    public bool MoveToTop(Guid id) => botService.MoveQueueItemToTop(id);
+    public bool MoveToBottom(Guid id) => botService.MoveQueueItemToBottom(id);
     public bool Pause(Guid id) => botService.PauseQueueItem(id);
     public bool Resume(Guid id) => botService.ResumeQueueItem(id);
     public bool Retry(Guid id) => botService.RetryQueueItem(id);

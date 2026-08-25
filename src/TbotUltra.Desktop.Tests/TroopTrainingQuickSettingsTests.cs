@@ -89,6 +89,22 @@ public sealed class TroopTrainingQuickSettingsTests
     }
 
     [Fact]
+    public void ResourcePercentMode_RequiresAtLeastOneSelectedResource()
+    {
+        var row = new TroopTrainingQuickVillageRow("v1", "Village 1", true, BuildSourcePayload(), "Teutons");
+        row.CheckWood = false;
+        row.CheckClay = false;
+        row.CheckIron = false;
+        row.CheckCrop = false;
+
+        Assert.True(row.RequiresResourceSelection);
+        Assert.False(row.HasResourceSelection);
+
+        row.CheckIron = true;
+        Assert.True(row.HasResourceSelection);
+    }
+
+    [Fact]
     public void MinimumResourcesPercentText_UpdatesAndNormalizesTheThreshold()
     {
         var row = new TroopTrainingQuickVillageRow("v1", "Village 1", true, BuildSourcePayload(), "Teutons");

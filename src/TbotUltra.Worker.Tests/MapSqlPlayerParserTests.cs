@@ -156,6 +156,22 @@ public sealed class MapSqlPlayerParserTests
     }
 
     [Fact]
+    public void FilterVillages_ExcludesEveryVillageOwnedByCurrentPlayer()
+    {
+        var villages = new[]
+        {
+            new MapSqlVillage(1, 2, "Own A", "Swollen", "ALLY", 10, false),
+            new MapSqlVillage(3, 4, "Own B", " swollen ", "ALLY", 20, false),
+            new MapSqlVillage(5, 6, "Other", "Alice", "ALLY", 30, false),
+        };
+
+        var result = MapSqlPlayerParser.FilterVillages(villages, true, true, ["SWOLLEN"], []);
+
+        var remaining = Assert.Single(result);
+        Assert.Equal("Alice", remaining.PlayerName);
+    }
+
+    [Fact]
     public void TryExtractBulkMessageMissingPlayerName_ReadsOfficialDialogText()
     {
         var name = TravianClient.TryExtractBulkMessageMissingPlayerName("The name grezullallala does not exist.");

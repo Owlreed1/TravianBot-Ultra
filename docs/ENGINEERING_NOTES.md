@@ -80,8 +80,13 @@ Published artifacts belong under `artifacts/`, never beside source files.
   source tests must not depend on ignored runtime configuration.
 - Interruptible writes use the atomic file helper. Retry bounded transient lock/sharing failures.
 - Quarantine and log corrupt queue/state files instead of silently overwriting them.
+- Shared building-template files use the versioned `.tbot-template.json` exchange format and contain no account,
+  server, village, or player identity. Import conflicts are matched only by template ID; validate each template
+  independently and never guess at a newer schema.
 - New settings require the complete pipeline: model, defaults, load/save, ViewModel, UI, and tests.
-- Demolition is a village-scoped queue group: start one Official `table#demolish` step, persist the server timer plus its random delay as `NextAttemptAt`, and never poll or sleep through it in the browser.
+- Embedded Village settings have no Save step: persist each row or group-toggle change immediately; bulk
+  "Check all" changes persist each affected row and publish one consolidated settings-changed notification.
+- Demolition is a village-scoped queue group: start one Official `table#demolish` step, persist the server timer plus its random delay as `NextAttemptAt`, and never poll or sleep through it in the browser. It has no per-village group toggle; an explicitly queued demolition is always group-enabled, while the village's master Auto toggle still controls automation.
 - Persist village identity by coordinates/key, not display name. Names may collide or change; queue items retain
   their target village identity.
 - Duplicate village names are valid. Fresh Official sidebar `data-did` plus `.coordinateX/.coordinateY` values
@@ -93,6 +98,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   lookup is valid only when exactly one cached village has that name; duplicate names never use last-write-wins.
 - Queue status transitions are gated. `MarkDeferred` accepts only RUNNING items; Pending items use
   `UpdateDeferred`/`UpdatePending`. Check the returned boolean.
+- Manual queue reordering persists through `CreatedAt` and therefore controls FIFO selection in both Auto Queue
+  and Continuous Loop. Up/down/top/bottom operate only inside the selected item's queue group and priority and
+  ignore history rows. A move that places a known construction requirement after its dependent task must require
+  an explicit `Move anyway` confirmation; the runtime construction guard remains the final safety net.
 - New villages default to Auto enabled. The version-1 migration enables existing villages once; later manual
   Auto-off choices persist.
 
@@ -114,18 +123,28 @@ Published artifacts belong under `artifacts/`, never beside source files.
   batch alive, and preview/forecast selection must not mutate the batch owner or attempt count.
 - Applying Session pacing settings while automation is active must take effect immediately: enabling starts its run
   timer, while disabling a scheduled sleep resumes the captured automation state.
+- Raising or disabling Daily max while sleeping for the old daily limit must re-evaluate the restriction immediately.
+  If the recorded runtime is below the new limit and Allowed hours permit running, wake with zero added sleep delay.
 - Known queue deadlines are authoritative and may not be shortened by pacing.
 - Action pacing is mandatory. Persisted configuration and incoming payloads may change its delay ranges but may
   not disable it. The manual Catapult wave tab burst is the only exception: it uses only its explicitly selected
   50–500 ms tab delay between clicks and does not apply general human/action pacing while filling its form.
 - Proxy settings are account-scoped. Browser, HTTP client, tests, and bonus video use the same effective route.
   Never log credentials or place them in user-visible URLs.
+- Proxy Finder and Proxy Library classify a proxy as reliable only after three consecutive neutral HTTPS probes
+  and two consecutive Travian reachability probes. All five probes use fresh connections and the active cancellation
+  token; a single failed probe rejects the proxy. Only HTTP 2xx/3xx responses count as usable; blocked, proxy-auth
+  and gateway/server-error responses do not.
 - Retry only transient failures with bounded attempts. Apply configured pacing; do not add unbounded sleeps.
 - Alarms represent actionable failures. Expected waiting/blocking and an explicitly retrying bounded transient
   attempt are normal status. Deduplicate identical alarms for 30 minutes; repeated occurrences update visible
   count without another alarm line.
+- Build-estimate server-speed detection accepts both `5x` and lobby-style `X5` names. Before the account has a
+  verified login, missing speed is expected and silently uses 1x; only an unparseable logged-in account alarms.
 - Detailed browser logging is development-only and off by default. Trace semantic operations, emit exactly one
   end event per flow, and sanitize all secrets. Navigation/mutations use the traced adapters.
+- Bonus-video audio muting is best-effort and retried during playback polling because provider controls may render
+  after play starts; a missing, detached, or unactionable audio control must never fail the video flow.
 
 ## Browser, login and account access
 
@@ -140,9 +159,17 @@ Published artifacts belong under `artifacts/`, never beside source files.
   a binary the session does not run. Bot-launched browser processes are therefore indistinguishable from the user's
   own by name or path: orphan cleanup MUST go through `LaunchedBrowserRegistry` (PID + start time + exe path, all
   three must match), never by process name or executable path alone.
+- A system browser can occasionally exit with code 0 before Playwright creates a browser/context/page, reported as
+  `TargetClosedException`. Retry that exact early launch closure once after a short cancellable delay; do not retry
+  missing executables, driver failures, later page closures, or arbitrary Playwright errors at this boundary.
 - `DOMContentLoaded` is sufficient only when followed by a required page-marker check.
 - Full login starts in the Travian lobby and enters the owned world through SSO; never submit credentials to the
   configured game server or add direct-server fallback.
+- Lobby navigation must wait for the delayed React world list or complete login form, then retry a missing/transient
+  lobby state at most three times. Re-submit credentials only after a fresh lobby load confirms the login form.
+- `Choose in lobby` is a one-time account resolution: save the concrete server only after verified game login, then
+  keep it authoritative. Transient proxy/navigation failures must retry or fail without reopening the world picker
+  or changing that account's server.
 - Preserve filtered SSO state only in in-app session transitions. Real process startup and user exit clear every
   account's saved Playwright auth state.
 - After Play now commits navigation to an Official game origin, rotate immediately to the clean in-app context that
@@ -151,7 +178,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - The Official mobile-version dialog can appear after Play now's first navigation wait expires. After confirming it
   with both mobile options off, wait again for the game origin before treating the current lobby URL as a failed SSO.
 - Preserve the intentional headed/maximized anti-detection setup and `ViewportSize.NoViewport`.
-- Login automation requires English UI and fails clearly when required markers are missing.
+- Read account language only on the configured game origin; lobby and browser-error documents are not evidence.
+  Accept Travian's equivalent `en` and `en-US` English codes. After either language-dialog action verifies English,
+  restore the exact automation mode that was running before the pause; do not start an idle bot.
 - The one-time Gold Shop offer is a blocking announcement, not an automation action. Dismiss it after game-page
   navigation/reload only through the visible `data-context="oneTimeOfferAnnouncement"` dialog; never use a broad
   dialog-close selector.
@@ -232,7 +261,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   button, and the periodic tick all clear a stale regen-estimate countdown, not just the background tick.
 - Hero crop anti-starve is account-configured but selected per coordinate-keyed village and runs only while the
   continuous bot is Running. A missing per-village entry defaults enabled; the account master defaults disabled.
-  Negative crop production uses the fresh dorf1 stock/production snapshot to calculate time to empty. Transfers
+  It is observation-driven: trusted resource snapshots from the existing jitter read and village scan cancel the
+  action for non-negative production or schedule a local no-browser deadline for negative production. Only when
+  that deadline reaches the configured trigger may one deduplicated live-confirmation task enter the queue; never
+  create permanent per-village polling tasks. The live confirmation uses dorf1 stock/production. Transfers
   navigate through `/hero/inventory`, open the visible `.heroItem` containing `.item.item148`, fill only
   `input[name="crop"]`, and click the enabled dialog action whose normalized text is exactly `Transfer` (never
   `Transfer maximum`). The configured minimum hero crop is an absolute post-transfer reserve: transferable crop is
@@ -248,8 +280,14 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Manual operations matching the canonical begin/busy/complete/paused/fail shape go through
   `RunGuardedOperationAsync`; flows with extra state, dialogs, or custom cancel handling keep explicit blocks.
 - Keep `DataGrid.RowHeight` unset or `Double.NaN`; the string `Auto` is not a WPF `Double`.
+- Queue Active/History grids use star sizing with explicit per-column `MinWidth` and disabled user resizing in both
+  the embedded panel and Pop out. A narrow viewport must scroll horizontally; never allow a header drag or an early
+  hidden-tab measurement to collapse queued task columns into apparently blank rows.
 - Enumerate mutable collections through immutable snapshots when sanitizing/exporting.
 - Village Overview is read-only and uses cache/queue snapshots; opening it never navigates or scans.
+- Village Overview construction totals consume the Queue tab's authoritative estimate rows. Rebuilding those
+  rows must invalidate the overview projection, and opening the overview rebuilds the local Queue projection
+  first; the 1 Hz render pulse may update countdowns/timestamps but must not make stale totals look refreshed.
 - Overview projections show only real deadlines and never mutate queue or scheduler state.
 - The Dashboard status line prioritizes a running queue item, then a scoped active browser workflow, then the
   read-only next-task forecast. Long-running workflows such as Village scan publish nested activity so an inner
@@ -420,6 +458,22 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - New-account analysis is account+server scoped. A pending first-login analysis forces hero inventory, hero
   attributes, and new-village startup until all three succeed; legacy account snapshots are already initialized.
 - Browser activity statistics are account-scoped: lifetime counters persist; session counters do not.
+- Build troops `% resources` checkboxes use OR semantics: at least one resource must be selected, any selected
+  resource at or above the percentage threshold releases training, and deferred waits use the earliest selected
+  resource ETA. This trigger never replaces the normal all-resource affordability, NPC, or hero-resource checks.
+- Build troops `maximum` amount mode must click Travian's numeric `.details .cta a[href='#']` shortcut beside the
+  selected troop input and verify Travian filled the advertised amount; do not type that maximum manually. The
+  existing paced Train-button click remains the submit action after the shortcut succeeds.
+- Dashboard B/S/W troop indicators represent effective per-village Build troops configuration, never training
+  queue activity: green means Auto + Build troops + that building toggle are enabled and the building exists;
+  amber means effectively enabled but the building is missing or its status is unknown; muted means disabled.
+- Map SQL `Skip own villages` resolves the in-game owner name from the active page's `.content > .playerName`;
+  never substitute the login email/account key. Add the resolved name to the normalized ignored-player filter so
+  every village owned by that player is excluded, and fail the import safely when the checked filter cannot resolve it.
+- Bulk messages must classify every Send as verified sent, one missing player, or a visible/timeout error. Remove
+  missing players one at a time and retry the same batch; an emptied batch continues to later batches. Cache only
+  recipients from a verified send. The analysis preview shows the summed map.sql village population per player in
+  the exact selected send order.
 - Farm-list exact timers get a 5-15s render margin; unreadable disabled timers use an estimated 60s wait.
 - "Send toggled lists" sends selected farm lists ONE AT A TIME via `SendFarmListsSequentiallyAsync`: click each list's Start,
   then wait for that list's `.farmListStatus` "N/M being raided" numerator to rise (or its Start to disable)
@@ -447,9 +501,20 @@ Published artifacts belong under `artifacts/`, never beside source files.
   `#dialogOverlay` intercepts every click on the form inputs (coordinate click times out). `OpenAddRaidFormAsync`
   closes any lingering dialog before opening, and a single target's fill/save exception is skipped (bounded
   consecutive-failure abort) instead of failing the whole batch.
+- Reused Add-target dialogs must replace X/Y through the traced input path and re-read both fresh fields as an exact
+  pair before validation. Retry replacement only a bounded number of times and never click Save while either
+  coordinate differs from the requested value.
+- Program-created farm lists carry the account-scoped Create-popup preference `Only create reports with losses`,
+  defaulting enabled when absent. Before Create, set and verify `#createFarmListForm input[name='onlyLosses']` with
+  a real label/input click; a missing or unverifiable checkbox is logged but must not block list creation.
 - Hero attribute priority is execution-authoritative from the latest saved account settings. A queued
   `hero_manage` or `spend_hero_attribute_points` payload is only a snapshot and must never overwrite a reorder
   the user made in the UI while the task was waiting.
+- Hero runtime state is published as one structured Worker update (`HeroRuntimeStatus`). The Hero page and the
+  Village overview icon must consume that same update so away/dead/reviving state cannot diverge between views.
+- Hero Attributes navigation is required only when the sidebar signals new points or no known attribute snapshot
+  exists. Successful point allocation invalidates memory and disk, and incomplete DOM reads never overwrite a valid
+  snapshot. Hero HP uses the global SVG first and opens Attributes only when that live signal is unavailable.
 - Hero inventory resources are an account+server persisted last-known snapshot. Quick re-login, process restart,
   and account switching restore it; incomplete inventory reads never replace it with fabricated zeroes. When no
   snapshot has ever been captured, construction/resource actions may open their existing resource-transfer dialog,
@@ -458,10 +523,67 @@ Published artifacts belong under `artifacts/`, never beside source files.
   General/Village tab click; that makes a Collect-to-tab transition effectively instantaneous.
 - Bonus-video failures use shared protected timing, typed cooldowns, account proxy routing, and sanitized logs.
   See [bonus-video ADR](adr/2026-07-18-bonus-video.md).
+  Start playback only through the exact visible provider play control after ancestry, geometry, and center hit-testing;
+  never use a blind video-area/iframe-center click because a partially rendered player may expose an advertiser link.
+  Optional audio muting is strictly best-effort and defaults enabled through General settings. Click only the exact
+  visible `.atg-gima-audio-button-enabled:not(.atg-gima-hidden)` icon after bounded geometry, ancestry, and center
+  hit-testing prove that exact icon owns the click. Never click its wrapper, the video area, use force/JS fallback,
+  or let a missing, unsafe, or failed audio control interrupt or fail the video lifecycle.
+- One `activate_production_bonus` run is a contiguous four-resource batch: after its initial cooldown gate,
+  attempt every resource found activatable before returning control to other automation. A failure or newly
+  created internal video cooldown for one resource must not stop the remaining resources in that same batch.
 - Diagnostics use shared busy/cancel behavior, sanitize settings/logs/paths/URLs/auth/proxy data, and never present
   partial output as a successful archive. Screenshots may contain visible game data.
 - The Dashboard active-village border represents verified live browser state only. Queue selection/Running state
   must never pre-mark a task's target village; update it only after a successful browser village verification.
+- Incoming Attack monitoring observes only real Dorf1 reads: the active village requires the hostile red
+  `img.att1` marker inside `.villageInfobox.movements #movements` (movement labels and `def1`/`att2` must never
+  signal an attack), while a Plus village overview uses
+  `.listEntry.village.attack[data-did]`. A nullable signal list means "Dorf1 was not read" and must preserve
+  prior signals; a completed Dorf1 read without an active-village signal is authoritative for that village and
+  immediately clears both pending and confirmed attack rows for it, even if Plus signals another village. Rally
+  Point details open `gid=16&tt=1&filter=1&subfilters=1`, wait for the
+  filter controls, and are read only after the parent `button.iconFilterActive img.filterCategory1` and exactly
+  `button.iconFilterActive img.subFilterCategory1` are active while subcategories 2/3 are inactive. Never treat the
+  parent `filterCategory1` as an extra subfilter: enabling the parent, enabling subcategory 1, and disabling
+  subcategories 2/3 are separate navigations and must be verified against fresh DOM after each click. A late Rally
+  Point result must not restore state cleared by a newer Dorf1 read.
+  Filter/read failures never clear known attacks. Exact movements persist per account+world, use the Travian
+  movement id when available, and expire at their server-derived absolute arrival. After a successful Rally Point
+  read, retain the confirmed movement-count high-water mark until an authoritative clear Dorf1 read. Countdown drift,
+  landed movements, Plus marker repeats, and periodic timers must not reopen Rally Point; read details again only when
+  the live red Dorf1 movement count exceeds that mark. Only an unconfirmed/failed signal receives the bounded
+  ten-minute retry. In each Rally Point movement,
+  `td.role` names the source village; the leading text of `td.troopHeadline` before `raids/attacks <target>` names
+  the source player. Monitoring enablement defaults on for every village and persists per account+world by canonical
+  village key. A disabled village ignores new Dorf1 signals and Rally Point results and is ineligible for Troop
+  Evasion, but its already-confirmed rows remain visible and persisted until their arrival. Persist the confirmed
+  movement-count high-water mark separately from visible rows, including after the user presses `Clear list`, so the
+  same movements are not fetched again after a restart or manual list clear.
+  The Incoming attacks village toggles and Dashboard > Village settings `Attack scan` column are two views of the
+  same per-account/world setting; bulk changes must persist once and refresh both views without clearing confirmed rows.
+- Troop Evasion consumes Incoming Attack state; it must never introduce a parallel signal source. Target Dorf1 is
+  re-read before Rally Point details: only red `img.att1` rows qualify, their timers are the fallback if Rally Point
+  fails, and a clear target Dorf1 read cancels pending evasion and skips Rally Point. Evasion settings and successful
+  protection windows persist atomically per account+world by coordinate key; corrupt files are quarantined. Automatic
+  dispatch is high-priority safe-boundary work gated by Continuous Loop or Auto Queue but independent of Village Auto.
+  Destination coordinates and movement type are global per account+world; village enablement, troop slots, and Hero
+  selection remain per village. The global `Evade for` filters default to both Raid and Attack, persist per
+  account+world, and gate scheduler candidates by authoritative movement type; an unknown Dorf1 fallback is eligible
+  only while both filters are enabled. Enabling an incomplete village is rejected with the themed warning dialog and
+  a concrete list of missing coordinates, troop/Hero selection, movement type, or incoming-type selection. Sync
+  settings copies every troop-slot and Hero choice from one village to explicitly selected target villages, but never
+  changes their individual enabled state.
+  Dashboard > Village settings `Troop evade` is a projection of the same per-village evasion setting and must use the
+  normal completeness validation, themed warning, immediate persistence, and bidirectional UI synchronization.
+  The first `#ok` and final `#confirmSendTroops` are separate one-shot state changes. Reinforcements confirm immediately;
+  Raid/Attack confirms only when a round trip cannot return before the triggering arrival plus 15 seconds, and never at
+  or after that arrival. Cancellation before final Confirm creates no protection state.
+  A live Dorf1 `.villageInfobox.units #troops td.noTroops` observation is authoritative evidence that no troops are at
+  home: a jitter/status observation no older than two minutes may skip only the initial lead-time milestone. The
+  one-minute and thirty-second retries always switch to the source Dorf1 and recheck live before Rally Point, so troops
+  that returned after the initial observation are still considered. Missing unit markup means unknown, not empty.
+  Troop presence and its own observation timestamp must be merged together and are not restored across process restart.
 - Construction timers shown in the village overview are Travian's raw slot finishes. Scheduling, loop wake-up,
   and `Next task` use the effective availability time: raw finish plus the already persisted construction-humanize
   delay (and existing race buffer). Forecasts must reuse the live selector without mutating queue, rotation, or
@@ -501,6 +623,7 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - [Browser session and login](adr/2026-07-18-browser-session-and-login.md)
 - [Bonus video](adr/2026-07-18-bonus-video.md)
 - [Continuous automation orchestration](adr/2026-08-14-continuous-automation-orchestration.md)
+- [Troop evasion deadlines](adr/2026-08-22-troop-evasion.md)
 
 ## Arkiverad historik
 

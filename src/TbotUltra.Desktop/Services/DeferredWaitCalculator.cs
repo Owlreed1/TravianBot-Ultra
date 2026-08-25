@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TbotUltra.Core.Configuration;
+using TbotUltra.Core.Travian;
 using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Desktop.Services;
@@ -120,53 +121,26 @@ public static class DeferredWaitCalculator
         var waitReason = "fallback_cooldown";
         foreach (var request in enabledRequests)
         {
-            var selectedKeys = ResolveDeferredTroopTrainingResourceKeys(request);
-            var meetsThreshold = true;
-            var requestWait = 0;
-            var requestReason = "fallback_cooldown";
-            foreach (var key in selectedKeys)
-            {
-                var capacity = string.Equals(key, "crop", StringComparison.OrdinalIgnoreCase)
-                    ? granaryCapacity
-                    : warehouseCapacity;
-                var thresholdPercent = Math.Clamp(request.MinimumResourcesPercent, 0, 100);
-                if (thresholdPercent <= 0)
-                {
-                    continue;
-                }
-
-                var threshold = (long)Math.Ceiling(capacity * (thresholdPercent / 100d));
-                currentResources.TryGetValue(key, out var currentValue);
-                var missing = Math.Max(0L, threshold - currentValue);
-                if (missing <= 0)
-                {
-                    continue;
-                }
-
-                meetsThreshold = false;
-                productionByHour.TryGetValue(key, out var productionValue);
-                if (productionValue > 0)
-                {
-                    var perResourceWait = Math.Max(1, (int)Math.Ceiling((missing / productionValue.Value) * 3600d));
-                    requestWait = Math.Max(requestWait, perResourceWait);
-                    requestReason = "estimated_from_status";
-                }
-                else
-                {
-                    requestWait = Math.Max(requestWait, fallbackCooldownSeconds);
-                    requestReason = "recheck_needed";
-                }
-            }
-
-            if (meetsThreshold)
+            var evaluation = TroopTrainingResourceThresholdCalculator.Evaluate(
+                currentResources,
+                productionByHour,
+                warehouseCapacity,
+                granaryCapacity,
+                request.MinimumResourcesPercent,
+                request.CheckWood,
+                request.CheckClay,
+                request.CheckIron,
+                request.CheckCrop,
+                fallbackCooldownSeconds);
+            if (evaluation.IsReady)
             {
                 return new DeferredTroopTrainingEvaluation(true, 0, "ready");
             }
 
-            if (requestWait > 0 && requestWait < shortestWait)
+            if (evaluation.WaitSeconds > 0 && evaluation.WaitSeconds < shortestWait)
             {
-                shortestWait = requestWait;
-                waitReason = requestReason;
+                shortestWait = evaluation.WaitSeconds;
+                waitReason = evaluation.WaitReason;
             }
         }
 
@@ -176,32 +150,6 @@ public static class DeferredWaitCalculator
         }
 
         return new DeferredTroopTrainingEvaluation(false, shortestWait, waitReason);
-    }
-
-    private static IReadOnlyList<string> ResolveDeferredTroopTrainingResourceKeys(DeferredTroopTrainingRequest request)
-    {
-        var keys = new List<string>();
-        if (request.CheckWood)
-        {
-            keys.Add("wood");
-        }
-
-        if (request.CheckClay)
-        {
-            keys.Add("clay");
-        }
-
-        if (request.CheckIron)
-        {
-            keys.Add("iron");
-        }
-
-        if (request.CheckCrop)
-        {
-            keys.Add("crop");
-        }
-
-        return keys.Count > 0 ? keys : ["wood", "clay", "iron", "crop"];
     }
 
     public static int ResolveTroopTrainingFallbackCooldownSeconds(int configuredSeconds)

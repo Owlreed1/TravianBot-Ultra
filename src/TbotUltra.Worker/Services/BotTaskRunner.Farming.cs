@@ -73,7 +73,8 @@ public sealed partial class BotTaskRunner
                 villageIdMatch.Success ? villageIdMatch.Groups[1].Value : null,
                 "First available troop",
                 1,
-                TroopIndexOverride: 1);
+                TroopIndexOverride: 1,
+                OnlyCreateReportsWithLosses: options.FarmListOnlyCreateReportsWithLosses);
 
         return new FarmListLossHandlingRequest(
             options.ContinuousFarmDeactivateOasisLosses,

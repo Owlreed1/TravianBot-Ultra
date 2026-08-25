@@ -128,6 +128,25 @@ public sealed class TroopTrainingViewModelTests
         Assert.True(vm.TryValidateMinimumTroopRanges(out _));
     }
 
+    [Fact]
+    public void TryValidateMinimumTroopRanges_RequiresAResourceForPercentMode()
+    {
+        var vm = new TroopTrainingViewModel();
+        vm.Initialize();
+        vm.Buildings[0].IsEnabled = true;
+        vm.Buildings[0].RunMode = "resource_percent";
+        vm.CheckWood = false;
+        vm.CheckClay = false;
+        vm.CheckIron = false;
+        vm.CheckCrop = false;
+
+        Assert.False(vm.TryValidateMinimumTroopRanges(out var error));
+        Assert.Contains("Select at least one resource", error);
+
+        vm.CheckClay = true;
+        Assert.True(vm.TryValidateMinimumTroopRanges(out _));
+    }
+
     private static TroopTrainingViewModel ReadyCelebrationViewModel()
     {
         var vm = new TroopTrainingViewModel();

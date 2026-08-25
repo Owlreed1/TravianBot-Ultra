@@ -21,6 +21,8 @@ public partial class CreateFarmListsWindow : Window
         Task<FarmListCreateBatchResult>> _runner;
     private readonly CancellationTokenSource _runCts;
     private readonly ObservableCollection<FarmListNameEntry> _listNameEntries = [];
+    private readonly Action<bool> _onlyCreateReportsWithLossesChanged;
+    private bool _loadingOnlyCreateReportsWithLosses;
 
     // Tribe used for the troop catalog only when the selected village's own tribe is unknown, so a
     // multi-tribe account never falls back to the generic troop list when a real tribe is available.
@@ -31,6 +33,8 @@ public partial class CreateFarmListsWindow : Window
     public CreateFarmListsWindow(
         string tribe,
         IReadOnlyList<VillageSelectionItem> villages,
+        bool onlyCreateReportsWithLosses,
+        Action<bool> onlyCreateReportsWithLossesChanged,
         Func<
             FarmListCreateRequest,
             IProgress<FarmListCreateProgress>,
@@ -41,7 +45,12 @@ public partial class CreateFarmListsWindow : Window
         InitializeComponent();
         ThemeChrome.EnableEarlyDarkTitleBar(this);
         _runner = runner;
+        _onlyCreateReportsWithLossesChanged = onlyCreateReportsWithLossesChanged;
         _runCts = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
+
+        _loadingOnlyCreateReportsWithLosses = true;
+        OnlyCreateReportsWithLossesCheckBox.IsChecked = onlyCreateReportsWithLosses;
+        _loadingOnlyCreateReportsWithLosses = false;
 
         ListNameFieldsItemsControl.ItemsSource = _listNameEntries;
         ListCountComboBox.ItemsSource = Enumerable.Range(1, 100);
@@ -81,6 +90,17 @@ public partial class CreateFarmListsWindow : Window
             ApplyTroopTypesForSelectedVillage();
         }
 
+        RefreshState();
+    }
+
+    private void OnlyCreateReportsWithLosses_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loadingOnlyCreateReportsWithLosses)
+        {
+            return;
+        }
+
+        _onlyCreateReportsWithLossesChanged(OnlyCreateReportsWithLossesCheckBox.IsChecked == true);
         RefreshState();
     }
 
@@ -229,7 +249,8 @@ public partial class CreateFarmListsWindow : Window
             village.Name,
             villageIdMatch.Success ? villageIdMatch.Groups[1].Value : null,
             troopType,
-            troopCount);
+            troopCount,
+            OnlyCreateReportsWithLosses: OnlyCreateReportsWithLossesCheckBox?.IsChecked == true);
         return true;
     }
 

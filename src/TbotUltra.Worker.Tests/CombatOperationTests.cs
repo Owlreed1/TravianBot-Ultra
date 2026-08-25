@@ -79,6 +79,12 @@ public sealed class CombatOperationTests
         public Task<string> TestSendReinforcementsBetweenOwnVillagesAsync(CancellationToken cancellationToken = default)
             => Record("test-reinforcements", cancellationToken, "Reinforcements test passed.");
 
+        public Task<TroopEvasionResult> SendTroopEvasionAsync(TroopEvasionRequest request, IProgress<TroopEvasionProgress>? progress = null, CancellationToken cancellationToken = default)
+            => Record("evasion", cancellationToken, new TroopEvasionResult(TroopEvasionOutcome.Succeeded, "sent"));
+
+        public Task<TroopEvasionValidationResult> ValidateTroopEvasionAsync(TroopEvasionRequest request, CancellationToken cancellationToken = default)
+            => Record("validate-evasion", cancellationToken, new TroopEvasionValidationResult(true, "valid"));
+
         private Task<T> Record<T>(string call, CancellationToken cancellationToken, T result)
         {
             Calls.Add(call);

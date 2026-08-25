@@ -835,6 +835,7 @@ public partial class MainWindow
 
     private void RefreshAfterActiveAccountChanged(string accountName)
     {
+        ClearDashboardVillagePanels();
         RefreshBrowserStatisticsUi();
         RecoverAndRefreshActiveAccountQueue();
         AppendLog($"Active account changed to '{accountName}'. Previous session closed and state reset.");
@@ -851,6 +852,7 @@ public partial class MainWindow
     // on the new server). This forces the picker + dashboard list back to the empty placeholder.
     private void ForceClearVillageSelectionUi()
     {
+        ClearIncomingAttackUiState();
         _suppressVillageSelectionChange = true;
         try
         {
@@ -1000,6 +1002,7 @@ public partial class MainWindow
         // Drop the in-memory per-village buildings/fields cache so the next account doesn't show the
         // previous account's villages. The on-disk village_cache.json per account is kept.
         _villageStatusCache.Clear();
+        ResetHeroCropAntiStarveObservations();
         _buildingRows.Clear();
         _buildingCatalogOptions.Clear();
         _demolishableBuildings.Clear();

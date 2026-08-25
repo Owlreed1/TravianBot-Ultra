@@ -55,6 +55,21 @@ public sealed class HeroAttributeSnapshotStoreTests : IDisposable
             out _));
     }
 
+    [Fact]
+    public void Delete_RemovesOnlyMatchingAccountAndServerSnapshot()
+    {
+        var store = new HeroAttributeSnapshotStore(_rootPath);
+        var retained = new HeroAttributeSnapshot(Resources: 28);
+        store.Save("account-one", "https://ts100.example.com", new HeroAttributeSnapshot(Resources: 20));
+        store.Save("account-one", "https://ts200.example.com", retained);
+
+        store.Delete("account-one", "https://ts100.example.com");
+
+        Assert.False(store.TryLoad("account-one", "https://ts100.example.com", out _));
+        Assert.True(store.TryLoad("account-one", "https://ts200.example.com", out var actual));
+        Assert.Equal(retained, actual);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_rootPath))

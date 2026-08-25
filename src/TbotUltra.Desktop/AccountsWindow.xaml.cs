@@ -605,7 +605,7 @@ public partial class AccountsWindow : Window
                 mode = "Proxy";
             }
 
-            var result = await ProxyCheckService.CheckIpAsync(mode, proxyServer, proxy, UpdateProxyCheckStatus, _proxyCheckCts.Token);
+            var result = await ProxyCheckService.CheckIpAsync(_projectRoot, mode, proxyServer, proxy, UpdateProxyCheckStatus, _proxyCheckCts.Token);
             var warningText = string.IsNullOrWhiteSpace(proxyWarning) ? string.Empty : $" Warning: {proxyWarning}";
             CompleteProxyCheckOverlay("Check IP address", result, warningText, success: true);
         }
@@ -640,7 +640,10 @@ public partial class AccountsWindow : Window
     {
         var initialScheme = (ProxySchemeComboBox?.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString();
         var finder = new ProxyFinderWindow(initialScheme) { Owner = this };
-        if (finder.ShowDialog() != true || finder.SelectedProxy is not { } pick)
+        var result = finder.ShowDialog();
+        ReloadProxyLibraryEntries();
+        RefreshSavedProxySelection();
+        if (result != true || finder.SelectedProxy is not { } pick)
         {
             return;
         }
@@ -1419,13 +1422,13 @@ public partial class AccountsWindow : Window
         ProxyCheckOverlayButton.IsEnabled = true;
         ProxyCheckOverlayButton.Content = completed ? "Continue" : "Cancel";
         ProxyCheckOverlayButton.Background = completed
-            ? FindResource("PrimaryButtonBrush") as System.Windows.Media.Brush
+            ? FindResource("SuccessBgBrush") as System.Windows.Media.Brush
             : FindResource("DangerBgBrush") as System.Windows.Media.Brush;
         ProxyCheckOverlayButton.BorderBrush = completed
-            ? FindResource("PrimaryButtonBrush") as System.Windows.Media.Brush
+            ? FindResource("SuccessBorderBrush") as System.Windows.Media.Brush
             : FindResource("DangerBorderBrush") as System.Windows.Media.Brush;
         ProxyCheckOverlayButton.Foreground = completed
-            ? FindResource("TooltipForegroundBrush") as System.Windows.Media.Brush
+            ? FindResource("SuccessTextBrush") as System.Windows.Media.Brush
             : FindResource("DangerTextBrush") as System.Windows.Media.Brush;
     }
 

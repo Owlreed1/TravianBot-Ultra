@@ -5,8 +5,11 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Threading;
+using Microsoft.Win32;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
@@ -17,7 +20,9 @@ namespace TbotUltra.Desktop;
 public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
 {
     private readonly BuildingTemplateStore _store;
+    private readonly BuildingTemplateExchangeService _exchangeService = new();
     private readonly BuildingTemplatePlanner _planner = new();
+    private readonly string _projectRoot;
     private readonly VillageStatus _status;
     private readonly double _serverSpeed;
     private readonly int _mainBuildingLevel;
@@ -35,6 +40,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     private string? _templateLoadWarning;
     private bool _isLoadingTemplateRows;
     private CancellationTokenSource? _templateLoadCts;
+    private readonly DispatcherTimer _planPreviewTimer;
 
     public ObservableCollection<BuildingTemplate> Templates { get; } = [];
     public ObservableCollection<BuildingTemplateRowView> Rows { get; } = [];
@@ -134,12 +140,22 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         ThemeChrome.EnableEarlyDarkTitleBar(this);
         DataContext = this;
 
+        _projectRoot = projectRoot;
         _store = new BuildingTemplateStore(projectRoot);
         _status = status;
         _serverSpeed = serverSpeed;
         _mainBuildingLevel = mainBuildingLevel;
 
         Rows.CollectionChanged += Rows_CollectionChanged;
+        _planPreviewTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(120),
+        };
+        _planPreviewTimer.Tick += (_, _) =>
+        {
+            _planPreviewTimer.Stop();
+            RefreshPlanPreview();
+        };
         LoadBuildingOptions(status.Tribe);
         Loaded += BuildingTemplatesWindow_Loaded;
         Closed += BuildingTemplatesWindow_Closed;
@@ -177,6 +193,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     private async void BuildingTemplatesWindow_Loaded(object sender, RoutedEventArgs e)
     {
         Loaded -= BuildingTemplatesWindow_Loaded;
+        LoadingOverlay.Show("Building templates", "Loading templates...");
         var loadCts = new CancellationTokenSource();
         _templateLoadCts = loadCts;
         try
@@ -215,6 +232,8 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             }
 
             SelectedTemplate = Templates[0];
+            _planPreviewTimer.Stop();
+            RefreshPlanPreview();
             LoadingOverlay.Hide();
         }
         finally
@@ -235,7 +254,10 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     }
 
     private void BuildingTemplatesWindow_Closed(object? sender, EventArgs e)
-        => _templateLoadCts?.Cancel();
+    {
+        _planPreviewTimer.Stop();
+        _templateLoadCts?.Cancel();
+    }
 
     private BuildingTemplate CreateNewTemplate(string name)
     {
@@ -284,7 +306,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         }
 
         RefreshIndexes();
-        RefreshPlanPreview();
+        RequestPlanPreviewRefresh();
     }
 
     private void Rows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -311,7 +333,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         }
 
         RefreshIndexes();
-        RefreshPlanPreview();
+        RequestPlanPreviewRefresh();
     }
 
     private void AddRowView(BuildingTemplateRowView row)
@@ -327,7 +349,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        RefreshPlanPreview();
+        RequestPlanPreviewRefresh();
     }
 
     private void NewTemplateButton_Click(object sender, RoutedEventArgs e)
@@ -337,6 +359,200 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         Templates.Add(template);
         SelectedTemplate = template;
         StatusText = "Created template.";
+    }
+
+    private void DuplicateTemplateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedTemplate is null)
+        {
+            return;
+        }
+
+        var duplicate = CreateDuplicateTemplate(
+            SelectedTemplate,
+            BuildTemplateRowsFromUi(),
+            Templates);
+        var sourceIndex = Templates.IndexOf(SelectedTemplate);
+        Templates.Insert(sourceIndex + 1, duplicate);
+        SelectedTemplate = duplicate;
+        StatusText = "Duplicated template. Save to keep it.";
+    }
+
+    private void ImportTemplatesButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!SaveAllTemplates(skipValidation: true))
+        {
+            return;
+        }
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import building templates",
+            Filter = "Tbot Ultra templates (*.tbot-template.json)|*.tbot-template.json|JSON files (*.json)|*.json",
+            DefaultExt = BuildingTemplateExchangeService.FileExtension,
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var candidates = _exchangeService.Import(dialog.FileName, _status.Tribe);
+            var preview = new BuildingTemplateImportWindow(
+                candidates,
+                Templates.Select(template => template.Id).ToHashSet())
+            {
+                Owner = this,
+            };
+            if (preview.ShowDialog() != true)
+            {
+                return;
+            }
+
+            var result = _exchangeService.ApplyImport(Templates.ToList(), preview.Selections, DateTimeOffset.UtcNow);
+            _store.Save(result.Templates);
+
+            SelectedTemplate = null;
+            Templates.Clear();
+            foreach (var template in result.Templates)
+            {
+                Templates.Add(template);
+            }
+
+            SelectedTemplate = result.ImportedTemplateIds.Count > 0
+                ? Templates.FirstOrDefault(template => template.Id == result.ImportedTemplateIds[0])
+                : Templates.FirstOrDefault();
+            StatusText = $"Imported {result.ImportedCount}, overwritten {result.OverwrittenCount}, copied {result.CopiedCount}.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            AppDialog.Show(
+                this,
+                ex.Message,
+                "Import building templates",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void ExportTemplatesButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { ContextMenu: { } menu } button)
+        {
+            return;
+        }
+
+        menu.PlacementTarget = button;
+        menu.Placement = PlacementMode.Bottom;
+        menu.IsOpen = true;
+    }
+
+    private void ExportSelectedTemplateMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedTemplate is null)
+        {
+            StatusText = "Select a template to export.";
+            return;
+        }
+
+        ExportTemplates([SelectedTemplate], SanitizeExportFileName(SelectedTemplate.Name));
+    }
+
+    private void ExportAllTemplatesMenuItem_Click(object sender, RoutedEventArgs e)
+        => ExportTemplates(Templates.ToList(), $"building-templates-{DateTime.Now:yyyyMMdd}");
+
+    private void ExportTemplates(IReadOnlyList<BuildingTemplate> templates, string suggestedName)
+    {
+        if (!SaveAllTemplates(skipValidation: true))
+        {
+            return;
+        }
+
+        if (templates.Count == 0)
+        {
+            StatusText = "There are no templates to export.";
+            return;
+        }
+
+        var downloads = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads");
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export building templates",
+            FileName = suggestedName + BuildingTemplateExchangeService.FileExtension,
+            Filter = "Tbot Ultra templates (*.tbot-template.json)|*.tbot-template.json",
+            DefaultExt = BuildingTemplateExchangeService.FileExtension,
+            AddExtension = true,
+            OverwritePrompt = true,
+            InitialDirectory = Directory.Exists(downloads) ? downloads : null,
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var appVersion = UpdateChecker.ReadCurrentVersion(Path.Combine(_projectRoot, "VERSION"));
+            _exchangeService.Export(dialog.FileName, templates, appVersion, DateTimeOffset.UtcNow);
+            StatusText = $"Exported {templates.Count} template(s) to {Path.GetFileName(dialog.FileName)}.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            AppDialog.Show(
+                this,
+                ex.Message,
+                "Export building templates",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private static string SanitizeExportFileName(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars().ToHashSet();
+        var sanitized = new string((string.IsNullOrWhiteSpace(name) ? "building-template" : name.Trim())
+            .Select(character => invalid.Contains(character) ? '-' : character)
+            .ToArray());
+        return string.IsNullOrWhiteSpace(sanitized) ? "building-template" : sanitized;
+    }
+
+    internal static BuildingTemplate CreateDuplicateTemplate(
+        BuildingTemplate source,
+        IReadOnlyList<BuildingTemplateRow> currentRows,
+        IReadOnlyCollection<BuildingTemplate> existingTemplates)
+    {
+        var sourceName = string.IsNullOrWhiteSpace(source.Name) ? "Template" : source.Name.Trim();
+        var copyName = $"{sourceName} copy";
+        var copyNumber = 2;
+        while (existingTemplates.Any(template =>
+                   string.Equals(template.Name, copyName, StringComparison.OrdinalIgnoreCase)))
+        {
+            copyName = $"{sourceName} copy {copyNumber++}";
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        return new BuildingTemplate
+        {
+            Name = copyName,
+            CreatedByTribe = source.CreatedByTribe,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+            Rows = currentRows.Select(row => new BuildingTemplateRow
+            {
+                Kind = row.Kind,
+                Gid = row.Gid,
+                BuildingName = row.BuildingName,
+                PreferredSlotId = row.PreferredSlotId,
+                TargetLevel = row.TargetLevel,
+                ResourceScope = row.ResourceScope,
+                ResourceStrategy = row.ResourceStrategy,
+            }).ToList(),
+        };
     }
 
     private void DeleteTemplateButton_Click(object sender, RoutedEventArgs e)
@@ -472,14 +688,6 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         StatusText = $"Inserted {prerequisitePlan.Rows.Count} prerequisite row(s) before {option.Name}.";
     }
 
-    private void RemoveRowButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (SelectedRow is not null)
-        {
-            RemoveTemplateRow(SelectedRow);
-        }
-    }
-
     private void DeleteRowButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: BuildingTemplateRowView row })
@@ -537,6 +745,26 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         MoveSelectedRow(1);
     }
 
+    private void BuildingOptions_DropDownOpened(object sender, EventArgs e)
+    {
+        if (sender is not ComboBox { DataContext: BuildingTemplateRowView row } || !row.IsBuildingRow)
+        {
+            return;
+        }
+
+        RefreshBuildingOptionAvailability(row);
+    }
+
+    private void MoveRowTopButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveSelectedRowTo(0);
+    }
+
+    private void MoveRowBottomButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveSelectedRowTo(Rows.Count - 1);
+    }
+
     private void MoveSelectedRow(int delta)
     {
         if (SelectedRow is null)
@@ -552,13 +780,27 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         }
 
         Rows.Move(index, target);
-        RefreshIndexes();
-        RefreshPlanPreview();
+    }
+
+    private void MoveSelectedRowTo(int target)
+    {
+        if (SelectedRow is null)
+        {
+            return;
+        }
+
+        var index = Rows.IndexOf(SelectedRow);
+        if (index < 0 || target < 0 || target >= Rows.Count || index == target)
+        {
+            return;
+        }
+
+        Rows.Move(index, target);
     }
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!SaveAllTemplates(skipValidation: false))
+        if (!SaveAllTemplates(skipValidation: true))
         {
             return;
         }
@@ -568,7 +810,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
 
     private void QueueTemplateButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!SaveAllTemplates(skipValidation: false))
+        if (!SaveAllTemplates(skipValidation: true))
         {
             return;
         }
@@ -577,7 +819,14 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         var plan = _planner.Plan(rows, _status, _serverSpeed, _mainBuildingLevel);
         if (plan.Errors.Count > 0)
         {
+            var message = string.Join("\n", plan.Errors);
             StatusText = string.Join(" ", plan.Errors.Take(2));
+            AppDialog.Show(
+                this,
+                message,
+                "Cannot queue template",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             return;
         }
 
@@ -586,6 +835,12 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             StatusText = plan.Warnings.Count > 0
                 ? string.Join(" ", plan.Warnings.Take(2))
                 : "Template has nothing to queue.";
+            AppDialog.Show(
+                this,
+                StatusText,
+                "Cannot queue template",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
@@ -638,6 +893,12 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     private IReadOnlyList<BuildingTemplateRow> BuildTemplateRowsFromUi()
         => Rows.Select(row => row.ToTemplateRow()).ToList();
 
+    private void RequestPlanPreviewRefresh()
+    {
+        _planPreviewTimer.Stop();
+        _planPreviewTimer.Start();
+    }
+
     private void RefreshPlanPreview(BuildingTemplatePlanResult? existingPlan = null)
     {
         if (_isRefreshingPlanPreview)
@@ -648,7 +909,6 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         _isRefreshingPlanPreview = true;
         try
         {
-            RefreshBuildingOptionAvailability();
             var plan = existingPlan ?? _planner.Plan(BuildTemplateRowsFromUi(), _status, _serverSpeed, _mainBuildingLevel);
             foreach (var row in Rows)
             {
@@ -686,38 +946,35 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         }
     }
 
-    private void RefreshBuildingOptionAvailability()
+    private void RefreshBuildingOptionAvailability(BuildingTemplateRowView row)
     {
-        for (var rowIndex = 0; rowIndex < Rows.Count; rowIndex++)
+        var rowIndex = Rows.IndexOf(row);
+        if (rowIndex < 0)
         {
-            var row = Rows[rowIndex];
-            if (!row.IsBuildingRow)
+            return;
+        }
+
+        var precedingRows = Rows.Take(rowIndex).Select(item => item.ToTemplateRow()).ToList();
+        var options = BuildingOptions.Select(option =>
+        {
+            if (option.Gid is not int gid)
             {
-                continue;
+                return option;
             }
 
-            var precedingRows = Rows.Take(rowIndex).Select(item => item.ToTemplateRow()).ToList();
-            var options = BuildingOptions.Select(option =>
+            var result = _planner.EvaluateBuildingAvailability(
+                gid,
+                precedingRows,
+                _status,
+                _serverSpeed,
+                _mainBuildingLevel);
+            return option with
             {
-                if (option.Gid is not int gid)
-                {
-                    return option;
-                }
-
-                var result = _planner.EvaluateBuildingAvailability(
-                    gid,
-                    precedingRows,
-                    _status,
-                    _serverSpeed,
-                    _mainBuildingLevel);
-                return option with
-                {
-                    Availability = result.Availability,
-                    AvailabilityReason = result.Reason,
-                };
-            }).ToList();
-            row.SetOptionSources(options, ResourceOptions);
-        }
+                Availability = result.Availability,
+                AvailabilityReason = result.Reason,
+            };
+        }).ToList();
+        row.SetOptionSources(options, ResourceOptions);
     }
 
     private void RefreshIndexes()

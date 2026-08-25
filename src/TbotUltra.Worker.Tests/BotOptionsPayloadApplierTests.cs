@@ -7,6 +7,19 @@ namespace TbotUltra.Worker.Tests;
 public sealed class BotOptionsPayloadApplierTests
 {
     [Fact]
+    public void FarmListOnlyLossReports_DefaultsEnabledAndCanBeDisabled()
+    {
+        var defaults = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        var disabled = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [BotOptionPayloadKeys.FarmListOnlyCreateReportsWithLosses] = "false",
+        }).Build();
+
+        Assert.True(BotOptionsFactory.FromConfiguration(defaults).FarmListOnlyCreateReportsWithLosses);
+        Assert.False(BotOptionsFactory.FromConfiguration(disabled).FarmListOnlyCreateReportsWithLosses);
+    }
+
+    [Fact]
     public void CropShortageRecovery_DefaultsTrueAndCanBeDisabled()
     {
         var defaults = new ConfigurationBuilder().AddInMemoryCollection().Build();
@@ -92,6 +105,21 @@ public sealed class BotOptionsPayloadApplierTests
 
         Assert.False(BotOptionsFactory.FromConfiguration(defaults).DetailedBrowserLoggingEnabled);
         Assert.True(BotOptionsFactory.FromConfiguration(enabled).DetailedBrowserLoggingEnabled);
+    }
+
+    [Fact]
+    public void FromConfiguration_VideoSoundMuteDefaultsEnabledAndCanDisable()
+    {
+        var defaults = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        var disabled = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [BotOptionPayloadKeys.TurnOffVideoSound] = "false",
+            })
+            .Build();
+
+        Assert.True(BotOptionsFactory.FromConfiguration(defaults).TurnOffVideoSound);
+        Assert.False(BotOptionsFactory.FromConfiguration(disabled).TurnOffVideoSound);
     }
 
     [Fact]

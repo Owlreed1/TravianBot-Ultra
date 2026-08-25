@@ -10,7 +10,11 @@ internal static partial class TravianLanguageDetector
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     public static bool IsExpected(string? language)
-        => string.Equals(Normalize(language), ExpectedLanguage, StringComparison.OrdinalIgnoreCase);
+    {
+        var normalized = Normalize(language);
+        return string.Equals(normalized, "en", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, ExpectedLanguage, StringComparison.OrdinalIgnoreCase);
+    }
 
     public static string? ExtractFromHtml(string? html)
     {

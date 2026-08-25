@@ -413,6 +413,8 @@ public partial class ProxyFinderWindow : Window
         _operationCts?.Dispose();
         _operationCts = new CancellationTokenSource();
         var token = _operationCts.Token;
+        BusyOverlay.ShowCancel = true;
+        BusyOverlay.Show("Loading proxy list", $"Downloading {scheme.ToUpperInvariant()} proxies...");
 
         try
         {
@@ -426,6 +428,7 @@ public partial class ProxyFinderWindow : Window
             var text = await response.Content.ReadAsStringAsync(token);
             token.ThrowIfCancellationRequested();
 
+            BusyOverlay.Show("Loading proxy list", $"Parsing {scheme.ToUpperInvariant()} proxies...");
             ProxyListTextBox.Text = text.Replace("\r\n", "\n").Trim();
             var parsed = ProxyListTester.ParseCandidates(ProxyListTextBox.Text, scheme, HardMaxProxies);
             ValidationTextBlock.Text = parsed.Count == 0
@@ -443,6 +446,7 @@ public partial class ProxyFinderWindow : Window
         }
         finally
         {
+            BusyOverlay.Hide();
             _busy = false;
         }
     }

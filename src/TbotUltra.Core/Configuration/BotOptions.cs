@@ -46,6 +46,9 @@ public sealed record BotOptions
     [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmSendMode)]
     public string ContinuousFarmSendMode { get; init; } = FarmingDefaults.SendModeListPerList;
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.FarmListOnlyCreateReportsWithLosses)]
+    public bool FarmListOnlyCreateReportsWithLosses { get; init; } = FarmingDefaults.OnlyCreateReportsWithLosses;
+
     [ConfigurationKeyName(BotOptionPayloadKeys.ShowFarmListLastSentTimer)]
     public bool ShowFarmListLastSentTimer { get; init; } = FarmingDefaults.ShowLastSentTimer;
 
@@ -144,6 +147,9 @@ public sealed record BotOptions
 
     [ConfigurationKeyName(BotOptionPayloadKeys.DetailedBrowserLoggingEnabled)]
     public bool DetailedBrowserLoggingEnabled { get; init; }
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.TurnOffVideoSound)]
+    public bool TurnOffVideoSound { get; init; } = true;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingBarracksEnabled)]
     public bool TroopTrainingBarracksEnabled { get; init; }

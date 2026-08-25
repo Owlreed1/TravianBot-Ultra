@@ -6,6 +6,11 @@ using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Worker.Services;
 
+public delegate Task<string> IsolatedBonusVideoRunner(
+    Func<IPage, CancellationToken, Task<string>> action,
+    CancellationToken cancellationToken,
+    bool bypassExistingCooldown = false);
+
 /// <summary>
 /// Optional host callbacks a <see cref="TravianClient"/> calls back into. Bundled into one object so
 /// the client's constructor stays a short list of core dependencies instead of a long tail of nullable
@@ -30,7 +35,7 @@ public sealed record TravianClientCallbacks
     public Func<IPage, CancellationToken, Task>? CleanupAfterBonusVideoAsync { get; init; }
 
     /// <summary>Runs a bonus-video action inside an isolated browser and returns its result.</summary>
-    public Func<Func<IPage, CancellationToken, Task<string>>, CancellationToken, Task<string>>? RunInIsolatedBonusVideoBrowserAsync { get; init; }
+    public IsolatedBonusVideoRunner? RunInIsolatedBonusVideoBrowserAsync { get; init; }
 
     /// <summary>Rotates to a fresh page/browser after a lobby login for the given account.</summary>
     public Func<string, CancellationToken, Task<IPage>>? RotateAfterLobbyLoginAsync { get; init; }

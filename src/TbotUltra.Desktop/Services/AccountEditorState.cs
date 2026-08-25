@@ -17,7 +17,26 @@ internal sealed record AccountEditorSnapshot(
 internal sealed record SavedProxyOption(
     ProxyLibraryEntry? Entry,
     string DisplayText,
-    ProxyReuse Availability = ProxyReuse.Ok);
+    string ContextText = "",
+    ProxyReuse Availability = ProxyReuse.Ok)
+{
+    public string CountryText => Entry?.CountryDisplay ?? DisplayText;
+
+    public string EndpointText => Entry?.HostPort ?? string.Empty;
+
+    public string HealthText => Entry?.IsWorking switch
+        {
+            true => "Working",
+            false => "Failed",
+            null when Entry?.LatencyMs is > 0 => "Unverified",
+            null when Entry is not null => "Not tested",
+            _ => string.Empty,
+        };
+
+    public string LatencyText => Entry?.LatencyMs is > 0 ? $"{Entry.LatencyMs} ms" : string.Empty;
+
+    public string PerformanceText => LatencyText.Length == 0 ? HealthText : $"{HealthText} · {LatencyText}";
+}
 
 internal sealed record AccountEditorInput(
     string Username,
@@ -159,14 +178,19 @@ internal static class AccountEditorState
         {
             new(null, "Select saved proxy..."),
         };
-        options.AddRange(orderedEntries.Select(entry => new SavedProxyOption(
-            entry,
-            BuildSavedProxyDisplay(entry, accountsByKey),
-            ProxyLibraryStore.ClassifyReuse(allEntries, entry.Server, normalizedAccount).Reuse)));
+        options.AddRange(orderedEntries.Select(entry =>
+        {
+            var context = BuildSavedProxyContext(entry, accountsByKey);
+            return new SavedProxyOption(
+                entry,
+                $"{entry.CountryDisplay} · {entry.HostPort}",
+                context,
+                ProxyLibraryStore.ClassifyReuse(allEntries, entry.Server, normalizedAccount).Reuse);
+        }));
         return options;
     }
 
-    private static string BuildSavedProxyDisplay(
+    private static string BuildSavedProxyContext(
         ProxyLibraryEntry entry,
         IReadOnlyDictionary<string, AccountEntry> accountsByKey)
     {
@@ -183,8 +207,7 @@ internal static class AccountEditorState
             accountName = "Missing account";
         }
 
-        var latency = entry.LatencyMs is > 0 ? $"{entry.LatencyMs} ms" : "Not tested";
-        return $"{entry.CountryDisplay} · {entry.HostPort} · {accountName} · {serverName} · {latency}";
+        return serverName == "—" ? accountName : $"{accountName} · {serverName}";
     }
 
     private static bool IsValidProxyHost(string host) =>

@@ -214,9 +214,6 @@
                     <Button x:Name="TroopsNavButton" Style="{StaticResource SidebarNavButtonStyle}" Tag="troops" Click="SidebarNavButton_Click">
                         <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE716;" /><TextBlock Style="{StaticResource NavText}" Text="Troops" /></StackPanel>
                     </Button>
-                    <Button x:Name="ReinforcementsNavButton" Style="{StaticResource SidebarNavButtonStyle}" Tag="reinforcements" Click="SidebarNavButton_Click">
-                        <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE724;" /><TextBlock Style="{StaticResource NavText}" Text="Send Troops" /></StackPanel>
-                    </Button>
                     <Button x:Name="NpcTradeNavButton" Style="{StaticResource SidebarNavButtonStyle}" Tag="npc_trade" Click="SidebarNavButton_Click">
                         <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE719;" /><TextBlock Style="{StaticResource NavText}" Text="NPC / Trade" /></StackPanel>
                     </Button>
@@ -587,21 +584,22 @@
                             Margin="0,0,0,8">
                         <StackPanel>
                             <DockPanel Margin="0,0,0,8">
+                                <Button x:Name="ResetProgramButton"
+                                        DockPanel.Dock="Right"
+                                        Height="32"
+                                        Content="Reset program"
+                                        Padding="10,4"
+                                        Background="{DynamicResource WarningButtonBgBrush}"
+                                        Foreground="{DynamicResource OnWarningBrush}"
+                                        BorderBrush="{DynamicResource WarningBorderBrush}"
+                                        Click="ResetProgramButton_Click"
+                                        ToolTip="Restart the browser session: stops running tasks and closes Chromium. Account, settings, queue, cached villages, and saved login are kept." />
                                 <Button x:Name="OpenResourceTestFunctionsButton"
                                         DockPanel.Dock="Right"
                                         Content="Debug"
                                         Padding="10,4"
-                                        Click="OpenResourceTestFunctionsButton_Click" />
-                                <Button x:Name="VillageSettingsButton"
-                                        DockPanel.Dock="Right"
-                                        Content="Village settings"
-                                        Padding="10,4"
                                         Margin="0,0,8,0"
-                                        Background="{DynamicResource SuccessBgBrush}"
-                                        BorderBrush="{DynamicResource SuccessBorderBrush}"
-                                        Foreground="{DynamicResource SuccessTextBrush}"
-                                        Click="VillageSettingsButton_Click"
-                                        ToolTip="Open per-village settings (hero resources, NPC, build/upgrade troops, farming)." />
+                                        Click="OpenResourceTestFunctionsButton_Click" />
                                 <Button x:Name="AccountScanButton"
                                         DockPanel.Dock="Right"
                                         Content="Account scan"
@@ -694,12 +692,12 @@
                     </TabControl.ItemContainerStyle>
 
                 <TabItem x:Name="DashboardTabItem" Header="Dashboard">
-                    <views:DashboardPanel x:Name="DashboardPanelControl" />
+                    <views:DashboardHubPanel x:Name="DashboardHubPanelControl" />
                 </TabItem>
 
                 <TabItem x:Name="ResourcesTabItem" Header="Resources"
                          DataContext="{Binding ResourcesVm, ElementName=RootWindow}">
-                    <views:ResourcesPanel x:Name="ResourcesPanelControl" />
+                    <views:ResourcesHubPanel x:Name="ResourcesHubPanelControl" />
                 </TabItem>
 
                 <TabItem x:Name="BuildingsTabItem" Header="Buildings"
@@ -723,9 +721,7 @@
 
                 <TabItem x:Name="HeroTabItem" Header="Hero / Adventures"
                          DataContext="{Binding HeroVm, ElementName=RootWindow}">
-                    <!-- TabItem keeps the DataContext binding so the panel inherits the
-                         HeroViewModel; all hero UI lives in Views/HeroPanel.xaml. -->
-                    <views:HeroPanel />
+                    <views:HeroHubPanel x:Name="HeroHubPanelControl" />
                 </TabItem>
                 <TabItem x:Name="FarmingTabItem" Header="Farming"
                          DataContext="{Binding FarmListsVm, ElementName=RootWindow}">
@@ -734,18 +730,12 @@
 
                 <TabItem x:Name="TroopsTabItem" Header="Troops"
                          DataContext="{Binding TroopTrainingVm, ElementName=RootWindow}">
-                    <!-- All troops UI lives in Views/TroopsPanel.xaml; the TabItem keeps the
-                         DataContext binding so the panel inherits the TroopTrainingViewModel. -->
-                    <views:TroopsPanel />
-                </TabItem>
-
-                <TabItem x:Name="ReinforcementsTabItem" Header="Send Troops">
-                    <views:ReinforcementsPanel x:Name="ReinforcementsPanelControl" />
+                    <views:TroopsHubPanel x:Name="TroopsHubPanelControl" />
                 </TabItem>
 
                 <TabItem x:Name="NpcTradeTabItem" Header="NPC / Trade"
                          DataContext="{Binding TroopTrainingVm, ElementName=RootWindow}">
-                    <views:NpcTradePanel x:Name="NpcTradePanelControl" />
+                    <views:NpcTradeHubPanel x:Name="NpcTradeHubPanelControl" />
                 </TabItem>
 
                 <TabItem x:Name="QueueTabItem" Header="Queue">

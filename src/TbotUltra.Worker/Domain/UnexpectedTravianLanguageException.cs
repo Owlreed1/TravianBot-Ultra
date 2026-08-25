@@ -13,6 +13,6 @@ public sealed class UnexpectedTravianLanguageException : InvalidOperationExcepti
     private static string BuildMessage(string? currentLanguage)
     {
         var display = string.IsNullOrWhiteSpace(currentLanguage) ? "unknown" : currentLanguage.Trim();
-        return $"Travian language must be English (en-US), but current language is '{display}'.";
+        return $"Travian language must be English (en or en-US), but current language is '{display}'.";
     }
 }

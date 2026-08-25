@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net;
 using TbotUltra.Worker.Infrastructure;
 using Xunit;
 
@@ -6,6 +7,21 @@ namespace TbotUltra.Worker.Tests;
 
 public sealed class ProxyListTesterTests
 {
+    [Theory]
+    [InlineData(HttpStatusCode.OK, true)]
+    [InlineData(HttpStatusCode.NoContent, true)]
+    [InlineData(HttpStatusCode.Redirect, true)]
+    [InlineData(HttpStatusCode.Forbidden, false)]
+    [InlineData(HttpStatusCode.ProxyAuthenticationRequired, false)]
+    [InlineData(HttpStatusCode.BadGateway, false)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, false)]
+    public void IsUsableResponseStatus_RejectsBlockedAndGatewayResponses(
+        HttpStatusCode statusCode,
+        bool expected)
+    {
+        Assert.Equal(expected, ProxyListTester.IsUsableResponseStatus(statusCode));
+    }
+
     [Fact]
     public void ParseCandidates_AppliesChosenSchemeToBareLines()
     {
@@ -151,7 +167,7 @@ public sealed class ProxyListTesterTests
                 return Task.FromResult(new ProxyProbeResult(attempt == 1, 10));
             }
 
-            // 2.2.2.2 is stable: passes both probes with latencies 20 and 40 -> average 30.
+            // 2.2.2.2 is stable: passes all probes with latencies 20, 40 and 40 -> average 33.
             return Task.FromResult(new ProxyProbeResult(true, attempt == 1 ? 20 : 40));
         });
 
@@ -159,7 +175,24 @@ public sealed class ProxyListTesterTests
 
         Assert.Single(results);
         Assert.Equal("2.2.2.2:2", results[0].Candidate.HostPort);
-        Assert.Equal(30, results[0].LatencyMs);
+        Assert.Equal(33, results[0].LatencyMs);
+    }
+
+    [Fact]
+    public async Task TestAsync_DropsProxyThatFailsTheThirdStabilityProbe()
+    {
+        var candidates = ProxyListTester.ParseCandidates("1.1.1.1:1", "socks5", 0);
+        var calls = 0;
+        var tester = new ProxyListTester(probe: (_, _, _) =>
+        {
+            calls++;
+            return Task.FromResult(new ProxyProbeResult(calls < 3, 10));
+        });
+
+        var results = await tester.TestAsync(candidates, 1, 10, null, CancellationToken.None);
+
+        Assert.Empty(results);
+        Assert.Equal(3, calls);
     }
 
     [Fact]
@@ -204,7 +237,34 @@ public sealed class ProxyListTesterTests
     }
 
     [Fact]
-    public async Task TestServerAgainstTargetAsync_RequiresTwoStableProbesAndTargetReachability()
+    public async Task FilterReachableAsync_DropsProxyThatFailsTheSecondTargetProbe()
+    {
+        var candidate = Assert.Single(ProxyListTester.ParseCandidates("1.1.1.1:1", "socks5", 0));
+        var targetCalls = 0;
+        var tester = new ProxyListTester(probe: (_, url, _) =>
+        {
+            if (!url.Contains("gstatic", StringComparison.Ordinal))
+            {
+                targetCalls++;
+            }
+
+            return Task.FromResult(new ProxyProbeResult(targetCalls < 2, 10));
+        });
+
+        var reachable = await tester.FilterReachableAsync(
+            [new ProxyTestResult(candidate, 10)],
+            "https://www.travian.com/",
+            1,
+            10,
+            null,
+            CancellationToken.None);
+
+        Assert.Empty(reachable);
+        Assert.Equal(2, targetCalls);
+    }
+
+    [Fact]
+    public async Task TestServerAgainstTargetAsync_RequiresThreeStableProbesAndTargetReachability()
     {
         var calls = 0;
         var tester = new ProxyListTester(probe: (_, url, _) =>
@@ -220,7 +280,7 @@ public sealed class ProxyListTesterTests
             CancellationToken.None);
 
         Assert.False(result.Success);
-        Assert.Equal(3, calls);
+        Assert.Equal(4, calls);
     }
 
     [Fact]

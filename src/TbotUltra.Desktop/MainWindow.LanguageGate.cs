@@ -9,9 +9,57 @@ public partial class MainWindow
 {
     private async Task<bool> HandleUnexpectedTravianLanguageAsync(UnexpectedTravianLanguageException ex)
     {
+        var resumeContinuous = IsContinuousLoopRunning() || _startContinuousLoopAfterQueueStop;
+        var resumeQueue = !resumeContinuous && _autoQueueRunning;
         RequestAutomationStop(AutomationStopMode.AfterCurrentAction);
         AppendLog($"[language] Bot paused: {ex.Message}");
-        return await ShowTravianLanguageGateAsync(ex.CurrentLanguage);
+        var verified = await ShowTravianLanguageGateAsync(ex.CurrentLanguage);
+        if (verified)
+        {
+            AcknowledgeLanguageAlarmEntries();
+            await ResumeAutomationAfterLanguageGateAsync(resumeContinuous, resumeQueue);
+        }
+
+        return verified;
+    }
+
+    private async Task ResumeAutomationAfterLanguageGateAsync(bool resumeContinuous, bool resumeQueue)
+    {
+        if (_loopController.IsClosing || !_isLoggedIn || IsSessionSleeping)
+        {
+            return;
+        }
+
+        if (resumeContinuous)
+        {
+            if (IsContinuousLoopRunning())
+            {
+                _restartContinuousLoopAfterStop = true;
+                AppendLog("[language] English verified; continuous loop will resume after the current stop completes.");
+            }
+            else
+            {
+                AppendLog("[language] English verified; resuming continuous loop.");
+                StartContinuousLoopRunner();
+            }
+
+            return;
+        }
+
+        if (!resumeQueue)
+        {
+            return;
+        }
+
+        if (_autoQueueRunning)
+        {
+            _restartAutoQueueAfterLanguageGate = true;
+            AppendLog("[language] English verified; queue auto-run will resume after the current stop completes.");
+            return;
+        }
+
+        AppendLog("[language] English verified; resuming queue auto-run.");
+        await TriggerQueueAutoRunAsync();
     }
 
     private async Task<bool> ShowTravianLanguageGateAsync(string? currentLanguage)

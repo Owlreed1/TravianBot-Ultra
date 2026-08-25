@@ -930,6 +930,7 @@ public partial class MainWindow
         // Reload the Troops tab from the (possibly just-changed) selected village's override so the
         // two surfaces stay in sync.
         ApplyTroopTrainingForSelectedVillage();
+        RequestDashboardVillageProjectionRefresh();
         _troopTrainingViewModel.InfoText = $"Saved troop-training settings for {window.Results.Count} village(s).";
         AppendLog($"Saved troop-training settings for {window.Results.Count} village(s). "
             + $"Cleared {removed} queued build_troops task(s) to apply the change.");
@@ -1050,6 +1051,7 @@ public partial class MainWindow
         {
             CacheDashboardTroopTrainingPayload(account, key, syncedPayload);
         }
+        RequestDashboardVillageProjectionRefresh();
         var removed = matchingVillages.Sum(village => RemoveTroopTrainingQueueItemsForVillage(village.Name));
         _troopTrainingViewModel.InfoText = $"Synced troop-training settings to {keys.Count} {sourceTribe} village(s); skipped {skippedVillages.Count}.";
         AppendLog($"Synced troop-training settings to {keys.Count} village(s). "
@@ -1123,6 +1125,7 @@ public partial class MainWindow
             var payload = _troopTrainingViewModel.BuildVillageTrainingPayload();
             _troopTrainingPanelService.SaveVillageSettings(account, key, payload);
             CacheDashboardTroopTrainingPayload(account, key, payload);
+            RequestDashboardVillageProjectionRefresh();
         }
         catch (Exception ex)
         {

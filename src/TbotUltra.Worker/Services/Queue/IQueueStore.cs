@@ -13,6 +13,8 @@ public interface IQueueStore
     bool Remove(Guid id);
     bool MoveUp(Guid id);
     bool MoveDown(Guid id);
+    bool MoveToTop(Guid id);
+    bool MoveToBottom(Guid id);
     bool Pause(Guid id);
     bool Resume(Guid id);
     bool Retry(Guid id);

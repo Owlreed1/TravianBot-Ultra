@@ -576,7 +576,8 @@ public sealed partial class BotTaskRunner
         var sharedClient = CreateClient(_sharedVisiblePage!, options, account, interactive, log, _sharedVisibleSessionCache,
             setConsentDomainsAllowed: allowed => GetRequiredSharedVisibleSession().ConsentDomainsAllowed = allowed,
             cleanupAfterBonusVideoAsync: (page, ct) => GetRequiredSharedVisibleSession().CleanupAfterBonusVideoAsync(page, ct),
-            runInIsolatedBonusVideoBrowserAsync: (action, ct) => GetRequiredSharedVisibleSession().RunInIsolatedBonusVideoBrowserAsync(action, ct),
+            runInIsolatedBonusVideoBrowserAsync: (action, ct, bypassExistingCooldown) =>
+                GetRequiredSharedVisibleSession().RunInIsolatedBonusVideoBrowserAsync(action, ct, bypassExistingCooldown),
             rotateAfterLobbyLoginAsync: (serverUrl, ct) => RotateSharedVisibleContextAfterLobbyLoginAsync(serverUrl, log, leaseGeneration, ct),
             browserTrace: GetRequiredSharedVisibleSession().BrowserTrace);
         return new ClientLease(_sharedVisibleSession!, sharedClient, true);
@@ -668,7 +669,7 @@ public sealed partial class BotTaskRunner
         TravianSessionCache? sessionCache = null,
         Action<bool>? setConsentDomainsAllowed = null,
         Func<IPage, CancellationToken, Task>? cleanupAfterBonusVideoAsync = null,
-        Func<Func<IPage, CancellationToken, Task<string>>, CancellationToken, Task<string>>? runInIsolatedBonusVideoBrowserAsync = null,
+        IsolatedBonusVideoRunner? runInIsolatedBonusVideoBrowserAsync = null,
         Func<string, CancellationToken, Task<IPage>>? rotateAfterLobbyLoginAsync = null,
         BrowserTraceLogger? browserTrace = null)
     {

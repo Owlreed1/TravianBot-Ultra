@@ -2,17 +2,18 @@ using Xunit;
 using System.Windows;
 using System.Windows.Controls;
 using TbotUltra.Desktop.Models;
+using TbotUltra.Desktop.Views;
 
 namespace TbotUltra.Desktop.Tests;
 
 // Runs on the shared WPF smoke thread: once any test creates Application.Current, constructing a
-// Window on a second STA thread deadlocks against that Application's dispatcher.
+// Panel tests run on the shared WPF smoke thread so compiled XAML and templates use one dispatcher.
 [Collection(WpfSmokeCollection.Name)]
-public sealed class VillageSettingsWindowTests
+public sealed class VillageSettingsPanelTests
 {
     private readonly WpfSmokeFixture _wpf;
 
-    public VillageSettingsWindowTests(WpfSmokeFixture wpf)
+    public VillageSettingsPanelTests(WpfSmokeFixture wpf)
     {
         _wpf = wpf;
     }
@@ -22,8 +23,8 @@ public sealed class VillageSettingsWindowTests
     {
         _wpf.Run(() =>
         {
-            var window = new VillageSettingsWindow([]);
-            window.Close();
+            var panel = new VillageSettingsPanel([]);
+            Assert.NotNull(panel);
         });
     }
 
@@ -37,10 +38,8 @@ public sealed class VillageSettingsWindowTests
                 BuildRow("First", isAutomationEnabled: true, isNpcTradeEnabled: false, isFarmingEnabled: false, canToggleFarming: true),
                 BuildRow("Second", isAutomationEnabled: true, isNpcTradeEnabled: true, isFarmingEnabled: true, canToggleFarming: false),
             };
-            var window = new VillageSettingsWindow(rows);
-            try
-            {
-                var grid = Assert.IsType<DataGrid>(window.FindName("VillageSettingsDataGrid"));
+            var panel = new VillageSettingsPanel(rows);
+            var grid = Assert.IsType<DataGrid>(panel.FindName("VillageSettingsDataGrid"));
                 var checkAllRow = Assert.IsType<VillageSettingsRow>(grid.Items[0]);
                 Assert.True(checkAllRow.IsCheckAllRow);
 
@@ -58,11 +57,122 @@ public sealed class VillageSettingsWindowTests
 
                 ClickCheckAll(npcColumn, checkAllRow);
                 Assert.All(rows, row => Assert.False(row.NpcTrade));
-            }
-            finally
+        });
+    }
+
+    [Fact]
+    public void Constructor_DoesNotShowDemolishGroupColumn()
+    {
+        _wpf.Run(() =>
+        {
+            var row = BuildRow("First", true, false, false, true, includeDemolish: true);
+
+            var panel = new VillageSettingsPanel([row]);
+            var grid = Assert.IsType<DataGrid>(panel.FindName("VillageSettingsDataGrid"));
+
+            Assert.DoesNotContain(grid.Columns, column => HeaderTitle(column) == "Demolish");
+        });
+    }
+
+    [Fact]
+    public void Changes_ArePersistedImmediatelyWithoutSaveButton()
+    {
+        _wpf.Run(() =>
+        {
+            var row = BuildRow("First", true, false, false, true);
+            var enabledChanges = 0;
+            var npcChanges = 0;
+            var groupChanges = 0;
+            var savedNotifications = 0;
+            var panel = new VillageSettingsPanel(
+                [row],
+                onEnabledChanged: _ => enabledChanges++,
+                onNpcTradeChanged: _ => npcChanges++,
+                onGroupsChanged: _ => groupChanges++,
+                onSaved: () => savedNotifications++);
+
+            row.IsEnabledForAutomation = false;
+            row.NpcTrade = true;
+            row.GroupToggles[0].IsEnabled = true;
+
+            Assert.Equal(1, enabledChanges);
+            Assert.Equal(1, npcChanges);
+            Assert.Equal(1, groupChanges);
+            Assert.Equal(3, savedNotifications);
+            Assert.Null(panel.FindName("SettingsFooter"));
+        });
+    }
+
+    [Fact]
+    public void ProtectionColumns_FollowTownHallAndPublishChanges()
+    {
+        _wpf.Run(() =>
+        {
+            var row = new VillageSettingsRow
             {
-                window.Close();
-            }
+                Name = "BRO",
+                AttackScanEnabled = true,
+                TroopEvadeEnabled = false,
+                GroupToggles =
+                [
+                    new VillageGroupToggle
+                    {
+                        GroupKey = "town_hall_celebration",
+                        Title = "Town Hall",
+                        CanToggle = true,
+                    },
+                    new VillageGroupToggle
+                    {
+                        GroupKey = "resource_transfer",
+                        Title = "Resource Transfer",
+                        CanToggle = true,
+                    },
+                ],
+            };
+            var attackScanChanges = 0;
+            var troopEvadeChanges = 0;
+            var panel = new VillageSettingsPanel(
+                [row],
+                onAttackScanChanged: _ => attackScanChanges++,
+                onTroopEvadeChanged: _ => troopEvadeChanges++);
+            var grid = Assert.IsType<DataGrid>(panel.FindName("VillageSettingsDataGrid"));
+            var headers = grid.Columns.OrderBy(column => column.DisplayIndex).Select(HeaderTitle).ToList();
+            var townHallIndex = headers.IndexOf("Town Hall");
+
+            Assert.Equal("Attack scan", headers[townHallIndex + 1]);
+            Assert.Equal("Troop evade", headers[townHallIndex + 2]);
+
+            row.AttackScanEnabled = false;
+            row.TroopEvadeEnabled = true;
+
+            Assert.Equal(1, attackScanChanges);
+            Assert.Equal(1, troopEvadeChanges);
+        });
+    }
+
+    [Fact]
+    public void CheckAll_PersistsEveryChangedRowAndPublishesOnce()
+    {
+        _wpf.Run(() =>
+        {
+            var rows = new[]
+            {
+                BuildRow("First", true, false, false, true),
+                BuildRow("Second", true, false, false, true),
+            };
+            var enabledChanges = 0;
+            var savedNotifications = 0;
+            var panel = new VillageSettingsPanel(
+                rows,
+                onEnabledChanged: _ => enabledChanges++,
+                onSaved: () => savedNotifications++);
+            var grid = Assert.IsType<DataGrid>(panel.FindName("VillageSettingsDataGrid"));
+            var checkAllRow = Assert.IsType<VillageSettingsRow>(grid.Items[0]);
+
+            ClickCheckAll(grid.Columns[0], checkAllRow);
+
+            Assert.Equal(2, enabledChanges);
+            Assert.Equal(1, savedNotifications);
         });
     }
 
@@ -71,23 +181,44 @@ public sealed class VillageSettingsWindowTests
         bool isAutomationEnabled,
         bool isNpcTradeEnabled,
         bool isFarmingEnabled,
-        bool canToggleFarming) => new()
+        bool canToggleFarming,
+        bool includeDemolish = false) => new()
     {
         Name = name,
         PopText = "100",
         IsEnabledForAutomation = isAutomationEnabled,
         NpcTrade = isNpcTradeEnabled,
-        GroupToggles =
-        [
-            new VillageGroupToggle
+        GroupToggles = BuildGroupToggles(isFarmingEnabled, canToggleFarming, includeDemolish),
+    };
+
+    private static IReadOnlyList<VillageGroupToggle> BuildGroupToggles(
+        bool isFarmingEnabled,
+        bool canToggleFarming,
+        bool includeDemolish)
+    {
+        var toggles = new List<VillageGroupToggle>
+        {
+            new()
             {
                 GroupKey = "farming",
                 Title = "Farming",
                 IsEnabled = isFarmingEnabled,
                 CanToggle = canToggleFarming,
             },
-        ],
-    };
+        };
+        if (includeDemolish)
+        {
+            toggles.Add(new VillageGroupToggle
+            {
+                GroupKey = "demolish",
+                Title = "Demolish",
+                IsEnabled = false,
+                CanToggle = true,
+            });
+        }
+
+        return toggles;
+    }
 
     private static void ClickCheckAll(DataGridColumn column, VillageSettingsRow checkAllRow)
     {
@@ -99,13 +230,14 @@ public sealed class VillageSettingsWindowTests
     }
 
     [Fact]
-    public void Constructor_DoesNotBuildOverviewBeforeTheWindowIsShown()
+    public void Constructor_DoesNotBuildOverviewBeforeThePanelIsLoaded()
     {
         _wpf.Run(() =>
         {
             var calls = 0;
-            var window = new VillageSettingsWindow(
+            var panel = new VillageSettingsPanel(
                 [],
+                section: "Overview",
                 overviewProjectionProvider: _ =>
                 {
                     calls++;
@@ -114,8 +246,7 @@ public sealed class VillageSettingsWindowTests
                 overviewSourceVersionProvider: () => 1);
 
             Assert.Equal(0, calls);
-            Assert.Equal("Loading overview...", Assert.IsType<TextBlock>(window.FindName("OverviewUpdatedTextBlock")).Text);
-            window.Close();
+            Assert.Equal("Loading overview...", Assert.IsType<TextBlock>(panel.FindName("OverviewUpdatedTextBlock")).Text);
         });
     }
 

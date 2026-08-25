@@ -25,6 +25,7 @@ public sealed class SettingsDialogViewModel : BaseViewModel
     private bool _quickReloginEnabled = true;
     private bool _automaticallyCheckLanguage = true;
     private bool _detailedBrowserLoggingEnabled;
+    private bool _turnOffVideoSound = true;
     private bool _dailyServerResetOverrideEnabled;
     private int _dailyServerResetHour;
     private bool _allowSilverSpending;
@@ -122,6 +123,12 @@ public sealed class SettingsDialogViewModel : BaseViewModel
     {
         get => _detailedBrowserLoggingEnabled;
         set => SetProperty(ref _detailedBrowserLoggingEnabled, value);
+    }
+
+    public bool TurnOffVideoSound
+    {
+        get => _turnOffVideoSound;
+        set => SetProperty(ref _turnOffVideoSound, value);
     }
 
     public bool DailyServerResetOverrideEnabled

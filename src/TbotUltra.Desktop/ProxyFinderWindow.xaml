@@ -133,17 +133,17 @@
                                 Background="{DynamicResource InfoBgBrush}"
                                 BorderBrush="{DynamicResource InfoBrush}"
                                 Foreground="{DynamicResource InfoTextBrush}"
-                                ToolTip="Set type to SOCKS5 and open the SOCKS5 list to copy." />
+                                ToolTip="Download and load the SOCKS5 proxy list." />
                         <Button x:Name="GetSocks4Button" Content="SOCKS4" Width="66" Margin="0,0,6,0" Tag="socks4" Click="GetListButton_Click"
                                 Background="{DynamicResource PurpleBgBrush}"
                                 BorderBrush="{DynamicResource PurpleBorderBrush}"
                                 Foreground="{DynamicResource PurpleTextBrush}"
-                                ToolTip="Set type to SOCKS4 and open the SOCKS4 list to copy." />
+                                ToolTip="Download and load the SOCKS4 proxy list." />
                         <Button x:Name="GetHttpButton" Content="HTTP" Width="56" Tag="http" Click="GetListButton_Click"
                                 Background="{DynamicResource WarningBgBrush}"
                                 BorderBrush="{DynamicResource WarningBorderBrush}"
                                 Foreground="{DynamicResource WarningTextBrush}"
-                                ToolTip="Set type to HTTP and open the HTTP list to copy." />
+                                ToolTip="Download and load the HTTP proxy list." />
                     </StackPanel>
                 </StackPanel>
             </Grid>

@@ -42,10 +42,7 @@ public sealed partial class TravianClient
             minHeroCropRemaining: 0);
         if (!initial.IsRequired)
         {
-            var wait = initial.SecondsToEmpty is int seconds
-                ? Math.Max(15, seconds - Math.Max(1, triggerMinutes) * 60)
-                : HeroCropAntiStarveCalculator.ResolvePassiveCheckSeconds(triggerMinutes);
-            return $"Anti-starve waiting: {initial.Reason} eta_seconds={initial.SecondsToEmpty?.ToString() ?? "unknown"} queue_wait_seconds={wait}";
+            return $"Anti-starve not required after live confirmation: {initial.Reason} eta_seconds={initial.SecondsToEmpty?.ToString() ?? "unknown"}";
         }
 
         var inventory = await ReadHeroInventoryResourcesAsync(cancellationToken);
@@ -155,11 +152,10 @@ public sealed partial class TravianClient
         var expectedMinimum = Math.Max(0L, projectedCrop + decision.TransferAmount - tolerance);
         var verifiedIncrease = afterCrop is not null && afterCrop.Value >= expectedMinimum;
         var postEta = afterForecast?.SecondsToEmpty;
-        var nextCheck = HeroCropAntiStarveCalculator.ResolvePostTransferCheckSeconds(postEta);
         var partial = decision.IsPartial
             || HeroCropAntiStarveCalculator.IsPostTransferEtaShortfallActionable(postEta, targetMinutes);
         var alarm = !verifiedIncrease || partial ? " anti_starve_alarm=true" : string.Empty;
-        return $"Anti-starve transferred crop={decision.TransferAmount} hero_before={dialogInventory.Crop} hero_after_min={dialogInventory.Crop - decision.TransferAmount} post_crop={afterCrop?.ToString() ?? "unknown"} post_eta_seconds={postEta?.ToString() ?? "unknown"} partial={partial.ToString().ToLowerInvariant()} verified={verifiedIncrease.ToString().ToLowerInvariant()}{alarm} queue_wait_seconds={nextCheck}";
+        return $"Anti-starve transferred crop={decision.TransferAmount} hero_before={dialogInventory.Crop} hero_after_min={dialogInventory.Crop - decision.TransferAmount} post_crop={afterCrop?.ToString() ?? "unknown"} post_eta_seconds={postEta?.ToString() ?? "unknown"} partial={partial.ToString().ToLowerInvariant()} verified={verifiedIncrease.ToString().ToLowerInvariant()}{alarm}";
     }
 
     private static long? ReadCrop(VillageStatus status)

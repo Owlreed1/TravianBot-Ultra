@@ -133,7 +133,7 @@ public sealed partial class TravianClient : IHeroClient
 
         var returnText = returnSeconds is int rs ? TravianParsing.FormatDuration(rs) : "(unknown)";
         Notify($"[hero] adventure dispatched — return in {returnText}");
-        HeroStatusUpdated?.Invoke(AccountName, "On the way to adventure");
+        PublishHeroRuntimeStatus("On the way to adventure", isAway: true, isDead: false, isReviving: false);
 
         return new HeroAdventureDispatchResult(
             IsInHomeVillage: true,

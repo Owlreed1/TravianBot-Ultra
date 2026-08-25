@@ -4,7 +4,40 @@ using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Worker.Services;
 
-// Hero attributes and inventory snapshot workflow. Navigation and cache semantics are unchanged.
+internal sealed record HeroAttributePageSnapshot(
+    bool Ok = false,
+    string? Error = null,
+    int AttributeCount = 0,
+    bool LevelUpAvailable = false,
+    int FreePoints = 0,
+    int FightingStrength = 0,
+    int OffenceBonus = 0,
+    int DefenceBonus = 0,
+    int Resources = 0,
+    string HeroState = "Unknown",
+    int? ReviveRemainingSeconds = null)
+{
+    public HeroAttributeSnapshot ToSnapshot()
+    {
+        if (!Ok || AttributeCount != 4)
+        {
+            throw new InvalidOperationException(
+                $"Hero attributes page returned an incomplete snapshot ({AttributeCount}/4 attributes): {Error ?? "unknown read error"}");
+        }
+
+        return new HeroAttributeSnapshot(
+            LevelUpAvailable,
+            FreePoints,
+            FightingStrength,
+            OffenceBonus,
+            DefenceBonus,
+            Resources,
+            HeroState: HeroState,
+            ReviveRemainingSeconds: ReviveRemainingSeconds);
+    }
+}
+
+// Hero attributes and inventory snapshot workflow.
 public sealed partial class TravianClient
 {
     private async Task<bool> HasHeroLevelUpIndicatorAsync(CancellationToken cancellationToken)
@@ -363,9 +396,9 @@ public sealed partial class TravianClient
         if (!ready)
         {
             var url = _page.Url;
-            var apText = await _page.EvaluateAsync<string?>(
-                "() => { const a = document.querySelector('#availablePoints'); return a ? (a.textContent || '') : null; }");
-            Notify($"Hero attributes table did not appear in time. url='{url}', availablePointsText='{apText ?? "<null>"}'.");
+            Notify($"Hero attributes table did not appear in time. url='{url}'.");
+            throw new InvalidOperationException(
+                "Hero attributes page did not expose its values; keeping the previous snapshot.");
         }
 
         string rawJson;
@@ -387,11 +420,11 @@ public sealed partial class TravianClient
                       const modern = document.querySelector('input[name="' + modernName + '"]');
                       if (modern) return Number(modern.value) || 0;
                       const row = document.getElementById(tableRowId);
-                      if (!row) return 0;
+                      if (!row) return null;
                       const input = row.querySelector('input[type="text"][name^="attribute"]');
                       if (input) return Number(input.value) || 0;
                       const td = row.querySelector('td.points');
-                      return td ? readDigit(td) : 0;
+                      return td ? readDigit(td) : null;
                     };
                     // Free points: ".pointsAvailable" on hero V2, "#availablePoints" in table markup.
                     const freePointsEl = document.querySelector('.heroAttributes .pointsAvailable, .pointsAvailable, #availablePoints');
@@ -417,14 +450,22 @@ public sealed partial class TravianClient
                     const reviveTimer = reviveTimerNode?.getAttribute?.('value')
                       ? Number(reviveTimerNode.getAttribute('value'))
                       : parseTimer(reviveTimerNode?.textContent || '');
+                    const fightingStrength = attrPoints('power', 'attributepower');
+                    const offenceBonus = attrPoints('offBonus', 'attributeoffBonus');
+                    const defenceBonus = attrPoints('defBonus', 'attributedefBonus');
+                    const resources = attrPoints('productionPoints', 'attributeproductionPoints');
+                    const attributes = [fightingStrength, offenceBonus, defenceBonus, resources];
+                    const attributeCount = attributes.filter(value => value !== null).length;
                     return JSON.stringify({
-                      ok: true,
+                      ok: attributeCount === 4,
+                      error: attributeCount === 4 ? null : 'one or more hero attributes were missing',
+                      attributeCount,
                       levelUpAvailable: !!document.querySelector('.bigSpeechBubble.levelUp'),
                       freePoints: readDigit(freePointsEl),
-                      fightingStrength: attrPoints('power', 'attributepower'),
-                      offenceBonus: attrPoints('offBonus', 'attributeoffBonus'),
-                      defenceBonus: attrPoints('defBonus', 'attributedefBonus'),
-                      resources: attrPoints('productionPoints', 'attributeproductionPoints'),
+                      fightingStrength: fightingStrength ?? 0,
+                      offenceBonus: offenceBonus ?? 0,
+                      defenceBonus: defenceBonus ?? 0,
+                      resources: resources ?? 0,
                       heroState: reviving ? 'Reviving' : dead ? 'Dead' : 'Alive',
                       reviveRemainingSeconds: Number.isFinite(reviveTimer) ? Math.max(0, Math.trunc(reviveTimer)) : null
                     });
@@ -437,19 +478,26 @@ public sealed partial class TravianClient
         catch (Exception ex)
         {
             Notify($"[hero] inventory snapshot EvaluateAsync threw: {ex.GetType().Name}: {ex.Message}");
-            return new HeroAttributeSnapshot();
+            throw new InvalidOperationException(
+                "Hero attribute values could not be read; keeping the previous snapshot.",
+                ex);
         }
         Notify($"[hero:verbose] inventory snapshot raw JSON: {rawJson}");
 
         if (string.IsNullOrWhiteSpace(rawJson))
         {
-            return new HeroAttributeSnapshot();
+            throw new InvalidOperationException(
+                "Hero attributes page returned no values; keeping the previous snapshot.");
         }
 
         // PropertyNameCaseInsensitive is required: JS emits camelCase ("freePoints"), the record is PascalCase ("FreePoints").
         // Without this, every field silently deserializes to its default (0/false).
-        return JsonSerializer.Deserialize<HeroAttributeSnapshot>(rawJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-            ?? new HeroAttributeSnapshot();
+        var pageSnapshot = JsonSerializer.Deserialize<HeroAttributePageSnapshot>(
+                rawJson,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new InvalidOperationException(
+                "Hero attributes page returned an invalid snapshot; keeping the previous snapshot.");
+        return pageSnapshot.ToSnapshot();
     }
 
     private string BuildHeroAttributeSnapshotCacheKey()
@@ -500,6 +548,9 @@ public sealed partial class TravianClient
         {
             CachedHeroAttributeSnapshotsByKey.Remove(key);
         }
+
+        _heroAttributeSnapshotStore.Delete(_account.Name, _config.BaseUrl);
+        Notify("[hero:verbose] invalidated in-memory and persisted hero attribute snapshot");
     }
 
 }

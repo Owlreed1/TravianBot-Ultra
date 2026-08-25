@@ -15,6 +15,32 @@ namespace TbotUltra.Worker.Services;
 
 public sealed partial class TravianClient
 {
+    private async Task ClickLocatorAsync(
+        ILocator locator,
+        string actionName,
+        CancellationToken cancellationToken)
+    {
+        await EnsureAccountAccessAllowedAsync(cancellationToken);
+        var field = locator.ToString() ?? "unknown-locator";
+        using var trace = _browserTrace.BeginOperation("CLICK", actionName, $"field={field}");
+        try
+        {
+            await locator.ClickAsync(new LocatorClickOptions { Timeout = _config.TimeoutMs })
+                .WaitAsync(cancellationToken);
+            trace.Complete("success");
+        }
+        catch (OperationCanceledException)
+        {
+            trace.Complete("canceled");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            trace.Complete("failed", $"{ex.GetType().Name}: {ex.Message}");
+            throw;
+        }
+    }
+
 // Helper för action pacing klick
     private async Task DelayBeforeClickAsync(
         CancellationToken cancellationToken,
@@ -43,7 +69,7 @@ public sealed partial class TravianClient
             $"field={field} {BrowserTraceSanitizer.FormatInputValue(field, value)}");
         try
         {
-            await input.ClickAsync(new LocatorClickOptions { Timeout = _config.TimeoutMs });
+            await ClickLocatorAsync(input, "focus-input", cancellationToken);
             await input.FillAsync(string.Empty, new LocatorFillOptions { Timeout = _config.TimeoutMs });
         // Small settle so the clear commits before typing (a too-fast type races the field's reset). Then
         // select any residual the field re-populated with — some Travian inputs reset an emptied field to
@@ -694,6 +720,16 @@ public sealed partial class TravianClient
         }
 
         _serverTimeUtc = parsed.ToUniversalTime();
+        _serverTimeObservedAtUtc = DateTimeOffset.UtcNow;
+    }
+
+    private DateTimeOffset CurrentTravianServerTimeUtc()
+    {
+        if (_serverTimeUtc is not { } serverTime || _serverTimeObservedAtUtc is not { } observedAt)
+        {
+            return DateTimeOffset.UtcNow;
+        }
+        return serverTime + (DateTimeOffset.UtcNow - observedAt);
     }
 
 }

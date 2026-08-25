@@ -11,7 +11,7 @@ namespace TbotUltra.Worker.Services;
 public sealed partial class TravianClient
 {
     public static event Action<string, int>? HeroHpUpdated;
-    public static event Action<string, string>? HeroStatusUpdated;
+    public static event Action<string, HeroRuntimeStatus>? HeroStatusUpdated;
 
     private async Task NotifyHeroHomeFromDorf1Async(CancellationToken cancellationToken)
     {
@@ -74,6 +74,12 @@ public sealed partial class TravianClient
             var away = root.TryGetProperty("away", out var a) && a.GetBoolean();
             var dead = root.TryGetProperty("dead", out var d) && d.GetBoolean();
             var reviving = root.TryGetProperty("reviving", out var r) && r.GetBoolean();
+
+            PublishHeroRuntimeStatus(
+                dead ? "Dead" : reviving ? "Reviving" : away ? "Away" : "Ready",
+                away,
+                dead,
+                reviving);
 
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -141,15 +147,21 @@ public sealed partial class TravianClient
 
     private void PublishHeroRuntimeStatus(HeroStatus status, bool inVillage)
     {
+        var isDead = status.IsDead;
+        var isReviving = string.Equals(status.State, "Reviving", StringComparison.OrdinalIgnoreCase);
+        var isAway = !inVillage && !isDead && !isReviving;
         var display = status.IsDead
             ? "Dead"
-            : string.Equals(status.State, "Reviving", StringComparison.OrdinalIgnoreCase)
+            : isReviving
                 ? "Reviving"
                 : inVillage
                     ? "Ready"
                     : status.MovementState ?? "Away";
-        HeroStatusUpdated?.Invoke(AccountName, display);
+        PublishHeroRuntimeStatus(display, isAway, isDead, isReviving);
     }
+
+    private void PublishHeroRuntimeStatus(string displayText, bool isAway, bool isDead, bool isReviving) =>
+        HeroStatusUpdated?.Invoke(AccountName, new HeroRuntimeStatus(displayText, isAway, isDead, isReviving));
 
     private static int ResolveAdventureCount(HeroQuickStatus quick)
     {
@@ -626,10 +638,11 @@ public sealed partial class TravianClient
         var cachedSnapshot = TryGetCachedHeroAttributeSnapshot();
         if (cachedSnapshot is not null && !quick.HasUnassignedPointsSignal)
         {
-            Notify("Hero attribute snapshot served from cache.");
+            Notify("[hero:verbose] known hero attributes reused; no new points signal");
             return cachedSnapshot with { AdventureCount = adventureCount };
         }
 
+        Notify("[hero:verbose] reading live hero attributes");
         await GotoAsync(Paths.HeroAttributes, cancellationToken);
         await WaitForPageReadyAsync(cancellationToken); // Wait for page to load
         await EnsureLoggedInAsync(cancellationToken: cancellationToken);

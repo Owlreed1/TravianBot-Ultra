@@ -136,11 +136,14 @@ public sealed partial class BrowserSession : IAsyncDisposable
             // Record the process this launch creates so a crashed run's browser window can be closed on the
             // next start. The session runs the user's system Chrome, so its processes are indistinguishable
             // from the user's own by name or path — only the recorded identity makes cleanup safe.
-            _browser = await LaunchedBrowserRegistry.TrackAsync(
-                _projectRoot,
-                launchOptions.Channel,
-                () => _playwright.Chromium.LaunchAsync(launchOptions),
-                _log);
+            _browser = await BrowserLaunchRetry.RunAsync(
+                () => LaunchedBrowserRegistry.TrackAsync(
+                    _projectRoot,
+                    launchOptions.Channel,
+                    () => _playwright.Chromium.LaunchAsync(launchOptions),
+                    _log),
+                _log,
+                cancellationToken: cancellationToken);
             return await OpenMainContextPageAsync(cancellationToken);
         }
         catch
@@ -729,7 +732,7 @@ public sealed partial class BrowserSession : IAsyncDisposable
     // Pin Playwright to the driver and browsers shipped inside the app folder. PLAYWRIGHT_DRIVER_PATH
     // is required for the single-file build: the bundled node.exe driver is not auto-discovered from the
     // exe location (Playwright otherwise reports "Driver not found"). Browsers live under ms-playwright.
-    private static string ConfigureLocalPlaywrightEnvironment(string projectRoot)
+    public static string ConfigureLocalPlaywrightEnvironment(string projectRoot)
     {
         var driverPath = ResolvePlaywrightDriverPath(projectRoot, AppContext.BaseDirectory);
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_PATH", driverPath);

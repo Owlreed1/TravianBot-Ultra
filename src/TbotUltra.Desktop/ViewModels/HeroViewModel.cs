@@ -33,7 +33,6 @@ public sealed class HeroViewModel : BaseViewModel
     private readonly RelayCommand _refreshHpCommand;
     private readonly RelayCommand _refreshStatsCommand;
     private readonly RelayCommand _refreshInventoryCommand;
-    private readonly RelayCommand _openResourceSettingsCommand;
     private bool _isManualOperationRunning;
     private static readonly string[] DefaultPriorityOrder =
         ["resources", "fighting_strength", "offence_bonus", "defence_bonus"];
@@ -78,7 +77,6 @@ public sealed class HeroViewModel : BaseViewModel
         _refreshHpCommand = new RelayCommand(() => RefreshHpRequested?.Invoke(), CanRunManualCommand);
         _refreshStatsCommand = new RelayCommand(() => RefreshStatsRequested?.Invoke(), CanRunManualCommand);
         _refreshInventoryCommand = new RelayCommand(() => RefreshInventoryRequested?.Invoke(), CanRunManualCommand);
-        _openResourceSettingsCommand = new RelayCommand(() => OpenResourceSettingsRequested?.Invoke(), CanRunManualCommand);
     }
 
     /// <summary>
@@ -99,13 +97,11 @@ public sealed class HeroViewModel : BaseViewModel
     public ICommand RefreshHpCommand => _refreshHpCommand;
     public ICommand RefreshStatsCommand => _refreshStatsCommand;
     public ICommand RefreshInventoryCommand => _refreshInventoryCommand;
-    public ICommand OpenResourceSettingsCommand => _openResourceSettingsCommand;
 
     public event Action? RefreshAdventuresRequested;
     public event Action? RefreshHpRequested;
     public event Action? RefreshStatsRequested;
     public event Action? RefreshInventoryRequested;
-    public event Action? OpenResourceSettingsRequested;
 
     public void SetManualOperationRunning(bool isRunning)
     {
@@ -118,7 +114,6 @@ public sealed class HeroViewModel : BaseViewModel
         _refreshHpCommand.RaiseCanExecuteChanged();
         _refreshStatsCommand.RaiseCanExecuteChanged();
         _refreshInventoryCommand.RaiseCanExecuteChanged();
-        _openResourceSettingsCommand.RaiseCanExecuteChanged();
     }
 
     private bool CanRunManualCommand() => !_isManualOperationRunning;

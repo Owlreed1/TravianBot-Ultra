@@ -189,6 +189,12 @@ public sealed record HeroStatus(
     TimerSnapshot? ReturnFinish = null,
     TimerSnapshot? ReviveFinish = null);
 
+public sealed record HeroRuntimeStatus(
+    string DisplayText,
+    bool IsAway,
+    bool IsDead,
+    bool IsReviving);
+
 public sealed record HeroAttributeSnapshot(
     bool LevelUpAvailable = false,
     int FreePoints = 0,
@@ -297,7 +303,54 @@ public sealed record VillageStatus(
     // exact identity of the village this status belongs to — unlike ActiveVillage (a display name),
     // coordinates are unique and survive renames, so caches can key on them without name matching.
     int? ActiveVillageCoordX = null,
-    int? ActiveVillageCoordY = null);
+    int? ActiveVillageCoordY = null,
+    // Null means this page was not an authoritative Dorf1 observation. An empty list means Dorf1 was
+    // inspected and no incoming-attack signal was visible. Partial reads must preserve prior signals.
+    IReadOnlyList<IncomingAttackSignal>? IncomingAttackSignals = null,
+    // Null means the Dorf1 unit infobox was not inspected. False is authoritative only for that live
+    // Dorf1 read and means Travian rendered #troops td.noTroops (no units currently at home).
+    bool? HasTroopsAtHome = null,
+    DateTimeOffset? TroopPresenceObservedAtUtc = null);
+
+public enum IncomingAttackMovementType
+{
+    Unknown,
+    Attack,
+    Raid,
+}
+
+public sealed record IncomingAttackSignal(
+    string VillageName,
+    string? VillageUrl = null,
+    int? VillageId = null,
+    int? CoordX = null,
+    int? CoordY = null,
+    DateTimeOffset? ObservedAtUtc = null,
+    IReadOnlyList<DateTimeOffset>? Dorf1ArrivalTimesUtc = null);
+
+public sealed record IncomingAttack(
+    string Id,
+    string TargetVillageName,
+    DateTimeOffset ArrivalAtUtc,
+    IncomingAttackMovementType MovementType = IncomingAttackMovementType.Unknown,
+    string? TargetVillageKey = null,
+    int? TargetCoordX = null,
+    int? TargetCoordY = null,
+    string? SourcePlayerName = null,
+    string? SourceVillageName = null,
+    int? SourceCoordX = null,
+    int? SourceCoordY = null,
+    DateTimeOffset? ObservedAtUtc = null);
+
+public sealed record IncomingAttackSnapshot(
+    string TargetVillageName,
+    string? TargetVillageKey,
+    int? TargetCoordX,
+    int? TargetCoordY,
+    DateTimeOffset ObservedAtUtc,
+    IReadOnlyList<IncomingAttack> Attacks,
+    bool RallyPointReadSucceeded = true,
+    IReadOnlyList<DateTimeOffset>? Dorf1FallbackArrivalTimesUtc = null);
 
 public sealed record InboxStatus(
     int UnreadMessages = 0,
@@ -394,7 +447,8 @@ public sealed record FarmListCreateRequest(
     string? VillageId,
     string TroopType,
     int TroopCount,
-    int? TroopIndexOverride = null);
+    int? TroopIndexOverride = null,
+    bool OnlyCreateReportsWithLosses = true);
 
 public sealed record FarmListCreateProgress(
     string Phase,

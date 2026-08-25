@@ -310,6 +310,28 @@ public sealed class ProxyLibraryStore
         return FindByServer(Load(), server);
     }
 
+    public bool Remove(string? entryId)
+    {
+        if (string.IsNullOrWhiteSpace(entryId))
+        {
+            return false;
+        }
+
+        lock (FileIoLock)
+        {
+            var entries = Load();
+            var removed = entries.RemoveAll(entry =>
+                string.Equals(entry.Id, entryId.Trim(), StringComparison.OrdinalIgnoreCase)) > 0;
+            if (removed)
+            {
+                Save(entries);
+                Debug.WriteLine($"[proxylib] removed proxy entry id={entryId.Trim()}.");
+            }
+
+            return removed;
+        }
+    }
+
     public void AddUsage(string? entryId, string? accountName)
     {
         var entries = Load();

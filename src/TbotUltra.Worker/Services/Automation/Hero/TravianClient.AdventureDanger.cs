@@ -510,11 +510,10 @@ public sealed partial class TravianClient
     }
 
     /// <summary>
-    /// Waits for the ad video iframe (<c>#videoArea</c>) to appear, then clicks the centered play
-    /// button with a real (trusted) mouse gesture. The button lives inside the cross-origin ad iframe
-    /// and the browser autoplay policy ignores scripted element.click()/video.play(); only a genuine
-    /// input event starts playback, and the button is centered in the iframe. Returns null when the
-    /// player never appears (ad blocked / no inventory).
+    /// Waits for the ad video iframe (<c>#videoArea</c>) and clicks only a visible, verified provider
+    /// play control with a trusted Playwright gesture. A blind iframe-center click is unsafe because
+    /// an incompletely rendered player may place an advertiser link at that point. Returns null when
+    /// no safe play control appears (ad blocked, slow provider, or no inventory).
     /// </summary>
     private async Task<DateTimeOffset?> StartAdventureVideoAsync(string label, CancellationToken cancellationToken)
         => await StartBonusVideoPlayerAsync(label, "[adventure-video:verbose]", cancellationToken);
@@ -570,8 +569,9 @@ public sealed partial class TravianClient
         // Let the ad frame load its player (the centered play button) before clicking it.
         await Task.Delay(1500, cancellationToken);
 
-        // Up to two trusted clicks. Prefer the actual ad-player play control in any frame; cross-origin
-        // frames remain queryable through Playwright. The iframe-center click is retained as fallback.
+        // Up to two trusted clicks. Use only the actual, geometry-verified ad-player play control in
+        // any frame; cross-origin frames remain queryable through Playwright. Never click a coordinate
+        // fallback because a partially rendered provider can put its advertiser link at the center.
         // The first click can be swallowed by a consentmanager overlay that pops with
         // the ad request; we only re-click when such an overlay was found and accepted between attempts, so
         // a click is never sent into an already-playing ad (which could toggle pause).
@@ -588,6 +588,11 @@ public sealed partial class TravianClient
                     {
                         var play = frame.Locator(".atg-gima-big-play-button-outer, .atg-gima-big-play-button").First;
                         if (await play.CountAsync() == 0 || !await play.IsVisibleAsync())
+                        {
+                            continue;
+                        }
+
+                        if (!await IsSafeBonusVideoPlayControlAsync(play))
                         {
                             continue;
                         }
@@ -619,24 +624,8 @@ public sealed partial class TravianClient
                         return null;
                     }
 
-                    var area = _page.Locator("#videoArea, #videoFeature iframe").First;
-                    // Scroll the player into view first: a click at a bounding-box center that sits below the
-                    // fold lands nowhere, which was one way the play button "wasn't clicked".
-                    await area.ScrollIntoViewIfNeededAsync(new LocatorScrollIntoViewIfNeededOptions { Timeout = 3000 });
-                    var box = await area.BoundingBoxAsync();
-                    if (box is null)
-                    {
-                        Notify($"{logPrefix} {label}: could not locate the video area to click play.");
-                        return null;
-                    }
-
-                    var x = box.X + box.Width / 2;
-                    var y = box.Y + box.Height / 2;
-                    await _page.Mouse.ClickAsync(x, y);
-                    clickConfirmedAtUtc = DateTimeOffset.UtcNow;
-                    Notify($"{logPrefix} {label}: actual play control was not found; clicked the video-area center fallback ({x:0},{y:0}) attempt={clickAttempt}.");
-                    await TryClickBonusVideoSkipAdAsync(label, logPrefix, cancellationToken);
-                    await MuteBonusVideoAsync(label, logPrefix, cancellationToken);
+                    Notify($"{logPrefix} {label}: no safe visible play control appeared; video area was left untouched.");
+                    return null;
                 }
             }
             catch (PlaywrightException ex) when (IsBonusVideoNavigationTransition(ex))
@@ -670,6 +659,29 @@ public sealed partial class TravianClient
 
         Notify($"{logPrefix} {label}: play could not be confirmed after consent retry.");
         return null;
+    }
+
+    private static Task<bool> IsSafeBonusVideoPlayControlAsync(ILocator control)
+    {
+        return control.EvaluateAsync<bool>(
+            """
+            element => {
+              if (!(element instanceof HTMLElement)) return false;
+              if (!element.matches('.atg-gima-big-play-button-outer, .atg-gima-big-play-button')) return false;
+              if (element.closest('a[href], video, iframe')) return false;
+
+              const style = getComputedStyle(element);
+              if (style.display === 'none' || style.visibility === 'hidden'
+                  || style.pointerEvents === 'none' || Number(style.opacity) <= 0) return false;
+
+              const rect = element.getBoundingClientRect();
+              if (rect.width < 12 || rect.height < 12 || rect.width > 240 || rect.height > 240) return false;
+              const x = Math.max(0, Math.min(innerWidth - 1, rect.left + rect.width / 2));
+              const y = Math.max(0, Math.min(innerHeight - 1, rect.top + rect.height / 2));
+              const hit = document.elementFromPoint(x, y);
+              return !!hit && (hit === element || element.contains(hit));
+            }
+            """);
     }
 
     private async Task<string?> TryReadVisibleBonusVideoFailureAsync(CancellationToken cancellationToken)
@@ -715,8 +727,13 @@ public sealed partial class TravianClient
         return null;
     }
 
-    private async Task MuteBonusVideoAsync(string label, string logPrefix, CancellationToken cancellationToken)
+    private async Task<bool> MuteBonusVideoAsync(string label, string logPrefix, CancellationToken cancellationToken)
     {
+        if (!_config.TurnOffVideoSound)
+        {
+            return true;
+        }
+
         try
         {
             for (var attempt = 1; attempt <= 10; attempt++)
@@ -728,13 +745,19 @@ public sealed partial class TravianClient
                     if (await disabled.CountAsync() > 0 && await disabled.IsVisibleAsync())
                     {
                         Notify($"{logPrefix} {label}: video audio is muted.");
-                        return;
+                        return true;
                     }
 
-                    var enabled = frame.Locator(".atg-gima-audio-button:has(.atg-gima-audio-button-enabled:not(.atg-gima-hidden))").First;
+                    var enabled = frame.Locator(".atg-gima-audio-button-enabled:not(.atg-gima-hidden)").First;
                     if (await enabled.CountAsync() == 0 || !await enabled.IsVisibleAsync())
                     {
                         continue;
+                    }
+
+                    if (!await IsSafeBonusVideoAudioControlAsync(enabled))
+                    {
+                        Notify($"{logPrefix} {label}: audio icon could not be verified safely; continuing the video without clicking it.");
+                        return false;
                     }
 
                     await enabled.ClickAsync(new LocatorClickOptions { Timeout = 3000 });
@@ -744,23 +767,51 @@ public sealed partial class TravianClient
                         if (await disabled.CountAsync() > 0 && await disabled.IsVisibleAsync())
                         {
                             Notify($"{logPrefix} {label}: clicked the audio control and confirmed the video is muted.");
-                            return;
+                            return true;
                         }
                     }
 
                     Notify($"{logPrefix} {label}: clicked the audio control, but muted state was not confirmed.");
-                    return;
+                    return false;
                 }
 
                 await Task.Delay(300, cancellationToken);
             }
 
             Notify($"{logPrefix} {label}: audio control was not found; continuing the video.");
+            return false;
         }
-        catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Notify($"{logPrefix} {label}: audio mute skipped ({ex.Message}); continuing the video.");
+            return false;
         }
+    }
+
+    private static Task<bool> IsSafeBonusVideoAudioControlAsync(ILocator control)
+    {
+        return control.EvaluateAsync<bool>(
+            """
+            element => {
+              if (!(element instanceof HTMLElement)) return false;
+              if (!element.classList.contains('atg-gima-audio-button-enabled')
+                  || element.classList.contains('atg-gima-hidden')) return false;
+              if (element.closest('a[href], video, iframe')) return false;
+
+              const owner = element.closest('.atg-gima-audio-button');
+              if (!owner || owner.closest('a[href]')) return false;
+              const style = getComputedStyle(element);
+              if (style.display === 'none' || style.visibility === 'hidden'
+                  || style.pointerEvents === 'none' || Number(style.opacity) <= 0) return false;
+
+              const rect = element.getBoundingClientRect();
+              if (rect.width < 4 || rect.height < 4 || rect.width > 96 || rect.height > 96) return false;
+              const x = Math.max(0, Math.min(innerWidth - 1, rect.left + rect.width / 2));
+              const y = Math.max(0, Math.min(innerHeight - 1, rect.top + rect.height / 2));
+              const hit = document.elementFromPoint(x, y);
+              return !!hit && (hit === element || element.contains(hit));
+            }
+            """);
     }
 
     // The ad provider can reveal Skip Ad at any point after playback starts. It is optional: a
@@ -911,11 +962,19 @@ public sealed partial class TravianClient
         var consecutiveProviderFailures = 0;
         var earlyRewardLogged = false;
         var ignoredProviderLogged = false;
+        var muteConfirmed = false;
         while (DateTimeOffset.UtcNow < deadlineUtc)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await Task.Delay(AdventureVideoPollIntervalMs, cancellationToken);
             await TryClickBonusVideoSkipAdAsync(label, "[adventure-video:verbose]", cancellationToken);
+            if (!muteConfirmed)
+            {
+                muteConfirmed = await MuteBonusVideoAsync(
+                    label,
+                    "[adventure-video:verbose]",
+                    cancellationToken);
+            }
 
             var now = DateTimeOffset.UtcNow;
             var elapsedSeconds = (now - playClickedAtUtc).TotalSeconds;

@@ -17,6 +17,8 @@ public interface IDesktopBotService
     bool RemoveQueueItem(Guid id);
     bool MoveQueueItemUp(Guid id);
     bool MoveQueueItemDown(Guid id);
+    bool MoveQueueItemToTop(Guid id);
+    bool MoveQueueItemToBottom(Guid id);
     bool PauseQueueItem(Guid id);
     bool ResumeQueueItem(Guid id);
     bool RetryQueueItem(Guid id);
@@ -63,6 +65,8 @@ public interface IDesktopBotService
     Task<IReadOnlyDictionary<string, long>> ReadAvailableTroopsForCatapultWavesAsync(BotOptions options, Action<string> log, bool forceRefresh, CancellationToken cancellationToken);
     Task<CatapultWaveSetupInfo> ReadCatapultWaveSetupInfoAsync(BotOptions options, Action<string> log, bool forceRefresh, CancellationToken cancellationToken);
     Task<CatapultWaveRunResult> StartCatapultWavesAsync(BotOptions options, CatapultWaveRequest request, Action<string> log, CancellationToken cancellationToken);
+    Task<TroopEvasionResult> SendTroopEvasionAsync(BotOptions options, TroopEvasionRequest request, Action<string> log, IProgress<TroopEvasionProgress>? progress, CancellationToken cancellationToken);
+    Task<TroopEvasionValidationResult> ValidateTroopEvasionAsync(BotOptions options, TroopEvasionRequest request, Action<string> log, CancellationToken cancellationToken);
     Task ExecuteLoginAsync(BotOptions options, Action<string> log, bool keepBrowserOpenAfterLogin, CancellationToken cancellationToken);
     Task<PostLoginSnapshot> ExecuteLoginAndLoadPostLoginSnapshotAsync(BotOptions options, Action<string> log, bool keepBrowserOpenAfterLogin, CancellationToken cancellationToken);
     Task<PostLoginSnapshot> LoadPostLoginSnapshotAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken);
@@ -85,6 +89,7 @@ public interface IDesktopBotService
     Task<string> RunActivateProductionBonusVideosAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken);
     Task<AccountSnapshot> ReadAccountSnapshotForScanAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken);
     Task<VillageStatus> ReadVillageStatusWithSmithyAsync(BotOptions options, Action<string> log, string? villageName, string? villageUrl, CancellationToken cancellationToken);
+    Task<IncomingAttackSnapshot> ReadIncomingAttacksAsync(BotOptions options, Action<string> log, string villageName, string? villageUrl, string? villageKey, CancellationToken cancellationToken);
     Task<VillageStatus> ReadVillageStatusAsync(BotOptions options, Action<string> log, string? villageName, string? villageUrl, CancellationToken cancellationToken);
     Task<VillageStatus> ReadVillageResourceStatusAsync(BotOptions options, Action<string> log, string? villageName, string? villageUrl, CancellationToken cancellationToken, bool currentPageOnly = false);
     Task<IReadOnlyList<VillageStatus>> ReadAllVillageResourceStatusesAsync(BotOptions options, Action<string> log, string? returnVillageName, string? returnVillageUrl, CancellationToken cancellationToken);

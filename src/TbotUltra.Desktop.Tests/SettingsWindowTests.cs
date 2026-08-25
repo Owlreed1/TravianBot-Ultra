@@ -76,6 +76,31 @@ public sealed class SettingsWindowTests : IDisposable
     }
 
     [Fact]
+    public void GeneralCategory_LoadsVideoSoundSettingAndControl()
+    {
+        _wpf.Run(() =>
+        {
+            var store = CreateStore(new JsonObject
+            {
+                [BotOptionPayloadKeys.TurnOffVideoSound] = false,
+            });
+            var window = new SettingsWindow(store, initialCategory: SettingsCategory.General);
+            try
+            {
+                var checkBox = Assert.IsType<CheckBox>(window.FindName("TurnOffVideoSoundCheckBox"));
+
+                Assert.Equal("Turn off video sound", checkBox.Content);
+                Assert.False(window.SettingsVm.TurnOffVideoSound);
+                Assert.False(checkBox.IsChecked);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void PacingCategory_LoadsShortVillageWaitDropdown()
     {
         _wpf.Run(() =>

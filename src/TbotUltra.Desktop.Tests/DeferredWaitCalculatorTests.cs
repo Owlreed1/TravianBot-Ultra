@@ -22,16 +22,16 @@ public sealed class DeferredWaitCalculatorTests
     }
 
     [Fact]
-    public void TroopTraining_waits_when_any_checked_resource_is_below_the_percent_threshold()
+    public void TroopTraining_is_ready_when_any_checked_resource_meets_the_percent_threshold()
     {
         var requests = new[] { Barracks(minPercent: 50, checkWood: true, checkClay: true, checkIron: true) };
         var current = Res(wood: 600, clay: 600, iron: 400);
-        var production = Prod(iron: 100); // iron is 100 short of 50%, so wait one hour.
+        var production = Prod(iron: 100);
 
         var result = DeferredWaitCalculator.EvaluateDeferredTroopTrainingWait(
             requests, NoBuildingFilter, current, production, warehouseCapacity: 1000, granaryCapacity: 1000, fallbackCooldownSeconds: 30);
 
-        Assert.Equal(new DeferredTroopTrainingEvaluation(false, 3600, "estimated_from_status"), result);
+        Assert.Equal(new DeferredTroopTrainingEvaluation(true, 0, "ready"), result);
     }
 
     [Fact]
@@ -47,11 +47,24 @@ public sealed class DeferredWaitCalculatorTests
     }
 
     [Fact]
-    public void TroopTraining_checks_all_resources_when_no_resource_checkbox_is_selected()
+    public void TroopTraining_rejects_an_empty_resource_selection()
     {
         var requests = new[] { Barracks(minPercent: 50, checkWood: false) };
         var current = Res(wood: 600, clay: 600, iron: 600, crop: 400);
-        var production = Prod(crop: 100); // no selection falls back to all resources; crop is 100 short.
+        var production = Prod(crop: 100);
+
+        var result = DeferredWaitCalculator.EvaluateDeferredTroopTrainingWait(
+            requests, NoBuildingFilter, current, production, warehouseCapacity: 1000, granaryCapacity: 1000, fallbackCooldownSeconds: 30);
+
+        Assert.Equal(new DeferredTroopTrainingEvaluation(false, 30, "no_resources_selected"), result);
+    }
+
+    [Fact]
+    public void TroopTraining_waits_for_the_first_selected_resource_to_reach_threshold()
+    {
+        var requests = new[] { Barracks(minPercent: 50, checkWood: true, checkClay: true) };
+        var current = Res(wood: 100, clay: 400);
+        var production = Prod(wood: 200, clay: 100); // wood: 2h, clay: 1h.
 
         var result = DeferredWaitCalculator.EvaluateDeferredTroopTrainingWait(
             requests, NoBuildingFilter, current, production, warehouseCapacity: 1000, granaryCapacity: 1000, fallbackCooldownSeconds: 30);

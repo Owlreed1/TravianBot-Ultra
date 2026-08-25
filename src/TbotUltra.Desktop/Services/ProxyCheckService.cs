@@ -11,6 +11,7 @@ namespace TbotUltra.Desktop.Services;
 internal static class ProxyCheckService
 {
     internal static async Task<string> CheckIpAsync(
+        string projectRoot,
         string mode,
         string? proxyServer,
         Proxy? proxy,
@@ -20,6 +21,7 @@ internal static class ProxyCheckService
         var stopwatch = Stopwatch.StartNew();
         status("Starting temporary browser...");
         cancellationToken.ThrowIfCancellationRequested();
+        BrowserSession.ConfigureLocalPlaywrightEnvironment(projectRoot);
         using var playwright = await Playwright.CreateAsync();
         IBrowser? browser = null;
         using var registration = cancellationToken.Register(() =>

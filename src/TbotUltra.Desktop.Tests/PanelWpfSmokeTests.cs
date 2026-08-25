@@ -27,7 +27,9 @@ public sealed class PanelWpfSmokeTests
             AssertPanelCommands(new HeroPanel(), new HeroViewModel(),
                 "RefreshAdventuresButton", "RefreshHeroHpButton", "RefreshHeroStatsButton", "RefreshHeroInventoryButton");
             AssertPanelCommands(new QueuePanel(), new TravianQueueViewModel(),
-                "QueueRemoveButton", "QueueMoveUpButton", "QueueMoveDownButton", "QueueRefreshButton", "QueueClearButton");
+                "QueueRemoveButton", "QueueRedoButton", "QueueMoveToTopButton", "QueueMoveUpButton",
+                "QueueMoveDownButton", "QueueMoveToBottomButton", "QueueRefreshButton",
+                "ClearVillageQueueButton", "QueueClearButton", "QueuePopoutButton");
             AssertPanelCommands(new ResourcesPanel(), new ResourcesViewModel(), "LoadResourcesButton");
             AssertPanelCommands(new TroopsPanel(), new TroopTrainingViewModel(), "CheckCelebrationButton", "RefreshTroopQueuesButton");
 

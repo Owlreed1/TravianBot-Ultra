@@ -158,8 +158,10 @@
                     <Button x:Name="QueueRemoveButton" Content="Remove" Width="76" Command="{Binding RemoveCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" />
                     <Button x:Name="QueueRedoButton" Content="Redo" Width="76" Margin="6,0,0,0" Command="{Binding RestoreCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" ToolTip="Bring back the queue item(s) removed by the last Remove" />
                     <Rectangle Width="1" Fill="{DynamicResource BorderSubtleBrush}" Margin="10,3,10,3" />
-                    <Button x:Name="QueueMoveUpButton" Content="↑" Width="36" Command="{Binding MoveUpCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" ToolTip="Move up" />
+                    <Button x:Name="QueueMoveToTopButton" Content="Move to top" Width="88" Command="{Binding MoveToTopCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" ToolTip="Move to the top of the same group and priority" />
+                    <Button x:Name="QueueMoveUpButton" Content="↑" Width="36" Margin="6,0,0,0" Command="{Binding MoveUpCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" ToolTip="Move up" />
                     <Button x:Name="QueueMoveDownButton" Content="↓" Width="36" Margin="6,0,0,0" Command="{Binding MoveDownCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" ToolTip="Move down" />
+                    <Button x:Name="QueueMoveToBottomButton" Content="Move to bottom" Width="104" Margin="6,0,0,0" Command="{Binding MoveToBottomCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" ToolTip="Move to the bottom of the same group and priority" />
                     <Rectangle Width="1" Fill="{DynamicResource BorderSubtleBrush}" Margin="10,3,10,3" />
                     <Button x:Name="QueueRefreshButton" Content="Refresh" Width="76" Command="{Binding RefreshCommand}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" />
                 </StackPanel>
@@ -176,6 +178,7 @@
                       CanUserAddRows="False"
                       CanUserDeleteRows="False"
                       CanUserReorderColumns="False"
+                      CanUserResizeColumns="False"
                       GridLinesVisibility="Horizontal"
                       HorizontalGridLinesBrush="{DynamicResource AppBackgroundBrush}"
                       RowBackground="{DynamicResource SurfaceBrush}"
@@ -185,6 +188,7 @@
                       HeadersVisibility="Column"
                       ColumnHeaderHeight="32"
                       RowHeight="30"
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                       FontSize="12">
                 <DataGrid.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -202,45 +206,11 @@
                         </Style.Triggers>
                     </Style>
                 </DataGrid.RowStyle>
-                <DataGrid.ColumnHeaderStyle>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
-                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-                        <Setter Property="FontWeight" Value="SemiBold" />
-                        <Setter Property="FontSize" Value="11" />
-                        <Setter Property="Padding" Value="10,6" />
-                        <Setter Property="BorderBrush" Value="{DynamicResource ControlBackgroundBrush}" />
-                        <Setter Property="BorderThickness" Value="0,0,1,1" />
-                        <Setter Property="HorizontalContentAlignment" Value="Left" />
-                    </Style>
-                </DataGrid.ColumnHeaderStyle>
-                <DataGrid.CellStyle>
-                    <Style TargetType="DataGridCell">
-                        <Setter Property="Padding" Value="10,4" />
-                        <Setter Property="BorderThickness" Value="0" />
-                        <Setter Property="Foreground" Value="{DynamicResource DataGridCellTextBrush}" />
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="DataGridCell">
-                                    <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}">
-                                        <ContentPresenter VerticalAlignment="Center" />
-                                    </Border>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Style.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource SelectedRowBgBrush}" />
-                                <Setter Property="Foreground" Value="{DynamicResource DataGridCellTextBrush}" />
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </DataGrid.CellStyle>
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Group" Width="1.15*" Binding="{Binding GroupName}" />
-                    <DataGridTextColumn Header="Village" Width="1.2*" Binding="{Binding VillageName}" />
-                    <DataGridTextColumn Header="Task" Width="2.4*" Binding="{Binding DisplayName}" />
-                    <DataGridTemplateColumn Header="Status" Width="*">
+                    <DataGridTextColumn Header="Group" Width="1.15*" MinWidth="90" Binding="{Binding GroupName}" />
+                    <DataGridTextColumn Header="Village" Width="1.2*" MinWidth="100" Binding="{Binding VillageName}" />
+                    <DataGridTextColumn Header="Task" Width="2.4*" MinWidth="220" Binding="{Binding DisplayName}" />
+                    <DataGridTemplateColumn Header="Status" Width="*" MinWidth="85">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding StatusText}">
@@ -263,8 +233,8 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Time" Width="1.1*" Binding="{Binding BuildTimeText}" />
-                    <DataGridTemplateColumn Header="Cost (W | C | I | Cr)" Width="1.7*">
+                    <DataGridTextColumn Header="Time" Width="1.1*" MinWidth="90" Binding="{Binding BuildTimeText}" />
+                    <DataGridTemplateColumn Header="Cost (W | C | I | Cr)" Width="1.7*" MinWidth="165">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -373,6 +343,7 @@
                       CanUserAddRows="False"
                       CanUserDeleteRows="False"
                       CanUserReorderColumns="False"
+                      CanUserResizeColumns="False"
                       GridLinesVisibility="Horizontal"
                       HorizontalGridLinesBrush="{DynamicResource AppBackgroundBrush}"
                       RowBackground="{DynamicResource SurfaceBrush}"
@@ -382,50 +353,18 @@
                       HeadersVisibility="Column"
                       ColumnHeaderHeight="32"
                       RowHeight="30"
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                       FontSize="12">
                 <DataGrid.ItemsPanel>
                     <ItemsPanelTemplate>
                         <VirtualizingStackPanel VirtualizationMode="Recycling" />
                     </ItemsPanelTemplate>
                 </DataGrid.ItemsPanel>
-                <DataGrid.ColumnHeaderStyle>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
-                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-                        <Setter Property="FontWeight" Value="SemiBold" />
-                        <Setter Property="FontSize" Value="11" />
-                        <Setter Property="Padding" Value="10,6" />
-                        <Setter Property="BorderBrush" Value="{DynamicResource ControlBackgroundBrush}" />
-                        <Setter Property="BorderThickness" Value="0,0,1,1" />
-                        <Setter Property="HorizontalContentAlignment" Value="Left" />
-                    </Style>
-                </DataGrid.ColumnHeaderStyle>
-                <DataGrid.CellStyle>
-                    <Style TargetType="DataGridCell">
-                        <Setter Property="Padding" Value="10,4" />
-                        <Setter Property="BorderThickness" Value="0" />
-                        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="DataGridCell">
-                                    <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}">
-                                        <ContentPresenter VerticalAlignment="Center" />
-                                    </Border>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Style.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </DataGrid.CellStyle>
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Group" Width="1.15*" Binding="{Binding GroupName}" />
-                    <DataGridTextColumn Header="Village" Width="1.2*" Binding="{Binding VillageName}" />
-                    <DataGridTextColumn Header="Completed task" Width="2.4*" Binding="{Binding DisplayName}" />
-                    <DataGridTemplateColumn Header="Status" Width="*">
+                    <DataGridTextColumn Header="Group" Width="1.15*" MinWidth="90" Binding="{Binding GroupName}" />
+                    <DataGridTextColumn Header="Village" Width="1.2*" MinWidth="100" Binding="{Binding VillageName}" />
+                    <DataGridTextColumn Header="Completed task" Width="2.4*" MinWidth="220" Binding="{Binding DisplayName}" />
+                    <DataGridTemplateColumn Header="Status" Width="*" MinWidth="85">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding Status}">
@@ -444,8 +383,8 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Retries" Width="0.7*" Binding="{Binding Retries}" />
-                    <DataGridTextColumn Header="Created" Width="1.5*" Binding="{Binding CreatedAtServer}" />
+                    <DataGridTextColumn Header="Retries" Width="0.7*" MinWidth="70" Binding="{Binding Retries}" />
+                    <DataGridTextColumn Header="Created" Width="1.5*" MinWidth="150" Binding="{Binding CreatedAtServer}" />
                 </DataGrid.Columns>
             </DataGrid>
         </Grid>

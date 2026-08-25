@@ -109,6 +109,7 @@ public static class BotOptionPayloadKeys
     public const string LastAcknowledgedUpdateVersion = "last_acknowledged_update_version";
     public const string AutomaticallyCheckLanguage = "automatically_check_language";
     public const string DetailedBrowserLoggingEnabled = "detailed_browser_logging_enabled";
+    public const string TurnOffVideoSound = "turn_off_video_sound";
     public const string HeroMinHpForAdventure = "hero_min_hp_for_adventure";
     public const string HeroHpRegenPerDayPercent = "hero_hp_regen_per_day_percent";
     public const string HeroAutoRevive = "hero_auto_revive";
@@ -151,6 +152,7 @@ public static class BotOptionPayloadKeys
     public const string ContinuousFarmDispatchDelayMinMinutes = "continuous_farm_dispatch_delay_min_minutes";
     public const string ContinuousFarmDispatchDelayMaxMinutes = "continuous_farm_dispatch_delay_max_minutes";
     public const string ContinuousFarmSendMode = "continuous_farm_send_mode";
+    public const string FarmListOnlyCreateReportsWithLosses = "farm_list_only_create_reports_with_losses";
     public const string ShowFarmListLastSentTimer = "show_farm_list_last_sent_timer";
     public const string FarmListLastSentLimitEnabled = "farm_list_last_sent_limit_enabled";
     public const string FarmListLastSentLimitHours = "farm_list_last_sent_limit_hours";

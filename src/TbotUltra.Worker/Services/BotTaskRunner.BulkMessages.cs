@@ -149,6 +149,27 @@ public sealed partial class BotTaskRunner
             throw new ArgumentException("Select Players or Natars before importing villages.", nameof(request));
         }
 
+        var effectiveIgnoredPlayers = request.IgnoredPlayers.ToList();
+        string? ownPlayerName = null;
+        if (request.SkipOwnVillages && request.IncludePlayers)
+        {
+            progress?.Report(new MapSqlVillageImportProgress("Identifying current player..."));
+            await ExecuteWithClientAsync(
+                options,
+                log,
+                accountName: null,
+                interactive: true,
+                cancellationToken,
+                async client => ownPlayerName = await client.ReadCurrentPlayerNameAsync(cancellationToken));
+            if (string.IsNullOrWhiteSpace(ownPlayerName))
+            {
+                throw new InvalidOperationException(
+                    "Skip own villages is enabled, but the current Travian player name could not be detected.");
+            }
+
+            effectiveIgnoredPlayers.Add(ownPlayerName);
+        }
+
         progress?.Report(new MapSqlVillageImportProgress("Downloading map.sql..."));
         var mapSql = await DownloadMapSqlAsync(options, log, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
@@ -159,7 +180,7 @@ public sealed partial class BotTaskRunner
             villages,
             request.IncludePlayers,
             request.IncludeNatars,
-            request.IgnoredPlayers,
+            effectiveIgnoredPlayers,
             request.IgnoredAlliances);
         var rows = filtered
             .Select(village => new TravcoRow(
@@ -169,7 +190,14 @@ public sealed partial class BotTaskRunner
                 Pop: village.Population,
                 Coordinates: $"{village.X}|{village.Y}"))
             .ToList();
-        log($"[all-villages] map.sql rows={villages.Count}, saved={rows.Count}, players={request.IncludePlayers}, natars={request.IncludeNatars}.");
+        var ownVillagesSkipped = string.IsNullOrWhiteSpace(ownPlayerName)
+            ? 0
+            : villages.Count(village => string.Equals(
+                MapSqlPlayerParser.NormalizeNameKey(village.PlayerName),
+                MapSqlPlayerParser.NormalizeNameKey(ownPlayerName),
+                StringComparison.Ordinal));
+        log($"[all-villages] map.sql rows={villages.Count}, saved={rows.Count}, players={request.IncludePlayers}, " +
+            $"natars={request.IncludeNatars}, skipOwn={request.SkipOwnVillages}, ownVillagesSkipped={ownVillagesSkipped}.");
         progress?.Report(new MapSqlVillageImportProgress($"Prepared {rows.Count} village(s)."));
         return new MapSqlVillageImportResult(rows);
     }

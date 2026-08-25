@@ -1,0 +1,18 @@
+<UserControl x:Class="TbotUltra.Desktop.Views.DashboardHubPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:TbotUltra.Desktop.Views">
+    <TabControl x:Name="DashboardTabControl"
+                Background="{DynamicResource AppBackgroundBrush}"
+                SelectionChanged="DashboardTabControl_SelectionChanged">
+        <TabItem x:Name="DashboardTabItem" Header="Dashboard">
+            <views:DashboardPanel x:Name="DashboardContent" />
+        </TabItem>
+        <TabItem x:Name="VillageSettingsTabItem" Header="Village settings">
+            <ContentControl x:Name="VillageSettingsContent" />
+        </TabItem>
+        <TabItem x:Name="VillageOverviewTabItem" Header="Village overview">
+            <ContentControl x:Name="VillageOverviewContent" />
+        </TabItem>
+    </TabControl>
+</UserControl>

@@ -91,6 +91,11 @@ public sealed class TroopTrainingQuickVillageRow : BaseViewModel
         set => SetProperty(ref _checkCrop, value);
     }
 
+    public bool RequiresResourceSelection => IsBuildTroopsEnabled
+        && BuildingCells.Any(cell => cell.IsEnabled && cell.UsesResourcePercentMode);
+
+    public bool HasResourceSelection => CheckWood || CheckClay || CheckIron || CheckCrop;
+
     public int FallbackCooldownSeconds
     {
         get => _fallbackCooldownSeconds;

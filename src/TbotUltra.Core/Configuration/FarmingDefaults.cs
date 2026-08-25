@@ -9,6 +9,7 @@ public static class FarmingDefaults
     public const int DefaultDispatchDelayMinMinutes = 30;
     public const int DefaultDispatchDelayMaxMinutes = 90;
     public const bool ShowLastSentTimer = true;
+    public const bool OnlyCreateReportsWithLosses = true;
     public const bool LastSentLimitEnabled = true;
     public const int DefaultLastSentLimitHours = 24;
     public const int MaxLastSentLimitHours = 120;

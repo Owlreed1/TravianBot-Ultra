@@ -27,4 +27,13 @@ public interface ICombatClient
     Task<string> SendResourcesBetweenOwnVillagesAsync(CancellationToken cancellationToken = default);
 
     Task<string> TestSendReinforcementsBetweenOwnVillagesAsync(CancellationToken cancellationToken = default);
+
+    Task<TroopEvasionResult> SendTroopEvasionAsync(
+        TroopEvasionRequest request,
+        IProgress<TroopEvasionProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
+    Task<TroopEvasionValidationResult> ValidateTroopEvasionAsync(
+        TroopEvasionRequest request,
+        CancellationToken cancellationToken = default);
 }

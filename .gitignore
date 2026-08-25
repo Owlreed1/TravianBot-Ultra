@@ -7,6 +7,9 @@ config/accounts.json
 config/bot.json
 config/queue.json
 config/queue.json.lock
+config/building_templates.json
+config/proxies.json
+config/proxyfinder.json
 config/servers.user.json
 config/account-analysis/
 config/cache/
@@ -41,6 +44,7 @@ TestResults/
 *.coveragexml
 *.binlog
 logs/
+docs/Logs to analyze/
 temp_build_out/
 **/temp_build_out/
 artifacts/

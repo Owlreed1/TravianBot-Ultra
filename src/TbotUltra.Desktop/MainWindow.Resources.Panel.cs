@@ -6,6 +6,7 @@ namespace TbotUltra.Desktop;
 
 public partial class MainWindow
 {
+    private Views.ResourcesPanel ResourcesPanelControl => ResourcesHubPanelControl.ResourcesPanel;
     private System.Windows.Controls.Button LoadResourcesButton => ResourcesPanelControl.RefreshButton;
     private System.Windows.Controls.StackPanel CroplandColumnPanel => ResourcesPanelControl.CroplandColumn;
     private System.Windows.Controls.ItemsControl CroplandItemsControl => ResourcesPanelControl.CroplandItems;

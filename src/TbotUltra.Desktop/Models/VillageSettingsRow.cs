@@ -6,7 +6,7 @@ using TbotUltra.Desktop.Services;
 
 namespace TbotUltra.Desktop.Models;
 
-// Row for the Village settings window. Village/Pop are read-only display values. The "Auto" toggle
+// Row for the Village settings panel. Village/Pop are read-only display values. The "Auto" toggle
 // (IsEnabledForAutomation) and "NPC" toggle are wired to VillageSettingsStore. GroupToggles mirrors the
 // dashboard automation-loop cards per village (enabled-group set), so the user can turn groups on/off for
 // many villages at once. INotifyPropertyChanged so the window can persist each change immediately.
@@ -16,6 +16,7 @@ public sealed class VillageSettingsRow : INotifyPropertyChanged
     public bool IsCheckAllRow { get; init; }
     public Visibility ToggleVisibility => IsCheckAllRow ? Visibility.Collapsed : Visibility.Visible;
     public Visibility CheckAllVisibility => IsCheckAllRow ? Visibility.Visible : Visibility.Collapsed;
+    public bool CanToggle => !IsCheckAllRow;
     public string Name { get; init; } = string.Empty;
     public string PopText { get; init; } = string.Empty;
 
@@ -91,6 +92,38 @@ public sealed class VillageSettingsRow : INotifyPropertyChanged
             }
 
             _npcTrade = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private bool _attackScanEnabled = true;
+    public bool AttackScanEnabled
+    {
+        get => _attackScanEnabled;
+        set
+        {
+            if (_attackScanEnabled == value)
+            {
+                return;
+            }
+
+            _attackScanEnabled = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private bool _troopEvadeEnabled;
+    public bool TroopEvadeEnabled
+    {
+        get => _troopEvadeEnabled;
+        set
+        {
+            if (_troopEvadeEnabled == value)
+            {
+                return;
+            }
+
+            _troopEvadeEnabled = value;
             OnPropertyChanged();
         }
     }

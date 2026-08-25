@@ -315,6 +315,47 @@ public sealed class SessionPacerTests
     }
 
     [Fact]
+    public void RaisingDailyMaxAboveRuntime_WakesDailyLimitSleepImmediately()
+    {
+        var now = new DateTimeOffset(2026, 6, 14, 12, 0, 0, TimeSpan.Zero);
+        var today = new DateOnly(2026, 6, 14);
+        var pacer = new SessionPacer(() => now);
+        pacer.Configure(new SessionPacerSettings(
+            true,
+            120,
+            120,
+            30,
+            30,
+            Enumerable.Range(0, 24).ToArray(),
+            DailyMaxHours: 12,
+            RuntimeDate: today,
+            RuntimeSeconds: TimeSpan.FromHours(12).TotalSeconds,
+            DailyMaxVariationPercent: 0));
+        pacer.SleepStarting += (_, _) => pacer.BeginSleep();
+        var wakeRequested = false;
+        pacer.WakeRequested += (_, _) => wakeRequested = true;
+        pacer.NotifyAutomationStarted();
+        Assert.Equal(SessionSleepReason.DailyLimit, pacer.SleepReason);
+
+        pacer.Configure(new SessionPacerSettings(
+            true,
+            120,
+            120,
+            30,
+            30,
+            Enumerable.Range(0, 24).ToArray(),
+            DailyMaxHours: 13,
+            RuntimeDate: today,
+            RuntimeSeconds: TimeSpan.FromHours(12).TotalSeconds,
+            DailyMaxVariationPercent: 0));
+
+        Assert.True(wakeRequested);
+        Assert.Equal(SessionPacerPhase.Disabled, pacer.Phase);
+        Assert.Equal(SessionSleepReason.None, pacer.SleepReason);
+        Assert.Null(pacer.TimeUntilWake);
+    }
+
+    [Fact]
     public void DailyProgress_ReportsOnlineLeftAndActualLimit()
     {
         var now = new DateTimeOffset(2026, 6, 14, 12, 0, 0, TimeSpan.Zero);

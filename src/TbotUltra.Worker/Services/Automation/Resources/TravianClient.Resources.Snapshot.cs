@@ -273,6 +273,17 @@ public sealed partial class TravianClient
         // Coordinates first: they identify which village this snapshot belongs to even when several
         // villages share a name, so the cached production survives switching between them.
         var activeCoords = await TryReadActiveVillageCoordsFromCurrentPageAsync(cancellationToken);
+        var activeVillageUrl = villages.FirstOrDefault(village =>
+            (activeCoords.X.HasValue && activeCoords.Y.HasValue
+             && village.CoordX == activeCoords.X && village.CoordY == activeCoords.Y)
+            || string.Equals(village.Name, activeVillage, StringComparison.OrdinalIgnoreCase))?.Url;
+        var incomingAttackSignals = await ReadIncomingAttackSignalsOnCurrentDorf1Async(
+            activeVillage,
+            activeVillageUrl,
+            activeCoords.X,
+            activeCoords.Y,
+            cancellationToken);
+        var hasTroopsAtHome = await ReadTroopPresenceOnCurrentDorf1Async(cancellationToken);
         var activePopulation = await ReadActiveVillagePopulationFromCurrentPageAsync(cancellationToken);
         if (activePopulation.HasValue)
         {
@@ -346,7 +357,10 @@ public sealed partial class TravianClient
             BuildQueueFinish: remaining is > 0 ? TimerSnapshot.FromRemaining(remaining.Value) : null,
             ActiveConstructionsFromOverview: _lastActiveConstructionsFromOverview,
             ActiveVillageCoordX: activeCoords.X,
-            ActiveVillageCoordY: activeCoords.Y);
+            ActiveVillageCoordY: activeCoords.Y,
+            IncomingAttackSignals: incomingAttackSignals,
+            HasTroopsAtHome: hasTroopsAtHome,
+            TroopPresenceObservedAtUtc: hasTroopsAtHome.HasValue ? CurrentTravianServerTimeUtc() : null);
     }
 
     private async Task<(

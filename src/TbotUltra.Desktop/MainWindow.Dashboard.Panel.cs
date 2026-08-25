@@ -7,7 +7,7 @@ namespace TbotUltra.Desktop;
 
 public partial class MainWindow
 {
-    private Button ResetProgramButton => DashboardPanelControl.ResetButton;
+    private Views.DashboardPanel DashboardPanelControl => DashboardHubPanelControl.DashboardPanel;
     private TextBlock VillagesInfoTextBlock => DashboardPanelControl.VillagesInfo;
     private TextBlock LastScanInfoTextBlock => DashboardPanelControl.LastScanInfo;
     private Ellipse AutomationLoopRunStateDot => DashboardPanelControl.AutomationRunStateDot;
@@ -19,7 +19,13 @@ public partial class MainWindow
     private CheckBox VillageStatusSweepCheckBox => DashboardPanelControl.VillageStatusSweep;
     private ItemsControl DashboardVillageList => DashboardPanelControl.VillageList;
 
-    internal void OnResetProgramClicked(object sender, RoutedEventArgs e) => ResetProgramButton_Click(sender, e);
+    internal void OnDashboardVillageTabSelected()
+    {
+        // Queue owns the build-time estimate projection. Rebuild it locally before the overview panel is
+        // created or reused, so opening Village overview always starts from the same totals as Queue.
+        RefreshQueueUi();
+        EnsureDashboardVillagePanels();
+    }
     internal void OnDashboardClearTimersClicked(object sender, RoutedEventArgs e) => DashboardClearTimersButton_Click(sender, e);
     internal void OnAutomationLoopToggleClicked(object sender, RoutedEventArgs e) => AutomationLoopToggleButton_Click(sender, e);
     internal void OnAutomationLoopPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) => AutomationLoopListBox_PreviewMouseLeftButtonDown(sender, e);
@@ -33,4 +39,5 @@ public partial class MainWindow
     internal void OnProductionBonusSettingsClicked(object sender, RoutedEventArgs e) => ProductionBonusSettingsButton_Click(sender, e);
     internal void OnVillageStatusSweepSettingChanged(object sender, RoutedEventArgs e) => VillageStatusSweepSetting_Changed(sender, e);
     internal void OnVillageStatusSweepSettingsClicked(object sender, RoutedEventArgs e) => VillageStatusSweepSettingsButton_Click(sender, e);
+    internal void OnIncomingAttackClicked(object sender, RoutedEventArgs e) => IncomingAttackButton_Click(sender, e);
 }

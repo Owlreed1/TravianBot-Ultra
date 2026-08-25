@@ -5,6 +5,7 @@ using System.Threading;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
+using TbotUltra.Desktop.Views;
 using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Desktop;
@@ -65,9 +66,37 @@ public partial class MainWindow
         OpenHeroResourceSettingsWindow(villageSettingsRows);
     }
 
-    internal void OpenHeroResourceSettingsFromHeroPanel()
+    internal void LoadHeroResourceSettingsIntoPanel(HeroPanel panel)
     {
-        OpenHeroResourceSettingsWindow(null);
+        if (string.IsNullOrWhiteSpace(_accountStore.ActiveAccountName()))
+        {
+            AppendLog("Hero resource settings: no active account.");
+            panel.LoadHeroResourceSettings([]);
+            return;
+        }
+
+        var villages = GetAllVillageKeyInfos();
+        if (villages.Count == 0)
+        {
+            AppendLog("Hero resource settings: no villages loaded.");
+            panel.LoadHeroResourceSettings([]);
+            return;
+        }
+
+        panel.LoadHeroResourceSettings(BuildHeroResourceOverviewRows(villages, null));
+    }
+
+    internal bool SaveHeroResourceSettingsFromPanel(IReadOnlyList<HeroResourceOverviewResult> results)
+    {
+        var villages = GetAllVillageKeyInfos();
+        if (villages.Count == 0)
+        {
+            AppendLog("Hero resource settings: no villages loaded; settings were not saved.");
+            return false;
+        }
+
+        SaveHeroResourceSettings(results, villages, null);
+        return true;
     }
 
     private void OpenHeroResourceSettingsWindow(IReadOnlyList<VillageSettingsRow>? villageSettingsRows)
@@ -85,8 +114,23 @@ public partial class MainWindow
             return;
         }
 
+        var rows = BuildHeroResourceOverviewRows(villages, villageSettingsRows);
+
+        var window = new HeroResourceOverviewWindow(rows) { Owner = this };
+        if (window.ShowDialog() != true)
+        {
+            return;
+        }
+
+        SaveHeroResourceSettings(window.Results, villages, villageSettingsRows);
+    }
+
+    private List<HeroResourceOverviewRow> BuildHeroResourceOverviewRows(
+        IReadOnlyList<VillageSettingsStore.VillageKeyInfo> villages,
+        IReadOnlyList<VillageSettingsRow>? villageSettingsRows)
+    {
         var defaults = BuildHeroResourceDefaults();
-        var rows = villages
+        return villages
             .Select(village =>
             {
                 var settings = _villageSettingsStore.GetHeroResourceSettings(village, defaults);
@@ -99,14 +143,14 @@ public partial class MainWindow
                 return new HeroResourceOverviewRow(village.Key, village.Name, settings);
             })
             .ToList();
+    }
 
-        var window = new HeroResourceOverviewWindow(rows) { Owner = this };
-        if (window.ShowDialog() != true)
-        {
-            return;
-        }
-
-        foreach (var result in window.Results)
+    private void SaveHeroResourceSettings(
+        IReadOnlyList<HeroResourceOverviewResult> results,
+        IReadOnlyList<VillageSettingsStore.VillageKeyInfo> villages,
+        IReadOnlyList<VillageSettingsRow>? villageSettingsRows)
+    {
+        foreach (var result in results)
         {
             var village = villages.FirstOrDefault(v => string.Equals(v.Key, result.VillageKey, StringComparison.OrdinalIgnoreCase))
                 ?? new VillageSettingsStore.VillageKeyInfo(result.VillageKey, result.VillageName, null, null, false);
@@ -121,10 +165,10 @@ public partial class MainWindow
 
         if (IsContinuousLoopRunning())
         {
-        RequestContinuousAutomationWake();
+            RequestContinuousAutomationWake();
         }
 
-        AppendLog($"Saved Hero resource settings for {window.Results.Count} village(s).");
+        AppendLog($"Saved Hero resource settings for {results.Count} village(s).");
     }
 
     private static void UpdateVillageSettingsHeroResourcesRow(

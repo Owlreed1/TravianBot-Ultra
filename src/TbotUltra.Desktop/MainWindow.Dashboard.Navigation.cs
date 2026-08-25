@@ -24,7 +24,6 @@ public partial class MainWindow
                 "hero" => HeroTabItem,
                 "farming" => FarmingTabItem,
                 "troops" => TroopsTabItem,
-                "reinforcements" => ReinforcementsTabItem,
                 "npc_trade" => NpcTradeTabItem,
                 "queue" => QueueTabItem,
                 "logs" => LogsTabItem,
@@ -49,14 +48,11 @@ public partial class MainWindow
                 else if (ReferenceEquals(targetTab, ResourcesTabItem))
                 {
                     _resourcesViewModel.TickLiveForecasts();
+                    TickResourceTransferVillageForecasts();
                 }
-                else if (ReferenceEquals(targetTab, ReinforcementsTabItem))
+                else if (ReferenceEquals(targetTab, TroopsTabItem))
                 {
                     UpdateReinforcementStatus();
-                }
-                else if (ReferenceEquals(targetTab, NpcTradeTabItem))
-                {
-                    TickResourceTransferVillageForecasts();
                 }
                 else if (ReferenceEquals(targetTab, QueueTabItem))
                 {
@@ -98,7 +94,6 @@ public partial class MainWindow
             HeroNavButton,
             FarmingNavButton,
             TroopsNavButton,
-            ReinforcementsNavButton,
             NpcTradeNavButton,
             QueueNavButton,
             LogsNavButton,

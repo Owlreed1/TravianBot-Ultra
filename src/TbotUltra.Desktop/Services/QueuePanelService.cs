@@ -13,6 +13,10 @@ public sealed class QueuePanelService(IQueuePanelClient client)
 
     public bool MoveDown(Guid id) => client.MoveDown(id);
 
+    public bool MoveToTop(Guid id) => client.MoveToTop(id);
+
+    public bool MoveToBottom(Guid id) => client.MoveToBottom(id);
+
     public bool Pause(Guid id) => client.Pause(id);
 
     public bool Resume(Guid id) => client.Resume(id);

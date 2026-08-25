@@ -73,6 +73,7 @@ public partial class BulkMessagesWindow : Window
                 ? _lastAnalyzeResult.PlayersAnalyzed
                 : FallbackMaxRecipients).ToString(CultureInfo.InvariantCulture);
             PlayersTextBlock.Text = BuildPlayersText(_lastAnalyzeResult);
+            RefreshAnalysisOrder();
             ValidationTextBlock.Text = _lastAnalyzeResult.EligiblePlayers > 0
                 ? string.Empty
                 : "No eligible players found with the current filters and sent cache.";
@@ -167,6 +168,10 @@ public partial class BulkMessagesWindow : Window
         if (sender is TextBox textBox)
         {
             textBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+        }
+        else if (ReferenceEquals(sender, SortOrderComboBox))
+        {
+            RefreshAnalysisOrder();
         }
 
         RefreshState();
@@ -284,6 +289,30 @@ public partial class BulkMessagesWindow : Window
     private static string BuildPlayersText(BulkMessageAnalyzeResult result)
     {
         return $"Players: {result.PlayersAnalyzed} | Eligible: {result.EligiblePlayers} | Cached sent: {result.SentCachedCount}";
+    }
+
+    private void RefreshAnalysisOrder()
+    {
+        if (AnalysisOrderDataGrid is null)
+        {
+            return;
+        }
+
+        if (_lastAnalyzeResult is null)
+        {
+            AnalysisOrderDataGrid.ItemsSource = null;
+            return;
+        }
+
+        AnalysisOrderDataGrid.ItemsSource = GetSortOrder() == BulkMessageSortOrder.PopulationAscending
+            ? _lastAnalyzeResult.Players
+                .OrderBy(player => player.Population)
+                .ThenBy(player => player.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+            : _lastAnalyzeResult.Players
+                .OrderByDescending(player => player.Population)
+                .ThenBy(player => player.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
     }
 
     private static IReadOnlyList<string> ParseSemicolonList(string? value)

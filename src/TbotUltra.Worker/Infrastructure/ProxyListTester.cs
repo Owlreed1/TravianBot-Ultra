@@ -32,8 +32,8 @@ public sealed record ProxyEnrichment(string Ip, string Country);
 /// Tests a pasted list of proxies (potentially thousands) with lightweight <see cref="HttpClient"/>
 /// requests instead of a full browser, so it stays fast and low on resources. Parsing, ranking and
 /// concurrency limiting are pure and unit-testable; the actual network probe is injectable so tests
-/// never touch the network. Each proxy is probed twice back-to-back and only kept if both succeed,
-/// which filters out the many free proxies that answer once then die. Ranks survivors by latency and
+/// never touch the network. Each proxy is probed three times back-to-back and only kept if all probes
+/// succeed, which filters out the many free proxies that answer briefly then die. Ranks survivors by latency and
 /// returns the fastest few.
 /// </summary>
 public sealed class ProxyListTester
@@ -42,6 +42,8 @@ public sealed class ProxyListTester
     // predicts real usefulness better than a plain-HTTP relay check. 204 = tiny, no body to download.
     private const string LatencyProbeUrl = "https://www.gstatic.com/generate_204";
     private const string IpLookupUrl = "https://ipwho.is/";
+    private const int StabilityProbeCount = 3;
+    private const int TargetProbeCount = 2;
     private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(6);
 
     private readonly Func<string, string, CancellationToken, Task<ProxyProbeResult>> _probe;
@@ -75,8 +77,8 @@ public sealed class ProxyListTester
             return stable;
         }
 
-        var target = await _probe(server, targetUrl, cancellationToken).ConfigureAwait(false);
-        return target.Success
+        var target = await ProbeTargetStableAsync(server, targetUrl, cancellationToken).ConfigureAwait(false);
+        return target
             ? stable
             : new ProxyProbeResult(false, stable.LatencyMs);
     }
@@ -131,7 +133,7 @@ public sealed class ProxyListTester
     /// <summary>
     /// Tests every candidate with at most <paramref name="maxConcurrency"/> probes in flight, reports
     /// progress, and returns the <paramref name="topCount"/> fastest working proxies (0 = keep all).
-    /// Each proxy must pass two consecutive probes to count as working. On cancellation it returns
+    /// Each proxy must pass three consecutive probes to count as working. On cancellation it returns
     /// whatever passed before the cancel.
     /// </summary>
     public async Task<IReadOnlyList<ProxyTestResult>> TestAsync(
@@ -202,9 +204,9 @@ public sealed class ProxyListTester
     /// Second stage: from an already-live <paramref name="pool"/> (from <see cref="TestAsync"/>), keeps
     /// only proxies that can actually reach <paramref name="targetUrl"/>. A proxy may answer a generic
     /// liveness probe yet fail to connect onward to the real target (e.g. its exit IP is blocked by the
-    /// site's CDN) — that is exactly what makes a "green" proxy fail in the bot's browser. Any HTTP
-    /// response counts as reachable (even a 403/503 means the connection got through). Keeps stage-1
-    /// latency for ranking and returns the <paramref name="topCount"/> fastest (0 = keep all).
+    /// site's CDN) — that is exactly what makes a "green" proxy fail in the bot's browser. Only a
+    /// successful or redirect response counts; blocked, authentication and gateway responses are rejected.
+    /// Keeps stage-1 latency for ranking and returns the <paramref name="topCount"/> fastest (0 = keep all).
     /// </summary>
     public async Task<IReadOnlyList<ProxyTestResult>> FilterReachableAsync(
         IReadOnlyList<ProxyTestResult> pool,
@@ -230,8 +232,7 @@ public sealed class ProxyListTester
             await throttle.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                var probe = await _probe(item.Candidate.Server, targetUrl, cancellationToken).ConfigureAwait(false);
-                if (probe.Success)
+                if (await ProbeTargetStableAsync(item.Candidate.Server, targetUrl, cancellationToken).ConfigureAwait(false))
                 {
                     reachable.Add(item); // keep the stage-1 latency so ranking stays consistent
                     Interlocked.Increment(ref found);
@@ -330,25 +331,43 @@ public sealed class ProxyListTester
         }
     }
 
-    // Probe twice back-to-back over fresh connections; keep the proxy only if both succeed. This
-    // filters out the many free proxies that answer a single request then die or refuse the next
-    // connection — the main reason a "green" proxy fails once the bot actually uses it. Latency is
-    // the average of the two successful probes. Short-circuits when the first probe already fails.
+    // Probe three times back-to-back over fresh connections; keep the proxy only if every probe succeeds.
+    // This filters out free proxies that answer briefly then die or refuse a later connection. Latency is
+    // the average of the successful probes. Short-circuits on the first failure.
     private async Task<ProxyProbeResult> ProbeStableAsync(string server, CancellationToken cancellationToken)
     {
-        var first = await _probe(server, LatencyProbeUrl, cancellationToken).ConfigureAwait(false);
-        if (!first.Success)
+        long totalLatency = 0;
+        for (var attempt = 0; attempt < StabilityProbeCount; attempt++)
         {
-            return new ProxyProbeResult(false, 0);
+            var probe = await _probe(server, LatencyProbeUrl, cancellationToken).ConfigureAwait(false);
+            if (!probe.Success)
+            {
+                return new ProxyProbeResult(false, 0);
+            }
+
+            totalLatency += probe.LatencyMs;
         }
 
-        var second = await _probe(server, LatencyProbeUrl, cancellationToken).ConfigureAwait(false);
-        if (!second.Success)
+        return new ProxyProbeResult(true, totalLatency / StabilityProbeCount);
+    }
+
+    // Travian reachability is checked twice because a single CDN response is not enough evidence that
+    // a free proxy will remain usable for the browser session that follows.
+    private async Task<bool> ProbeTargetStableAsync(
+        string server,
+        string targetUrl,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < TargetProbeCount; attempt++)
         {
-            return new ProxyProbeResult(false, 0);
+            var probe = await _probe(server, targetUrl, cancellationToken).ConfigureAwait(false);
+            if (!probe.Success)
+            {
+                return false;
+            }
         }
 
-        return new ProxyProbeResult(true, (first.LatencyMs + second.LatencyMs) / 2);
+        return true;
     }
 
     private static async Task<ProxyProbeResult> DefaultProbeAsync(string server, string url, CancellationToken cancellationToken)
@@ -365,13 +384,14 @@ public sealed class ProxyListTester
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            // Any HTTP response means the proxy relayed the request, so it is reachable/usable.
             using var response = await client.GetAsync(
                 url,
                 HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
-            return new ProxyProbeResult(true, stopwatch.ElapsedMilliseconds);
+            return new ProxyProbeResult(
+                IsUsableResponseStatus(response.StatusCode),
+                stopwatch.ElapsedMilliseconds);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -411,6 +431,9 @@ public sealed class ProxyListTester
             return false;
         }
     }
+
+    internal static bool IsUsableResponseStatus(HttpStatusCode statusCode)
+        => (int)statusCode is >= 200 and < 400;
 
     private static bool TryParseLine(string line, string scheme, out ProxyCandidate? candidate)
     {

@@ -391,27 +391,24 @@ public partial class MainWindow
     private double ResolveServerSpeed()
     {
         var serverName = LoadBotOptions().ServerName;
-
-        // Server name: digit before the x, e.g. "10x".
-        var nameMatch = Regex.Match(serverName ?? string.Empty, @"(\d+)\s*[xX]");
-        if (nameMatch.Success && double.TryParse(nameMatch.Groups[1].Value, out var nameSpeed) && nameSpeed > 0)
-        {
-            _serverSpeedAlarmRaised = false;
-            return nameSpeed;
-        }
-
-        // Server URL: speed subdomain, x before the digits, e.g. ".x10.".
         var serverUrl = GetActiveAccountServerUrl();
-        var urlMatch = Regex.Match(serverUrl ?? string.Empty, @"\.x(\d+)\b", RegexOptions.IgnoreCase);
-        if (urlMatch.Success && double.TryParse(urlMatch.Groups[1].Value, out var urlSpeed) && urlSpeed > 0)
+        var configuredSpeed = ResolveConfiguredServerSpeed(serverName, serverUrl);
+        if (configuredSpeed.HasValue)
         {
             _serverSpeedAlarmRaised = false;
-            return urlSpeed;
+            return configuredSpeed.Value;
         }
 
         // No server configured at all (e.g. fresh install, no accounts added) — nothing to detect,
         // so stay silent instead of alarming. The alarm only matters when a server is set but unparseable.
         if (string.IsNullOrWhiteSpace(serverName) && string.IsNullOrWhiteSpace(serverUrl))
+        {
+            return 1.0;
+        }
+
+        // Account creation and Choose in lobby temporarily combine lobby data with a selected world name.
+        // That state is expected until the first verified login supplies the real game origin.
+        if (!_isLoggedIn)
         {
             return 1.0;
         }
@@ -430,6 +427,22 @@ public partial class MainWindow
         }
 
         return 1.0;
+    }
+
+    internal static double? ResolveConfiguredServerSpeed(string? serverName, string? serverUrl)
+    {
+        // Official world names use both "5x" and "X5" depending on the lobby/catalog source.
+        var nameMatch = Regex.Match(serverName ?? string.Empty, @"(?:\b(\d+)\s*[xX]\b|\b[xX]\s*(\d+)\b)");
+        var rawNameSpeed = nameMatch.Groups[1].Success ? nameMatch.Groups[1].Value : nameMatch.Groups[2].Value;
+        if (nameMatch.Success && double.TryParse(rawNameSpeed, out var nameSpeed) && nameSpeed > 0)
+        {
+            return nameSpeed;
+        }
+
+        var urlMatch = Regex.Match(serverUrl ?? string.Empty, @"\.x(\d+)\b", RegexOptions.IgnoreCase);
+        return urlMatch.Success && double.TryParse(urlMatch.Groups[1].Value, out var urlSpeed) && urlSpeed > 0
+            ? urlSpeed
+            : null;
     }
 
     private string? GetActiveAccountServerUrl()

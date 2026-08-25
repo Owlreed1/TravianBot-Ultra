@@ -96,6 +96,9 @@ public partial class MainWindow : Window
     private readonly TravcoListStore _travcoListStore;
     private readonly AllVillagesImportSettingsStore _allVillagesImportSettingsStore;
     private readonly VillageCacheStore _villageCacheStore;
+    private readonly IncomingAttackStore _incomingAttackStore;
+    private readonly IncomingAttackMonitoringSettingsStore _incomingAttackMonitoringStore;
+    private readonly TroopEvasionStore _troopEvasionStore;
     private readonly LatestSnapshotWriter<VillageCacheWrite> _villageCacheWriter;
     private sealed record VillageCacheWrite(string AccountName, IReadOnlyDictionary<string, VillageStatus> Snapshot);
     private readonly IAccountProvider _accountProvider;
@@ -345,6 +348,7 @@ public partial class MainWindow : Window
     private bool _logFlushQueued;
     private bool _restartContinuousLoopAfterStop;
     private bool _startContinuousLoopAfterQueueStop;
+    private bool _restartAutoQueueAfterLanguageGate;
 
     /// <summary>
     /// Public accessor so the Buildings panel can bind to the buildings view
@@ -439,6 +443,14 @@ public partial class MainWindow : Window
             () => LoadBotOptions().BaseUrl,
             AppendLog);
         _villageCacheStore = new VillageCacheStore(_projectRoot, () => _accountStore.ActiveAccountName(), AppendLog);
+        _incomingAttackStore = new IncomingAttackStore(_projectRoot, AppendLog);
+        _incomingAttackMonitoringStore = new IncomingAttackMonitoringSettingsStore(_projectRoot, AppendLog);
+        _troopEvasionStore = new TroopEvasionStore(_projectRoot, AppendLog);
+        TroopsHubPanelControl.IncomingAttacksGrid.ItemsSource = _incomingAttackRows;
+        TroopsHubPanelControl.IncomingAttackMonitoringVillages.ItemsSource = _incomingAttackMonitoringVillages;
+        TroopsHubPanelControl.EvasionPanel.SettingsChanged += TroopEvasionSettingsChanged;
+        TroopsHubPanelControl.EvasionPanel.ValidateRequested += TroopEvasionValidateRequested;
+        TroopsHubPanelControl.EvasionPanel.EnableValidationRequested += ValidateTroopEvasionEnable;
         _villageCacheWriter = new LatestSnapshotWriter<VillageCacheWrite>(write =>
         {
             _villageCacheStore.Save(write.AccountName, write.Snapshot);
@@ -487,6 +499,8 @@ public partial class MainWindow : Window
         _travianQueueViewModel.RestoreRequested += RestoreRemovedQueueItems;
         _travianQueueViewModel.MoveUpRequested += MoveSelectedQueueItemUp;
         _travianQueueViewModel.MoveDownRequested += MoveSelectedQueueItemDown;
+        _travianQueueViewModel.MoveToTopRequested += MoveSelectedQueueItemToTop;
+        _travianQueueViewModel.MoveToBottomRequested += MoveSelectedQueueItemToBottom;
         _travianQueueViewModel.RefreshRequested += () => RefreshQueueUi();
         _travianQueueViewModel.ClearVillageRequested += ClearVillageQueue;
         _travianQueueViewModel.ClearAccountRequested += ClearQueueOrHistory;
@@ -523,6 +537,8 @@ public partial class MainWindow : Window
                 HandleBrowserClosedSignal();
                 TickFarmListCountdowns();
                 TickAutomationLoopCountdowns();
+                TickIncomingAttacks(serverNow);
+                TickTroopEvasion(serverNow);
 
                 TickBuildQueueCountdown();
                 RefreshDemolishStatusForSelectedVillage();
@@ -541,12 +557,12 @@ public partial class MainWindow : Window
                     RefreshTravianSmithyQueueUi();
                 }
 
-                if (IsMainTabSelected(NpcTradeTabItem))
+                if (IsMainTabSelected(ResourcesTabItem))
                 {
                     TickResourceTransferVillageForecasts();
                 }
 
-                if (IsMainTabSelected(ReinforcementsTabItem))
+                if (IsMainTabSelected(TroopsTabItem))
                 {
                     UpdateReinforcementStatus();
                 }
@@ -579,6 +595,7 @@ public partial class MainWindow : Window
         _resourceSnapshotRefreshTimer.Tick += async (_, _) =>
         {
             await HandleResourceSnapshotRefreshTickAsync();
+            ActivateDueHeroCropAntiStarveObservations();
             // Jitter the next tick (15–35s) so the dashboard refresh isn't a perfectly periodic 20s heartbeat.
             _resourceSnapshotRefreshTimer.Interval = TimeSpan.FromSeconds(Random.Shared.Next(15, 36));
         };
@@ -668,7 +685,6 @@ public partial class MainWindow : Window
         _heroViewModel.RefreshHpRequested += () => _ = RunHeroPanelOperationAsync(RefreshHeroHpCoreAsync);
         _heroViewModel.RefreshStatsRequested += () => _ = RunHeroPanelOperationAsync(RefreshHeroStatsCoreAsync);
         _heroViewModel.RefreshInventoryRequested += () => _ = RunHeroPanelOperationAsync(RefreshHeroInventoryCoreAsync);
-        _heroViewModel.OpenResourceSettingsRequested += OpenHeroResourceSettingsFromHeroPanel;
         SubscribeToHeroInventoryUpdates();
         InitializeBuildingSlotPlaceholders();
         _farmLists.CollectionChanged += (_, _) =>
@@ -831,7 +847,7 @@ public partial class MainWindow : Window
         var hasExplicitAutoCelebrationSetting = storedAutoCelebration.HasValue;
         LoadAutomationLoopTasks(options);
         // Settings saves reload the account/global config. Keep the dashboard group toggles on the
-        // selected village's saved state so they do not drift from the Village settings popup.
+        // selected village's saved state so they do not drift from the Village settings panel.
         if (_isLoggedIn)
         {
             ApplyAutomationLoopGroupsForSelectedVillage();
@@ -1232,7 +1248,7 @@ public partial class MainWindow : Window
         ReconcileConfirmedVillageList(status.Villages, "post_login");
         // Apply the landing village's per-village automation-group override to the dashboard cards. Without
         // this the cards keep the global default loaded by LoadAutomationLoopTasks, so on login they could
-        // disagree with the per-village toggles shown in the Village settings window (e.g. Construction on
+        // disagree with the per-village toggles shown in the Village settings panel (e.g. Construction on
         // there but off in the dashboard).
         ApplyAutomationLoopGroupsForSelectedVillage();
 
