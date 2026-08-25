@@ -80,6 +80,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   source tests must not depend on ignored runtime configuration.
 - Interruptible writes use the atomic file helper. Retry bounded transient lock/sharing failures.
 - Quarantine and log corrupt queue/state files instead of silently overwriting them.
+- Shared building-template files use the versioned `.tbot-template.json` exchange format and contain no account,
+  server, village, or player identity. Import conflicts are matched only by template ID; validate each template
+  independently and never guess at a newer schema.
 - New settings require the complete pipeline: model, defaults, load/save, ViewModel, UI, and tests.
 - Embedded Village settings have no Save step: persist each row or group-toggle change immediately; bulk
   "Check all" changes persist each affected row and publish one consolidated settings-changed notification.

@@ -265,6 +265,38 @@ public sealed class WindowSmokeTests
     }
 
     [Fact]
+    public void BuildingTemplateImportWindow_LoadsConflictManifest()
+    {
+        _wpf.Run(() =>
+        {
+            var template = new BuildingTemplate
+            {
+                Name = "Shared starter",
+                CreatedByTribe = "Gauls",
+                Rows = [new BuildingTemplateRow { Gid = 15, BuildingName = "Main Building", TargetLevel = 3 }],
+            };
+            var candidate = new BuildingTemplateImportCandidate(template, [], TribeMismatch: true);
+            var window = new BuildingTemplateImportWindow([candidate], [template.Id]);
+            try
+            {
+                window.Measure(new Size(900, 560));
+                window.Arrange(new Rect(0, 0, 900, 560));
+                window.UpdateLayout();
+
+                var row = Assert.Single(window.Rows);
+                Assert.True(row.HasConflict);
+                Assert.True(row.TribeMismatch);
+                Assert.Equal("Conflict · Different tribe", row.StatusText);
+                Assert.Equal(BuildingTemplateImportConflictAction.ImportAsCopy, row.SelectedConflictChoice.Action);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void VillageSettingsPanel_ShowsTribeColumnOnASpecialServerWithMixedTribes()
     {
         AssertTribeColumnVisibility(

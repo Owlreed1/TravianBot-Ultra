@@ -5,9 +5,11 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
@@ -18,7 +20,9 @@ namespace TbotUltra.Desktop;
 public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
 {
     private readonly BuildingTemplateStore _store;
+    private readonly BuildingTemplateExchangeService _exchangeService = new();
     private readonly BuildingTemplatePlanner _planner = new();
+    private readonly string _projectRoot;
     private readonly VillageStatus _status;
     private readonly double _serverSpeed;
     private readonly int _mainBuildingLevel;
@@ -136,6 +140,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         ThemeChrome.EnableEarlyDarkTitleBar(this);
         DataContext = this;
 
+        _projectRoot = projectRoot;
         _store = new BuildingTemplateStore(projectRoot);
         _status = status;
         _serverSpeed = serverSpeed;
@@ -371,6 +376,149 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         Templates.Insert(sourceIndex + 1, duplicate);
         SelectedTemplate = duplicate;
         StatusText = "Duplicated template. Save to keep it.";
+    }
+
+    private void ImportTemplatesButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!SaveAllTemplates(skipValidation: true))
+        {
+            return;
+        }
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import building templates",
+            Filter = "Tbot Ultra templates (*.tbot-template.json)|*.tbot-template.json|JSON files (*.json)|*.json",
+            DefaultExt = BuildingTemplateExchangeService.FileExtension,
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var candidates = _exchangeService.Import(dialog.FileName, _status.Tribe);
+            var preview = new BuildingTemplateImportWindow(
+                candidates,
+                Templates.Select(template => template.Id).ToHashSet())
+            {
+                Owner = this,
+            };
+            if (preview.ShowDialog() != true)
+            {
+                return;
+            }
+
+            var result = _exchangeService.ApplyImport(Templates.ToList(), preview.Selections, DateTimeOffset.UtcNow);
+            _store.Save(result.Templates);
+
+            SelectedTemplate = null;
+            Templates.Clear();
+            foreach (var template in result.Templates)
+            {
+                Templates.Add(template);
+            }
+
+            SelectedTemplate = result.ImportedTemplateIds.Count > 0
+                ? Templates.FirstOrDefault(template => template.Id == result.ImportedTemplateIds[0])
+                : Templates.FirstOrDefault();
+            StatusText = $"Imported {result.ImportedCount}, overwritten {result.OverwrittenCount}, copied {result.CopiedCount}.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            AppDialog.Show(
+                this,
+                ex.Message,
+                "Import building templates",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void ExportTemplatesButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { ContextMenu: { } menu } button)
+        {
+            return;
+        }
+
+        menu.PlacementTarget = button;
+        menu.Placement = PlacementMode.Bottom;
+        menu.IsOpen = true;
+    }
+
+    private void ExportSelectedTemplateMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedTemplate is null)
+        {
+            StatusText = "Select a template to export.";
+            return;
+        }
+
+        ExportTemplates([SelectedTemplate], SanitizeExportFileName(SelectedTemplate.Name));
+    }
+
+    private void ExportAllTemplatesMenuItem_Click(object sender, RoutedEventArgs e)
+        => ExportTemplates(Templates.ToList(), $"building-templates-{DateTime.Now:yyyyMMdd}");
+
+    private void ExportTemplates(IReadOnlyList<BuildingTemplate> templates, string suggestedName)
+    {
+        if (!SaveAllTemplates(skipValidation: true))
+        {
+            return;
+        }
+
+        if (templates.Count == 0)
+        {
+            StatusText = "There are no templates to export.";
+            return;
+        }
+
+        var downloads = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads");
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export building templates",
+            FileName = suggestedName + BuildingTemplateExchangeService.FileExtension,
+            Filter = "Tbot Ultra templates (*.tbot-template.json)|*.tbot-template.json",
+            DefaultExt = BuildingTemplateExchangeService.FileExtension,
+            AddExtension = true,
+            OverwritePrompt = true,
+            InitialDirectory = Directory.Exists(downloads) ? downloads : null,
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var appVersion = UpdateChecker.ReadCurrentVersion(Path.Combine(_projectRoot, "VERSION"));
+            _exchangeService.Export(dialog.FileName, templates, appVersion, DateTimeOffset.UtcNow);
+            StatusText = $"Exported {templates.Count} template(s) to {Path.GetFileName(dialog.FileName)}.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            AppDialog.Show(
+                this,
+                ex.Message,
+                "Export building templates",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private static string SanitizeExportFileName(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars().ToHashSet();
+        var sanitized = new string((string.IsNullOrWhiteSpace(name) ? "building-template" : name.Trim())
+            .Select(character => invalid.Contains(character) ? '-' : character)
+            .ToArray());
+        return string.IsNullOrWhiteSpace(sanitized) ? "building-template" : sanitized;
     }
 
     internal static BuildingTemplate CreateDuplicateTemplate(

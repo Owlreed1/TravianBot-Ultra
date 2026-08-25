@@ -70,4 +70,24 @@ public sealed class BuildingTemplatesWindowSourceTests
         Assert.Contains("AppDialog.Show(", queueHandler, StringComparison.Ordinal);
         Assert.Contains("\"Cannot queue template\"", queueHandler, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ImportAndExportUseCompactIconsAndAConflictPreview()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "BuildingTemplatesWindow.xaml"));
+        var previewXaml = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "BuildingTemplateImportWindow.xaml"));
+        var previewCode = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "BuildingTemplateImportWindow.xaml.cs"));
+        var code = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "BuildingTemplatesWindow.xaml.cs"));
+
+        Assert.Contains("TemplateImportIconGeometry", xaml, StringComparison.Ordinal);
+        Assert.Contains("TemplateExportIconGeometry", xaml, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"Import templates\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"Export templates\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Selected template\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"All templates\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Import manifest", previewXaml, StringComparison.Ordinal);
+        Assert.Contains("Import as copy", previewCode, StringComparison.Ordinal);
+        Assert.Contains("SaveAllTemplates(skipValidation: true)", code, StringComparison.Ordinal);
+    }
 }

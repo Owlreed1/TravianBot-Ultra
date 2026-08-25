@@ -17,6 +17,10 @@
                       Figures="M 4,4 L 15,4 L 15,15 L 4,15 Z M 9,9 L 20,9 L 20,20 L 9,20 Z" />
         <PathGeometry x:Key="TemplateDeleteIconGeometry"
                       Figures="M 5,7 L 19,7 M 9,4 L 15,4 M 7,7 L 8,20 L 16,20 L 17,7 M 11,10 L 11,17 M 14,10 L 14,17" />
+        <PathGeometry x:Key="TemplateImportIconGeometry"
+                      Figures="M 12,3 L 12,15 M 7,10 L 12,15 L 17,10 M 5,17 L 5,20 L 19,20 L 19,17" />
+        <PathGeometry x:Key="TemplateExportIconGeometry"
+                      Figures="M 12,16 L 12,4 M 7,9 L 12,4 L 17,9 M 5,17 L 5,20 L 19,20 L 19,17" />
         <Style x:Key="TemplateActionIconStyle" TargetType="Path">
             <Setter Property="Width" Value="13" />
             <Setter Property="Height" Value="13" />
@@ -88,6 +92,7 @@
                     <Button Width="32"
                             Height="28"
                             Padding="7"
+                            Margin="0,0,6,0"
                             ToolTip="Delete the selected template"
                             AutomationProperties.Name="Delete template"
                             Background="{DynamicResource DangerBgBrush}"
@@ -95,6 +100,34 @@
                             BorderBrush="{DynamicResource DangerBorderBrush}"
                             Click="DeleteTemplateButton_Click">
                         <Path Data="{StaticResource TemplateDeleteIconGeometry}"
+                              Style="{StaticResource TemplateActionIconStyle}" />
+                    </Button>
+                    <Button Width="32"
+                            Height="28"
+                            Padding="7"
+                            Margin="0,0,6,0"
+                            ToolTip="Import shared templates"
+                            AutomationProperties.Name="Import templates"
+                            Click="ImportTemplatesButton_Click">
+                        <Path Data="{StaticResource TemplateImportIconGeometry}"
+                              Style="{StaticResource TemplateActionIconStyle}" />
+                    </Button>
+                    <Button x:Name="ExportTemplatesButton"
+                            Width="32"
+                            Height="28"
+                            Padding="7"
+                            ToolTip="Export templates"
+                            AutomationProperties.Name="Export templates"
+                            Click="ExportTemplatesButton_Click">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Selected template"
+                                          Click="ExportSelectedTemplateMenuItem_Click" />
+                                <MenuItem Header="All templates"
+                                          Click="ExportAllTemplatesMenuItem_Click" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                        <Path Data="{StaticResource TemplateExportIconGeometry}"
                               Style="{StaticResource TemplateActionIconStyle}" />
                     </Button>
                 </StackPanel>
