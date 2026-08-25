@@ -1,4 +1,5 @@
 <UserControl x:Class="TbotUltra.Desktop.Views.HeroPanel"
+             x:Name="HeroPanelRoot"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -8,6 +9,26 @@
              d:DataContext="{d:DesignInstance Type=vm:HeroViewModel}"
              d:DesignHeight="600"
              d:DesignWidth="800">
+    <UserControl.Resources>
+        <Style x:Key="HeroResourceHeaderTextStyle" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+        </Style>
+        <Style x:Key="HeroResourceColumnToggleStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Padding" Value="7,2" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+        </Style>
+    </UserControl.Resources>
     <ScrollViewer x:Name="RootScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource AppBackgroundBrush}">
         <StackPanel>
             <!-- Header -->
@@ -442,17 +463,6 @@
                         Margin="6,0,0,0">
                     <StackPanel>
                         <DockPanel Margin="0,0,0,12">
-                            <StackPanel DockPanel.Dock="Right"
-                                        Orientation="Horizontal"
-                                        HorizontalAlignment="Right">
-                                <Button x:Name="RefreshHeroInventoryButton"
-                                        Content="Refresh hero inventory"
-                                        Width="170"
-                                        HorizontalAlignment="Right"
-                                        Command="{Binding RefreshInventoryCommand}"
-                                        Background="{DynamicResource SurfaceBrush}"
-                                        BorderBrush="{DynamicResource BorderSubtleBrush}" />
-                            </StackPanel>
                             <StackPanel Orientation="Horizontal"
                                         VerticalAlignment="Center">
                                 <TextBlock Text="Hero inventory"
@@ -460,16 +470,11 @@
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextPrimaryBrush}"
                                            VerticalAlignment="Center" />
-                                <Button Width="24"
-                                        Height="24"
-                                        Padding="0"
+                                <Button x:Name="RefreshHeroInventoryButton"
+                                        Style="{StaticResource RefreshIconButtonStyle}"
                                         Margin="8,0,0,0"
-                                        FontFamily="Segoe MDL2 Assets"
-                                        Content="&#xE713;"
-                                        ToolTip="Open per-village Hero resource settings."
-                                        Command="{Binding OpenResourceSettingsCommand}"
-                                        Background="{DynamicResource SurfaceBrush}"
-                                        BorderBrush="{DynamicResource BorderSubtleBrush}" />
+                                        ToolTip="Refresh hero inventory"
+                                        Command="{Binding RefreshInventoryCommand}" />
                             </StackPanel>
                         </DockPanel>
 
@@ -524,6 +529,138 @@
                                    FontSize="12"
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,8" />
+
+                        <Border Margin="0,8,0,0"
+                                Background="{DynamicResource AppBackgroundBrush}"
+                                BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <StackPanel>
+                                <Grid Margin="14,12,14,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Hero resources by village"
+                                                       FontSize="14"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                                            <ContentControl Style="{DynamicResource InfoTooltipIconStyle}"
+                                                            Margin="7,1,0,0"
+                                                            ToolTip="Choose which villages and features may use resources from the hero inventory." />
+                                        </StackPanel>
+                                        <TextBlock Text="Control where inventory resources may be spent."
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextSubtleBrush}"
+                                                   Margin="0,3,0,0" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Content="Toggle all villages"
+                                            Padding="10,3"
+                                            VerticalAlignment="Center"
+                                            Click="ToggleAllHeroResources_Click"
+                                            ToolTip="Turn hero resources on or off for every village." />
+                                </Grid>
+
+                                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                              VerticalScrollBarVisibility="Disabled">
+                                    <Grid MinWidth="720">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Border Grid.Row="0"
+                                                BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                                BorderThickness="0,1,0,1"
+                                                Padding="14,8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="54" />
+                                                    <ColumnDefinition Width="*" MinWidth="140" />
+                                                    <ColumnDefinition Width="130" />
+                                                    <ColumnDefinition Width="104" />
+                                                    <ColumnDefinition Width="104" />
+                                                    <ColumnDefinition Width="118" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="ON" Style="{StaticResource HeroResourceHeaderTextStyle}" />
+                                                <TextBlock Grid.Column="1" Text="VILLAGE" Style="{StaticResource HeroResourceHeaderTextStyle}" />
+                                                <Button Grid.Column="2" Content="CONSTRUCTION" Style="{StaticResource HeroResourceColumnToggleStyle}"
+                                                        Click="ToggleAllHeroConstruction_Click" ToolTip="Toggle Construction for every village." />
+                                                <Button Grid.Column="3" Content="SMITHY" Style="{StaticResource HeroResourceColumnToggleStyle}"
+                                                        Click="ToggleAllHeroSmithy_Click" ToolTip="Toggle Smithy for every village." />
+                                                <Button Grid.Column="4" Content="BREWERY" Style="{StaticResource HeroResourceColumnToggleStyle}"
+                                                        Click="ToggleAllHeroBrewery_Click" ToolTip="Toggle Brewery for every village." />
+                                                <Button Grid.Column="5" Content="TOWN HALL" Style="{StaticResource HeroResourceColumnToggleStyle}"
+                                                        Click="ToggleAllHeroTownHall_Click" ToolTip="Toggle Town Hall for every village." />
+                                            </Grid>
+                                        </Border>
+
+                                        <ItemsControl Grid.Row="1"
+                                                      ItemsSource="{Binding HeroResourceRows, ElementName=HeroPanelRoot}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                                            BorderThickness="0,0,0,1"
+                                                            Padding="14,6">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="54" />
+                                                                <ColumnDefinition Width="*" MinWidth="140" />
+                                                                <ColumnDefinition Width="130" />
+                                                                <ColumnDefinition Width="104" />
+                                                                <ColumnDefinition Width="104" />
+                                                                <ColumnDefinition Width="118" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <CheckBox Style="{DynamicResource ToggleSwitchBlueStyle}"
+                                                                      IsChecked="{Binding IsHeroResourcesEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                      ToolTip="Enable hero inventory resources for this village." />
+                                                            <TextBlock Grid.Column="1" Text="{Binding VillageName}"
+                                                                       VerticalAlignment="Center" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                       TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
+                                                            <CheckBox Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                      IsChecked="{Binding UseConstruction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                      ToolTip="Allow hero resources for construction." />
+                                                            <CheckBox Grid.Column="3" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                      IsChecked="{Binding UseSmithy, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                      ToolTip="Allow hero resources for Smithy upgrades." />
+                                                            <CheckBox Grid.Column="4" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                      IsChecked="{Binding UseBrewery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                      ToolTip="Allow hero resources for Brewery celebrations." />
+                                                            <CheckBox Grid.Column="5" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                      IsChecked="{Binding UseTownHall, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                      ToolTip="Allow hero resources for Town Hall celebrations." />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Grid>
+                                </ScrollViewer>
+
+                                <Grid Margin="14,10,14,12">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="Max per resource" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                        <ContentControl Style="{DynamicResource InfoTooltipIconStyle}" Margin="6,1,0,0"
+                                                        ToolTip="Maximum hero inventory resources used per resource for one action." />
+                                        <TextBox x:Name="HeroResourceMaxLimitTextBox" Width="96" Margin="10,0,0,0"
+                                                 Padding="6,4" Text="5000" BorderBrush="{DynamicResource BorderSubtleBrush}" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <TextBlock x:Name="HeroResourceSettingsStatusText" Margin="0,0,12,0"
+                                                   VerticalAlignment="Center" Foreground="{DynamicResource SuccessTextBrush}" />
+                                        <Button Content="Save changes" Width="116" Height="30"
+                                                Click="SaveHeroResourceSettings_Click"
+                                                Background="{DynamicResource SuccessBgBrush}"
+                                                BorderBrush="{DynamicResource SuccessBorderBrush}"
+                                                Foreground="{DynamicResource SuccessTextBrush}" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Border>
             </Grid>

@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -33,6 +36,8 @@ public partial class HeroPanel : UserControl
     private Point _dragStart;
     private HeroAttributePriorityItem? _dragSource;
     private MainWindow? _hostCache;
+
+    public ObservableCollection<HeroResourceOverviewRow> HeroResourceRows { get; } = [];
 
     public HeroPanel()
     {
@@ -71,6 +76,84 @@ public partial class HeroPanel : UserControl
         AttributeColumn.Width = new GridLength(0);
         InventoryColumn.Width = new GridLength(1, GridUnitType.Star);
         HeroInventoryCard.Margin = new Thickness(0);
+        RefreshHeroResourceSettings();
+    }
+
+    internal void RefreshHeroResourceSettings()
+    {
+        if (string.Equals(Section, "Hero inventory", StringComparison.OrdinalIgnoreCase))
+        {
+            Host?.LoadHeroResourceSettingsIntoPanel(this);
+        }
+    }
+
+    internal void LoadHeroResourceSettings(IReadOnlyList<HeroResourceOverviewRow> rows)
+    {
+        HeroResourceRows.Clear();
+        foreach (var row in rows)
+        {
+            HeroResourceRows.Add(row);
+        }
+
+        HeroResourceMaxLimitTextBox.Text = rows.Count > 0
+            ? rows.Max(row => row.MaxUsePerResource).ToString()
+            : "5000";
+        HeroResourceSettingsStatusText.Text = string.Empty;
+    }
+
+    private void ToggleAllHeroResources_Click(object sender, RoutedEventArgs e)
+        => SetAllHeroResourceRows(row => row.IsHeroResourcesEnabled, (row, value) => row.IsHeroResourcesEnabled = value);
+
+    private void ToggleAllHeroConstruction_Click(object sender, RoutedEventArgs e)
+        => SetAllHeroResourceRows(row => row.UseConstruction, (row, value) => row.UseConstruction = value);
+
+    private void ToggleAllHeroSmithy_Click(object sender, RoutedEventArgs e)
+        => SetAllHeroResourceRows(row => row.UseSmithy, (row, value) => row.UseSmithy = value);
+
+    private void ToggleAllHeroBrewery_Click(object sender, RoutedEventArgs e)
+        => SetAllHeroResourceRows(row => row.UseBrewery, (row, value) => row.UseBrewery = value);
+
+    private void ToggleAllHeroTownHall_Click(object sender, RoutedEventArgs e)
+        => SetAllHeroResourceRows(row => row.UseTownHall, (row, value) => row.UseTownHall = value);
+
+    private void SetAllHeroResourceRows(
+        Func<HeroResourceOverviewRow, bool> get,
+        Action<HeroResourceOverviewRow, bool> set)
+    {
+        if (HeroResourceRows.Count == 0)
+        {
+            return;
+        }
+
+        var target = !HeroResourceRows.All(get);
+        foreach (var row in HeroResourceRows)
+        {
+            set(row, target);
+        }
+    }
+
+    private void SaveHeroResourceSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (!int.TryParse(HeroResourceMaxLimitTextBox.Text, out var maxUsePerResource) || maxUsePerResource < 0)
+        {
+            HeroResourceSettingsStatusText.Foreground = (Brush)FindResource("DangerTextBrush");
+            HeroResourceSettingsStatusText.Text = "Enter a valid max limit.";
+            return;
+        }
+
+        var results = HeroResourceRows
+            .Select(row => new HeroResourceOverviewResult(
+                row.VillageKey,
+                row.VillageName,
+                row.Settings with { MaxUsePerResource = maxUsePerResource }))
+            .ToList();
+        if (Host?.SaveHeroResourceSettingsFromPanel(results) != true)
+        {
+            return;
+        }
+
+        HeroResourceSettingsStatusText.Foreground = (Brush)FindResource("SuccessTextBrush");
+        HeroResourceSettingsStatusText.Text = "Saved.";
     }
 
     /// <summary>

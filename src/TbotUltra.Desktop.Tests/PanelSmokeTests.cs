@@ -315,6 +315,32 @@ public sealed class PanelSmokeTests
     }
 
     [Fact]
+    public void HeroInventoryTab_EmbedsVillageSettingsAndUsesHeaderRefreshIcon()
+    {
+        _wpf.Run(() =>
+        {
+            var hub = new HeroHubPanel { DataContext = new HeroViewModel() };
+            var inventoryPanel = Assert.IsType<HeroPanel>(hub.FindName("HeroInventoryPanel"));
+            var tabs = Assert.IsType<TabControl>(hub.FindName("HeroTabControl"));
+            tabs.SelectedItem = hub.FindName("HeroInventoryTabItem");
+            hub.Measure(new Size(1000, 700));
+            hub.Arrange(new Rect(0, 0, 1000, 700));
+            hub.UpdateLayout();
+
+            var refresh = Assert.IsType<Button>(inventoryPanel.FindName("RefreshHeroInventoryButton"));
+            Assert.Null(refresh.Content);
+            Assert.Same(Application.Current.FindResource("RefreshIconButtonStyle"), refresh.Style);
+            Assert.IsType<TextBox>(inventoryPanel.FindName("HeroResourceMaxLimitTextBox"));
+            Assert.Contains(
+                FindVisualChildren<Button>(inventoryPanel),
+                button => Equals(button.Content, "Save changes"));
+            Assert.DoesNotContain(
+                FindVisualChildren<Button>(inventoryPanel),
+                button => Equals(button.Content, "Refresh hero inventory"));
+        });
+    }
+
+    [Fact]
     public void HeroHubPanel_AdventurePickOrderCanBeChanged()
     {
         _wpf.Run(() =>

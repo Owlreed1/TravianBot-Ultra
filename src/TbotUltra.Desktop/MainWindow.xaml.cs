@@ -685,7 +685,6 @@ public partial class MainWindow : Window
         _heroViewModel.RefreshHpRequested += () => _ = RunHeroPanelOperationAsync(RefreshHeroHpCoreAsync);
         _heroViewModel.RefreshStatsRequested += () => _ = RunHeroPanelOperationAsync(RefreshHeroStatsCoreAsync);
         _heroViewModel.RefreshInventoryRequested += () => _ = RunHeroPanelOperationAsync(RefreshHeroInventoryCoreAsync);
-        _heroViewModel.OpenResourceSettingsRequested += OpenHeroResourceSettingsFromHeroPanel;
         SubscribeToHeroInventoryUpdates();
         InitializeBuildingSlotPlaceholders();
         _farmLists.CollectionChanged += (_, _) =>
