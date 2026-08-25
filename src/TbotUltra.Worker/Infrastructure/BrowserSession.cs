@@ -729,7 +729,7 @@ public sealed partial class BrowserSession : IAsyncDisposable
     // Pin Playwright to the driver and browsers shipped inside the app folder. PLAYWRIGHT_DRIVER_PATH
     // is required for the single-file build: the bundled node.exe driver is not auto-discovered from the
     // exe location (Playwright otherwise reports "Driver not found"). Browsers live under ms-playwright.
-    private static string ConfigureLocalPlaywrightEnvironment(string projectRoot)
+    public static string ConfigureLocalPlaywrightEnvironment(string projectRoot)
     {
         var driverPath = ResolvePlaywrightDriverPath(projectRoot, AppContext.BaseDirectory);
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_PATH", driverPath);

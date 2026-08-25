@@ -47,10 +47,38 @@ public sealed class ProxyWorkflowSourceTests
         Assert.Contains("TravianTargetUrl", method, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void CheckIp_UsesTheApplicationPlaywrightEnvironmentBeforeCreatingTheDriver()
+    {
+        var source = ReadDesktopServiceSource("ProxyCheckService.cs");
+        var method = MethodBody(source, "internal static async Task<string> CheckIpAsync");
+        var configure = method.IndexOf("BrowserSession.ConfigureLocalPlaywrightEnvironment(projectRoot)", StringComparison.Ordinal);
+        var create = method.IndexOf("Playwright.CreateAsync()", StringComparison.Ordinal);
+
+        Assert.True(configure >= 0 && configure < create, "The IP check must resolve the app's bundled browser before Playwright starts.");
+    }
+
+    [Fact]
+    public void CompletedIpCheck_UsesSoftGreenContinueButton()
+    {
+        var source = ReadDesktopSource("AccountsWindow.xaml.cs");
+        var method = MethodBody(source, "private void ShowProxyCheckOverlay");
+
+        Assert.Contains("FindResource(\"SuccessBgBrush\")", method, StringComparison.Ordinal);
+        Assert.Contains("FindResource(\"SuccessBorderBrush\")", method, StringComparison.Ordinal);
+        Assert.Contains("FindResource(\"SuccessTextBrush\")", method, StringComparison.Ordinal);
+    }
+
     private static string ReadDesktopSource(string fileName)
     {
         var root = ProjectRootLocator.FindProjectRoot();
         return File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", fileName));
+    }
+
+    private static string ReadDesktopServiceSource(string fileName)
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        return File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "Services", fileName));
     }
 
     private static string MethodBody(string source, string signature)
