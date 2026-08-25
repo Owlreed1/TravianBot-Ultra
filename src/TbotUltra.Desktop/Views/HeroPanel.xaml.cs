@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.ViewModels;
 
@@ -36,12 +38,34 @@ public partial class HeroPanel : UserControl
     private Point _dragStart;
     private HeroAttributePriorityItem? _dragSource;
     private MainWindow? _hostCache;
+    private readonly DispatcherTimer _heroResourceMaxSaveTimer;
+    private bool _isLoadingHeroResourceSettings;
+    private bool _isApplyingHeroResourceBulkChange;
 
     public ObservableCollection<HeroResourceOverviewRow> HeroResourceRows { get; } = [];
 
     public HeroPanel()
     {
         InitializeComponent();
+        _heroResourceMaxSaveTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(350),
+        };
+        _heroResourceMaxSaveTimer.Tick += (_, _) =>
+        {
+            _heroResourceMaxSaveTimer.Stop();
+            PersistHeroResourceSettings();
+        };
+        HeroResourceMaxLimitTextBox.TextChanged += (_, _) =>
+        {
+            if (_isLoadingHeroResourceSettings)
+            {
+                return;
+            }
+
+            _heroResourceMaxSaveTimer.Stop();
+            _heroResourceMaxSaveTimer.Start();
+        };
         Loaded += (_, _) => ApplySection();
     }
 
@@ -89,16 +113,45 @@ public partial class HeroPanel : UserControl
 
     internal void LoadHeroResourceSettings(IReadOnlyList<HeroResourceOverviewRow> rows)
     {
-        HeroResourceRows.Clear();
-        foreach (var row in rows)
+        _isLoadingHeroResourceSettings = true;
+        try
         {
-            HeroResourceRows.Add(row);
+            foreach (var existingRow in HeroResourceRows)
+            {
+                existingRow.PropertyChanged -= HeroResourceRow_PropertyChanged;
+            }
+
+            HeroResourceRows.Clear();
+            foreach (var row in rows)
+            {
+                row.PropertyChanged += HeroResourceRow_PropertyChanged;
+                HeroResourceRows.Add(row);
+            }
+
+            HeroResourceMaxLimitTextBox.Text = rows.Count > 0
+                ? rows.Max(row => row.MaxUsePerResource).ToString()
+                : "5000";
+            HeroResourceSettingsStatusText.Text = string.Empty;
+        }
+        finally
+        {
+            _isLoadingHeroResourceSettings = false;
+        }
+    }
+
+    private void HeroResourceRow_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(HeroResourceOverviewRow.Settings))
+        {
+            return;
         }
 
-        HeroResourceMaxLimitTextBox.Text = rows.Count > 0
-            ? rows.Max(row => row.MaxUsePerResource).ToString()
-            : "5000";
-        HeroResourceSettingsStatusText.Text = string.Empty;
+        if (!_isLoadingHeroResourceSettings
+            && !_isApplyingHeroResourceBulkChange
+            && sender is HeroResourceOverviewRow row)
+        {
+            PersistHeroResourceSettings([row]);
+        }
     }
 
     private void ToggleAllHeroResources_Click(object sender, RoutedEventArgs e)
@@ -126,14 +179,25 @@ public partial class HeroPanel : UserControl
         }
 
         var target = !HeroResourceRows.All(get);
-        foreach (var row in HeroResourceRows)
+        _isApplyingHeroResourceBulkChange = true;
+        try
         {
-            set(row, target);
+            foreach (var row in HeroResourceRows)
+            {
+                set(row, target);
+            }
         }
+        finally
+        {
+            _isApplyingHeroResourceBulkChange = false;
+        }
+
+        PersistHeroResourceSettings();
     }
 
-    private void SaveHeroResourceSettings_Click(object sender, RoutedEventArgs e)
+    private void PersistHeroResourceSettings(IReadOnlyCollection<HeroResourceOverviewRow>? changedRows = null)
     {
+        _heroResourceMaxSaveTimer.Stop();
         if (!int.TryParse(HeroResourceMaxLimitTextBox.Text, out var maxUsePerResource) || maxUsePerResource < 0)
         {
             HeroResourceSettingsStatusText.Foreground = (Brush)FindResource("DangerTextBrush");
@@ -141,7 +205,8 @@ public partial class HeroPanel : UserControl
             return;
         }
 
-        var results = HeroResourceRows
+        var rowsToSave = changedRows ?? HeroResourceRows;
+        var results = rowsToSave
             .Select(row => new HeroResourceOverviewResult(
                 row.VillageKey,
                 row.VillageName,
@@ -149,6 +214,8 @@ public partial class HeroPanel : UserControl
             .ToList();
         if (Host?.SaveHeroResourceSettingsFromPanel(results) != true)
         {
+            HeroResourceSettingsStatusText.Foreground = (Brush)FindResource("DangerTextBrush");
+            HeroResourceSettingsStatusText.Text = "Could not save.";
             return;
         }
 

@@ -650,13 +650,8 @@
                                                  Padding="6,4" Text="5000" BorderBrush="{DynamicResource BorderSubtleBrush}" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                        <TextBlock x:Name="HeroResourceSettingsStatusText" Margin="0,0,12,0"
+                                        <TextBlock x:Name="HeroResourceSettingsStatusText"
                                                    VerticalAlignment="Center" Foreground="{DynamicResource SuccessTextBrush}" />
-                                        <Button Content="Save changes" Width="116" Height="30"
-                                                Click="SaveHeroResourceSettings_Click"
-                                                Background="{DynamicResource SuccessBgBrush}"
-                                                BorderBrush="{DynamicResource SuccessBorderBrush}"
-                                                Foreground="{DynamicResource SuccessTextBrush}" />
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>

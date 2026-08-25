@@ -84,10 +84,38 @@ public sealed class BuildingTemplatesWindowSourceTests
         Assert.Contains("TemplateExportIconGeometry", xaml, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"Import templates\"", xaml, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"Export templates\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"8,0,6,0\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Header=\"Selected template\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Header=\"All templates\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Import manifest", previewXaml, StringComparison.Ordinal);
         Assert.Contains("Import as copy", previewCode, StringComparison.Ordinal);
         Assert.Contains("SaveAllTemplates(skipValidation: true)", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExportMenu_UsesALocalThemeTemplateWithoutSystemCheckGutter()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "BuildingTemplatesWindow.xaml"));
+
+        Assert.Contains("x:Key=\"ExportMenuItemStyle\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Property=\"OverridesDefaultStyle\" Value=\"True\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{DynamicResource SurfaceBrush}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{StaticResource ExportMenuItemStyle}\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RowDeleteIcon_PreservesItsTwentyFourPixelDrawingViewport()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "BuildingTemplatesWindow.xaml"));
+
+        var rowDeleteStart = xaml.IndexOf("ToolTip=\"Delete row\"", StringComparison.Ordinal);
+        var rowDeleteEnd = xaml.IndexOf("</Button>", rowDeleteStart, StringComparison.Ordinal);
+        Assert.True(rowDeleteStart >= 0 && rowDeleteEnd > rowDeleteStart);
+        var rowDeleteButton = xaml[rowDeleteStart..rowDeleteEnd];
+        Assert.Contains("<Viewbox Width=\"14\" Height=\"14\"", rowDeleteButton, StringComparison.Ordinal);
+        Assert.Contains("<Canvas Width=\"24\" Height=\"24\">", rowDeleteButton, StringComparison.Ordinal);
+        Assert.Contains("TemplateRowDeleteIconStyle", rowDeleteButton, StringComparison.Ordinal);
     }
 }

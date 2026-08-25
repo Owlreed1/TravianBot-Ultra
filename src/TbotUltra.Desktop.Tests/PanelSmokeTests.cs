@@ -331,7 +331,7 @@ public sealed class PanelSmokeTests
             Assert.Null(refresh.Content);
             Assert.Same(Application.Current.FindResource("RefreshIconButtonStyle"), refresh.Style);
             Assert.IsType<TextBox>(inventoryPanel.FindName("HeroResourceMaxLimitTextBox"));
-            Assert.Contains(
+            Assert.DoesNotContain(
                 FindVisualChildren<Button>(inventoryPanel),
                 button => Equals(button.Content, "Save changes"));
             Assert.DoesNotContain(

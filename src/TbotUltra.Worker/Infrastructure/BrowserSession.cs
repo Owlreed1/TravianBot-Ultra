@@ -136,11 +136,14 @@ public sealed partial class BrowserSession : IAsyncDisposable
             // Record the process this launch creates so a crashed run's browser window can be closed on the
             // next start. The session runs the user's system Chrome, so its processes are indistinguishable
             // from the user's own by name or path — only the recorded identity makes cleanup safe.
-            _browser = await LaunchedBrowserRegistry.TrackAsync(
-                _projectRoot,
-                launchOptions.Channel,
-                () => _playwright.Chromium.LaunchAsync(launchOptions),
-                _log);
+            _browser = await BrowserLaunchRetry.RunAsync(
+                () => LaunchedBrowserRegistry.TrackAsync(
+                    _projectRoot,
+                    launchOptions.Channel,
+                    () => _playwright.Chromium.LaunchAsync(launchOptions),
+                    _log),
+                _log,
+                cancellationToken: cancellationToken);
             return await OpenMainContextPageAsync(cancellationToken);
         }
         catch

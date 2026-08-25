@@ -76,6 +76,10 @@ public partial class MainWindow
             {
                 _queueEstimateRowsById[row.Id] = row;
             }
+            // Village overview caches a projection of these exact Queue rows. Mark that projection stale
+            // only after the authoritative estimates have been replaced, so its next render cannot keep
+            // showing old totals with a newly ticking "Updated" timestamp.
+            InvalidateVillageOverview();
             UpdateDashboardQueueDurationTooltips(projection.ActiveRows);
             RequestDashboardVillageProjectionRefresh();
             var nowUtc = DateTimeOffset.UtcNow;

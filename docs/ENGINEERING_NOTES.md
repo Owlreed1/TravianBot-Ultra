@@ -159,6 +159,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   a binary the session does not run. Bot-launched browser processes are therefore indistinguishable from the user's
   own by name or path: orphan cleanup MUST go through `LaunchedBrowserRegistry` (PID + start time + exe path, all
   three must match), never by process name or executable path alone.
+- A system browser can occasionally exit with code 0 before Playwright creates a browser/context/page, reported as
+  `TargetClosedException`. Retry that exact early launch closure once after a short cancellable delay; do not retry
+  missing executables, driver failures, later page closures, or arbitrary Playwright errors at this boundary.
 - `DOMContentLoaded` is sufficient only when followed by a required page-marker check.
 - Full login starts in the Travian lobby and enters the owned world through SSO; never submit credentials to the
   configured game server or add direct-server fallback.
@@ -282,6 +285,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   hidden-tab measurement to collapse queued task columns into apparently blank rows.
 - Enumerate mutable collections through immutable snapshots when sanitizing/exporting.
 - Village Overview is read-only and uses cache/queue snapshots; opening it never navigates or scans.
+- Village Overview construction totals consume the Queue tab's authoritative estimate rows. Rebuilding those
+  rows must invalidate the overview projection, and opening the overview rebuilds the local Queue projection
+  first; the 1 Hz render pulse may update countdowns/timestamps but must not make stale totals look refreshed.
 - Overview projections show only real deadlines and never mutate queue or scheduler state.
 - The Dashboard status line prioritizes a running queue item, then a scoped active browser workflow, then the
   read-only next-task forecast. Long-running workflows such as Village scan publish nested activity so an inner

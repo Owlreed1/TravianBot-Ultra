@@ -31,6 +31,47 @@
             <Setter Property="StrokeEndLineCap" Value="Round" />
             <Setter Property="StrokeLineJoin" Value="Round" />
         </Style>
+        <Style x:Key="TemplateRowDeleteIconStyle" TargetType="Path">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Stretch" Value="None" />
+            <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+            <Setter Property="StrokeThickness" Value="1.8" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+        </Style>
+        <Style x:Key="ExportMenuItemStyle" TargetType="MenuItem">
+            <Setter Property="OverridesDefaultStyle" Value="True" />
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="MinWidth" Value="180" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="MenuItemSurface"
+                                Background="{TemplateBinding Background}"
+                                TextElement.Foreground="{TemplateBinding Foreground}">
+                            <ContentPresenter ContentSource="Header"
+                                              RecognizesAccessKey="True"
+                                              Margin="{TemplateBinding Padding}"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="MenuItemSurface"
+                                        Property="Background"
+                                        Value="{DynamicResource InfoBgBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="MenuItemSurface" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
     <Grid Margin="14">
         <Grid.ColumnDefinitions>
@@ -105,7 +146,7 @@
                     <Button Width="32"
                             Height="28"
                             Padding="7"
-                            Margin="0,0,6,0"
+                            Margin="8,0,6,0"
                             ToolTip="Import shared templates"
                             AutomationProperties.Name="Import templates"
                             Click="ImportTemplatesButton_Click">
@@ -122,8 +163,10 @@
                         <Button.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Selected template"
+                                          Style="{StaticResource ExportMenuItemStyle}"
                                           Click="ExportSelectedTemplateMenuItem_Click" />
                                 <MenuItem Header="All templates"
+                                          Style="{StaticResource ExportMenuItemStyle}"
                                           Click="ExportAllTemplatesMenuItem_Click" />
                             </ContextMenu>
                         </Button.ContextMenu>
@@ -321,8 +364,12 @@
                                             Foreground="{DynamicResource DangerTextBrush}"
                                             BorderBrush="{DynamicResource DangerBorderBrush}"
                                             Click="DeleteRowButton_Click">
-                                        <Path Data="{StaticResource TemplateDeleteIconGeometry}"
-                                              Style="{StaticResource TemplateActionIconStyle}" />
+                                        <Viewbox Width="14" Height="14" Stretch="Uniform">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Data="{StaticResource TemplateDeleteIconGeometry}"
+                                                      Style="{StaticResource TemplateRowDeleteIconStyle}" />
+                                            </Canvas>
+                                        </Viewbox>
                                     </Button>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
