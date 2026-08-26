@@ -51,6 +51,11 @@ public sealed record BuildingTemplatePrerequisiteLoss(
     string BuildingName,
     string Reason);
 
+public sealed record BuildingTemplateStoragePrerequisitePlan(
+    IReadOnlyList<BuildingTemplateRow> Rows,
+    IReadOnlyList<StoragePreflightUpgrade> Upgrades,
+    string? CannotPlanReason = null);
+
 public sealed class BuildingTemplatePlanner
 {
     private const string HighestSingleResourceStrategy = "highest-single";
@@ -177,6 +182,65 @@ public sealed class BuildingTemplatePlanner
             totalIron += action.Iron;
             totalCrop += action.Crop;
         }
+    }
+
+    public BuildingTemplateStoragePrerequisitePlan PlanStoragePrerequisites(
+        IReadOnlyList<BuildingTemplateRow> rowsThroughTarget,
+        VillageStatus status,
+        double serverSpeed,
+        int mainBuildingLevel,
+        int storageUpgradeLevelsAhead = ConstructionDefaults.StorageUpgradeLevelsAhead)
+    {
+        var plan = Plan(rowsThroughTarget, status, serverSpeed, mainBuildingLevel);
+        if (plan.Errors.Count > 0)
+        {
+            return new BuildingTemplateStoragePrerequisitePlan([], [], plan.Errors[0]);
+        }
+
+        var requests = plan.Actions
+            .Select(action => new QueueItemCreateRequest(
+                action.TaskName,
+                new Dictionary<string, string>(action.Payload, StringComparer.OrdinalIgnoreCase),
+                Priority: 0,
+                MaxRetries: 3))
+            .ToList();
+        var preflight = StorageCapacityQueuePreflightPlanner.PlanConstructionRequestsStepwise(
+            status,
+            [],
+            requests,
+            storageUpgradeLevelsAhead);
+        if (!string.IsNullOrWhiteSpace(preflight.CannotPlanReason))
+        {
+            return new BuildingTemplateStoragePrerequisitePlan([], preflight.Upgrades, preflight.CannotPlanReason);
+        }
+
+        var rows = new List<BuildingTemplateRow>();
+        foreach (var upgrade in preflight.Upgrades)
+        {
+            var gid = upgrade.Kind == StorageCapacityKind.Warehouse ? 10 : 11;
+            var existingIndex = rows.FindIndex(row => row.Gid == gid && row.PreferredSlotId == upgrade.SlotId);
+            if (existingIndex >= 0)
+            {
+                if (upgrade.TargetLevel > rows[existingIndex].TargetLevel)
+                {
+                    rows[existingIndex].TargetLevel = upgrade.TargetLevel;
+                }
+                continue;
+            }
+
+            rows.Add(new BuildingTemplateRow
+            {
+                Kind = BuildingTemplateRowKind.Building,
+                Gid = gid,
+                BuildingName = upgrade.Kind.ToString(),
+                PreferredSlotId = upgrade.SlotId,
+                TargetLevel = upgrade.TargetLevel,
+                ResourceScope = "all",
+                ResourceStrategy = "lowest",
+            });
+        }
+
+        return new BuildingTemplateStoragePrerequisitePlan(rows, preflight.Upgrades);
     }
 
     private static void AddTemplateSlotFallbackMetadata(IReadOnlyList<BuildingTemplatePlanAction> actions)

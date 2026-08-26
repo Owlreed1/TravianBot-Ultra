@@ -65,6 +65,20 @@ public sealed class BuildingTemplatesWindowSourceTests
     }
 
     [Fact]
+    public void BuildingOrLevelChange_OffersStorageRowsBeforeTheAffectedTemplateRow()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var code = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "BuildingTemplatesWindow.xaml.cs"));
+
+        Assert.Contains("e.PropertyName is nameof(BuildingTemplateRowView.Target) or nameof(BuildingTemplateRowView.TargetLevel)", code, StringComparison.Ordinal);
+        Assert.Contains("OfferStoragePrerequisites", code, StringComparison.Ordinal);
+        Assert.Contains("_pendingStorageCheckRows.Add(row)", code, StringComparison.Ordinal);
+        Assert.Contains("PlanStoragePrerequisites", code, StringComparison.Ordinal);
+        Assert.Contains("Add required storage", code, StringComparison.Ordinal);
+        Assert.Contains("Rows.Insert(targetIndex++", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TemplateAndRowDeleteActions_UseCompactIconOnlyButtons()
     {
         var root = ProjectRootLocator.FindProjectRoot();

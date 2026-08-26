@@ -180,7 +180,8 @@ public partial class MainWindow
             _projectRoot,
             status,
             ResolveServerSpeed(),
-            ResolveMainBuildingLevel())
+            ResolveMainBuildingLevel(),
+            LoadBotOptions().ConstructionStorageUpgradeLevelsAhead)
         {
             Owner = this,
         };

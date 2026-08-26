@@ -26,12 +26,14 @@ public static class ConstructionQueueSelector
                 false);
         }
 
-        // A one-level construction task is marked InProgress after its click is registered. It must not
-        // hold later rows when Travian still has a free slot (for example MB6 may be followed by MB7 on a
-        // Plus queue). Parent tasks stay at the head because they orchestrate several starts themselves.
+        // A one-level construction task is marked InProgress after its click is registered. While its
+        // authoritative retry deadline is still ahead it must not hold later rows when Travian has a free
+        // slot (for example MB6 may be followed by MB7 on a Plus queue). Once due, select the item itself
+        // so the Worker revalidates its live level; otherwise a stale in-progress row can block every
+        // dependent template row even after a confirmed empty construction overview.
         var itemIndex = 0;
         while (itemIndex < orderedItems.Count
-            && CanYieldQueueOrderAfterInProgress(orderedItems[itemIndex]))
+            && CanYieldQueueOrderAfterInProgress(orderedItems[itemIndex], now))
         {
             itemIndex++;
         }
@@ -109,9 +111,10 @@ public static class ConstructionQueueSelector
         return new ConstructionQueueSelection(item, null, null, false);
     }
 
-    private static bool CanYieldQueueOrderAfterInProgress(QueueItem item)
+    private static bool CanYieldQueueOrderAfterInProgress(QueueItem item, DateTimeOffset now)
     {
-        if (!ConstructionQueueState.IsConstructionInProgressDeferred(item))
+        if (!ConstructionQueueState.IsConstructionInProgressDeferred(item)
+            || item.NextAttemptAt <= now)
         {
             return false;
         }

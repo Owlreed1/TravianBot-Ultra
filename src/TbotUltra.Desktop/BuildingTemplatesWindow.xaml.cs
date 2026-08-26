@@ -26,6 +26,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     private readonly VillageStatus _status;
     private readonly double _serverSpeed;
     private readonly int _mainBuildingLevel;
+    private readonly int _storageUpgradeLevelsAhead;
     private BuildingTemplate? _selectedTemplate;
     private BuildingTemplateRowView? _selectedRow;
     private string _statusText = string.Empty;
@@ -41,6 +42,9 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
     private bool _isLoadingTemplateRows;
     private CancellationTokenSource? _templateLoadCts;
     private readonly DispatcherTimer _planPreviewTimer;
+    private readonly Dictionary<Guid, string> _dismissedStoragePrompts = [];
+    private readonly HashSet<BuildingTemplateRowView> _pendingStorageCheckRows = [];
+    private bool _isApplyingStoragePrerequisites;
 
     public ObservableCollection<BuildingTemplate> Templates { get; } = [];
     public ObservableCollection<BuildingTemplateRowView> Rows { get; } = [];
@@ -134,7 +138,8 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         string projectRoot,
         VillageStatus status,
         double serverSpeed,
-        int mainBuildingLevel)
+        int mainBuildingLevel,
+        int storageUpgradeLevelsAhead)
     {
         InitializeComponent();
         ThemeChrome.EnableEarlyDarkTitleBar(this);
@@ -145,6 +150,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         _status = status;
         _serverSpeed = serverSpeed;
         _mainBuildingLevel = mainBuildingLevel;
+        _storageUpgradeLevelsAhead = storageUpgradeLevelsAhead;
 
         Rows.CollectionChanged += Rows_CollectionChanged;
         _planPreviewTimer = new DispatcherTimer(DispatcherPriority.Background)
@@ -154,7 +160,13 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         _planPreviewTimer.Tick += (_, _) =>
         {
             _planPreviewTimer.Stop();
+            var storageCheckRows = Rows.Where(_pendingStorageCheckRows.Contains).ToList();
+            _pendingStorageCheckRows.Clear();
             RefreshPlanPreview();
+            foreach (var storageCheckRow in storageCheckRows)
+            {
+                OfferStoragePrerequisites(storageCheckRow);
+            }
         };
         LoadBuildingOptions(status.Tribe);
         Loaded += BuildingTemplatesWindow_Loaded;
@@ -329,6 +341,10 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             foreach (BuildingTemplateRowView row in e.NewItems)
             {
                 row.PropertyChanged += Row_PropertyChanged;
+                if (!_isApplyingStoragePrerequisites)
+                {
+                    _pendingStorageCheckRows.Add(row);
+                }
             }
         }
 
@@ -349,7 +365,103 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             return;
         }
 
+        if (!_isApplyingStoragePrerequisites
+            && sender is BuildingTemplateRowView row
+            && e.PropertyName is nameof(BuildingTemplateRowView.Target) or nameof(BuildingTemplateRowView.TargetLevel))
+        {
+            _pendingStorageCheckRows.Add(row);
+        }
+
         RequestPlanPreviewRefresh();
+    }
+
+    private void OfferStoragePrerequisites(BuildingTemplateRowView targetRow)
+    {
+        var targetIndex = Rows.IndexOf(targetRow);
+        if (targetIndex < 0 || targetRow.Target is null)
+        {
+            return;
+        }
+
+        var precedingRows = Rows.Take(targetIndex).Select(row => row.ToTemplateRow()).ToList();
+        var rowsThroughTarget = precedingRows.Append(targetRow.ToTemplateRow()).ToList();
+        var precedingStorage = _planner.PlanStoragePrerequisites(
+            precedingRows,
+            _status,
+            _serverSpeed,
+            _mainBuildingLevel,
+            _storageUpgradeLevelsAhead);
+        var requiredStorage = _planner.PlanStoragePrerequisites(
+            rowsThroughTarget,
+            _status,
+            _serverSpeed,
+            _mainBuildingLevel,
+            _storageUpgradeLevelsAhead);
+        if (!string.IsNullOrWhiteSpace(requiredStorage.CannotPlanReason))
+        {
+            return;
+        }
+
+        var precedingTargets = precedingStorage.Rows
+            .GroupBy(row => (row.Gid, row.PreferredSlotId))
+            .ToDictionary(group => group.Key, group => group.Max(row => row.TargetLevel));
+        var rowsToInsert = requiredStorage.Rows
+            .Where(row => row.TargetLevel > precedingTargets.GetValueOrDefault((row.Gid, row.PreferredSlotId)))
+            .ToList();
+        if (rowsToInsert.Count == 0)
+        {
+            _dismissedStoragePrompts.Remove(targetRow.Id);
+            return;
+        }
+
+        var signature = string.Join(
+            ";",
+            rowsThroughTarget.Select(row =>
+                $"{row.Id:N}:{row.Kind}:{row.Gid}:{row.PreferredSlotId}:{row.TargetLevel}:{row.ResourceScope}:{row.ResourceStrategy}"));
+        if (_dismissedStoragePrompts.TryGetValue(targetRow.Id, out var dismissedSignature)
+            && string.Equals(dismissedSignature, signature, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var targetName = targetRow.Target.Name;
+        var requiredRows = string.Join(
+            "\n",
+            rowsToInsert.Select(row => $"  • {row.BuildingName} to level {row.TargetLevel}"));
+        var choice = AppDialog.ShowCustom(
+            this,
+            $"{targetName} to level {targetRow.TargetLevel} needs more storage capacity.\n\n" +
+            $"The following rows will be inserted immediately before {targetName}:\n{requiredRows}\n\n" +
+            "Add required storage upgrades?",
+            "Storage capacity required",
+            [("Add required storage", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
+            MessageBoxImage.Warning,
+            MessageBoxResult.Cancel,
+            MessageBoxResult.Cancel);
+        if (choice != MessageBoxResult.Yes)
+        {
+            _dismissedStoragePrompts[targetRow.Id] = signature;
+            return;
+        }
+
+        _isApplyingStoragePrerequisites = true;
+        try
+        {
+            foreach (var storageRow in rowsToInsert)
+            {
+                var rowView = BuildingTemplateRowView.From(storageRow, BuildingOptions, ResourceOptions);
+                rowView.SetOptionSources(BuildingOptions, ResourceOptions);
+                Rows.Insert(targetIndex++, rowView);
+            }
+        }
+        finally
+        {
+            _isApplyingStoragePrerequisites = false;
+        }
+
+        _dismissedStoragePrompts.Remove(targetRow.Id);
+        RefreshPlanPreview();
+        StatusText = $"Inserted {rowsToInsert.Count} storage prerequisite row(s) before {targetName}.";
     }
 
     private void NewTemplateButton_Click(object sender, RoutedEventArgs e)

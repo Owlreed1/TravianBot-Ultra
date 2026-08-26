@@ -422,6 +422,29 @@ public sealed class BuildingTemplatePlannerTests
     }
 
     [Fact]
+    public void PlanStoragePrerequisites_MainBuildingUpgradeReturnsRowsForImmediateInsertion()
+    {
+        var status = Status(
+            "Teutons",
+            Building(19, "Warehouse", 1, 10),
+            Building(20, "Granary", 1, 11),
+            Building(21, "Main Building", 1, 15)) with
+        {
+            WarehouseCapacity = 1_200,
+            GranaryCapacity = 1_200,
+        };
+        var target = Row(15, "Main Building", 20, preferredSlot: 21);
+
+        var storage = _planner.PlanStoragePrerequisites([target], status, 1, 1);
+
+        Assert.Null(storage.CannotPlanReason);
+        Assert.NotEmpty(storage.Rows);
+        Assert.Contains(storage.Rows, row => row.Gid == 10 && row.TargetLevel > 1);
+        Assert.Contains(storage.Rows, row => row.Gid == 11 && row.TargetLevel > 1);
+        Assert.All(storage.Rows, row => Assert.True(row.Gid is 10 or 11));
+    }
+
+    [Fact]
     public void RowView_MissingRequirementOption_IsInvokableButNotDirectlySelectable()
     {
         var available = new BuildingTemplateTargetOption(23, "Cranny", "Infrastructure", null, null);

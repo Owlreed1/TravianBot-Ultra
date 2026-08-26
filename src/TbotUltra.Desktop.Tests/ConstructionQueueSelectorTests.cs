@@ -159,6 +159,22 @@ public sealed class ConstructionQueueSelectorTests
     }
 
     [Fact]
+    public void SelectNext_OverdueInProgressSingleLevelUpgradeIsRevalidatedBeforeDependentRows()
+    {
+        var inProgress = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
+        inProgress.NextAttemptAt = Now.AddSeconds(-1);
+        var dependent = CreateReadyItem();
+
+        var result = ConstructionQueueSelector.SelectNext(
+            [inProgress, dependent],
+            Now,
+            ConstructionQueueAvailability.Available,
+            index => index == 1);
+
+        Assert.Same(inProgress, result.Item);
+    }
+
+    [Fact]
     public void SelectNext_InProgressHoldsWhenNextBlockedByDependency()
     {
         var inProgress = CreateDeferredItem(BotOptionPayloadKeys.UpgradeDeferReasonInProgress);
