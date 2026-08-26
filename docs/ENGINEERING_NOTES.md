@@ -127,6 +127,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - A ready enabled task always wins over holding the current village for an imminent deferred task. The account-scoped
   Pacing setting `short_village_defer_seconds` may be 20, 60, or 90 seconds (default 60) and applies only when no task
   is ready in any village; changing it while the continuous loop runs requests a wake at the next safe boundary.
+- A bulk resource-field scan reads active constructions and the compact build queue once on dorf1 and reuses that
+  snapshot while evaluating candidates. A blocked field must not cause build.php -> dorf2 -> build.php navigation
+  before the next field; refresh the snapshot only after a construction mutation starts a new scan iteration.
 - Continuous Loop and Auto Queue share runtime-only village batching over the account queue: ready work is drained
   across groups in the verified browser village before normal work elsewhere. Ready Account work or `Priority > 0`
   may preempt; after 10 execution attempts another ready village gets a turn. Deferred/unknown work never keeps a

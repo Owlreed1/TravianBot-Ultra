@@ -287,6 +287,9 @@ public sealed partial class TravianClient
                     .Where(field => ResourceUpgradeSelection.Matches(field.FieldType, field.Name, selectedTypes))
                     .ToList();
                 var buildQueueAtScan = await ReadBuildQueueAsync(cancellationToken);
+                var activeConstructionsAtScan = await ReadActiveConstructionsAsync(
+                    cancellationToken,
+                    allowNavigationToBuildings: false);
                 // Note: each successful upgrade is already announced by WaitForResourceLevelAdvanceAsync
                 // at the moment the level advances. We deliberately do NOT diff levels again here, as
                 // that produced a duplicate "Resource slot N level increased ..." line per upgrade.
@@ -377,7 +380,12 @@ public sealed partial class TravianClient
                     // second click would overshoot the requested target. This fires on Plus/Roman accounts where
                     // a second queue slot is free while one upgrade is already in flight. If Travian does not
                     // expose a slot id for the queued resource, fall back to same-name matching conservatively.
-                    var highestQueuedLevel = await ReadHighestKnownQueuedResourceLevelAsync(slot, resourceName, level, cancellationToken);
+                    var highestQueuedLevel = ResourceConstructionQueueMatcher.HighestQueuedLevelForSlot(
+                        activeConstructionsAtScan,
+                        buildQueueAtScan,
+                        slot,
+                        resourceName,
+                        level);
                     if (highestQueuedLevel >= preliminaryTarget)
                     {
                         anyQueuedTowardTarget = true;
