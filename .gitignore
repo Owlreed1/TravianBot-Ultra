@@ -8,6 +8,7 @@ config/bot.json
 config/queue.json
 config/queue.json.lock
 config/building_templates.json
+/building_templates/
 config/proxies.json
 config/proxyfinder.json
 config/servers.user.json

@@ -13,9 +13,10 @@ public sealed class SelfUpdaterTests
     private static readonly string Script = SelfUpdater.BuildUpdaterScript();
 
     [Theory]
-    // config/ holds bot.json, proxies.json, building_templates.json and config/accounts/<account>/
+    // config/ holds account/settings data; building_templates/ holds the shared user-created templates.
     // (queue.json, settings.json, proxy_plan.json, village_cache.json, session state).
     [InlineData("'config'")]
+    [InlineData("'building_templates'")]
     [InlineData("'logs'")]
     [InlineData("'playwright'")]
     // .env holds the account credentials.

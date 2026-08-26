@@ -66,6 +66,23 @@ public sealed class IncomingAttackStoreTests : IDisposable
     }
 
     [Fact]
+    public void Load_DropsExpiredPendingWarningAfterConfirmedMovementArrived()
+    {
+        var now = new DateTimeOffset(2026, 8, 22, 20, 0, 0, TimeSpan.Zero);
+        new IncomingAttackStore(_root).Save(
+            "account",
+            "https://ts1.example",
+            [],
+            [new IncomingAttackSignal("BRO", CoordX: 25, CoordY: -196)],
+            new Dictionary<string, int> { ["xy:25|-196"] = 1 });
+
+        var restored = new IncomingAttackStore(_root).Load(
+            "account", "https://ts1.example", now);
+
+        Assert.Empty(restored.PendingSignals);
+    }
+
+    [Fact]
     public void Load_VersionOneSnapshotMigratesActiveAttacksAndConfirmedCounts()
     {
         var path = TbotUltra.Core.Accounts.AccountStoragePaths.IncomingAttacksSnapshotPath(

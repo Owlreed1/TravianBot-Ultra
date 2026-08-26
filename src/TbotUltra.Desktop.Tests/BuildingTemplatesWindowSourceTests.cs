@@ -35,6 +35,33 @@ public sealed class BuildingTemplatesWindowSourceTests
         Assert.Contains("MoveSelectedRowTo(Rows.Count - 1)", code, StringComparison.Ordinal);
         Assert.Contains("Content=\"Top\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Content=\"Bottom\"", xaml, StringComparison.Ordinal);
+
+        var up = xaml.IndexOf("Content=\"Up\"", StringComparison.Ordinal);
+        var down = xaml.IndexOf("Content=\"Down\"", StringComparison.Ordinal);
+        var top = xaml.IndexOf("Content=\"Top\"", StringComparison.Ordinal);
+        var bottom = xaml.IndexOf("Content=\"Bottom\"", StringComparison.Ordinal);
+        Assert.True(up < down && down < top && top < bottom);
+        Assert.Contains("Margin=\"12,0,6,0\"", xaml[top..bottom], StringComparison.Ordinal);
+        Assert.Contains("Header=\"Action\" Width=\"72\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AcceptedPrerequisites_RefreshAvailabilityBeforeSelectingRequestedBuilding()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var code = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "BuildingTemplatesWindow.xaml.cs"));
+        var handlerStart = code.IndexOf("private void BuildingOption_PreviewMouseLeftButtonDown", StringComparison.Ordinal);
+        var handlerEnd = code.IndexOf("private void DeleteRowButton_Click", handlerStart, StringComparison.Ordinal);
+        var handler = code[handlerStart..handlerEnd];
+
+        var prerequisiteInsert = handler.IndexOf("Rows.Insert", StringComparison.Ordinal);
+        var availabilityRefresh = handler.IndexOf("RefreshBuildingOptionAvailability(targetRow)", StringComparison.Ordinal);
+        var requestedBuildingLookup = handler.IndexOf("var nowAvailable =", StringComparison.Ordinal);
+        Assert.True(
+            prerequisiteInsert >= 0
+            && availabilityRefresh > prerequisiteInsert
+            && requestedBuildingLookup > availabilityRefresh,
+            "The requested building must be made selectable after its prerequisite rows are inserted.");
     }
 
     [Fact]

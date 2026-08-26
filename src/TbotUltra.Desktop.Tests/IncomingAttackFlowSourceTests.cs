@@ -59,6 +59,18 @@ public sealed class IncomingAttackFlowSourceTests
     }
 
     [Fact]
+    public void ArrivedAttack_DoesNotCreateAnotherPendingWarning()
+    {
+        var source = Read("TbotUltra.Desktop", "MainWindow.IncomingAttacks.cs");
+        var start = source.IndexOf("private void TickIncomingAttacks", StringComparison.Ordinal);
+        var end = source.IndexOf("private void RefreshIncomingAttackUi", start, StringComparison.Ordinal);
+        var tick = source[start..end];
+
+        Assert.Contains("ShouldKeepPendingSignal", tick, StringComparison.Ordinal);
+        Assert.DoesNotContain("new IncomingAttackSignal", tick, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void UnchangedDorf1Signals_DoNotCauseMinuteByMinuteRallyPointReads()
     {
         var source = Read("TbotUltra.Desktop", "MainWindow.IncomingAttacks.cs");

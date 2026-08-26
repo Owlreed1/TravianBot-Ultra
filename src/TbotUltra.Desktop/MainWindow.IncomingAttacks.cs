@@ -259,28 +259,34 @@ public partial class MainWindow
         var expiredKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in _incomingAttacksByVillage.ToList())
         {
-            var expired = pair.Value.Where(attack => attack.ArrivalAtUtc <= nowUtc).ToList();
             var active = pair.Value.Where(attack => attack.ArrivalAtUtc > nowUtc).ToList();
             if (active.Count != pair.Value.Count)
             {
                 expiredKeys.Add(pair.Key);
                 _incomingAttacksByVillage[pair.Key] = active;
-                if (!_incomingAttackPendingSignals.ContainsKey(pair.Key) && expired.FirstOrDefault() is { } arrived)
-                {
-                    if (IsIncomingAttackMonitoringEnabled(pair.Key))
-                    {
-                        _incomingAttackPendingSignals[pair.Key] = new IncomingAttackSignal(
-                            arrived.TargetVillageName,
-                            CoordX: arrived.TargetCoordX,
-                            CoordY: arrived.TargetCoordY,
-                            ObservedAtUtc: nowUtc);
-                    }
-                }
             }
         }
 
-        if (expiredKeys.Count > 0)
+        var expiredPendingKeys = _incomingAttackPendingSignals
+            .Where(pair => !IncomingAttackObservationPolicy.ShouldKeepPendingSignal(
+                pair.Value,
+                _incomingAttacksByVillage.GetValueOrDefault(pair.Key)?.Count > 0,
+                _incomingAttackConfirmedMovementCounts.ContainsKey(pair.Key),
+                nowUtc))
+            .Select(pair => pair.Key)
+            .ToList();
+        foreach (var key in expiredPendingKeys)
         {
+            _incomingAttackPendingSignals.Remove(key);
+            _incomingAttackLastReadUtc.Remove(key);
+        }
+
+        if (expiredKeys.Count > 0 || expiredPendingKeys.Count > 0)
+        {
+            if (expiredPendingKeys.Count > 0)
+            {
+                AppendLog($"[incoming-attacks] removed {expiredPendingKeys.Count} warning(s) after their arrival time passed.");
+            }
             RefreshIncomingAttackUi();
             SaveIncomingAttackState();
         }

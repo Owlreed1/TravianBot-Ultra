@@ -53,6 +53,7 @@ public sealed record BuildingTemplatePrerequisiteLoss(
 
 public sealed class BuildingTemplatePlanner
 {
+    private const string HighestSingleResourceStrategy = "highest-single";
     private static readonly HashSet<int> WallGids = [31, 32, 33, 42, 43];
     private static readonly HashSet<int> UnsupportedPlanGids = [38, 39, 40];
     private static readonly HashSet<int> DuplicateAllowedGids = [10, 11, 23, 38, 39];
@@ -354,7 +355,7 @@ public sealed class BuildingTemplatePlanner
                     BuildingName = ResourceScopeDisplayName(scope),
                     TargetLevel = requirement.Level,
                     ResourceScope = scope,
-                    ResourceStrategy = "lowest",
+                    ResourceStrategy = HighestSingleResourceStrategy,
                 });
                 state.ApplyResources(scope, requirement.Level);
                 return;
@@ -469,7 +470,15 @@ public sealed class BuildingTemplatePlanner
         var scope = ResourceScope(row);
         if (scope != "all")
         {
-            return PlanResourceGroup(status, state, scope, targetLevel, serverSpeed, mainBuildingLevel, warnings);
+            return PlanResourceGroup(
+                status,
+                state,
+                scope,
+                row.ResourceStrategy,
+                targetLevel,
+                serverSpeed,
+                mainBuildingLevel,
+                warnings);
         }
 
         var action = PlanAllResources(row, status, state, targetLevel, serverSpeed, mainBuildingLevel, warnings);
@@ -551,16 +560,23 @@ public sealed class BuildingTemplatePlanner
         VillageStatus status,
         ProjectedVillageState state,
         string scope,
+        string resourceStrategy,
         int targetLevel,
         double serverSpeed,
         int mainBuildingLevel,
         List<string> warnings)
     {
         var actions = new List<BuildingTemplatePlanAction>();
-        foreach (var field in status.ResourceFields
-                     .Where(field => field.SlotId is >= 1 and <= 18)
-                     .Where(field => string.Equals(ResourceScope(field.Name, field.FieldType), scope, StringComparison.OrdinalIgnoreCase))
-                     .OrderBy(field => field.SlotId))
+        var matchingFields = status.ResourceFields
+            .Where(field => field.SlotId is >= 1 and <= 18)
+            .Where(field => string.Equals(ResourceScope(field.Name, field.FieldType), scope, StringComparison.OrdinalIgnoreCase));
+        var selectedFields = string.Equals(resourceStrategy, HighestSingleResourceStrategy, StringComparison.OrdinalIgnoreCase)
+            ? matchingFields
+                .OrderByDescending(field => field.Level ?? 0)
+                .ThenBy(field => field.SlotId)
+                .Take(1)
+            : matchingFields.OrderBy(field => field.SlotId);
+        foreach (var field in selectedFields)
         {
             var slotId = field.SlotId!.Value;
             var currentLevel = state.ResourceLevel(field.Name, field.FieldType, field.Level ?? 0);

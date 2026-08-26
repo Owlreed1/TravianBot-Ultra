@@ -105,9 +105,8 @@ public static class SelfUpdater
     // PowerShell updater: shows a small window (status label + marquee progress bar), waits for the app to
     // close, overlays the new files while excluding user-data paths, then relaunches the app.
     //
-    // Everything the user owns lives under config/ (bot.json, proxies.json, building_templates.json and
-    // config/accounts/<account>/ with queue.json, settings.json, proxy_plan.json, village_cache.json,
-    // session state) plus .env for the account credentials. Those are excluded from the overlay, and
+    // User-owned settings live under config/, shared templates under building_templates/, and account
+    // credentials in .env. Those paths are excluded from the overlay, and
     // robocopy runs WITHOUT /MIR so files missing from the new build are never deleted. Data the app owns
     // (e.g. buildings_catalog.json) is an embedded resource and travels with the binary instead.
     // Internal for the test that locks these exclusions in — losing one silently wipes user accounts.
@@ -179,7 +178,7 @@ public static class SelfUpdater
             $log = Join-Path $TempRoot 'robocopy.log'
             $roboArgs = @(
               $StagingDir, $InstallDir, '/E', '/R:2', '/W:2', '/NFL', '/NDL', '/NJH', '/NP',
-              '/XD', (Join-Path $StagingDir 'config'), (Join-Path $StagingDir 'logs'), (Join-Path $StagingDir 'playwright'),
+              '/XD', (Join-Path $StagingDir 'config'), (Join-Path $StagingDir 'building_templates'), (Join-Path $StagingDir 'logs'), (Join-Path $StagingDir 'playwright'),
               '/XF', (Join-Path $StagingDir '.env'),
               "/LOG:$log"
             )

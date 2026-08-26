@@ -13,6 +13,7 @@ public sealed class DiagnosticsExporterTests
         var projectLogPath = fixture.WriteProjectFile("logs/session.txt", "account=user_gmail_com_server password=secret");
         fixture.WriteAppFile("logs/desktop-unhandled.log", "person@example.com failed");
         fixture.WriteProjectFile("config/bot.json", "{\"password\":\"secret\",\"base_url\":\"https://example.invalid\",\"loop_tasks\":[\"person@example.com\",\"status\"]}");
+        fixture.WriteProjectFile("building_templates/building_templates.json", "{\"templates\":[]}");
         fixture.WriteProjectFile("config/accounts/user_gmail_com_server/settings.json", "{\"email\":\"person@example.com\",\"enabled\":true}");
         fixture.WriteProjectFile("config/accounts/user_gmail_com_server/session/playwright-state.json", "{\"token\":\"must-not-exist\"}");
         fixture.WriteProjectFile(".env", "PASSWORD=must-not-exist");
@@ -30,6 +31,7 @@ public sealed class DiagnosticsExporterTests
         Assert.Contains("logs/session.txt", entryNames);
         Assert.Contains("logs/desktop-unhandled.log", entryNames);
         Assert.Contains("configuration/global/bot.json", entryNames);
+        Assert.Contains("configuration/global/building_templates.json", entryNames);
         Assert.Contains("configuration/accounts/account-001/settings.json", entryNames);
         Assert.Contains("runtime-diagnostics/page.html", entryNames);
         Assert.Contains("runtime-diagnostics/page.png", entryNames);

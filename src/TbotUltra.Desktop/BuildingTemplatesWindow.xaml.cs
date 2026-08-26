@@ -674,7 +674,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             Rows.Insert(targetIndex++, rowView);
         }
 
-        RefreshPlanPreview();
+        RefreshBuildingOptionAvailability(targetRow);
         var nowAvailable = targetRow.TargetOptionsView
             .Cast<BuildingTemplateTargetOption>()
             .FirstOrDefault(candidate => candidate.Gid == gid && candidate.IsSelectable);
@@ -685,6 +685,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         }
 
         targetRow.Target = nowAvailable;
+        RefreshPlanPreview();
         StatusText = $"Inserted {prerequisitePlan.Rows.Count} prerequisite row(s) before {option.Name}.";
     }
 
@@ -1064,6 +1065,7 @@ public sealed class BuildingTemplateRowView : INotifyPropertyChanged
     private BuildingTemplateTargetOption? _target;
     private string _slotText = "Auto";
     private string _targetLevel = "1";
+    private string _resourceStrategy = "lowest";
     private string _status = string.Empty;
     private IReadOnlyList<BuildingTemplateTargetOption> _buildingOptions = [];
     private IReadOnlyList<BuildingTemplateTargetOption> _resourceOptions = [];
@@ -1121,6 +1123,12 @@ public sealed class BuildingTemplateRowView : INotifyPropertyChanged
     {
         get => _targetLevel;
         set => SetProperty(ref _targetLevel, string.IsNullOrWhiteSpace(value) ? "1" : value);
+    }
+
+    public string ResourceStrategy
+    {
+        get => _resourceStrategy;
+        set => SetProperty(ref _resourceStrategy, string.IsNullOrWhiteSpace(value) ? "lowest" : value);
     }
 
     public string Status
@@ -1193,6 +1201,7 @@ public sealed class BuildingTemplateRowView : INotifyPropertyChanged
             Target = target,
             SlotText = target?.FixedSlotId?.ToString() ?? row.PreferredSlotId?.ToString() ?? "Auto",
             TargetLevel = Math.Max(1, row.TargetLevel).ToString(),
+            ResourceStrategy = row.ResourceStrategy,
         };
     }
 
@@ -1212,7 +1221,7 @@ public sealed class BuildingTemplateRowView : INotifyPropertyChanged
             PreferredSlotId = isAllResources ? null : slotId,
             TargetLevel = Math.Clamp(targetLevel, 1, 20),
             ResourceScope = isAllResources ? Target?.ResourceScope ?? "all" : "all",
-            ResourceStrategy = "lowest",
+            ResourceStrategy = ResourceStrategy,
         };
     }
 

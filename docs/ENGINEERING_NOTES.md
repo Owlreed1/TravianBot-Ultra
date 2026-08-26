@@ -82,9 +82,13 @@ Published artifacts belong under `artifacts/`, never beside source files.
   source tests must not depend on ignored runtime configuration.
 - Interruptible writes use the atomic file helper. Retry bounded transient lock/sharing failures.
 - Quarantine and log corrupt queue/state files instead of silently overwriting them.
-- Shared building-template files use the versioned `.tbot-template.json` exchange format and contain no account,
+- The editable building-template library lives in root-level `building_templates/building_templates.json`, beside
+  `docs/`. On first load, copy a valid legacy `config/building_templates.json` there without deleting the legacy file.
+  Shared building-template files use the versioned `.tbot-template.json` exchange format and contain no account,
   server, village, or player identity. Import conflicts are matched only by template ID; validate each template
-  independently and never guess at a newer schema.
+  independently and never guess at a newer schema. An automatically inserted resource-field prerequisite upgrades
+  exactly one matching field, choosing the highest current level first; explicit `All ...` template rows retain
+  their normal all-matching-fields behavior.
 - New settings require the complete pipeline: model, defaults, load/save, ViewModel, UI, and tests.
 - Embedded Village settings have no Save step: persist each row or group-toggle change immediately; bulk
   "Check all" changes persist each affected row and publish one consolidated settings-changed notification.
@@ -565,7 +569,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   Point result must not restore state cleared by a newer Dorf1 read.
   Filter/read failures never clear known attacks. Exact movements persist per account+world, use the Travian
   movement id when available, and expire at their server-derived absolute arrival. After a successful Rally Point
-  read, retain the confirmed movement-count high-water mark until an authoritative clear Dorf1 read. Countdown drift,
+  read, do not replace an arrived confirmed movement with a pending warning. Pending Dorf1 signals with known arrival
+  times expire when their last arrival passes; legacy pending signals backed only by arrived confirmed history are
+  discarded on restore.
+  Retain the confirmed movement-count high-water mark until an authoritative clear Dorf1 read. Countdown drift,
   landed movements, Plus marker repeats, and periodic timers must not reopen Rally Point; read details again only when
   the live red Dorf1 movement count exceeds that mark. Only an unconfirmed/failed signal receives the bounded
   ten-minute retry. In each Rally Point movement,

@@ -8,6 +8,7 @@ namespace TbotUltra.Desktop.Services;
 public sealed class BuildingTemplateStore
 {
     private readonly string _path;
+    private readonly string? _legacyPath;
     private bool _saveBlockedByLoadFailure;
 
     public string? LastLoadWarning { get; private set; }
@@ -21,35 +22,56 @@ public sealed class BuildingTemplateStore
 
     public BuildingTemplateStore(string projectRoot)
     {
-        _path = Path.Combine(projectRoot, "config", "building_templates.json");
+        _path = Path.Combine(projectRoot, "building_templates", "building_templates.json");
+        _legacyPath = Path.Combine(projectRoot, "config", "building_templates.json");
     }
 
     internal BuildingTemplateStore(string path, bool useExactPath)
     {
-        _path = useExactPath ? path : Path.Combine(path, "config", "building_templates.json");
+        _path = useExactPath ? path : Path.Combine(path, "building_templates", "building_templates.json");
+        _legacyPath = useExactPath ? null : Path.Combine(path, "config", "building_templates.json");
     }
 
     public IReadOnlyList<BuildingTemplate> Load()
     {
         LastLoadWarning = null;
         _saveBlockedByLoadFailure = false;
-        if (!File.Exists(_path))
+        var loadPath = File.Exists(_path)
+            ? _path
+            : _legacyPath is not null && File.Exists(_legacyPath)
+                ? _legacyPath
+                : _path;
+        if (!File.Exists(loadPath))
         {
             return [];
         }
 
         try
         {
-            var raw = File.ReadAllText(_path);
+            var raw = File.ReadAllText(loadPath);
             var file = JsonSerializer.Deserialize<BuildingTemplateFile>(raw, JsonOptions);
-            return Normalize(file?.Templates ?? []);
+            var templates = Normalize(file?.Templates ?? []);
+            if (!string.Equals(loadPath, _path, StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    Save(templates);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    _saveBlockedByLoadFailure = true;
+                    LastLoadWarning =
+                        $"Templates were loaded from the legacy config file, but migration failed ({ex.Message}). The original file was preserved.";
+                }
+            }
+            return templates;
         }
         catch (JsonException ex)
         {
-            var quarantinePath = $"{_path}.corrupt-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmssfff}";
+            var quarantinePath = $"{loadPath}.corrupt-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmssfff}";
             try
             {
-                File.Move(_path, quarantinePath);
+                File.Move(loadPath, quarantinePath);
                 LastLoadWarning =
                     $"The template file contained invalid JSON and was moved to '{Path.GetFileName(quarantinePath)}'.";
                 return [];

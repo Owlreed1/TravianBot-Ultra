@@ -234,20 +234,19 @@
                             Height="28"
                             Margin="0,0,6,0"
                             Click="MoveRowUpButton_Click" />
-                    <Button Content="Top"
-                            Width="54"
-                            Height="28"
-                            Margin="0,0,6,0"
-                            Click="MoveRowTopButton_Click" />
                     <Button Content="Down"
                             Width="62"
                             Height="28"
-                            Margin="0,0,6,0"
                             Click="MoveRowDownButton_Click" />
+                    <Button Content="Top"
+                            Width="54"
+                            Height="28"
+                            Margin="12,0,6,0"
+                            Click="MoveRowTopButton_Click" />
                     <Button Content="Bottom"
                             Width="66"
                             Height="28"
-                            Margin="0,0,6,0"
+                            Margin="0"
                             Click="MoveRowBottomButton_Click" />
                 </StackPanel>
 
@@ -352,7 +351,7 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Action" Width="56">
+                        <DataGridTemplateColumn Header="Action" Width="72">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Button Width="30"

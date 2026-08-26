@@ -54,6 +54,22 @@ public sealed class BuildingTemplateStoreTests
         Assert.Equal(15, loaded[0].Rows[0].Gid);
         Assert.Equal("wood", loaded[0].Rows[1].ResourceScope);
         Assert.Equal(20, loaded[0].Rows[1].TargetLevel);
+        Assert.True(File.Exists(Path.Combine(root, "building_templates", "building_templates.json")));
+    }
+
+    [Fact]
+    public void Load_MigratesLegacyConfigFileWithoutDeletingIt()
+    {
+        var root = TempRoot();
+        var legacyPath = Path.Combine(root, "config", "building_templates.json");
+        new BuildingTemplateStore(legacyPath, useExactPath: true).Save(
+            [new BuildingTemplate { Name = "Legacy", CreatedByTribe = "Gauls" }]);
+
+        var loaded = new BuildingTemplateStore(root).Load();
+
+        Assert.Equal("Legacy", Assert.Single(loaded).Name);
+        Assert.True(File.Exists(legacyPath));
+        Assert.True(File.Exists(Path.Combine(root, "building_templates", "building_templates.json")));
     }
 
     [Fact]
@@ -73,15 +89,15 @@ public sealed class BuildingTemplateStoreTests
     public void Load_CorruptJson_QuarantinesFileBeforeReturningEmpty()
     {
         var root = TempRoot();
-        var config = Path.Combine(root, "config");
-        Directory.CreateDirectory(config);
-        File.WriteAllText(Path.Combine(config, "building_templates.json"), "{broken");
+        var templatesDirectory = Path.Combine(root, "building_templates");
+        Directory.CreateDirectory(templatesDirectory);
+        File.WriteAllText(Path.Combine(templatesDirectory, "building_templates.json"), "{broken");
         var store = new BuildingTemplateStore(root);
 
         Assert.Empty(store.Load());
         Assert.NotNull(store.LastLoadWarning);
-        Assert.False(File.Exists(Path.Combine(config, "building_templates.json")));
-        Assert.Single(Directory.GetFiles(config, "building_templates.json.corrupt-*"));
+        Assert.False(File.Exists(Path.Combine(templatesDirectory, "building_templates.json")));
+        Assert.Single(Directory.GetFiles(templatesDirectory, "building_templates.json.corrupt-*"));
     }
 
     private static string TempRoot()

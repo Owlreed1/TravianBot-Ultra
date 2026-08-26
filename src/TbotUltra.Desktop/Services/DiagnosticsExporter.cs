@@ -12,7 +12,6 @@ internal sealed class DiagnosticsExporter
         "settings.json",
         "servers.user.json",
         "proxies.json",
-        "building_templates.json",
     };
 
     private static readonly HashSet<string> AccountConfigurationFiles = new(StringComparer.OrdinalIgnoreCase)
@@ -139,6 +138,21 @@ internal sealed class DiagnosticsExporter
         CancellationToken cancellationToken)
     {
         var configRoot = Path.Combine(projectRoot, "config");
+        var templatePath = Path.Combine(projectRoot, "building_templates", "building_templates.json");
+        if (!File.Exists(templatePath))
+        {
+            templatePath = Path.Combine(configRoot, "building_templates.json");
+        }
+        if (File.Exists(templatePath))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            WriteSanitizedConfigurationFile(
+                templatePath,
+                Path.Combine("configuration", "global", "building_templates.json"),
+                stagingPath,
+                included);
+        }
+
         if (!Directory.Exists(configRoot))
         {
             missing.Add("Configuration directory not found.");

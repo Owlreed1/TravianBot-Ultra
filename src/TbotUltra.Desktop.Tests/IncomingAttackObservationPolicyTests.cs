@@ -95,4 +95,64 @@ public sealed class IncomingAttackObservationPolicyTests
 
         Assert.False(shouldRead);
     }
+
+    [Fact]
+    public void PendingSignal_WithOnlyArrivedMovements_IsNotKept()
+    {
+        var signal = new IncomingAttackSignal(
+            "BRE",
+            Dorf1ArrivalTimesUtc: [Now.AddMinutes(-2), Now]);
+
+        var shouldKeep = IncomingAttackObservationPolicy.ShouldKeepPendingSignal(
+            signal,
+            hasActiveConfirmedMovements: false,
+            hasConfirmedMovementHistory: false,
+            Now);
+
+        Assert.False(shouldKeep);
+    }
+
+    [Fact]
+    public void LegacyPendingSignal_AfterConfirmedMovementArrived_IsNotKept()
+    {
+        var signal = new IncomingAttackSignal("BRE");
+
+        var shouldKeep = IncomingAttackObservationPolicy.ShouldKeepPendingSignal(
+            signal,
+            hasActiveConfirmedMovements: false,
+            hasConfirmedMovementHistory: true,
+            Now);
+
+        Assert.False(shouldKeep);
+    }
+
+    [Fact]
+    public void PendingSignal_WithFutureArrival_IsKept()
+    {
+        var signal = new IncomingAttackSignal(
+            "BRE",
+            Dorf1ArrivalTimesUtc: [Now.AddMinutes(-1), Now.AddMinutes(1)]);
+
+        var shouldKeep = IncomingAttackObservationPolicy.ShouldKeepPendingSignal(
+            signal,
+            hasActiveConfirmedMovements: false,
+            hasConfirmedMovementHistory: true,
+            Now);
+
+        Assert.True(shouldKeep);
+    }
+
+    [Fact]
+    public void UnconfirmedPendingSignal_WithoutArrivalTime_IsKeptForRetry()
+    {
+        var signal = new IncomingAttackSignal("BRE");
+
+        var shouldKeep = IncomingAttackObservationPolicy.ShouldKeepPendingSignal(
+            signal,
+            hasActiveConfirmedMovements: false,
+            hasConfirmedMovementHistory: false,
+            Now);
+
+        Assert.True(shouldKeep);
+    }
 }

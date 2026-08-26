@@ -64,9 +64,30 @@ public sealed class IncomingAttackStore(string projectRoot, Action<string>? log 
                 : activeAttacks
                     .GroupBy(attack => attack.TargetVillageKey ?? attack.TargetVillageName, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+            var activeAttackKeys = activeAttacks
+                .Select(attack => attack.TargetVillageKey ?? attack.TargetVillageName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var pendingSignals = (file.PendingSignals ?? [])
+                .Where(signal =>
+                {
+                    var key = signal.CoordX.HasValue && signal.CoordY.HasValue
+                        ? $"xy:{signal.CoordX.Value}|{signal.CoordY.Value}"
+                        : signal.VillageName;
+                    return IncomingAttackObservationPolicy.ShouldKeepPendingSignal(
+                        signal,
+                        activeAttackKeys.Contains(key),
+                        confirmedMovementCounts.ContainsKey(key),
+                        nowUtc);
+                })
+                .ToList();
+            var removedPendingCount = (file.PendingSignals?.Count ?? 0) - pendingSignals.Count;
+            if (removedPendingCount > 0)
+            {
+                log?.Invoke($"[incoming-attacks] discarded {removedPendingCount} expired pending warning(s) from snapshot.");
+            }
             return new IncomingAttackPersistedState(
                 activeAttacks,
-                file.PendingSignals ?? [],
+                pendingSignals,
                 confirmedMovementCounts);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)

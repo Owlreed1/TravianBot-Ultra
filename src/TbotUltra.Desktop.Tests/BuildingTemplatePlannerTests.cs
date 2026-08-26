@@ -377,6 +377,51 @@ public sealed class BuildingTemplatePlannerTests
     }
 
     [Fact]
+    public void PlanMissingPrerequisites_BrickyardQueuesOnlyHighestClayPit()
+    {
+        var fields = ResourceFields()
+            .Select(field => field with
+            {
+                Level = field.SlotId switch
+                {
+                    6 => 7,
+                    10 => 5,
+                    _ => field.Level,
+                },
+            })
+            .ToList();
+        var status = Status("Teutons", Building(30, "Main Building", 5, 15)) with
+        {
+            ResourceFields = fields,
+        };
+
+        var prerequisites = _planner.PlanMissingPrerequisites(6, [], status, 1, 5);
+        var resourceOptions = new[]
+        {
+            new BuildingTemplateTargetOption(null, "All Clay Pits", "Resources", "clay", null),
+        };
+        var prerequisiteRows = prerequisites.Rows.Select(row =>
+        {
+            var rowView = BuildingTemplateRowView.From(row, [], resourceOptions);
+            rowView.SetOptionSources([], resourceOptions);
+            return rowView.ToTemplateRow();
+        }).ToList();
+        var result = _planner.Plan(
+            prerequisiteRows.Append(Row(6, "Brickyard", 1)).ToList(),
+            status,
+            1,
+            5);
+
+        Assert.Empty(prerequisites.Blockers);
+        Assert.Equal("highest-single", Assert.Single(prerequisiteRows).ResourceStrategy);
+        var resourceAction = Assert.Single(result.Actions, action => action.TaskName == "upgrade_resource_to_level");
+        Assert.Equal(6, resourceAction.SlotId);
+        Assert.Equal(10, resourceAction.TargetLevel);
+        Assert.Contains(result.Actions, action => action.DisplayName.Contains("Brickyard", StringComparison.OrdinalIgnoreCase));
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
     public void RowView_MissingRequirementOption_IsInvokableButNotDirectlySelectable()
     {
         var available = new BuildingTemplateTargetOption(23, "Cranny", "Infrastructure", null, null);
