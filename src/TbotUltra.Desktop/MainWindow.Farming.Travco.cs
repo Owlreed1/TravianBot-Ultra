@@ -1,4 +1,3 @@
-using System.Windows;
 using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Worker.Domain;
@@ -7,62 +6,74 @@ namespace TbotUltra.Desktop;
 
 public partial class MainWindow
 {
-    private TravcoToolsWindow? _travcoToolsWindow;
+    private TravcoToolsControl? _travcoToolsControl;
     private bool _travcoResumeContinuous;
     private bool _travcoResumeQueue;
     private bool _travcoSuppressRestart;
+    private bool _travcoSessionActive;
+    private bool _travcoBrowserTabOpen;
 
-    private async void TravcoInactiveSearchButton_Click(object sender, RoutedEventArgs e)
-        => await GuardUiAsync(TravcoInactiveSearchButtonClickAsync);
-
-    private async Task TravcoInactiveSearchButtonClickAsync()
+    private void InitializeTravcoTools()
     {
-        if (BlockIfSessionSleeping("Travco inactive search"))
+        var control = new TravcoToolsControl(
+            _travcoListStore,
+            _allVillagesImportSettingsStore,
+            GetTravcoVillages(),
+            AppendLog)
+        {
+            VillagesRequested = GetTravcoVillages,
+            SearchRequested = async (request, progress, cancellationToken) =>
+            {
+                await BeginTravcoSessionAsync();
+                return await RunTravcoSearchAsync(request, progress, cancellationToken);
+            },
+            ScrapeAllPagesRequested = (progress, cancellationToken) =>
+                RunManualOperationAsync(
+                    "Save All Travco Pages",
+                    token => _botService.ScrapeAllTravcoPagesAsync(AppendLog, progress, token),
+                    cancellationToken),
+            MapOasisScanRequested = async (request, progress, cancellationToken) =>
+            {
+                await BeginTravcoSessionAsync();
+                return await RunMapOasisScanAsync(request, progress, cancellationToken);
+            },
+            AddAllVillagesRequested = async (request, progress, cancellationToken) =>
+            {
+                await BeginTravcoSessionAsync();
+                return await RunAllVillagesImportAsync(request, progress, cancellationToken);
+            },
+            CloseRequested = CloseTravcoSessionAsync,
+        };
+        _travcoToolsControl = control;
+        FarmingPanelControl.TravcoWorkspaceHost.Content = control;
+        UpdateTravcoSessionUi();
+    }
+
+    private async Task BeginTravcoSessionAsync()
+    {
+        if (_travcoSessionActive)
         {
             return;
         }
 
-        if (_travcoToolsWindow is { IsVisible: true })
+        if (BlockIfSessionSleeping("Travco analysis"))
         {
-            _travcoToolsWindow.Activate();
-            return;
+            throw new InvalidOperationException("Travco analysis is unavailable while the session is sleeping.");
         }
 
         if (!_isLoggedIn)
         {
-            AppendLog("Travco inactive search requires an active Travian login.");
-            return;
-        }
-
-        var options = LoadBotOptions();
-        var villages = GetTravcoVillages();
-        if (villages.Count == 0)
-        {
-            AppendLog("Village coordinates are unavailable. Scan villages or refresh village status first.");
-            return;
+            throw new InvalidOperationException("Travco analysis requires an active Travian login.");
         }
 
         _travcoResumeContinuous = IsContinuousLoopRunning();
         _travcoResumeQueue = _autoQueueRunning && !_travcoResumeContinuous;
         _travcoSuppressRestart = false;
         await PauseAutomationForTravcoAsync();
-
-        var window = new TravcoToolsWindow(_travcoListStore, _allVillagesImportSettingsStore, villages, AppendLog)
-        {
-            Owner = this,
-            SearchRequested = RunTravcoSearchAsync,
-            ScrapeAllPagesRequested = (progress, cancellationToken) =>
-                RunManualOperationAsync(
-                    "Save All Travco Pages",
-                    token => _botService.ScrapeAllTravcoPagesAsync(AppendLog, progress, token),
-                    cancellationToken),
-            MapOasisScanRequested = RunMapOasisScanAsync,
-            AddAllVillagesRequested = RunAllVillagesImportAsync,
-            CloseRequested = () => _botService.CloseTravcoTabAsync(AppendLog),
-        };
-        window.Closed += TravcoToolsWindow_Closed;
-        _travcoToolsWindow = window;
-        window.Show();
+        _travcoSessionActive = true;
+        _travcoBrowserTabOpen = false;
+        UpdateTravcoSessionUi();
+        AppendLog("[travco] analysis session started; automation is paused until the session is explicitly finished.");
     }
 
     private async Task<MapSqlVillageImportResult> RunAllVillagesImportAsync(
@@ -84,18 +95,12 @@ public partial class MainWindow
         var options = LoadBotOptions();
         AppendLog(
             $"[travco-ui] analyze requested: coordinates=({request.X}|{request.Y}), days={request.DaysInactive}, order={request.OrderBy}.");
-        if (IsContinuousLoopRunning() || _autoQueueRunning)
-        {
-            _travcoResumeContinuous = IsContinuousLoopRunning();
-            _travcoResumeQueue = _autoQueueRunning && !_travcoResumeContinuous;
-            _travcoSuppressRestart = false;
-            await PauseAutomationForTravcoAsync();
-        }
-
         return await RunManualOperationAsync(
             "Analyze Travco",
             async token =>
             {
+                _travcoBrowserTabOpen = true;
+                UpdateTravcoSessionUi();
                 await _botService.OpenTravcoAndSearchAsync(options, request, AppendLog, progress, token);
                 progress.Report(new TravcoSearchProgress(4, 5, "Reading inactive villages..."));
                 var result = await _botService.ScrapeTravcoPageAsync(AppendLog, token);
@@ -196,17 +201,44 @@ public partial class MainWindow
             ?? [];
     }
 
-    private async void TravcoToolsWindow_Closed(object? sender, EventArgs e)
-        => await GuardUiAsync(() => TravcoToolsWindowClosedAsync(sender, e));
-
-    private async Task TravcoToolsWindowClosedAsync(object? sender, EventArgs e)
+    private async Task CloseTravcoSessionAsync()
     {
-        if (sender is TravcoToolsWindow window)
+        if (!_travcoSessionActive)
         {
-            window.Closed -= TravcoToolsWindow_Closed;
+            return;
         }
 
-        _travcoToolsWindow = null;
+        if (_travcoBrowserTabOpen)
+        {
+            await _botService.CloseTravcoTabAsync(AppendLog);
+        }
+
+        _travcoBrowserTabOpen = false;
+        _travcoSessionActive = false;
+        UpdateTravcoSessionUi();
+        await ResumeAutomationAfterTravcoAsync();
+    }
+
+    private void UpdateTravcoSessionUi()
+    {
+        _travcoToolsControl?.SetSessionState(_travcoSessionActive, _travcoBrowserTabOpen);
+        TravcoSessionAttentionBorder.Visibility = _travcoSessionActive ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+        GlobalCloseTravcoTabButton.Content = _travcoBrowserTabOpen ? "Close Travco tab" : "Finish Travco session";
+        GlobalCloseTravcoTabButton.ToolTip = _travcoBrowserTabOpen
+            ? "Close the Travco browser tab and resume paused automation."
+            : "Finish the Travco analysis session and resume paused automation.";
+    }
+
+    private async void GlobalCloseTravcoTabButton_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (_travcoToolsControl is not null)
+        {
+            await _travcoToolsControl.RequestCloseSessionAsync();
+        }
+    }
+
+    private async Task ResumeAutomationAfterTravcoAsync()
+    {
         if (_travcoSuppressRestart || _loopController.IsClosing || !_isLoggedIn)
         {
             _travcoResumeContinuous = false;

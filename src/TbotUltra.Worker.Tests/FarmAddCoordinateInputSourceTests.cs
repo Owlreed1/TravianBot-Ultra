@@ -44,7 +44,8 @@ public sealed class FarmAddCoordinateInputSourceTests
             "Farming",
             "TravianClient.FarmAdd.cs"));
 
-        Assert.Contains("reuseAfterInvalidCoordinates: reuseOpenFormAfterInvalidCoordinates", source, StringComparison.Ordinal);
+        Assert.Contains("var reuseAfterInvalidCoordinates = reuseOpenFormAfterInvalidCoordinates", source, StringComparison.Ordinal);
+        Assert.Contains("reuseAfterInvalidCoordinates: reuseAfterInvalidCoordinates", source, StringComparison.Ordinal);
         Assert.Contains("if (!reuseAfterInvalidCoordinates)", source, StringComparison.Ordinal);
 
         var invalidOutcome = source.IndexOf("saveOutcome == AddRaidSaveOutcome.InvalidCoordinates", StringComparison.Ordinal);
@@ -63,5 +64,32 @@ public sealed class FarmAddCoordinateInputSourceTests
             "The initial settle must run only inside the normal pacing branch.");
         Assert.True(clickPacing > pacingBranch && clickPacing < fillCoordinates,
             "Click pacing must run only inside the normal pacing branch.");
+    }
+
+    [Fact]
+    public void LookupTimeout_RetriesSameCoordinateBeforeReportingFailure()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            ProjectRootLocator.FindProjectRoot(),
+            "src",
+            "TbotUltra.Worker",
+            "Services",
+            "Automation",
+            "Farming",
+            "TravianClient.FarmAdd.cs"));
+
+        Assert.Contains("AddRaidSaveOutcome.LookupTimedOut", source, StringComparison.Ordinal);
+        Assert.Contains("Retrying Add target lookup", source, StringComparison.Ordinal);
+
+        var retryLoop = source.IndexOf("for (var lookupAttempt = 1; lookupAttempt <= AddTargetLookupMaxAttempts; lookupAttempt++)", StringComparison.Ordinal);
+        var firstAttempt = source.IndexOf("saveOutcome = await TryFillAddRaidFormAndSaveAsync", retryLoop, StringComparison.Ordinal);
+        var retryCheck = source.IndexOf("saveOutcome != AddRaidSaveOutcome.LookupTimedOut", firstAttempt, StringComparison.Ordinal);
+        var reopenForm = source.IndexOf("await OpenAddRaidFormAsync(lid, cancellationToken);", retryCheck, StringComparison.Ordinal);
+        var failedOutcome = source.IndexOf("Failed to validate farm", reopenForm, StringComparison.Ordinal);
+
+        Assert.True(retryLoop >= 0 && firstAttempt > retryLoop && retryCheck > firstAttempt);
+        Assert.True(reopenForm > retryCheck);
+        Assert.True(failedOutcome > reopenForm, "Failure must be reported only after the bounded retry.");
+        Assert.Contains("Save was not attempted", source[failedOutcome..], StringComparison.Ordinal);
     }
 }

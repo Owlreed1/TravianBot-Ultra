@@ -27,7 +27,7 @@ public partial class FarmingPanel : UserControl
     internal CheckBox DeactivateOasisLossesOption => DeactivateFarmOasisLossesCheckBox;
     internal CheckBox MoveLossesOption => MoveFarmLossesCheckBox;
     internal ComboBox LossDestinationOption => FarmLossDestinationComboBox;
-    internal Button TravcoSearchButton => TravcoInactiveSearchButton;
+    internal ContentControl TravcoWorkspaceHost => TravcoToolsHost;
 
     public string NextSendDisplay
     {

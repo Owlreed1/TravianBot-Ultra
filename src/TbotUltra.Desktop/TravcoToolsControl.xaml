@@ -1,0 +1,257 @@
+<UserControl x:Class="TbotUltra.Desktop.TravcoToolsControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:TbotUltra.Desktop.Views"
+             Background="{DynamicResource AppBackgroundBrush}">
+    <Grid>
+        <Grid Margin="14">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="0,0,0,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Inactive villages &amp; oasis scan"
+                                   FontSize="22"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="Collect targets, review saved lists and calculate travel distance in one workspace."
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSubtleBrush}"
+                                   Margin="0,3,0,0" />
+                    </StackPanel>
+                    <Border Grid.Column="1"
+                            Padding="10,5"
+                            VerticalAlignment="Center"
+                            Background="{DynamicResource InfoBgBrush}"
+                            BorderBrush="{DynamicResource FocusBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12">
+                        <TextBlock x:Name="SessionStateTextBlock"
+                                   Text="Browser session starts when needed"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource InfoTextStrongBrush}" />
+                    </Border>
+                </Grid>
+
+                <Grid Grid.Row="1" Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Padding="12,10" CornerRadius="8"
+                            Background="{DynamicResource PurpleBgBrush}"
+                            BorderBrush="{DynamicResource PurpleBorderBrush}" BorderThickness="1">
+                        <Grid>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                            <TextBlock Text="Server map" FontWeight="SemiBold" Foreground="{DynamicResource PurpleTextBrush}" />
+                            <TextBlock Grid.Row="1" Text="Import villages and players from map.sql into a reusable list."
+                                       TextWrapping="Wrap" Margin="0,3,0,8" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <Button x:Name="AddAllVillagesButton" Grid.Row="2" HorizontalAlignment="Left"
+                                    Content="Map SQL scan" FontWeight="SemiBold"
+                                    Background="{DynamicResource PurpleBgBrush}" BorderBrush="{DynamicResource PurpleBorderBrush}"
+                                    Foreground="{DynamicResource PurpleTextBrush}" Click="AddAllVillagesButton_Click" />
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Column="2" Padding="12,10" CornerRadius="8"
+                            Background="{DynamicResource SuccessBgBrush}"
+                            BorderBrush="{DynamicResource SuccessBorderBrush}" BorderThickness="1">
+                        <Grid>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                            <TextBlock Text="Inactive villages" FontWeight="SemiBold" Foreground="{DynamicResource SuccessTextBrush}" />
+                            <TextBlock Grid.Row="1" Text="Analyze Travco activity and save every result page as one list."
+                                       TextWrapping="Wrap" Margin="0,3,0,8" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <Button x:Name="InactiveSearchButton" Grid.Row="2" HorizontalAlignment="Left"
+                                    Content="Analyze Travco" FontWeight="SemiBold"
+                                    Background="{DynamicResource SuccessBgBrush}" BorderBrush="{DynamicResource SuccessBorderBrush}"
+                                    Foreground="{DynamicResource SuccessTextBrush}" Click="InactiveSearchButton_Click" />
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Column="4" Padding="12,10" CornerRadius="8"
+                            Background="{DynamicResource InfoBgBrush}"
+                            BorderBrush="{DynamicResource FocusBorderBrush}" BorderThickness="1">
+                        <Grid>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                            <TextBlock Text="Map oases" FontWeight="SemiBold" Foreground="{DynamicResource InfoTextStrongBrush}" />
+                            <TextBlock Grid.Row="1" Text="Scan a chosen area for free and occupied oasis targets."
+                                       TextWrapping="Wrap" Margin="0,3,0,8" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <Button x:Name="AnalyzeMapOasisButton" Grid.Row="2" HorizontalAlignment="Left"
+                                    Content="Analyze map oasis" FontWeight="SemiBold"
+                                    Background="{DynamicResource InfoBgBrush}" BorderBrush="{DynamicResource FocusBorderBrush}"
+                                    Foreground="{DynamicResource InfoTextBrush}" Click="AnalyzeMapOasisButton_Click" />
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="360" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="10">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Saved lists"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Margin="0,0,0,8" />
+                        <DataGrid x:Name="SavedListsListBox"
+                                  Grid.Row="1"
+                                  ItemsSource="{Binding SavedLists}"
+                                  SelectedItem="{Binding SelectedSavedList}"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  IsReadOnly="True"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Name" Width="*" MinWidth="90" Binding="{Binding Name}" />
+                                <DataGridTextColumn Header="Saved date" Width="145" Binding="{Binding SavedDateText}" />
+                                <DataGridTextColumn Header="Villages" Width="75" Binding="{Binding VillageCount}" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <StackPanel x:Name="EditNamePanel"
+                                    Grid.Row="2"
+                                    Visibility="Collapsed"
+                                    Margin="0,10,0,0">
+                            <TextBlock Text="List name"
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       Margin="0,0,0,4" />
+                            <TextBox x:Name="ListNameTextBox"
+                                     VerticalContentAlignment="Center"
+                                     Text="{Binding ListName, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                        <Grid Grid.Row="3" Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="Open" Click="OpenListButton_Click" />
+                            <Button Grid.Column="1" Margin="6,0,0,0" Content="Edit" Click="EditListButton_Click" />
+                            <Button x:Name="SaveEditedListButton"
+                                    Grid.Column="2"
+                                    Margin="6,0,0,0"
+                                    Content="Save"
+                                    IsEnabled="False"
+                                    Click="SaveEditedListButton_Click" />
+                            <Button Grid.Column="3" Margin="6,0,0,0" Content="Delete" Click="DeleteListButton_Click" />
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="8">
+                    <DataGrid x:Name="ResultsDataGrid"
+                              ItemsSource="{Binding Rows}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              IsReadOnly="False"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal"
+                              SelectionMode="Extended">
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn x:Name="UseColumn"
+                                                    IsReadOnly="True"
+                                                    Header="Use"
+                                                    Width="52"
+                                                    Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <DataGridTextColumn x:Name="DistanceColumn" Header="Distance" Width="90" IsReadOnly="True" Binding="{Binding Distance, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                            <DataGridTextColumn x:Name="AccountColumn" Header="Account" Width="*" MinWidth="150" IsReadOnly="True" Binding="{Binding Account, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                            <DataGridTextColumn x:Name="VillageColumn" Header="Village" Width="*" MinWidth="150" IsReadOnly="True" Binding="{Binding Village, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                            <DataGridTextColumn x:Name="PopColumn" Header="Pop" Width="90" IsReadOnly="True" Binding="{Binding Pop, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                            <DataGridTextColumn x:Name="CoordinatesColumn" Header="Coordinates" Width="110" IsReadOnly="True" Binding="{Binding Coordinates, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+            </Grid>
+
+            <Grid Grid.Row="2" Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="{Binding StatusText}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,0,18,0" />
+                <Button x:Name="CalculateDistanceButton"
+                        Grid.Column="1"
+                        Content="Calculate distance"
+                        Click="CalculateDistanceButton_Click" />
+                <ComboBox x:Name="DistanceVillageComboBox"
+                          Grid.Column="2"
+                          Width="220"
+                          Margin="8,0,0,0"
+                          VerticalAlignment="Center"
+                          ToolTip="Village the distances in the lists are measured from."
+                          ItemsSource="{Binding Villages}"
+                          SelectedItem="{Binding SelectedVillage}"
+                          DisplayMemberPath="NameWithCoords" />
+                <Border x:Name="CloseTravcoTabAttentionBorder"
+                        Grid.Column="3"
+                        Margin="12,0,0,0"
+                        Visibility="Collapsed"
+                        Style="{StaticResource TravcoAttentionRingStyle}">
+                    <Button x:Name="CloseTravcoTabButton"
+                            MinWidth="132"
+                            Content="Finish session"
+                            Background="{DynamicResource SuccessBgBrush}"
+                            BorderBrush="{DynamicResource SuccessBorderBrush}"
+                            Foreground="{DynamicResource SuccessTextBrush}"
+                            Click="CloseTravcoTabButton_Click" />
+                </Border>
+            </Grid>
+        </Grid>
+
+        <views:BusyOverlayControl x:Name="BusyOverlay"
+                                  ShowCancel="False"
+                                  Cancelled="BusyOverlay_Cancelled"
+                                  Title="Travco inactive search"
+                                  Text="Searching Travco..." />
+    </Grid>
+</UserControl>

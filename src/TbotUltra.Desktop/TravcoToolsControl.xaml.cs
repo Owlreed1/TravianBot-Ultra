@@ -8,17 +8,17 @@ using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Desktop;
 
-public partial class TravcoToolsWindow : Window
+public partial class TravcoToolsControl : UserControl
 {
     private readonly TravcoListStore _store;
     private readonly AllVillagesImportSettingsStore _allVillagesSettingsStore;
     private readonly Action<string>? _log;
-    private readonly CancellationTokenSource _windowCts = new();
+    private readonly CancellationTokenSource _lifetimeCts = new();
     private readonly TravcoToolsViewModel _viewModel = new();
     private CancellationTokenSource? _activeOperationCts;
     private Guid? _openedSavedListId;
-    private bool _allowClose;
-    private bool _closeInProgress;
+    private bool _sessionActive;
+    private bool _browserTabOpen;
     private bool _busy;
     private bool _editMode;
 
@@ -27,8 +27,9 @@ public partial class TravcoToolsWindow : Window
     public Func<MapOasisScanRequest, IProgress<MapOasisScanProgress>, CancellationToken, Task<List<OasisInfo>>>? MapOasisScanRequested { get; init; }
     public Func<MapSqlVillageImportRequest, IProgress<MapSqlVillageImportProgress>, CancellationToken, Task<MapSqlVillageImportResult>>? AddAllVillagesRequested { get; init; }
     public Func<Task>? CloseRequested { get; init; }
+    public Func<IReadOnlyList<VillageSelectionItem>>? VillagesRequested { get; init; }
 
-    public TravcoToolsWindow(
+    public TravcoToolsControl(
         TravcoListStore store,
         AllVillagesImportSettingsStore allVillagesSettingsStore,
         IReadOnlyList<VillageSelectionItem> villages,
@@ -38,37 +39,70 @@ public partial class TravcoToolsWindow : Window
         _allVillagesSettingsStore = allVillagesSettingsStore;
         _log = log;
         InitializeComponent();
-        ThemeChrome.EnableEarlyDarkTitleBar(this);
         DataContext = _viewModel;
+        UpdateVillages(villages);
+        ReloadSavedLists();
+        SetSessionState(active: false, browserTabOpen: false);
+        SetBusy(false);
+    }
+
+    public void StopForShutdown()
+    {
+        _lifetimeCts.Cancel();
+    }
+
+    public void UpdateVillages(IReadOnlyList<VillageSelectionItem> villages)
+    {
+        var selectedCoordinates = _viewModel.SelectedVillage is { CoordX: { } x, CoordY: { } y }
+            ? (x, y)
+            : ((int X, int Y)?)null;
+        _viewModel.Villages.Clear();
         foreach (var village in villages)
         {
             _viewModel.Villages.Add(village);
         }
 
-        _viewModel.SelectedVillage = villages.FirstOrDefault(village => village.IsCapital) ?? villages.FirstOrDefault();
-        Closing += TravcoToolsWindow_Closing;
-        ReloadSavedLists();
-        SetBusy(false);
+        _viewModel.SelectedVillage = selectedCoordinates is { } coordinates
+            ? villages.FirstOrDefault(village => village.CoordX == coordinates.X && village.CoordY == coordinates.Y)
+            : null;
+        _viewModel.SelectedVillage ??= villages.FirstOrDefault(village => village.IsCapital) ?? villages.FirstOrDefault();
     }
 
-    public void CloseForShutdown()
+    public void SetSessionState(bool active, bool browserTabOpen)
     {
-        _allowClose = true;
-        _windowCts.Cancel();
-        Close();
+        _sessionActive = active;
+        _browserTabOpen = active && browserTabOpen;
+        SessionStateTextBlock.Text = _browserTabOpen
+            ? "Travco tab open · automation paused"
+            : active
+                ? "Analysis session active · automation paused"
+                : "Browser session starts when needed";
+        CloseTravcoTabButton.Content = _browserTabOpen ? "Close Travco tab" : "Finish session";
+        CloseTravcoTabButton.IsEnabled = active && !_busy;
+        CloseTravcoTabAttentionBorder.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    protected override void OnClosed(EventArgs e)
+    internal Task RequestCloseSessionAsync() => CloseTravcoSessionAsync();
+
+    private bool RefreshVillages()
     {
-        Closing -= TravcoToolsWindow_Closing;
-        _windowCts.Cancel();
-        _windowCts.Dispose();
-        base.OnClosed(e);
+        if (VillagesRequested is not null)
+        {
+            UpdateVillages(VillagesRequested());
+        }
+
+        if (_viewModel.Villages.Count > 0)
+        {
+            return true;
+        }
+
+        SetStatus("Village coordinates are unavailable. Scan villages or refresh village status first.");
+        return false;
     }
 
     private void InactiveSearchButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_busy || SearchRequested is null || ScrapeAllPagesRequested is null)
+        if (_busy || SearchRequested is null || ScrapeAllPagesRequested is null || !RefreshVillages())
         {
             return;
         }
@@ -82,9 +116,9 @@ public partial class TravcoToolsWindow : Window
             SearchRequested,
             ScrapeAllPagesRequested,
             _log,
-            _windowCts.Token)
+            _lifetimeCts.Token)
         {
-            Owner = this,
+            Owner = Window.GetWindow(this),
         };
         analyze.ShowDialog();
         if (analyze.ListSaved)
@@ -146,7 +180,7 @@ public partial class TravcoToolsWindow : Window
         });
 
         var result = AppDialog.ShowCustomContent(
-            this,
+            Window.GetWindow(this),
             content,
             "Add all villages",
             [("Add villages", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
@@ -189,7 +223,7 @@ public partial class TravcoToolsWindow : Window
         }
 
         SetBusy(true);
-        using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(_windowCts.Token);
+        using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token);
         _activeOperationCts = operationCts;
         BusyOverlay.ShowCancel = true;
         BusyOverlay.IsIndeterminate = true;
@@ -243,9 +277,14 @@ public partial class TravcoToolsWindow : Window
 
     private void AnalyzeMapOasisButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_busy || !RefreshVillages())
+        {
+            return;
+        }
+
         var settings = new MapOasisSettingsWindow(_viewModel.Villages, _viewModel.SelectedVillage)
         {
-            Owner = this,
+            Owner = Window.GetWindow(this),
         };
         if (settings.ShowDialog() != true || settings.Request is null)
         {
@@ -257,6 +296,7 @@ public partial class TravcoToolsWindow : Window
 
     private void CalculateDistanceButton_Click(object sender, RoutedEventArgs e)
     {
+        RefreshVillages();
         CalculateDistancesFromSelectedVillage();
     }
 
@@ -344,7 +384,7 @@ public partial class TravcoToolsWindow : Window
         }
 
         SetBusy(true);
-        using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(_windowCts.Token);
+        using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token);
         _activeOperationCts = operationCts;
         BusyOverlay.ShowCancel = true;
         BusyOverlay.Show("Analyze map oasis", "0% - preparing map scan...");
@@ -515,7 +555,7 @@ public partial class TravcoToolsWindow : Window
         }
 
         var result = AppDialog.ShowCustom(
-            this,
+            Window.GetWindow(this),
             $"Delete the saved list '{selected.Name}'?",
             "Delete Travco list",
             [("Delete", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
@@ -538,10 +578,8 @@ public partial class TravcoToolsWindow : Window
         SetStatus($"Deleted '{selected.Name}'.");
     }
 
-    private void CloseButton_Click(object sender, RoutedEventArgs e)
-    {
-        Close();
-    }
+    private async void CloseTravcoTabButton_Click(object sender, RoutedEventArgs e)
+        => await AsyncUi.GuardAsync(CloseTravcoSessionAsync, SetStatus);
 
     private void ApplyRows(IEnumerable<TravcoListRow> rows)
     {
@@ -718,27 +756,23 @@ public partial class TravcoToolsWindow : Window
             : _viewModel.SavedLists.FirstOrDefault(list => list.Id == desiredId.Value);
     }
 
-    private async void TravcoToolsWindow_Closing(object? sender, CancelEventArgs e)
-        => await AsyncUi.GuardAsync(() => TravcoToolsWindowClosingAsync(sender, e), SetStatus);
-
-    private async Task TravcoToolsWindowClosingAsync(object? sender, CancelEventArgs e)
+    private async Task CloseTravcoSessionAsync()
     {
-        if (_allowClose)
+        if (_busy || !_sessionActive)
         {
             return;
         }
 
-        e.Cancel = true;
-        if (_closeInProgress)
-        {
-            return;
-        }
-
+        var message = _browserTabOpen
+            ? "Close the Travco browser tab and resume the automation that was paused for this session?"
+            : "Finish this analysis session and resume the automation that was paused?";
+        var title = _browserTabOpen ? "Close Travco tab" : "Finish analysis session";
+        var confirmLabel = _browserTabOpen ? "Close tab" : "Finish session";
         var result = AppDialog.ShowCustom(
-            this,
-            "Close Travco tools and its browser tab?",
-            "Close Travco tools",
-            [("Yes", MessageBoxResult.Yes), ("No", MessageBoxResult.No)],
+            Window.GetWindow(this),
+            message,
+            title,
+            [(confirmLabel, MessageBoxResult.Yes), ("Keep open", MessageBoxResult.No)],
             MessageBoxImage.Question,
             MessageBoxResult.No,
             MessageBoxResult.No,
@@ -748,14 +782,19 @@ public partial class TravcoToolsWindow : Window
             return;
         }
 
-        _closeInProgress = true;
-        _windowCts.Cancel();
+        SetBusy(true);
         try
         {
             if (CloseRequested is not null)
             {
                 await CloseRequested();
             }
+
+            var completionMessage = _browserTabOpen
+                ? "Travco browser tab closed. Paused automation resumed."
+                : "Analysis session finished. Paused automation resumed.";
+            SetSessionState(active: false, browserTabOpen: false);
+            SetStatus(completionMessage);
         }
         catch (Exception ex)
         {
@@ -763,8 +802,7 @@ public partial class TravcoToolsWindow : Window
         }
         finally
         {
-            _allowClose = true;
-            await Dispatcher.InvokeAsync(Close, System.Windows.Threading.DispatcherPriority.Background);
+            SetBusy(false);
         }
     }
 
@@ -779,6 +817,7 @@ public partial class TravcoToolsWindow : Window
         SavedListsListBox.IsEnabled = !busy;
         ResultsDataGrid.IsEnabled = !busy;
         SaveEditedListButton.IsEnabled = !busy && _editMode;
+        CloseTravcoTabButton.IsEnabled = !busy && _sessionActive;
     }
 
     private void SetStatus(string message)

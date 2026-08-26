@@ -6,6 +6,8 @@ namespace TbotUltra.Worker.Services;
 
 public sealed partial class TravianClient
 {
+    private const int AddTargetLookupMaxAttempts = 2;
+
     public async Task<FarmAddBatchResult> AddFarmsFromCoordinatesAsync(
         string farmListName,
         string troopType,
@@ -158,17 +160,35 @@ public sealed partial class TravianClient
             AddRaidSaveOutcome saveOutcome;
             try
             {
-                saveOutcome = await TryFillAddRaidFormAndSaveAsync(
-                    farmListName,
-                    troopType.Trim(),
-                    troopCount,
-                    coordinate.X,
-                    coordinate.Y,
-                    lid,
-                    useDefaultTroops,
-                    coordinate.RequireUnoccupiedOasis,
-                    reuseAfterInvalidCoordinates: reuseOpenFormAfterInvalidCoordinates,
-                    cancellationToken);
+                var reuseAfterInvalidCoordinates = reuseOpenFormAfterInvalidCoordinates;
+                saveOutcome = AddRaidSaveOutcome.Failed;
+                for (var lookupAttempt = 1; lookupAttempt <= AddTargetLookupMaxAttempts; lookupAttempt++)
+                {
+                    saveOutcome = await TryFillAddRaidFormAndSaveAsync(
+                        farmListName,
+                        troopType.Trim(),
+                        troopCount,
+                        coordinate.X,
+                        coordinate.Y,
+                        lid,
+                        useDefaultTroops,
+                        coordinate.RequireUnoccupiedOasis,
+                        reuseAfterInvalidCoordinates: reuseAfterInvalidCoordinates,
+                        cancellationToken);
+                    if (saveOutcome != AddRaidSaveOutcome.LookupTimedOut || lookupAttempt >= AddTargetLookupMaxAttempts)
+                    {
+                        break;
+                    }
+
+                    Notify(
+                        $"{stepPrefix} Retrying Add target lookup for ({coordinate.X}|{coordinate.Y}) " +
+                        $"after Travian left the form unresolved (attempt {lookupAttempt + 1}/{AddTargetLookupMaxAttempts}).");
+                    await DismissAddTargetDialogAsync($"retrying unresolved lookup for ({coordinate.X}|{coordinate.Y})");
+                    await Task.Delay(Random.Shared.Next(1200, 2500), cancellationToken);
+                    await OpenAddRaidFormAsync(lid, cancellationToken);
+                    reuseAfterInvalidCoordinates = false;
+                }
+
                 consecutiveFillExceptions = 0;
             }
             catch (OperationCanceledException)
@@ -239,6 +259,18 @@ public sealed partial class TravianClient
                 progress?.Report(new FarmAddProgress(farmListName, attempted, targetAddedCount, added, notFound, OccupiedOasisSkippedCount: occupiedSkipped));
                 // Keep the open form and type the next coordinate straight into it.
                 reuseOpenForm = true;
+                continue;
+            }
+
+            if (saveOutcome == AddRaidSaveOutcome.LookupTimedOut)
+            {
+                failed++;
+                Notify(
+                    $"{stepPrefix} Failed to validate farm ({coordinate.X}|{coordinate.Y}) in '{farmListName}' " +
+                    $"after {AddTargetLookupMaxAttempts} attempts because Travian left the Add target form unresolved; " +
+                    "Save was not attempted.");
+                progress?.Report(new FarmAddProgress(farmListName, attempted, targetAddedCount, added, notFound, OccupiedOasisSkippedCount: occupiedSkipped));
+                await DismissAddTargetDialogAsync($"unresolved lookup for ({coordinate.X}|{coordinate.Y})");
                 continue;
             }
 
@@ -531,7 +563,7 @@ public sealed partial class TravianClient
         catch (TimeoutException)
         {
             Notify($"[farm-list] Add target form did not become ready for ({x}|{y}) in '{farmListName}'.");
-            return AddRaidSaveOutcome.Failed;
+            return AddRaidSaveOutcome.LookupTimedOut;
         }
 
         var invalidCoordinates = await _page.EvaluateAsync<bool>(
@@ -974,5 +1006,6 @@ public sealed partial class TravianClient
         InvalidCoordinates = 3,
         OccupiedOasisSkipped = 4,
         AlreadyInListFormOpen = 5,
+        LookupTimedOut = 6,
     }
 }

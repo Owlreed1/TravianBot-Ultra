@@ -134,12 +134,49 @@ public sealed class PanelSmokeTests
         {
             var panel = new FarmingPanel();
             var tabs = Assert.IsType<TabControl>(panel.FindName("FarmingTabControl"));
-            var inactiveButton = Assert.IsType<Button>(panel.FindName("TravcoInactiveSearchButton"));
+            var travcoHost = Assert.IsType<ContentControl>(panel.FindName("TravcoToolsHost"));
 
             Assert.Equal(
                 new[] { "Farming", "Inactive / oasis scan" },
                 tabs.Items.Cast<TabItem>().Select(item => item.Header?.ToString() ?? string.Empty).ToArray());
-            Assert.Equal("Inactive / oasis analysis", inactiveButton.Content);
+            Assert.Null(travcoHost.Content);
+            Assert.Null(panel.FindName("TravcoInactiveSearchButton"));
+        });
+    }
+
+    [Fact]
+    public void TravcoToolsControl_RendersCompleteInlineWorkspace()
+    {
+        _wpf.Run(() =>
+        {
+            var root = Path.GetTempPath();
+            var control = new TravcoToolsControl(
+                new TravcoListStore(root, () => "smoke-account"),
+                new AllVillagesImportSettingsStore(root, () => "smoke-account", () => "https://example.invalid"),
+                [new VillageSelectionItem { Name = "Capital", CoordX = 10, CoordY = -20, IsCapital = true }],
+                log: null);
+
+            control.Measure(new Size(1280, 800));
+            control.Arrange(new Rect(0, 0, 1280, 800));
+            control.UpdateLayout();
+
+            Assert.IsType<Button>(control.FindName("AddAllVillagesButton"));
+            Assert.IsType<Button>(control.FindName("InactiveSearchButton"));
+            Assert.IsType<Button>(control.FindName("AnalyzeMapOasisButton"));
+            Assert.IsType<DataGrid>(control.FindName("SavedListsListBox"));
+            Assert.IsType<DataGrid>(control.FindName("ResultsDataGrid"));
+            var finishButton = Assert.IsType<Button>(control.FindName("CloseTravcoTabButton"));
+            var finishAttention = Assert.IsType<Border>(control.FindName("CloseTravcoTabAttentionBorder"));
+            Assert.False(finishButton.IsEnabled);
+            Assert.Equal(Visibility.Collapsed, finishAttention.Visibility);
+
+            control.SetSessionState(active: true, browserTabOpen: false);
+            Assert.True(finishButton.IsEnabled);
+            Assert.Equal("Finish session", finishButton.Content);
+            Assert.Equal(Visibility.Visible, finishAttention.Visibility);
+
+            control.SetSessionState(active: true, browserTabOpen: true);
+            Assert.Equal("Close Travco tab", finishButton.Content);
         });
     }
 

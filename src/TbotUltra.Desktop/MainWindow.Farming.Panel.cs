@@ -16,6 +16,4 @@ public partial class MainWindow
     private System.Windows.Controls.CheckBox DeactivateFarmOasisLossesCheckBox => FarmingPanelControl.DeactivateOasisLossesOption;
     private System.Windows.Controls.CheckBox MoveFarmLossesCheckBox => FarmingPanelControl.MoveLossesOption;
     private System.Windows.Controls.ComboBox FarmLossDestinationComboBox => FarmingPanelControl.LossDestinationOption;
-    private System.Windows.Controls.Button TravcoInactiveSearchButton => FarmingPanelControl.TravcoSearchButton;
-
 }

@@ -20,6 +20,23 @@ public sealed class BonusVideoMuteSourceTests
     }
 
     [Fact]
+    public void MuteSupportsDirectAutoplayVideoWithoutRemovingLegacyAudioButtonSupport()
+    {
+        var method = ReadMethod("Hero", "TravianClient.AdventureDanger.cs", "MuteBonusVideoAsync");
+
+        var directVideoMute = method.IndexOf("document.querySelectorAll('video')", StringComparison.Ordinal);
+        var legacyAudioButton = method.IndexOf(
+            ".atg-gima-audio-button-enabled:not(.atg-gima-hidden)",
+            StringComparison.Ordinal);
+
+        Assert.True(directVideoMute >= 0, "Direct autoplay media must support safe property-based muting.");
+        Assert.Contains("video.muted = true", method, StringComparison.Ordinal);
+        Assert.True(
+            legacyAudioButton > directVideoMute,
+            "The direct-video variant should be handled before retaining the legacy audio-button fallback.");
+    }
+
+    [Fact]
     public void PlaybackStart_NeverClicksTheUnverifiedVideoAreaCenter()
     {
         var method = ReadMethod(
@@ -31,6 +48,27 @@ public sealed class BonusVideoMuteSourceTests
         Assert.Contains("IsSafeBonusVideoPlayControlAsync(", method, StringComparison.Ordinal);
         Assert.DoesNotContain("_page.Mouse.ClickAsync", method, StringComparison.Ordinal);
         Assert.DoesNotContain("video-area center fallback", method, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlaybackStart_AcceptsVerifiedAutoplayBeforeReportingMissingPlayControl()
+    {
+        var method = ReadMethod(
+            "Hero",
+            "TravianClient.AdventureDanger.cs",
+            "StartBonusVideoPlayerAsync",
+            "DateTimeOffset?");
+
+        var autoplayCheck = method.IndexOf("IsBonusVideoPlaybackActiveAsync(", StringComparison.Ordinal);
+        var missingPlayFailure = method.IndexOf(
+            "no safe visible play control appeared",
+            StringComparison.Ordinal);
+
+        Assert.True(autoplayCheck >= 0, "The player start flow must recognize provider autoplay.");
+        Assert.True(
+            missingPlayFailure > autoplayCheck,
+            "Verified autoplay must be checked before a missing play control closes the video browser.");
+        Assert.Contains("MuteBonusVideoAsync(", method[autoplayCheck..missingPlayFailure], StringComparison.Ordinal);
     }
 
     [Theory]

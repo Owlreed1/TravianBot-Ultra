@@ -543,6 +543,14 @@ public partial class MainWindow : Window
                 TickBuildQueueCountdown();
                 RefreshDemolishStatusForSelectedVillage();
 
+                if (dashboardTabSelected)
+                {
+                    // Active construction timers belong to the cached Travian snapshot. Reproject them on
+                    // the presentation pulse so expired icons disappear immediately while the live refresh
+                    // requested by TickBuildQueueCountdown confirms the queue in the browser.
+                    RefreshVillageActivityIndicatorsOnDashboard();
+                }
+
                 // Only render the cached projection here. Queue/status changes rebuild it through
                 // RefreshAutomationLoopDashboardUi; the one-second pulse merely advances its countdown.
                 TickNextTaskUi();
@@ -658,7 +666,7 @@ public partial class MainWindow : Window
         _farmListsViewModel.SendNowRequested += list => _ = GuardUiAsync(() => FarmListSendNowButtonClickAsync(list));
         _farmListsViewModel.SettingsChanged += PersistFarmingSettings;
         _farmListsViewModel.MoveLossesEnabledRequested += () => _ = GuardUiAsync(EnsureFarmLossDestinationSelectedAsync);
-        _farmListsViewModel.TravcoInactiveSearchRequested += () => _ = GuardUiAsync(TravcoInactiveSearchButtonClickAsync);
+        InitializeTravcoTools();
         _troopTrainingViewModel.Initialize();
         _troopTrainingViewModel.UpdateTroopOptions(ResolveStoredTroopTrainingTribe());
         _troopTrainingViewModel.ResetQueueStatus();

@@ -389,31 +389,8 @@
                      </Grid>
         </TabItem>
         <TabItem x:Name="InactiveOasisScanTabItem" Header="Inactive / oasis scan">
-            <Grid Background="{DynamicResource AppBackgroundBrush}">
-                <Border Background="{DynamicResource SurfaceBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="16"
-                        Margin="2,0,2,2"
-                        VerticalAlignment="Top">
-                    <StackPanel>
-                        <TextBlock Text="Inactive / oasis scan"
-                                   FontSize="22"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Find inactive villages and analyze oasis targets."
-                                   FontSize="12"
-                                   Foreground="{DynamicResource TextSubtleBrush}"
-                                   Margin="0,4,0,14" />
-                        <Button x:Name="TravcoInactiveSearchButton"
-                                Content="Inactive / oasis analysis"
-                                MinWidth="170"
-                                HorizontalAlignment="Left"
-                                Command="{Binding TravcoInactiveSearchCommand}" />
-                    </StackPanel>
-                </Border>
-            </Grid>
+            <ContentControl x:Name="TravcoToolsHost"
+                            Background="{DynamicResource AppBackgroundBrush}" />
         </TabItem>
     </TabControl>
 </UserControl>

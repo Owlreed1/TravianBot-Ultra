@@ -624,8 +624,22 @@ public sealed partial class TravianClient
                         return null;
                     }
 
-                    Notify($"{logPrefix} {label}: no safe visible play control appeared; video area was left untouched.");
-                    return null;
+                    if (await IsBonusVideoPlaybackActiveAsync(cancellationToken))
+                    {
+                        clickConfirmedAtUtc = DateTimeOffset.UtcNow;
+                        Notify(
+                            $"{logPrefix} {label}: provider autoplay is active; " +
+                            "continuing without a play-button click.");
+                        await TryClickBonusVideoSkipAdAsync(label, logPrefix, cancellationToken);
+                        await MuteBonusVideoAsync(label, logPrefix, cancellationToken);
+                    }
+                    else
+                    {
+                        Notify(
+                            $"{logPrefix} {label}: no safe visible play control appeared and playback was not active; " +
+                            "video area was left untouched.");
+                        return null;
+                    }
                 }
             }
             catch (PlaywrightException ex) when (IsBonusVideoNavigationTransition(ex))
@@ -659,6 +673,34 @@ public sealed partial class TravianClient
 
         Notify($"{logPrefix} {label}: play could not be confirmed after consent retry.");
         return null;
+    }
+
+    private async Task<bool> IsBonusVideoPlaybackActiveAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (var frame in _page.Frames)
+        {
+            try
+            {
+                if (await frame.EvaluateAsync<bool>(
+                    """
+                    () => Array.from(document.querySelectorAll('video')).some(video =>
+                      !video.paused
+                      && !video.ended
+                      && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+                      && video.currentTime > 0)
+                    """))
+                {
+                    return true;
+                }
+            }
+            catch (PlaywrightException ex) when (IsBonusVideoNavigationTransition(ex))
+            {
+                // The provider may replace its frame while autoplay starts. The next frame still gets checked.
+            }
+        }
+
+        return false;
     }
 
     private static Task<bool> IsSafeBonusVideoPlayControlAsync(ILocator control)
@@ -741,6 +783,33 @@ public sealed partial class TravianClient
                 cancellationToken.ThrowIfCancellationRequested();
                 foreach (var frame in _page.Frames)
                 {
+                    var directVideoMuteState = await frame.EvaluateAsync<string>(
+                        """
+                        () => {
+                          const videos = Array.from(document.querySelectorAll('video')).filter(video => {
+                            const style = getComputedStyle(video);
+                            const rect = video.getBoundingClientRect();
+                            return style.display !== 'none'
+                              && style.visibility !== 'hidden'
+                              && Number(style.opacity) > 0
+                              && rect.width > 0
+                              && rect.height > 0
+                              && !video.ended;
+                          });
+                          if (videos.length === 0) return 'missing';
+                          for (const video of videos) {
+                            video.muted = true;
+                            video.defaultMuted = true;
+                          }
+                          return videos.every(video => video.muted) ? 'muted' : 'unconfirmed';
+                        }
+                        """);
+                    if (directVideoMuteState == "muted")
+                    {
+                        Notify($"{logPrefix} {label}: direct autoplay video is muted.");
+                        return true;
+                    }
+
                     var disabled = frame.Locator(".atg-gima-audio-button-disabled:not(.atg-gima-hidden)").First;
                     if (await disabled.CountAsync() > 0 && await disabled.IsVisibleAsync())
                     {

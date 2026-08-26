@@ -11,10 +11,13 @@ Active decision, extracted from `ENGINEERING_NOTES.md` on 2026-07-18.
 - Isolated video has separate 60-second setup and 240-second action caps. Expected provider failure must not
   block construction, hero dispatch, or other automation.
 - Construct, resource, production, and hero bonus videos share one post-play policy: the protected 60-second
-  interval begins only after a trusted play click succeeds; post-play verification times out after 120 seconds.
+  interval begins only after verified active HTML-media autoplay or a trusted play click; post-play verification
+  times out after 120 seconds.
 - A trusted play click targets only the exact visible provider play control after ancestry, geometry, and center
   hit-testing. Never click the video-area or iframe center as fallback; during slow rendering that point may belong
   to an advertiser link and open an external tab.
+- Optional muting supports both provider variants: set the media properties on a visible direct HTML video, or use
+  the exact geometry-verified provider audio button when that older control-based player is rendered.
 - During the protected minute, missing iframe/dialog/reward or provider help/error text cannot end the attempt.
   Afterward, provider failure needs two consecutive confirmations while the player is present, or one when it
   is demonstrably absent. Cancellation, shutdown, and closed/crashed browser may abort immediately.

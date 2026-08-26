@@ -44,6 +44,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - `LoopController` owns loop lifecycle and cancellation. UI code must not create competing loop state.
 - Long-running UI commands use the shared busy/guard pattern, expose Cancel when supported, and restore UI
   state in `finally`.
+- A dispatcher exception raised before any WPF window has loaded is a fatal startup failure: log it and explicitly
+  shut down the application so a failed `StartupUri` construction cannot leave an invisible process running.
 
 ## Official-only paths and selectors
 
@@ -239,6 +241,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
 ### Desktop
 
 - UI text is English. Reuse theme resources and controls; do not hard-code near-match colors.
+- Inactive/Travco and Map Oasis tools live directly on the Farming subtab. Merely viewing the subtab does not pause
+  automation; the first browser-backed action starts an analysis session. Finishing it closes the external Travco
+  browser tab only when one was actually opened, then resumes whichever automation mode the session paused. An active
+  session keeps a green animated finish control visible in the global sidebar, so ordinary UI navigation never hides
+  the action or implicitly closes a tab while analysis may still be running.
 - The Settings window is category-tabbed: General (including post-login automation), Pacing, Construction, Hero,
   Farming, Troops, Celebrations, and NPC / Trade. Town Hall per-village/queue controls belong under Celebrations;
   account-wide Gold/Silver limits belong under NPC / Trade. Town Hall and Brewery restart delays include the
@@ -504,6 +511,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Reused Add-target dialogs must replace X/Y through the traced input path and re-read both fresh fields as an exact
   pair before validation. Retry replacement only a bounded number of times and never click Save while either
   coordinate differs from the requested value.
+- When Travian leaves a valid Add-target lookup unresolved, close/reopen the form and retry that same coordinate once
+  before marking it failed. Definitive invalid-coordinate, occupied-oasis, duplicate, and verified Save outcomes are
+  never retried; an exhausted lookup retry must state that Save was not attempted.
 - Program-created farm lists carry the account-scoped Create-popup preference `Only create reports with losses`,
   defaulting enabled when absent. Before Create, set and verify `#createFarmListForm input[name='onlyLosses']` with
   a real label/input click; a missing or unverifiable checkbox is logged but must not block list creation.
@@ -527,8 +537,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
   never use a blind video-area/iframe-center click because a partially rendered player may expose an advertiser link.
   Optional audio muting is strictly best-effort and defaults enabled through General settings. Click only the exact
   visible `.atg-gima-audio-button-enabled:not(.atg-gima-hidden)` icon after bounded geometry, ancestry, and center
-  hit-testing prove that exact icon owns the click. Never click its wrapper, the video area, use force/JS fallback,
-  or let a missing, unsafe, or failed audio control interrupt or fail the video lifecycle.
+  hit-testing prove that exact icon owns the click. A direct visible HTML `<video>` without provider audio controls
+  may instead be muted through its media properties. Never click its wrapper, the video area, use force/JS click
+  fallback, or let a missing, unsafe, or failed audio control interrupt or fail the video lifecycle.
+  The provider may autoplay without rendering a play button. Verified active HTML-media playback is a trusted start
+  signal: begin the normal protected completion wait and attempt optional muting instead of closing the isolated browser.
 - One `activate_production_bonus` run is a contiguous four-resource batch: after its initial cooldown gate,
   attempt every resource found activatable before returning control to other automation. A failure or newly
   created internal video cooldown for one resource must not stop the remaining resources in that same batch.

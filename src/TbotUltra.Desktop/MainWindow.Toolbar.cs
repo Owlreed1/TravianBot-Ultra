@@ -414,7 +414,7 @@ public partial class MainWindow
         try
         {
             _travcoSuppressRestart = true;
-            _travcoToolsWindow?.CloseForShutdown();
+            _travcoToolsControl?.StopForShutdown();
             _logsPopupWindow?.Close();
             _queuePopupWindow?.Close();
             _resourceTestFunctionsWindow?.Close();

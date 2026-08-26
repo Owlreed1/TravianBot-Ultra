@@ -15,6 +15,7 @@ namespace TbotUltra.Desktop;
 public partial class App : Application
 {
     private static ServiceProvider? _serviceProvider;
+    private bool _hasLoadedWindow;
 
     /// <summary>
     /// Application-wide service provider. Populated in <see cref="OnStartup"/>
@@ -41,10 +42,11 @@ public partial class App : Application
         base.OnStartup(e);
     }
 
-    private static void OnAnyWindowLoaded(object sender, RoutedEventArgs e)
+    private void OnAnyWindowLoaded(object sender, RoutedEventArgs e)
     {
         if (sender is Window window)
         {
+            _hasLoadedWindow = true;
             ThemeChrome.TryEnableDarkTitleBar(window);
         }
     }
@@ -96,6 +98,14 @@ public partial class App : Application
     {
         TryWriteUnhandledException("DispatcherUnhandledException", e.Exception);
         e.Handled = true;
+
+        // StartupUri construction failures happen before MainWindow loads. Keeping the
+        // exception handled without an explicit shutdown leaves an invisible dispatcher
+        // process running indefinitely.
+        if (!_hasLoadedWindow)
+        {
+            Shutdown(-1);
+        }
     }
 
     private void CurrentDomain_UnhandledException(object? sender, UnhandledExceptionEventArgs e)

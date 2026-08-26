@@ -19,7 +19,6 @@ public sealed class FarmListsViewModel : BaseViewModel
     private readonly RelayCommand _createFarmListCommand;
     private readonly RelayCommand _sendAllNowCommand;
     private readonly RelayCommand<FarmListStatusRow> _sendNowCommand;
-    private readonly RelayCommand _travcoInactiveSearchCommand;
     private bool _canAnalyze = true;
     private bool _canManageLists;
     private bool _canCreate = true;
@@ -40,7 +39,6 @@ public sealed class FarmListsViewModel : BaseViewModel
         _createFarmListCommand = new RelayCommand(() => CreateFarmListRequested?.Invoke(), () => _canCreate);
         _sendAllNowCommand = new RelayCommand(() => SendAllNowRequested?.Invoke(), () => _canSendAll);
         _sendNowCommand = new RelayCommand<FarmListStatusRow>(row => SendNowRequested?.Invoke(row), row => _canManageLists && row.CanSendNow);
-        _travcoInactiveSearchCommand = new RelayCommand(() => TravcoInactiveSearchRequested?.Invoke());
     }
 
     /// <summary>
@@ -54,14 +52,12 @@ public sealed class FarmListsViewModel : BaseViewModel
     public ICommand CreateFarmListCommand => _createFarmListCommand;
     public ICommand SendAllNowCommand => _sendAllNowCommand;
     public ICommand SendNowCommand => _sendNowCommand;
-    public ICommand TravcoInactiveSearchCommand => _travcoInactiveSearchCommand;
 
     public event Action? AnalyzeRequested;
     public event Action? AddFarmsRequested;
     public event Action? CreateFarmListRequested;
     public event Action? SendAllNowRequested;
     public event Action<FarmListStatusRow>? SendNowRequested;
-    public event Action? TravcoInactiveSearchRequested;
     public event Action? SettingsChanged;
     public event Action? MoveLossesEnabledRequested;
 
