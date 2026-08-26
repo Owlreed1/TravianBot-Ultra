@@ -104,6 +104,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   when coordinates can be resolved; active coordinates come from `#villageName[data-x][data-y]`.
 - Per-village runtime caches are shared by the UI and background loop and must be synchronized. A display-name
   lookup is valid only when exactly one cached village has that name; duplicate names never use last-write-wins.
+  A storage-only or non-dorf1 read with unknown production must preserve that coordinate-keyed village's last-known
+  production rates, so cache persistence and login restore cannot turn valid forecasts into `-/h` / `Not filling`.
 - Queue status transitions are gated. `MarkDeferred` accepts only RUNNING items; Pending items use
   `UpdateDeferred`/`UpdatePending`. Check the returned boolean.
 - Manual queue reordering persists through `CreatedAt` and therefore controls FIFO selection in both Auto Queue

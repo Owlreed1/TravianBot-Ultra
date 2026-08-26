@@ -59,6 +59,39 @@ public sealed class VillageStatusCacheTests
     }
 
     [Fact]
+    public void Set_StorageOnlyRefreshPreservesKnownProductionForTheSameVillage()
+    {
+        var cache = new VillageStatusCache();
+        var known = MakeStatus("LILAC", 159, -114) with
+        {
+            WarehouseCapacity = 4_000,
+            GranaryCapacity = 4_000,
+            ResourceStorageForecasts =
+            [
+                new ResourceStorageForecast("wood", 100, 4_000, 2.5, 250, 56_160),
+            ],
+        };
+        cache.Set("LILAC", known);
+
+        var storageOnly = MakeStatus("LILAC", 159, -114) with
+        {
+            WarehouseCapacity = 4_000,
+            GranaryCapacity = 4_000,
+            ResourceStorageForecasts =
+            [
+                new ResourceStorageForecast("wood", 200, 4_000, 5, null, null),
+            ],
+        };
+        cache.Set("LILAC", storageOnly);
+
+        Assert.True(cache.TryGetByKey("xy:159|-114", out var stored));
+        var wood = Assert.Single(stored.ResourceStorageForecasts!);
+        Assert.Equal(200, wood.Current);
+        Assert.Equal(250, wood.ProductionPerHour);
+        Assert.Equal(54_720, wood.SecondsToFull);
+    }
+
+    [Fact]
     public void Set_CanonicalWriteSupersedesLegacyNameEntry()
     {
         var cache = new VillageStatusCache();

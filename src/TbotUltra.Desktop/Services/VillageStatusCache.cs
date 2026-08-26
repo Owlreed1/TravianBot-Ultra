@@ -168,9 +168,84 @@ public sealed class VillageStatusCache
                 _byKey.Remove(normalized);
             }
 
+            if (_byKey.TryGetValue(key, out var previous))
+            {
+                status = PreserveKnownResourceProduction(status, previous);
+            }
+
             _byKey[key] = status;
         }
     }
+
+    private static VillageStatus PreserveKnownResourceProduction(VillageStatus current, VillageStatus previous)
+    {
+        var previousForecasts = previous.ResourceStorageForecasts?
+            .Where(item => !string.IsNullOrWhiteSpace(item.ResourceKey))
+            .GroupBy(item => item.ResourceKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase);
+        if (previousForecasts is null
+            || previousForecasts.Count == 0
+            || !previousForecasts.Values.Any(item => item.ProductionPerHour is not null))
+        {
+            return current;
+        }
+
+        var currentForecasts = current.ResourceStorageForecasts?.ToList() ?? [];
+        var merged = new List<ResourceStorageForecast>(Math.Max(currentForecasts.Count, previousForecasts.Count));
+        var changed = false;
+        foreach (var forecast in currentForecasts)
+        {
+            if (forecast.ProductionPerHour is not null
+                || !previousForecasts.TryGetValue(forecast.ResourceKey, out var previousForecast)
+                || previousForecast.ProductionPerHour is null)
+            {
+                merged.Add(forecast);
+                previousForecasts.Remove(forecast.ResourceKey);
+                continue;
+            }
+
+            merged.Add(WithProduction(forecast, previousForecast.ProductionPerHour.Value));
+            previousForecasts.Remove(forecast.ResourceKey);
+            changed = true;
+        }
+
+        foreach (var previousForecast in previousForecasts.Values)
+        {
+            merged.Add(previousForecast);
+            changed = true;
+        }
+
+        return changed ? current with { ResourceStorageForecasts = merged } : current;
+    }
+
+    private static ResourceStorageForecast WithProduction(
+        ResourceStorageForecast forecast,
+        double productionPerHour)
+    {
+        int? secondsToFull = null;
+        int? secondsToEmpty = null;
+        if (forecast.Current is long current && forecast.Capacity is long capacity)
+        {
+            if (productionPerHour > 0)
+            {
+                secondsToFull = ToBoundedSeconds((Math.Max(0L, capacity - current) / productionPerHour) * 3600d);
+            }
+            else if (productionPerHour < 0)
+            {
+                secondsToEmpty = ToBoundedSeconds((Math.Max(0L, current) / -productionPerHour) * 3600d);
+            }
+        }
+
+        return forecast with
+        {
+            ProductionPerHour = productionPerHour,
+            SecondsToFull = secondsToFull,
+            SecondsToEmpty = secondsToEmpty,
+        };
+    }
+
+    private static int ToBoundedSeconds(double seconds)
+        => seconds >= int.MaxValue ? int.MaxValue : (int)Math.Ceiling(Math.Max(0d, seconds));
 
     /// <summary>
     /// Carries the cache across an in-game village rename. Canonical-keyed entries only move their
