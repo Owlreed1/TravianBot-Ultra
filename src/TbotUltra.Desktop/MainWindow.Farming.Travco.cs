@@ -37,11 +37,7 @@ public partial class MainWindow
                 await BeginTravcoSessionAsync();
                 return await RunMapOasisScanAsync(request, progress, cancellationToken);
             },
-            AddAllVillagesRequested = async (request, progress, cancellationToken) =>
-            {
-                await BeginTravcoSessionAsync();
-                return await RunAllVillagesImportAsync(request, progress, cancellationToken);
-            },
+            AddAllVillagesRequested = RunAllVillagesImportAsync,
             CloseRequested = CloseTravcoSessionAsync,
         };
         _travcoToolsControl = control;

@@ -246,6 +246,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   browser tab only when one was actually opened, then resumes whichever automation mode the session paused. An active
   session keeps a green animated finish control visible in the global sidebar, so ordinary UI navigation never hides
   the action or implicitly closes a tab while analysis may still be running.
+- Map SQL scan is a self-contained manual operation. It never starts a persistent Travco analysis session and exposes
+  no Finish-session action after download, filtering, and list persistence complete.
 - The Settings window is category-tabbed: General (including post-login automation), Pacing, Construction, Hero,
   Farming, Troops, Celebrations, and NPC / Trade. Town Hall per-village/queue controls belong under Celebrations;
   account-wide Gold/Silver limits belong under NPC / Trade. Town Hall and Brewery restart delays include the

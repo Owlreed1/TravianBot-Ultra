@@ -763,25 +763,6 @@ public partial class TravcoToolsControl : UserControl
             return;
         }
 
-        var message = _browserTabOpen
-            ? "Close the Travco browser tab and resume the automation that was paused for this session?"
-            : "Finish this analysis session and resume the automation that was paused?";
-        var title = _browserTabOpen ? "Close Travco tab" : "Finish analysis session";
-        var confirmLabel = _browserTabOpen ? "Close tab" : "Finish session";
-        var result = AppDialog.ShowCustom(
-            Window.GetWindow(this),
-            message,
-            title,
-            [(confirmLabel, MessageBoxResult.Yes), ("Keep open", MessageBoxResult.No)],
-            MessageBoxImage.Question,
-            MessageBoxResult.No,
-            MessageBoxResult.No,
-            successResult: MessageBoxResult.Yes);
-        if (result != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
         SetBusy(true);
         try
         {

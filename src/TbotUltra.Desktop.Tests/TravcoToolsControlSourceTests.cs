@@ -6,6 +6,39 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class TravcoToolsControlSourceTests
 {
     [Fact]
+    public void MapSqlScan_DoesNotStartPersistentTravcoSession()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            ProjectRootLocator.FindProjectRoot(),
+            "src",
+            "TbotUltra.Desktop",
+            "MainWindow.Farming.Travco.cs"));
+
+        Assert.Contains("AddAllVillagesRequested = RunAllVillagesImportAsync", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "AddAllVillagesRequested = async (request, progress, cancellationToken)",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CloseTravcoAction_ClosesImmediatelyWithoutConfirmationDialog()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            ProjectRootLocator.FindProjectRoot(),
+            "src",
+            "TbotUltra.Desktop",
+            "TravcoToolsControl.xaml.cs"));
+        var methodStart = source.IndexOf("private async Task CloseTravcoSessionAsync()", StringComparison.Ordinal);
+        var methodEnd = source.IndexOf("private void SetBusy", methodStart, StringComparison.Ordinal);
+        var method = source[methodStart..methodEnd];
+
+        Assert.Contains("await CloseRequested();", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("AppDialog.ShowCustom", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("Keep open", method, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ActiveSession_ExposesGlobalCloseActionAcrossUiNavigation()
     {
         var root = ProjectRootLocator.FindProjectRoot();

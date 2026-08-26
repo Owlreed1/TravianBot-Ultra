@@ -163,6 +163,13 @@ public sealed class PanelSmokeTests
             Assert.IsType<Button>(control.FindName("AddAllVillagesButton"));
             Assert.IsType<Button>(control.FindName("InactiveSearchButton"));
             Assert.IsType<Button>(control.FindName("AnalyzeMapOasisButton"));
+            Assert.Equal(0, Grid.GetColumn(Assert.IsType<Border>(control.FindName("TravcoCard"))));
+            Assert.Equal(2, Grid.GetColumn(Assert.IsType<Border>(control.FindName("OasisCard"))));
+            Assert.Equal(4, Grid.GetColumn(Assert.IsType<Border>(control.FindName("MapSqlCard"))));
+            var workspaceInfo = Assert.IsType<ContentControl>(control.FindName("WorkspaceInfoIcon"));
+            Assert.Equal(
+                "Collect targets, review saved lists and calculate travel distance in one workspace.",
+                workspaceInfo.ToolTip);
             Assert.IsType<DataGrid>(control.FindName("SavedListsListBox"));
             Assert.IsType<DataGrid>(control.FindName("ResultsDataGrid"));
             var finishButton = Assert.IsType<Button>(control.FindName("CloseTravcoTabButton"));
