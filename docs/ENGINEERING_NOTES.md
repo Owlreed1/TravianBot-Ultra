@@ -84,6 +84,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Quarantine and log corrupt queue/state files instead of silently overwriting them.
 - The editable building-template library lives in root-level `building_templates/building_templates.json`, beside
   `docs/`. On first load, copy a valid legacy `config/building_templates.json` there without deleting the legacy file.
+  Every library save and successful load also synchronizes one ignored, shareable `.tbot-template.json` file per
+  template in that folder, named from the visible template name; a private manifest may remove only files previously
+  created by this synchronization and must never remove manual exports. The updater preserves the entire folder.
   Shared building-template files use the versioned `.tbot-template.json` exchange format and contain no account,
   server, village, or player identity. Import conflicts are matched only by template ID; validate each template
   independently and never guess at a newer schema. An automatically inserted resource-field prerequisite upgrades
@@ -92,6 +95,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
   same configured storage-capacity preflight as the normal construction queue; after confirmation, required Warehouse
   and Granary rows are inserted immediately before the affected row instead of waiting until the template is queued.
 - New settings require the complete pipeline: model, defaults, load/save, ViewModel, UI, and tests.
+- Portable Settings profiles use the versioned `.tbot-settings.json` format and an explicit scalar/allowed-hours
+  allowlist. They must remain anonymous and portable: never include account/server/proxy identity or credentials,
+  tribe-specific Brewery options, village/list/queue/object identifiers, runtime state or usage, manual server-reset
+  overrides, update-notification preferences, or detailed browser logging. Import merges into the current validated
+  form draft and remains unsaved until the user uses the normal Settings Save action.
 - Embedded Village settings have no Save step: persist each row or group-toggle change immediately; bulk
   "Check all" changes persist each affected row and publish one consolidated settings-changed notification.
 - Demolition is a village-scoped queue group: start one Official `table#demolish` step, persist the server timer plus its random delay as `NextAttemptAt`, and never poll or sleep through it in the browser. It has no per-village group toggle; an explicitly queued demolition is always group-enabled, while the village's master Auto toggle still controls automation.
@@ -129,7 +137,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   is ready in any village; changing it while the continuous loop runs requests a wake at the next safe boundary.
 - A bulk resource-field scan reads active constructions and the compact build queue once on dorf1 and reuses that
   snapshot while evaluating candidates. A blocked field must not cause build.php -> dorf2 -> build.php navigation
-  before the next field; refresh the snapshot only after a construction mutation starts a new scan iteration.
+  before the next field; refresh the snapshot only after a construction mutation starts a new scan iteration. Rank
+  candidates by their projected level including an exact-slot queued upgrade, so a just-queued field is not probed
+  again ahead of untouched lower-level fields.
 - Continuous Loop and Auto Queue share runtime-only village batching over the account queue: ready work is drained
   across groups in the verified browser village before normal work elsewhere. Ready Account work or `Priority > 0`
   may preempt; after 10 execution attempts another ready village gets a turn. Deferred/unknown work never keeps a

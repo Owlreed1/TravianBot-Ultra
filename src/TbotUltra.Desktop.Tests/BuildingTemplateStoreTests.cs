@@ -58,6 +58,75 @@ public sealed class BuildingTemplateStoreTests
     }
 
     [Fact]
+    public void Save_WritesEachTemplateAsNamedShareableFile()
+    {
+        var root = TempRoot();
+        var store = new BuildingTemplateStore(root);
+        var first = new BuildingTemplate { Name = "Starter plan", CreatedByTribe = "Teutons" };
+        var second = new BuildingTemplate { Name = "Starter plan", CreatedByTribe = "Gauls" };
+
+        store.Save([first, second]);
+
+        var directory = Path.Combine(root, "building_templates");
+        var firstPath = Path.Combine(directory, "Starter plan.tbot-template.json");
+        var secondPath = Path.Combine(directory, "Starter plan (2).tbot-template.json");
+        Assert.True(File.Exists(firstPath));
+        Assert.True(File.Exists(secondPath));
+        Assert.Equal(first.Id, Assert.Single(new BuildingTemplateExchangeService().Import(firstPath, "Teutons")).Template.Id);
+        Assert.Equal(second.Id, Assert.Single(new BuildingTemplateExchangeService().Import(secondPath, "Gauls")).Template.Id);
+    }
+
+    [Fact]
+    public void Load_ExistingLibrary_CreatesMissingIndividualFiles()
+    {
+        var root = TempRoot();
+        var store = new BuildingTemplateStore(root);
+        store.Save([new BuildingTemplate { Name = "Existing", CreatedByTribe = "Romans" }]);
+        var directory = Path.Combine(root, "building_templates");
+        File.Delete(Path.Combine(directory, "Existing.tbot-template.json"));
+        File.Delete(Path.Combine(directory, "building_templates.manifest.json"));
+
+        var loaded = new BuildingTemplateStore(root).Load();
+
+        Assert.Single(loaded);
+        Assert.True(File.Exists(Path.Combine(directory, "Existing.tbot-template.json")));
+    }
+
+    [Fact]
+    public void Save_RenameAndDelete_CleansOnlyManagedFiles()
+    {
+        var root = TempRoot();
+        var store = new BuildingTemplateStore(root);
+        var kept = new BuildingTemplate { Name = "First", CreatedByTribe = "Romans" };
+        var removed = new BuildingTemplate { Name = "Second", CreatedByTribe = "Romans" };
+        store.Save([kept, removed]);
+        var directory = store.DirectoryPath;
+        var manualPath = Path.Combine(directory, "Manual backup.tbot-template.json");
+        new BuildingTemplateExchangeService().Export(
+            manualPath,
+            [new BuildingTemplate { Name = "Manual", CreatedByTribe = "Romans" }],
+            "test",
+            DateTimeOffset.UtcNow);
+
+        kept.Name = "Renamed";
+        store.Save([kept]);
+
+        Assert.True(File.Exists(Path.Combine(directory, "Renamed.tbot-template.json")));
+        Assert.False(File.Exists(Path.Combine(directory, "First.tbot-template.json")));
+        Assert.False(File.Exists(Path.Combine(directory, "Second.tbot-template.json")));
+        Assert.True(File.Exists(manualPath));
+    }
+
+    [Theory]
+    [InlineData("Bad/name", "Bad-name")]
+    [InlineData("CON", "_CON")]
+    [InlineData("...", "building-template")]
+    public void SanitizeTemplateFileName_ProducesSafeReadableName(string name, string expected)
+    {
+        Assert.Equal(expected, BuildingTemplateStore.SanitizeTemplateFileName(name));
+    }
+
+    [Fact]
     public void Load_MigratesLegacyConfigFileWithoutDeletingIt()
     {
         var root = TempRoot();

@@ -290,6 +290,21 @@ public sealed partial class TravianClient
                 var activeConstructionsAtScan = await ReadActiveConstructionsAsync(
                     cancellationToken,
                     allowNavigationToBuildings: false);
+                var queuedLevelsBySlot = resourceFields
+                    .Where(field => field.SlotId is int && field.Level is int)
+                    .GroupBy(field => field.SlotId!.Value)
+                    .ToDictionary(
+                        group => group.Key,
+                        group =>
+                        {
+                            var field = group.First();
+                            return ResourceConstructionQueueMatcher.HighestQueuedLevelForSlot(
+                                activeConstructionsAtScan,
+                                buildQueueAtScan,
+                                group.Key,
+                                field.Name,
+                                field.Level!.Value);
+                        });
                 // Note: each successful upgrade is already announced by WaitForResourceLevelAdvanceAsync
                 // at the moment the level advances. We deliberately do NOT diff levels again here, as
                 // that produced a duplicate "Resource slot N level increased ..." line per upgrade.
@@ -329,7 +344,10 @@ public sealed partial class TravianClient
 
                 if (stockByType is not null)
                 {
-                    candidateRows = ResourceSnapshotCalculator.OrderUpgradeCandidates(resourceFields, stockByType).ToList();
+                    candidateRows = ResourceSnapshotCalculator.OrderUpgradeCandidates(
+                        resourceFields,
+                        stockByType,
+                        queuedLevelsBySlot).ToList();
                     string Stock(string key) => stockByType.TryGetValue(key, out var v) ? v.ToString() : "?";
                     var orderNote = stockByType.Values.Distinct().Count() <= 1
                         ? "tracked stocks equal; lowest-level-first tiebreak"
@@ -338,7 +356,10 @@ public sealed partial class TravianClient
                 }
                 else
                 {
-                    candidateRows = ResourceSnapshotCalculator.OrderUpgradeCandidates(resourceFields, stockByType: null).ToList();
+                    candidateRows = ResourceSnapshotCalculator.OrderUpgradeCandidates(
+                        resourceFields,
+                        stockByType: null,
+                        queuedLevelsBySlot).ToList();
                 }
 
                 Notify($"[UpgradeAllResourcesToLevelAsync] scanned {candidateRows.Count} resource fields on dorf1.");

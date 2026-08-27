@@ -205,7 +205,8 @@ public partial class MainWindow
             GetContinuousKeepAliveNextReloadUtc,
             RunVillageStatusSweepNowFromSettingsAsync,
             HasCompletedNewAccountAnalysis(),
-            BuildHeroCropAntiStarveVillageRows())
+            BuildHeroCropAntiStarveVillageRows(),
+            _projectRoot)
         {
             Owner = Application.Current.Windows
                 .OfType<Window>()

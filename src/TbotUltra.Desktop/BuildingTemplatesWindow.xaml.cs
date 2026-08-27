@@ -238,12 +238,17 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
                 Templates.Add(template);
             }
 
-            if (Templates.Count == 0)
+            var createdDefaultTemplate = Templates.Count == 0;
+            if (createdDefaultTemplate)
             {
                 Templates.Add(CreateNewTemplate("New template"));
             }
 
             SelectedTemplate = Templates[0];
+            if (createdDefaultTemplate)
+            {
+                SaveAllTemplates(skipValidation: true);
+            }
             _planPreviewTimer.Stop();
             RefreshPlanPreview();
             LoadingOverlay.Hide();
@@ -470,7 +475,9 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         var template = CreateNewTemplate($"Template {index}");
         Templates.Add(template);
         SelectedTemplate = template;
-        StatusText = "Created template.";
+        StatusText = SaveAllTemplates(skipValidation: true)
+            ? "Created and saved template."
+            : StatusText;
     }
 
     private void DuplicateTemplateButton_Click(object sender, RoutedEventArgs e)
@@ -487,7 +494,9 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
         var sourceIndex = Templates.IndexOf(SelectedTemplate);
         Templates.Insert(sourceIndex + 1, duplicate);
         SelectedTemplate = duplicate;
-        StatusText = "Duplicated template. Save to keep it.";
+        StatusText = SaveAllTemplates(skipValidation: true)
+            ? "Duplicated and saved template."
+            : StatusText;
     }
 
     private void ImportTemplatesButton_Click(object sender, RoutedEventArgs e)
@@ -570,7 +579,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        ExportTemplates([SelectedTemplate], SanitizeExportFileName(SelectedTemplate.Name));
+        ExportTemplates([SelectedTemplate], BuildingTemplateStore.SanitizeTemplateFileName(SelectedTemplate.Name));
     }
 
     private void ExportAllTemplatesMenuItem_Click(object sender, RoutedEventArgs e)
@@ -589,9 +598,16 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        var downloads = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "Downloads");
+        try
+        {
+            Directory.CreateDirectory(_store.DirectoryPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StatusText = $"Could not open the building templates folder: {ex.Message}";
+            return;
+        }
+
         var dialog = new SaveFileDialog
         {
             Title = "Export building templates",
@@ -600,7 +616,7 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
             DefaultExt = BuildingTemplateExchangeService.FileExtension,
             AddExtension = true,
             OverwritePrompt = true,
-            InitialDirectory = Directory.Exists(downloads) ? downloads : null,
+            InitialDirectory = _store.DirectoryPath,
         };
         if (dialog.ShowDialog(this) != true)
         {
@@ -622,15 +638,6 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
-    }
-
-    private static string SanitizeExportFileName(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().ToHashSet();
-        var sanitized = new string((string.IsNullOrWhiteSpace(name) ? "building-template" : name.Trim())
-            .Select(character => invalid.Contains(character) ? '-' : character)
-            .ToArray());
-        return string.IsNullOrWhiteSpace(sanitized) ? "building-template" : sanitized;
     }
 
     internal static BuildingTemplate CreateDuplicateTemplate(

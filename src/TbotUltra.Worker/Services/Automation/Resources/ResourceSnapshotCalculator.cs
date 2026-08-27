@@ -39,18 +39,30 @@ internal static class ResourceSnapshotCalculator
 
     internal static IReadOnlyList<ResourceField> OrderUpgradeCandidates(
         IEnumerable<ResourceField> fields,
-        IReadOnlyDictionary<string, long>? stockByType)
+        IReadOnlyDictionary<string, long>? stockByType,
+        IReadOnlyDictionary<int, int>? queuedLevelsBySlot = null)
     {
-        var actionable = fields.Where(field => field.SlotId is not null && field.Level is not null);
+        var actionable = fields
+            .Where(field => field.SlotId is not null && field.Level is not null)
+            .Select(field => new
+            {
+                Field = field,
+                ProjectedLevel = queuedLevelsBySlot is not null
+                    && queuedLevelsBySlot.TryGetValue(field.SlotId!.Value, out var queuedLevel)
+                        ? Math.Max(field.Level!.Value, queuedLevel)
+                        : field.Level!.Value,
+            });
         return stockByType is null
             ? actionable
-                .OrderBy(field => field.Level ?? 0)
-                .ThenBy(field => field.SlotId ?? 999)
+                .OrderBy(item => item.ProjectedLevel)
+                .ThenBy(item => item.Field.SlotId ?? 999)
+                .Select(item => item.Field)
                 .ToList()
             : actionable
-                .OrderBy(field => stockByType.TryGetValue(field.FieldType, out var stock) ? stock : long.MaxValue)
-                .ThenBy(field => field.Level ?? 0)
-                .ThenBy(field => field.SlotId ?? 999)
+                .OrderBy(item => stockByType.TryGetValue(item.Field.FieldType, out var stock) ? stock : long.MaxValue)
+                .ThenBy(item => item.ProjectedLevel)
+                .ThenBy(item => item.Field.SlotId ?? 999)
+                .Select(item => item.Field)
                 .ToList();
     }
 

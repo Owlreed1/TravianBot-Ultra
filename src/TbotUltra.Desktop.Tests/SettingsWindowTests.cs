@@ -128,6 +128,62 @@ public sealed class SettingsWindowTests : IDisposable
     }
 
     [Fact]
+    public void Footer_PlacesImportAndExportTogetherBeforeOtherActions()
+    {
+        _wpf.Run(() =>
+        {
+            var window = new SettingsWindow(CreateStore(new JsonObject()));
+            try
+            {
+                var import = Assert.IsType<Button>(window.FindName("ImportSettingsButton"));
+                var export = Assert.IsType<Button>(window.FindName("ExportSettingsButton"));
+                var reset = Assert.IsType<Button>(window.FindName("ResetSettingsButton"));
+                var panel = Assert.IsType<StackPanel>(import.Parent);
+
+                Assert.Same(panel, export.Parent);
+                Assert.Same(panel, reset.Parent);
+                Assert.Equal(0, panel.Children.IndexOf(import));
+                Assert.Equal(1, panel.Children.IndexOf(export));
+                Assert.Equal(2, panel.Children.IndexOf(reset));
+                Assert.Equal(20, export.Margin.Right);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void NormalizedDraft_UsesUnsavedFormValuesWithoutWritingToDisk()
+    {
+        _wpf.Run(() =>
+        {
+            var store = CreateStore(new JsonObject
+            {
+                [BotOptionPayloadKeys.AutomaticallyCheckLanguage] = true,
+            });
+            var configPath = Path.Combine(_root, "bot.json");
+            var before = File.ReadAllText(configPath);
+            var window = new SettingsWindow(store);
+            try
+            {
+                ShowWindowForTest(window);
+                DrainDispatcher();
+                window.SettingsVm.AutomaticallyCheckLanguage = false;
+
+                Assert.True(window.TryBuildNormalizedConfigDraft(out var draft));
+                Assert.False(draft[BotOptionPayloadKeys.AutomaticallyCheckLanguage]!.GetValue<bool>());
+                Assert.Equal(before, File.ReadAllText(configPath));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void OpeningWithPersistedRiskyValues_DoesNotShowUserConfirmationDialogs()
     {
         _wpf.Run(() =>

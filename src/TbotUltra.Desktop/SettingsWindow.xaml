@@ -1327,6 +1327,21 @@
 
         <Grid Grid.Row="1" Margin="0,12,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button x:Name="ImportSettingsButton"
+                        MinWidth="116"
+                        Height="32"
+                        Padding="14,0"
+                        Content="Import settings"
+                        FontWeight="SemiBold"
+                        Click="ImportSettingsButton_Click" />
+                <Button x:Name="ExportSettingsButton"
+                        MinWidth="116"
+                        Height="32"
+                        Padding="14,0"
+                        Margin="8,0,20,0"
+                        Content="Export settings"
+                        FontWeight="SemiBold"
+                        Click="ExportSettingsButton_Click" />
                 <Button x:Name="ResetSettingsButton"
                         MinWidth="106"
                         Height="32"

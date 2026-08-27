@@ -54,6 +54,28 @@ public sealed class ResourceSnapshotCalculatorTests
     }
 
     [Fact]
+    public void OrderUpgradeCandidates_QueuedLevelRanksAfterUntouchedFieldAtLowerProjectedLevel()
+    {
+        var fields = new[]
+        {
+            Field(13, "crop", 0),
+            Field(14, "wood", 0),
+            Field(15, "crop", 1),
+        };
+        var queuedLevelsBySlot = new Dictionary<int, int>
+        {
+            [13] = 1,
+        };
+
+        var result = ResourceSnapshotCalculator.OrderUpgradeCandidates(
+            fields,
+            stockByType: null,
+            queuedLevelsBySlot);
+
+        Assert.Equal(new int?[] { 14, 13, 15 }, result.Select(field => field.SlotId));
+    }
+
+    [Fact]
     public void BuildUpgradeOfferIdentity_GroupsOnlySameResourceTypeAndLevel()
     {
         var cropLevelEight = ResourceSnapshotCalculator.BuildUpgradeOfferIdentity("crop", 8);
