@@ -66,6 +66,21 @@ internal static class ResourceSnapshotCalculator
                 .ToList();
     }
 
+    internal static IReadOnlyDictionary<int, int> MergeQueuedLevelProjections(
+        IReadOnlyDictionary<int, int> liveQueuedLevels,
+        IReadOnlyDictionary<int, int> confirmedDuringOperation)
+    {
+        var merged = new Dictionary<int, int>(liveQueuedLevels);
+        foreach (var (slotId, confirmedLevel) in confirmedDuringOperation)
+        {
+            merged[slotId] = merged.TryGetValue(slotId, out var liveLevel)
+                ? Math.Max(liveLevel, confirmedLevel)
+                : confirmedLevel;
+        }
+
+        return merged;
+    }
+
     /// <summary>
     /// Identifies resource fields that have the same Official upgrade offer in one bulk-upgrade pass.
     /// </summary>

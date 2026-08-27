@@ -273,6 +273,7 @@ public sealed partial class TravianClient
         int? currentTransientSlot = null;
         var constructionNpcTradeAttempted = false;
         var heroTransferAttemptedOffers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var confirmedQueuedLevelsBySlot = new Dictionary<int, int>();
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -290,7 +291,7 @@ public sealed partial class TravianClient
                 var activeConstructionsAtScan = await ReadActiveConstructionsAsync(
                     cancellationToken,
                     allowNavigationToBuildings: false);
-                var queuedLevelsBySlot = resourceFields
+                var liveQueuedLevelsBySlot = resourceFields
                     .Where(field => field.SlotId is int && field.Level is int)
                     .GroupBy(field => field.SlotId!.Value)
                     .ToDictionary(
@@ -305,6 +306,9 @@ public sealed partial class TravianClient
                                 field.Name,
                                 field.Level!.Value);
                         });
+                var queuedLevelsBySlot = ResourceSnapshotCalculator.MergeQueuedLevelProjections(
+                    liveQueuedLevelsBySlot,
+                    confirmedQueuedLevelsBySlot);
                 // Note: each successful upgrade is already announced by WaitForResourceLevelAdvanceAsync
                 // at the moment the level advances. We deliberately do NOT diff levels again here, as
                 // that produced a duplicate "Resource slot N level increased ..." line per upgrade.
@@ -401,12 +405,15 @@ public sealed partial class TravianClient
                     // second click would overshoot the requested target. This fires on Plus/Roman accounts where
                     // a second queue slot is free while one upgrade is already in flight. If Travian does not
                     // expose a slot id for the queued resource, fall back to same-name matching conservatively.
-                    var highestQueuedLevel = ResourceConstructionQueueMatcher.HighestQueuedLevelForSlot(
+                    var liveHighestQueuedLevel = ResourceConstructionQueueMatcher.HighestQueuedLevelForSlot(
                         activeConstructionsAtScan,
                         buildQueueAtScan,
                         slot,
                         resourceName,
                         level);
+                    var highestQueuedLevel = queuedLevelsBySlot.TryGetValue(slot, out var projectedQueuedLevel)
+                        ? Math.Max(liveHighestQueuedLevel, projectedQueuedLevel)
+                        : liveHighestQueuedLevel;
                     if (highestQueuedLevel >= preliminaryTarget)
                     {
                         anyQueuedTowardTarget = true;
@@ -499,6 +506,13 @@ public sealed partial class TravianClient
                             rawUpgradeSeconds,
                             cancellationToken);
                         Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} click result advanced={progress.Advanced} queued={progress.QueuedOrInProgress} evidence={progress.Evidence}.");
+                        if (progress.Advanced || progress.QueuedOrInProgress)
+                        {
+                            confirmedQueuedLevelsBySlot[slot] = confirmedQueuedLevelsBySlot.TryGetValue(slot, out var confirmedLevel)
+                                ? Math.Max(confirmedLevel, nextLevel)
+                                : nextLevel;
+                            Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} projected level {confirmedQueuedLevelsBySlot[slot]} retained for the next Dorf1 ranking.");
+                        }
                         if (!progress.Advanced && !progress.QueuedOrInProgress)
                         {
                             var queueDeferMessage = await CheckQueueOrDeferAsync(
@@ -647,6 +661,19 @@ public sealed partial class TravianClient
         if (!IsCurrentUrlForPath(Paths.Resources))
         {
             await GotoAsync(Paths.Resources, cancellationToken);
+        }
+        else
+        {
+            // The upgrade click itself redirects to Dorf1, bypassing GotoAsync and therefore its
+            // normal post-navigation pacing. Apply it once before the next field is selected.
+            await WaitForPageReadyAsync(cancellationToken);
+            InvalidateActiveConstructionsCache();
+            await ApplyPacingDelayAsync(
+                _config.ActionPacingPageLoadMinSeconds,
+                _config.ActionPacingPageLoadMaxSeconds,
+                "page-load-pacing",
+                "after resource upgrade redirect",
+                cancellationToken);
         }
 
         await EnsureLoggedInAsync(cancellationToken: cancellationToken);

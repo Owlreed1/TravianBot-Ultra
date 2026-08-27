@@ -40,6 +40,14 @@ public sealed partial class TravianClient
 
         var fallbackArrivals = activeSignal.Dorf1ArrivalTimesUtc ?? [];
 
+        var rallyPointState = await ReadRallyPointConstructionStateAsync(cancellationToken);
+        if (rallyPointState == RallyPointConstructionState.Missing)
+        {
+            Notify($"[incoming-attacks] Rally Point is not constructed in '{activeVillage}'; using {fallbackArrivals.Count} red Dorf1 timer(s).");
+            trace.Complete("fallback", $"village={activeVillage} reason=rally-point-missing timers={fallbackArrivals.Count}");
+            return new IncomingAttackSnapshot(activeVillage, resolvedKey, coords.X, coords.Y, dorf1ObservedAtUtc, [], false, fallbackArrivals);
+        }
+
         Notify("[incoming-attacks] opening Rally Point incoming-only overview.");
         try
         {
@@ -68,6 +76,34 @@ public sealed partial class TravianClient
         Notify($"[incoming-attacks] read {attacks.Count} movement(s) for '{activeVillage}'.");
         trace.Complete("success", $"village={activeVillage} count={attacks.Count}");
         return new IncomingAttackSnapshot(activeVillage, resolvedKey, coords.X, coords.Y, observedAtUtc, attacks, true, fallbackArrivals);
+    }
+
+    private async Task<RallyPointConstructionState> ReadRallyPointConstructionStateAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await GotoAsync(Paths.Buildings, cancellationToken);
+            await EnsureLoggedInAsync(cancellationToken: cancellationToken);
+
+            var firstState = IncomingAttackRallyPointPolicy.GetConstructionState(
+                await ScanBuildingOverviewAsync(cancellationToken));
+            if (firstState != RallyPointConstructionState.Missing)
+            {
+                return firstState;
+            }
+
+            Notify("[incoming-attacks] Rally Point slot looked empty on Dorf2; reloading once to confirm.");
+            await ReloadOrGotoAsync(Paths.Buildings, cancellationToken);
+            await EnsureLoggedInAsync(cancellationToken: cancellationToken);
+            return IncomingAttackRallyPointPolicy.GetConstructionState(
+                await ScanBuildingOverviewAsync(cancellationToken));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Notify($"[incoming-attacks] Dorf2 Rally Point check was inconclusive; continuing with the Rally Point overview: {ex.Message}");
+            return RallyPointConstructionState.Unknown;
+        }
     }
 
     private async Task<IReadOnlyList<IncomingAttackSignal>?> ReadIncomingAttackSignalsOnCurrentDorf1Async(

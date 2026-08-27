@@ -76,6 +76,25 @@ public sealed class ResourceSnapshotCalculatorTests
     }
 
     [Fact]
+    public void MergeQueuedLevelProjections_ConfirmedUpgradeSurvivesMissingLiveSlotIdentity()
+    {
+        var fields = new[]
+        {
+            Field(5, "clay", 4),
+            Field(10, "iron", 4),
+        };
+        var liveQueuedLevels = new Dictionary<int, int>();
+        var confirmedDuringOperation = new Dictionary<int, int> { [5] = 5 };
+
+        var merged = ResourceSnapshotCalculator.MergeQueuedLevelProjections(
+            liveQueuedLevels,
+            confirmedDuringOperation);
+        var result = ResourceSnapshotCalculator.OrderUpgradeCandidates(fields, null, merged);
+
+        Assert.Equal(new int?[] { 10, 5 }, result.Select(field => field.SlotId));
+    }
+
+    [Fact]
     public void BuildUpgradeOfferIdentity_GroupsOnlySameResourceTypeAndLevel()
     {
         var cropLevelEight = ResourceSnapshotCalculator.BuildUpgradeOfferIdentity("crop", 8);

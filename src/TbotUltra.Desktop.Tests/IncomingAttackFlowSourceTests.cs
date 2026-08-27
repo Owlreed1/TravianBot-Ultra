@@ -10,6 +10,10 @@ public sealed class IncomingAttackFlowSourceTests
     {
         var source = Read("TbotUltra.Worker", "Services", "Automation", "Combat", "TravianClient.IncomingAttacks.cs");
 
+        var constructionCheck = source.IndexOf("ReadRallyPointConstructionStateAsync", StringComparison.Ordinal);
+        var rallyPointOpen = source.IndexOf("/build.php?gid=16&tt=1&filter=1&subfilters=1", StringComparison.Ordinal);
+        Assert.True(constructionCheck >= 0);
+        Assert.True(rallyPointOpen > constructionCheck);
         Assert.Contains("/build.php?gid=16&tt=1&filter=1&subfilters=1", source, StringComparison.Ordinal);
         Assert.Contains("await category.WaitForAsync", source, StringComparison.Ordinal);
         Assert.Contains("img.filterCategory1", source, StringComparison.Ordinal);

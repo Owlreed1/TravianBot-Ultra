@@ -138,8 +138,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - A bulk resource-field scan reads active constructions and the compact build queue once on dorf1 and reuses that
   snapshot while evaluating candidates. A blocked field must not cause build.php -> dorf2 -> build.php navigation
   before the next field; refresh the snapshot only after a construction mutation starts a new scan iteration. Rank
-  candidates by their projected level including an exact-slot queued upgrade, so a just-queued field is not probed
-  again ahead of untouched lower-level fields.
+  candidates by their projected level including an exact-slot queued upgrade. Retain a level confirmed during the
+  current operation even when the refreshed live queue omits its slot identity, so a just-queued field is not probed
+  again ahead of untouched lower-level fields. An upgrade-click redirect to dorf1 receives the normal page-load pacing
+  once before the next candidate is selected.
 - Continuous Loop and Auto Queue share runtime-only village batching over the account queue: ready work is drained
   across groups in the verified browser village before normal work elsewhere. Ready Account work or `Priority > 0`
   may preempt; after 10 execution attempts another ready village gets a turn. Deferred/unknown work never keeps a
@@ -580,6 +582,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   `.listEntry.village.attack[data-did]`. A nullable signal list means "Dorf1 was not read" and must preserve
   prior signals; a completed Dorf1 read without an active-village signal is authoritative for that village and
   immediately clears both pending and confirmed attack rows for it, even if Plus signals another village. Rally
+  Point detail reads first inspect the fixed Dorf2 slot 39. An apparently empty slot must be confirmed by one reload;
+  a confirmed missing/destroyed Rally Point uses the visible red Dorf1 timers as a non-authoritative fallback and must
+  not wait for Rally Point filter controls. Incomplete or ambiguous Dorf2 reads continue to the normal detail attempt.
   Point details open `gid=16&tt=1&filter=1&subfilters=1`, wait for the
   filter controls, and are read only after the parent `button.iconFilterActive img.filterCategory1` and exactly
   `button.iconFilterActive img.subFilterCategory1` are active while subcategories 2/3 are inactive. Never treat the
