@@ -195,6 +195,147 @@ public sealed class ResourceSnapshotCalculatorTests
         Assert.Equal(long.MaxValue, result.TimeUntilAffordableSeconds);
     }
 
+    [Fact]
+    public void BuildBulkUpgradePlan_SkipsUnaffordableFieldAndSelectsAffordableFieldWithoutNavigation()
+    {
+        var expensiveIron = BuildingCatalogService.CostFor(3, 10)!;
+        var affordableClay = BuildingCatalogService.CostFor(2, 1)!;
+        var fields = new[]
+        {
+            Field(1, "iron", 9),
+            Field(2, "clay", 0),
+        };
+        var resources = ResourcesFor(affordableClay);
+        Assert.True(expensiveIron.Wood > affordableClay.Wood
+            || expensiveIron.Clay > affordableClay.Clay
+            || expensiveIron.Iron > affordableClay.Iron
+            || expensiveIron.Crop > affordableClay.Crop);
+
+        var plan = ResourceSnapshotCalculator.BuildBulkUpgradePlan(
+            fields,
+            targetLevel: 10,
+            fallbackMax: 40,
+            queuedLevelsBySlot: new Dictionary<int, int>(),
+            resources,
+            CompleteProduction(),
+            warehouseCapacity: 100_000,
+            granaryCapacity: 100_000);
+
+        Assert.True(plan.IsComplete);
+        Assert.Equal(2, plan.CandidateToInspect?.Field.SlotId);
+        Assert.Equal(1, Assert.Single(plan.BlockedByResources).Field.SlotId);
+    }
+
+    [Fact]
+    public void BuildBulkUpgradePlan_UsesProjectedQueuedLevelForTheNextCatalogCost()
+    {
+        var levelThreeCost = BuildingCatalogService.CostFor(1, 3)!;
+        var fields = new[] { Field(7, "wood", 1) };
+
+        var plan = ResourceSnapshotCalculator.BuildBulkUpgradePlan(
+            fields,
+            targetLevel: 4,
+            fallbackMax: 40,
+            queuedLevelsBySlot: new Dictionary<int, int> { [7] = 2 },
+            ResourcesFor(levelThreeCost),
+            CompleteProduction(),
+            warehouseCapacity: 100_000,
+            granaryCapacity: 100_000);
+
+        var candidate = Assert.IsType<ResourceBulkUpgradeCandidate>(plan.CandidateToInspect);
+        Assert.Equal(2, candidate.ProjectedLevel);
+        Assert.Equal(3, candidate.OfferLevel);
+        Assert.Equal(levelThreeCost, candidate.Cost);
+    }
+
+    [Fact]
+    public void BuildBulkUpgradePlan_WhenNoneAreAffordable_ProvidesOneRecoveryCandidateAndEarliestWait()
+    {
+        var fields = new[]
+        {
+            Field(1, "iron", 2),
+            Field(2, "clay", 2),
+        };
+        var production = CompleteProduction(100);
+
+        var plan = ResourceSnapshotCalculator.BuildBulkUpgradePlan(
+            fields,
+            targetLevel: 10,
+            fallbackMax: 40,
+            queuedLevelsBySlot: new Dictionary<int, int>(),
+            EmptyResources(),
+            production,
+            warehouseCapacity: 100_000,
+            granaryCapacity: 100_000);
+
+        Assert.True(plan.IsComplete);
+        Assert.Null(plan.CandidateToInspect);
+        Assert.Equal(1, plan.RecoveryCandidate?.Field.SlotId);
+        Assert.Equal(2, plan.BlockedByResources.Count);
+        Assert.NotNull(plan.EarliestBlockedCandidate);
+        Assert.True(plan.EarliestBlockedCandidate!.Affordability.TimeUntilAffordableSeconds > 0);
+    }
+
+    [Fact]
+    public void BuildBulkUpgradePlan_IncompleteDorf1SnapshotRequestsLegacyFallback()
+    {
+        var plan = ResourceSnapshotCalculator.BuildBulkUpgradePlan(
+            new[] { Field(1, "wood", 1) },
+            targetLevel: 10,
+            fallbackMax: 40,
+            queuedLevelsBySlot: new Dictionary<int, int>(),
+            resources: new Dictionary<string, string> { ["wood"] = "100" },
+            CompleteProduction(),
+            warehouseCapacity: null,
+            granaryCapacity: null);
+
+        Assert.False(plan.IsComplete);
+        Assert.Null(plan.CandidateToInspect);
+    }
+
+    [Fact]
+    public void BuildBulkUpgradePlan_ReportsQueuedFieldAlreadyReachingTarget()
+    {
+        var plan = ResourceSnapshotCalculator.BuildBulkUpgradePlan(
+            new[] { Field(7, "wood", 1) },
+            targetLevel: 2,
+            fallbackMax: 40,
+            queuedLevelsBySlot: new Dictionary<int, int> { [7] = 2 },
+            EmptyResources(),
+            CompleteProduction(),
+            warehouseCapacity: 100_000,
+            granaryCapacity: 100_000);
+
+        Assert.True(plan.IsComplete);
+        Assert.True(plan.AnyQueuedTowardTarget);
+        Assert.Null(plan.CandidateToInspect);
+        Assert.Empty(plan.BlockedByResources);
+    }
+
+    private static Dictionary<string, string> ResourcesFor(BuildingLevelStats cost) => new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["wood"] = cost.Wood.ToString(),
+        ["clay"] = cost.Clay.ToString(),
+        ["iron"] = cost.Iron.ToString(),
+        ["crop"] = cost.Crop.ToString(),
+    };
+
+    private static Dictionary<string, string> EmptyResources() => new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["wood"] = "0",
+        ["clay"] = "0",
+        ["iron"] = "0",
+        ["crop"] = "0",
+    };
+
+    private static Dictionary<string, double?> CompleteProduction(double value = 1_000) => new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["wood"] = value,
+        ["clay"] = value,
+        ["iron"] = value,
+        ["crop"] = value,
+    };
+
     private static ResourceField Field(int? slotId, string type, int? level)
         => new(slotId, type, type, level, null);
 }

@@ -197,9 +197,128 @@ internal static class ResourceSnapshotCalculator
             hasUnknownWait,
             wood + clay + iron + crop);
     }
+
+    internal static ResourceBulkUpgradePlan BuildBulkUpgradePlan(
+        IReadOnlyList<ResourceField> orderedCandidates,
+        int targetLevel,
+        int fallbackMax,
+        IReadOnlyDictionary<int, int> queuedLevelsBySlot,
+        IReadOnlyDictionary<string, string> resources,
+        IReadOnlyDictionary<string, double?> productionByHour,
+        long? warehouseCapacity,
+        long? granaryCapacity)
+    {
+        var hasCompleteStock = ResourceKeys.All(key =>
+            resources.TryGetValue(key, out var raw)
+            && TravianParsing.TryParseResourceValue(raw) is not null);
+        if (!hasCompleteStock || warehouseCapacity is not > 0 || granaryCapacity is not > 0)
+        {
+            return ResourceBulkUpgradePlan.Incomplete;
+        }
+
+        var effectiveTarget = Math.Min(targetLevel, fallbackMax);
+        var blocked = new List<ResourceBulkUpgradeCandidate>();
+        ResourceBulkUpgradeCandidate? candidateToInspect = null;
+        var anyQueuedTowardTarget = false;
+        foreach (var field in orderedCandidates)
+        {
+            if (field.SlotId is not int slotId || field.Level is not int currentLevel)
+            {
+                continue;
+            }
+
+            var projectedLevel = queuedLevelsBySlot.TryGetValue(slotId, out var queuedLevel)
+                ? Math.Max(currentLevel, queuedLevel)
+                : currentLevel;
+            if (projectedLevel >= effectiveTarget)
+            {
+                anyQueuedTowardTarget |= currentLevel < effectiveTarget;
+                continue;
+            }
+
+            var gid = ResourceFieldGid(field.FieldType);
+            var offerLevel = projectedLevel + 1;
+            var cost = gid is int resolvedGid
+                ? BuildingCatalogService.CostFor(resolvedGid, offerLevel)
+                : null;
+            if (cost is null)
+            {
+                return ResourceBulkUpgradePlan.Incomplete;
+            }
+
+            var affordability = EvaluateUpgradeAffordability(
+                cost.Wood,
+                cost.Clay,
+                cost.Iron,
+                cost.Crop,
+                resources,
+                productionByHour);
+            var candidate = new ResourceBulkUpgradeCandidate(
+                field,
+                projectedLevel,
+                offerLevel,
+                cost,
+                affordability);
+            var exceedsKnownCapacity = cost.Wood > warehouseCapacity.Value
+                || cost.Clay > warehouseCapacity.Value
+                || cost.Iron > warehouseCapacity.Value
+                || cost.Crop > granaryCapacity.Value;
+            if (affordability.TimeUntilAffordableSeconds == 0 || exceedsKnownCapacity)
+            {
+                candidateToInspect ??= candidate;
+                continue;
+            }
+
+            blocked.Add(candidate);
+        }
+
+        var earliestBlocked = blocked
+            .OrderBy(candidate => candidate.Affordability.TimeUntilAffordableSeconds)
+            .FirstOrDefault();
+        return new ResourceBulkUpgradePlan(
+            IsComplete: true,
+            CandidateToInspect: candidateToInspect,
+            RecoveryCandidate: candidateToInspect is null ? blocked.FirstOrDefault() : null,
+            EarliestBlockedCandidate: earliestBlocked,
+            BlockedByResources: blocked,
+            AnyQueuedTowardTarget: anyQueuedTowardTarget);
+    }
+
+    private static int? ResourceFieldGid(string? fieldType) => fieldType?.Trim().ToLowerInvariant() switch
+    {
+        "wood" => 1,
+        "clay" => 2,
+        "iron" => 3,
+        "crop" => 4,
+        _ => null,
+    };
 }
 
 internal sealed record ResourceUpgradeAffordability(
     long TimeUntilAffordableSeconds,
     bool HasUnknownWait,
     long TotalCost);
+
+internal sealed record ResourceBulkUpgradeCandidate(
+    ResourceField Field,
+    int ProjectedLevel,
+    int OfferLevel,
+    BuildingLevelStats Cost,
+    ResourceUpgradeAffordability Affordability);
+
+internal sealed record ResourceBulkUpgradePlan(
+    bool IsComplete,
+    ResourceBulkUpgradeCandidate? CandidateToInspect,
+    ResourceBulkUpgradeCandidate? RecoveryCandidate,
+    ResourceBulkUpgradeCandidate? EarliestBlockedCandidate,
+    IReadOnlyList<ResourceBulkUpgradeCandidate> BlockedByResources,
+    bool AnyQueuedTowardTarget)
+{
+    internal static ResourceBulkUpgradePlan Incomplete { get; } = new(
+        false,
+        null,
+        null,
+        null,
+        [],
+        false);
+}

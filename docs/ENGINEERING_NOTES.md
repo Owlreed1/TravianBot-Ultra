@@ -136,8 +136,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
   Pacing setting `short_village_defer_seconds` may be 20, 60, or 90 seconds (default 60) and applies only when no task
   is ready in any village; changing it while the continuous loop runs requests a wake at the next safe boundary.
 - A bulk resource-field scan reads active constructions and the compact build queue once on dorf1 and reuses that
-  snapshot while evaluating candidates. A blocked field must not cause build.php -> dorf2 -> build.php navigation
-  before the next field; refresh the snapshot only after a construction mutation starts a new scan iteration. Rank
+  snapshot while evaluating candidates. The same dorf1 pass reads current stock, production, and storage capacity;
+  combine those values with the catalog cost for each projected next level and discard resource-unaffordable offers
+  before opening a build page. Open only the first affordable/live-check candidate in the selected order. If none is
+  affordable, Hero/NPC recovery may inspect at most one representative offer; incomplete dorf1/catalog data falls
+  back to live per-page checks. Refresh the snapshot only after a construction mutation starts a new scan iteration. Rank
   candidates by their projected level including an exact-slot queued upgrade. Retain a level confirmed during the
   current operation even when the refreshed live queue omits its slot identity, so a just-queued field is not probed
   again ahead of untouched lower-level fields. An upgrade-click redirect to dorf1 receives the normal page-load pacing

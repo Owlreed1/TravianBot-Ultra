@@ -93,11 +93,11 @@ An uncertain Plus resource slot is retried at most three times. The delay is ran
 _Avoid_: Fixed retry cadence, unlimited retry loop
 
 **Affordable Bulk Resource Candidate**:
-For `Upgrade all resources to level`, a resource-blocked candidate does not end the pass. The operation continues in its selected order until it finds an eligible candidate affordable for a live free Plus resource slot.
+For `Upgrade all resources to level`, the first eligible candidate in the selected order whose catalog cost is affordable from the current Dorf1 stock snapshot. Resource-blocked candidates are filtered locally before build-page navigation; the selected page remains the final authority.
 _Avoid_: First blocked field, bulk stop
 
 **Bulk Resource Wait Deadline**:
-When no affordable bulk-resource candidate can start, the resource wait is the earliest live affordability deadline among eligible candidates, not the first candidate's deadline.
+When no affordable bulk-resource candidate can start, the resource wait is the earliest locally calculated affordability deadline among eligible candidates, with a live representative check only when recovery or incomplete data requires it.
 _Avoid_: First wait, strategy wait
 
 **Representative Bulk Resource Offer**:

@@ -315,11 +315,19 @@ public sealed partial class TravianClient
                 var fallbackMax = 40;
                 List<ResourceField> candidateRows;
                 Dictionary<string, long>? stockByType = null;
-                if (smartStrategy)
+                IReadOnlyDictionary<string, string> currentResources = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                IReadOnlyDictionary<string, double?> currentProduction = new Dictionary<string, double?>(StringComparer.OrdinalIgnoreCase);
+                long? warehouseCapacity = null;
+                long? granaryCapacity = null;
+                try
                 {
-                    try
+                    var snapshot = await ReadResourceSnapshotAsync(cancellationToken);
+                    currentResources = snapshot.Resources;
+                    currentProduction = snapshot.ProductionByHour;
+                    warehouseCapacity = snapshot.Capacities.Warehouse;
+                    granaryCapacity = snapshot.Capacities.Granary;
+                    if (smartStrategy)
                     {
-                        var snapshot = await ReadResourceSnapshotAsync(cancellationToken);
                         var parsed = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
                         foreach (var resourceKey in new[] { "wood", "clay", "iron", "crop" })
                         {
@@ -336,14 +344,14 @@ public sealed partial class TravianClient
                             stockByType = parsed;
                         }
                     }
-                    catch (OperationCanceledException)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        Notify($"[UpgradeAllResourcesToLevelAsync] smart strategy could not read storage ({ex.Message}). Falling back to lowest-level-first.");
-                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    Notify($"[UpgradeAllResourcesToLevelAsync] Dorf1 resource preflight could not read storage ({ex.Message}). Falling back to live build-page checks.");
                 }
 
                 if (stockByType is not null)
@@ -366,14 +374,79 @@ public sealed partial class TravianClient
                         queuedLevelsBySlot).ToList();
                 }
 
-                Notify($"[UpgradeAllResourcesToLevelAsync] scanned {candidateRows.Count} resource fields on dorf1.");
+                var scannedCandidateCount = candidateRows.Count;
+                var localPlan = ResourceSnapshotCalculator.BuildBulkUpgradePlan(
+                    candidateRows,
+                    targetLevel,
+                    fallbackMax,
+                    queuedLevelsBySlot,
+                    currentResources,
+                    currentProduction,
+                    warehouseCapacity,
+                    granaryCapacity);
+                ResourceBulkUpgradeCandidate? localEarliestBlocked = null;
+                if (localPlan.IsComplete)
+                {
+                    var selectedCandidate = localPlan.CandidateToInspect;
+                    var recoveryEnabled = (_config.HeroResourceTransferEnabled && _config.HeroResourceUseConstruction)
+                        || _config.NpcTradeConstructionEnabled;
+                    if (selectedCandidate is null && recoveryEnabled)
+                    {
+                        selectedCandidate = localPlan.RecoveryCandidate;
+                    }
+
+                    localEarliestBlocked = localPlan.CandidateToInspect is null
+                        ? localPlan.EarliestBlockedCandidate
+                        : null;
+                    candidateRows = selectedCandidate is null
+                        ? []
+                        : [selectedCandidate.Field];
+                    Notify(
+                        $"[UpgradeAllResourcesToLevelAsync] Dorf1 catalog preflight complete: " +
+                        $"affordable/live candidate={(localPlan.CandidateToInspect?.Field.SlotId.ToString() ?? "none")}, " +
+                        $"resource-blocked={localPlan.BlockedByResources.Count}, " +
+                        $"selected={(selectedCandidate?.Field.SlotId.ToString() ?? "none")}, " +
+                        $"recovery={(selectedCandidate is not null && selectedCandidate == localPlan.RecoveryCandidate ? "representative" : "not-needed")}.");
+                }
+                else
+                {
+                    Notify("[UpgradeAllResourcesToLevelAsync] Dorf1 catalog preflight incomplete; retaining live per-page fallback for this scan.");
+                }
+
+                Notify($"[UpgradeAllResourcesToLevelAsync] scanned {scannedCandidateCount} resource fields on dorf1; {candidateRows.Count} field(s) require a live build-page check.");
                 await NotifyCurrentResourceProductionForUiAsync(cancellationToken);
 
                 var attemptedAny = false;
-                var anyQueuedTowardTarget = false;
+                var anyQueuedTowardTarget = localPlan.IsComplete && localPlan.AnyQueuedTowardTarget;
                 var blockReasons = new List<string>();
                 var blockedOfferIdentities = new HashSet<string>(StringComparer.Ordinal);
                 UpgradeResourceWaitSnapshot? earliestResourceWait = null;
+                if (localEarliestBlocked is not null)
+                {
+                    var blockedField = localEarliestBlocked.Field;
+                    var blockedSlot = blockedField.SlotId ?? 0;
+                    var blockedName = string.IsNullOrWhiteSpace(blockedField.Name)
+                        ? $"slot {blockedSlot}"
+                        : blockedField.Name;
+                    var blockedLabel = $"Resource slot {blockedSlot} ({blockedName}) upgrade to level {localEarliestBlocked.OfferLevel}";
+                    var cost = localEarliestBlocked.Cost;
+                    earliestResourceWait = UpgradeResourceWaitCalculator.BuildSnapshot(
+                        blockedLabel,
+                        new Dictionary<string, long?>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["wood"] = cost.Wood,
+                            ["clay"] = cost.Clay,
+                            ["iron"] = cost.Iron,
+                            ["crop"] = cost.Crop,
+                        },
+                        currentResources,
+                        currentProduction,
+                        fallbackWaitSeconds: 0,
+                        waitReasonWhenEstimated: "dorf1_catalog",
+                        warehouseCapacity,
+                        granaryCapacity);
+                    blockReasons.Add($"{localPlan.BlockedByResources.Count} resource field offer(s) were unaffordable in the Dorf1 catalog preflight");
+                }
                 foreach (var candidate in candidateRows)
                 {
                     var slot = candidate.SlotId ?? 0;
