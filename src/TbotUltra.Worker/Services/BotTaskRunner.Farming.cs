@@ -322,6 +322,7 @@ public sealed partial class BotTaskRunner
         IProgress<FarmListCreateProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        using var priorityRequest = _priorityBrowserWork.EnterPriorityRequest();
         FarmListCreateBatchResult? result = null;
         await ExecuteWithClientAsync(
             options,

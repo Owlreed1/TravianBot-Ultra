@@ -403,12 +403,14 @@ public sealed partial class TravianClient : IBuildingClient
                 ?? BuildQueueFingerprints.FindTargetBuilding(queueItems, buildingName, slotId, gid, targetLevel);
             if (targetQueueItem is not null)
             {
+                await PublishConstructionQueueObservationAsync(cancellationToken);
                 return (true, $"build queue contains slot {targetQueueItem.SlotId?.ToString(CultureInfo.InvariantCulture) ?? "unknown"} {buildingName}");
             }
 
             var newQueueItem = BuildQueueFingerprints.FindNewBuildingByName(buildQueueBefore, queueItems, buildingName);
             if (newQueueItem is not null)
             {
+                await PublishConstructionQueueObservationAsync(cancellationToken);
                 return (true, $"build queue added {buildingName}");
             }
 
@@ -423,6 +425,7 @@ public sealed partial class TravianClient : IBuildingClient
                 && ActiveConstructionMatchesTarget(item, slotId, gid, targetLevel));
             if (matchingActiveConstruction is not null)
             {
+                await PublishConstructionQueueObservationAsync(cancellationToken, activeConstructions);
                 return (true, $"active construction detected for slot {matchingActiveConstruction.SlotId?.ToString(CultureInfo.InvariantCulture) ?? "unknown"} {matchingActiveConstruction.Name}");
             }
 
@@ -435,6 +438,7 @@ public sealed partial class TravianClient : IBuildingClient
                 if (sameBuilding && slotInfo.Level >= 0)
                 {
                     var slotLabel = string.IsNullOrWhiteSpace(slotInfo.BuildingName) ? buildingName : slotInfo.BuildingName;
+                    await PublishConstructionQueueObservationAsync(cancellationToken);
                     return (true, $"slot {slotId} now shows {slotLabel} level {slotInfo.Level}");
                 }
             }

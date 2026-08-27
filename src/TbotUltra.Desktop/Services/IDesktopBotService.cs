@@ -10,6 +10,7 @@ public interface IDesktopBotService
 
     event Action<FarmLossDestinationChange>? FarmLossDestinationChanged;
     event Action<VerifiedActiveVillage>? ActiveVillageVerified;
+    event Action<ConstructionQueueObservation>? ConstructionQueueObserved;
     QueueItem Enqueue(string taskName, Dictionary<string, string>? payload, int priority, int maxRetries);
     IReadOnlyList<QueueItem> EnqueueBatch(IReadOnlyList<QueueItemCreateRequest> requests);
     IReadOnlyList<QueueItem> ReplaceActiveQueueGroup(QueueGroup group, IReadOnlyList<QueueItemCreateRequest> requests);

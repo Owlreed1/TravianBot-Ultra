@@ -355,10 +355,11 @@ public sealed partial class TravianClient
             if (actual != desired)
             {
                 var clicked = await TryClickFirstVisibleEnabledAsync(
-                    "#createFarmListForm label.checkbox:has(input[name='onlyLosses']), "
-                    + "#createFarmListForm input[type='checkbox'][name='onlyLosses']",
+                    "#createFarmListForm input[type='checkbox'][name='onlyLosses']",
                     cancellationToken,
-                    reason: "create farm list: only losses");
+                    reason: "create farm list: only losses",
+                    timeoutMs: Math.Min(_config.TimeoutMs, 5000),
+                    allowForcedRetry: true);
                 if (!clicked)
                 {
                     Notify(

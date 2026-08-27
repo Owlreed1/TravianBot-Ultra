@@ -355,6 +355,7 @@ public partial class MainWindow
         _automationDesk.Updated -= AutomationDesk_Updated;
         _botService.FarmLossDestinationChanged -= OnFarmLossDestinationChanged;
         _botService.ActiveVillageVerified -= OnActiveVillageVerified;
+        _botService.ConstructionQueueObserved -= OnConstructionQueueObserved;
         TravianClient.HeroInventoryUpdated -= OnWorkerHeroInventoryUpdated;
         TravianClient.HeroHpUpdated -= OnWorkerHeroHpUpdated;
         TravianClient.HeroStatusUpdated -= OnWorkerHeroStatusUpdated;

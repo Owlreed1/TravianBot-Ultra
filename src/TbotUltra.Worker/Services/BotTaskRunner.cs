@@ -105,6 +105,7 @@ public sealed partial class BotTaskRunner
     public Func<LobbyWorldServerResolution, CancellationToken, Task>? LobbyWorldServerResolved { get; set; }
     public event Action<FarmLossDestinationChange>? FarmLossDestinationChanged;
     public event Action<VerifiedActiveVillage>? ActiveVillageVerified;
+    public event Action<ConstructionQueueObservation>? ConstructionQueueObserved;
 
     private void RaiseFarmLossDestinationChanged(FarmLossDestinationChange change)
         => FarmLossDestinationChanged?.Invoke(change);
@@ -685,6 +686,7 @@ public sealed partial class BotTaskRunner
             {
                 StatusCallback = log,
                 ActiveVillageVerified = village => ActiveVillageVerified?.Invoke(village),
+                ConstructionQueueObserved = observation => ConstructionQueueObserved?.Invoke(observation),
                 SetConsentDomainsAllowed = setConsentDomainsAllowed,
                 CleanupAfterBonusVideoAsync = cleanupAfterBonusVideoAsync,
                 RunInIsolatedBonusVideoBrowserAsync = runInIsolatedBonusVideoBrowserAsync,

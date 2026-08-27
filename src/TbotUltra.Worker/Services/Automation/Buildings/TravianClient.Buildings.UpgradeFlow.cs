@@ -1287,6 +1287,7 @@ public sealed partial class TravianClient : IBuildingClient
             var observedLevel = await TryReadSlotLevelOnCurrentPageAsync(slotId);
             if (observedLevel is int level && level > previousLevel)
             {
+                await PublishConstructionQueueObservationAsync(cancellationToken);
                 return new UpgradeProgressResult(true, true, $"level advanced to {level}");
             }
 
@@ -1295,12 +1296,14 @@ public sealed partial class TravianClient : IBuildingClient
             var targetQueueItem = BuildQueueFingerprints.FindNewTargetBuilding(buildQueueBefore, queueItems, buildingName, slotId, gid, targetLevel);
             if (targetQueueItem is not null)
             {
+                await PublishConstructionQueueObservationAsync(cancellationToken);
                 return new UpgradeProgressResult(false, true, $"build queue contains slot {targetQueueItem.SlotId?.ToString(CultureInfo.InvariantCulture) ?? "unknown"} {buildingName}");
             }
 
             var newQueueItem = BuildQueueFingerprints.FindNewBuildingByName(buildQueueBefore, queueItems, buildingName);
             if (newQueueItem is not null)
             {
+                await PublishConstructionQueueObservationAsync(cancellationToken);
                 return new UpgradeProgressResult(false, true, $"build queue added {buildingName}");
             }
 
@@ -1315,6 +1318,7 @@ public sealed partial class TravianClient : IBuildingClient
                 && ActiveConstructionMatchesTarget(item, slotId, gid, targetLevel));
             if (matchingActiveConstruction is not null)
             {
+                await PublishConstructionQueueObservationAsync(cancellationToken, activeConstructions);
                 return new UpgradeProgressResult(false, true, $"active construction detected for slot {matchingActiveConstruction.SlotId?.ToString(CultureInfo.InvariantCulture) ?? "unknown"} {matchingActiveConstruction.Name}");
             }
         }
@@ -1325,6 +1329,7 @@ public sealed partial class TravianClient : IBuildingClient
         var finalLevel = await TryReadSlotLevelOnCurrentPageAsync(slotId);
         if (finalLevel is int finalValue && finalValue > previousLevel)
         {
+            await PublishConstructionQueueObservationAsync(cancellationToken);
             return new UpgradeProgressResult(true, true, $"level advanced to {finalValue} (post-poll)");
         }
 

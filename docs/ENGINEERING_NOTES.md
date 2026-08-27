@@ -538,12 +538,16 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Reused Add-target dialogs must replace X/Y through the traced input path and re-read both fresh fields as an exact
   pair before validation. Retry replacement only a bounded number of times and never click Save while either
   coordinate differs from the requested value.
+- A Farm Lists overview read refreshes the Official Farm Lists page exactly once before reading its React state,
+  even when the browser is already on that page. Wait for the refreshed page and list wrappers before projecting
+  counts and capacities into Add farms or the Desktop UI; later retry attempts may reuse the hydrated page.
 - When Travian leaves a valid Add-target lookup unresolved, close/reopen the form and retry that same coordinate once
   before marking it failed. Definitive invalid-coordinate, occupied-oasis, duplicate, and verified Save outcomes are
   never retried; an exhausted lookup retry must state that Save was not attempted.
 - Program-created farm lists carry the account-scoped Create-popup preference `Only create reports with losses`,
   defaulting enabled when absent. Before Create, set and verify `#createFarmListForm input[name='onlyLosses']` with
-  a real label/input click; a missing or unverifiable checkbox is logged but must not block list creation.
+  a direct input click (the wrapping label can be covered by `.onlyLossesSelection`); use a short actionability wait
+  with a trusted forced-click fallback. A missing or unverifiable checkbox is logged but must not block list creation.
 - Hero attribute priority is execution-authoritative from the latest saved account settings. A queued
   `hero_manage` or `spend_hero_attribute_points` payload is only a snapshot and must never overwrite a reorder
   the user made in the UI while the task was waiting.
@@ -639,6 +643,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   forces or reschedules a Village scan: it may fill only the live-verified browser village, while an independently due
   scan may fill free slots as it naturally visits each village. Full slots retain their persisted queue-humanize extra
   so later navigation still waits for the effective deadline.
+- Every target-specific live confirmation that a building or resource entered Travian's construction queue publishes
+  that authoritative overview snapshot to Desktop immediately. Update the coordinate-owned village cache and green
+  construction-slot icons before the enclosing Worker task finishes; retain the normal post-task refresh as backup.
 - An automation run captures Worker's actual `BrowserGeneration`; never mirror or synthesize that generation in
   Desktop. Runtime-item reconciliation identifies village scope with `BotOptionPayloadKeys.TargetVillageKey` and
   must preserve an existing pending item's authoritative `NextAttemptAt` when refreshing payload or priority.

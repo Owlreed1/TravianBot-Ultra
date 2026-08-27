@@ -34,7 +34,9 @@ public sealed partial class TravianClient : IFarmingClient
         IReadOnlyList<FarmListOverview> rows = [];
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            await EnsureRallyPointAndOpenFarmListPageAsync(cancellationToken);
+            await EnsureRallyPointAndOpenFarmListPageAsync(
+                cancellationToken,
+                refreshCurrentPage: attempt == 1);
             await DismissDeactivatedTargetsNoticeAsync(cancellationToken);
             await WaitForPageReadyAsync(cancellationToken); // Wait for page to load
             await WaitForFarmListsRenderedAsync(cancellationToken);
@@ -992,15 +994,26 @@ public sealed partial class TravianClient : IFarmingClient
             lid);
     }
 
-    private async Task EnsureRallyPointAndOpenFarmListPageAsync(CancellationToken cancellationToken)
+    private async Task EnsureRallyPointAndOpenFarmListPageAsync(
+        CancellationToken cancellationToken,
+        bool refreshCurrentPage = false)
     {
-        if (await CanReuseCurrentFarmListPageAsync(cancellationToken))
+        if (!refreshCurrentPage && await CanReuseCurrentFarmListPageAsync(cancellationToken))
         {
             Notify("[farm-list:verbose] reusing the current hydrated farm list page.");
             return;
         }
 
-        await GotoAsync(Paths.RallyPointFarmLists, cancellationToken);
+        if (refreshCurrentPage)
+        {
+            Notify("[farm-list] refreshing Farm Lists before reading current values.");
+            await ReloadOrGotoAsync(Paths.RallyPointFarmLists, cancellationToken);
+        }
+        else
+        {
+            await GotoAsync(Paths.RallyPointFarmLists, cancellationToken);
+        }
+
         await EnsureLoggedInAsync(cancellationToken: cancellationToken);
         await WaitForOfficialFarmListRenderAsync(cancellationToken);
         if (await IsFarmListPageAsync(cancellationToken))

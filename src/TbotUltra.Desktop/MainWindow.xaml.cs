@@ -495,6 +495,7 @@ public partial class MainWindow : Window
         _queuePanelService = new QueuePanelService(new DesktopQueuePanelClient(_botService));
         _botService.FarmLossDestinationChanged += OnFarmLossDestinationChanged;
         _botService.ActiveVillageVerified += OnActiveVillageVerified;
+        _botService.ConstructionQueueObserved += OnConstructionQueueObserved;
         _travianQueueViewModel.RemoveRequested += QueueRemoveSelected;
         _travianQueueViewModel.RestoreRequested += RestoreRemovedQueueItems;
         _travianQueueViewModel.MoveUpRequested += MoveSelectedQueueItemUp;

@@ -18,7 +18,9 @@ public sealed class FarmListOnlyLossesSourceTests
         var helper = source[helperStart..nextMethod];
 
         Assert.Contains("input[type='checkbox'][name='onlyLosses']", helper, StringComparison.Ordinal);
-        Assert.Contains("label.checkbox:has(input[name='onlyLosses'])", helper, StringComparison.Ordinal);
+        Assert.DoesNotContain("label.checkbox:has(input[name='onlyLosses'])", helper, StringComparison.Ordinal);
+        Assert.Contains("timeoutMs: Math.Min(_config.TimeoutMs, 5000)", helper, StringComparison.Ordinal);
+        Assert.Contains("allowForcedRetry: true", helper, StringComparison.Ordinal);
         Assert.True(
             helper.Split("IsCheckedAsync", StringSplitOptions.None).Length >= 3,
             "The Official checkbox must be read before the click and verified after it.");

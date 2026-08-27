@@ -718,6 +718,7 @@ public sealed partial class TravianClient
             if (current is int currentLevel && currentLevel > previousLevel)
             {
                 Notify($"Resource slot {slotId} level increased from {previousLevel} to {currentLevel}.");
+                await PublishConstructionQueueObservationAsync(cancellationToken);
                 return new UpgradeProgressResult(true, false, "level advanced");
             }
 
@@ -730,6 +731,7 @@ public sealed partial class TravianClient
                 targetLevel);
             if (targetQueueItem is not null)
             {
+                await PublishConstructionQueueObservationAsync(cancellationToken);
                 return new UpgradeProgressResult(
                     false,
                     true,

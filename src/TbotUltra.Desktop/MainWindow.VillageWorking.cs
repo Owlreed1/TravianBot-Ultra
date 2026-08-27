@@ -1161,6 +1161,89 @@ public partial class MainWindow
         RunOrPostToUi(() => SetActiveWorkingVillage(key, village.Name));
     }
 
+    private void OnConstructionQueueObserved(ConstructionQueueObservation observation)
+    {
+        if (!string.Equals(
+                observation.AccountName,
+                _accountStore.ActiveAccountName(),
+                StringComparison.OrdinalIgnoreCase)
+            || observation.ActiveConstructions.Count == 0)
+        {
+            return;
+        }
+
+        RunOrPostToUi(() =>
+        {
+            var name = NormalizeVillageName(observation.VillageName);
+            var villageKey = observation.CoordX.HasValue && observation.CoordY.HasValue
+                ? VillageKey.FromCoords(observation.CoordX.Value, observation.CoordY.Value)
+                : ResolveVillageKeyByName(name);
+            if (name is null || (villageKey is null && IsVillageNameAmbiguous(name)))
+            {
+                AppendLog(
+                    $"[construction-ui] skipped immediate queue update for ambiguous village " +
+                    $"'{observation.VillageName}'.");
+                return;
+            }
+
+            VillageStatus? existing = null;
+            var found = villageKey is not null
+                ? _villageStatusCache.TryGetByKey(villageKey, out existing)
+                : _villageStatusCache.TryGetByName(name, out existing);
+            var now = DateTimeOffset.UtcNow;
+            var remaining = observation.ActiveConstructions
+                .Select(item => item.Finish?.RemainingSecondsAt(now) ?? item.TimeLeftSeconds)
+                .Where(seconds => seconds is > 0)
+                .Select(seconds => seconds!.Value)
+                .DefaultIfEmpty()
+                .Min();
+            var shortestFinish = observation.ActiveConstructions
+                .Where(item => item.Finish is not null)
+                .Select(item => item.Finish!)
+                .OrderBy(item => item.FinishUtc)
+                .FirstOrDefault();
+
+            var status = found && existing is not null
+                ? existing with
+                {
+                    ActiveVillage = name,
+                    IsBuildingInProgress = true,
+                    ActiveBuildCount = observation.ActiveConstructions.Count,
+                    BuildQueueRemainingSeconds = remaining > 0 ? remaining : null,
+                    BuildQueueRemainingText = remaining > 0 ? FormatBuildDuration(remaining) : string.Empty,
+                    ActiveConstructions = observation.ActiveConstructions,
+                    BuildQueueFinish = shortestFinish,
+                    ActiveConstructionsFromOverview = true,
+                    ActiveVillageCoordX = observation.CoordX ?? existing.ActiveVillageCoordX,
+                    ActiveVillageCoordY = observation.CoordY ?? existing.ActiveVillageCoordY,
+                }
+                : new VillageStatus(
+                    ActiveVillage: name,
+                    Villages: [],
+                    Resources: new Dictionary<string, string>(),
+                    ResourceFields: [],
+                    Buildings: [],
+                    BuildQueue: [],
+                    IsBuildingInProgress: true,
+                    ActiveBuildCount: observation.ActiveConstructions.Count,
+                    BuildQueueRemainingSeconds: remaining > 0 ? remaining : null,
+                    BuildQueueRemainingText: remaining > 0 ? FormatBuildDuration(remaining) : string.Empty,
+                    ActiveConstructions: observation.ActiveConstructions,
+                    BuildQueueFinish: shortestFinish,
+                    ActiveConstructionsFromOverview: true,
+                    ActiveVillageCoordX: observation.CoordX,
+                    ActiveVillageCoordY: observation.CoordY);
+
+            StoreVillageStatusCacheEntry(name, status);
+            InvalidateVillageOverview();
+            SetActiveWorkingVillage(villageKey, name);
+            RefreshVillageActivityIndicatorsOnDashboard();
+            AppendLog(
+                $"[construction-ui] applied {observation.ActiveConstructions.Count} active construction(s) " +
+                $"to village='{name}' immediately after queue confirmation.");
+        });
+    }
+
     private string? ResolveVillageKeyByName(string? villageName)
     {
         if (string.IsNullOrWhiteSpace(villageName))
