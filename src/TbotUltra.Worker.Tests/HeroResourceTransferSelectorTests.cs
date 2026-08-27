@@ -55,6 +55,9 @@ public sealed class HeroResourceTransferSelectorTests
         Assert.Contains("TryLoadMissingHeroInventoryFromCurrentBuildPageAsync", buildingUpgradeSource);
         Assert.Contains("TryLoadMissingHeroInventoryFromCurrentBuildPageAsync", constructSource);
         Assert.Contains("TryLoadMissingHeroInventoryFromCurrentBuildPageAsync", resourceUpgradeSource);
+        Assert.Contains("HeroInventoryProbePolicy.ShouldProbe", transferSource);
+        Assert.Contains("TryReserveEmptyHeroInventoryProbe", transferSource);
+        Assert.DoesNotContain("GotoAsync(Paths.HeroInventory", transferSource, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()

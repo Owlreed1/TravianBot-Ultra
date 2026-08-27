@@ -373,7 +373,7 @@ public sealed partial class TravianClient
             ?? new HeroInventoryResources();
 
             Notify($"[hero-inventory] wood={resources.Wood} clay={resources.Clay} iron={resources.Iron} crop={resources.Crop}");
-            UpdateHeroInventoryCache(resources);
+            UpdateHeroInventoryCache(resources, HeroInventoryObservationSource.HeroInventoryPage);
             return resources;
         }
         finally

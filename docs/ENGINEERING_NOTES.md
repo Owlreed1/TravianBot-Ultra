@@ -559,7 +559,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Hero inventory resources are an account+server persisted last-known snapshot. Quick re-login, process restart,
   and account switching restore it; incomplete inventory reads never replace it with fabricated zeroes. When no
   snapshot has ever been captured, construction/resource actions may open their existing resource-transfer dialog,
-  read the live inventory, and close it without transferring before continuing the original action.
+  read the live inventory, and close it without transferring before continuing the original action. A cached empty
+  inventory is not permanent truth: after a persisted randomized cooldown, the next real resource-blocked action may
+  re-open that exact current-page dialog, refresh the inventory and transfer in the same dialog when allowed. Repeated
+  confirmed-empty reads back off from 15–30 to 30–45 and then 45–60 minutes per account+server; never navigate to the
+  Hero inventory page or probe more than once inside the cooldown.
 - React task-tab changes use Action pacing's click delay before the DOM click. Do not put the delay after the
   General/Village tab click; that makes a Collect-to-tab transition effectively instantaneous.
 - Bonus-video failures use shared protected timing, typed cooldowns, account proxy routing, and sanitized logs.

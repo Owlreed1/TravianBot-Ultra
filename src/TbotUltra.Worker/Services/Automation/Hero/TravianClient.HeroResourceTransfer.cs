@@ -72,7 +72,9 @@ public sealed partial class TravianClient
             var toastText = await TryReadErrorToastTextAsync();
             if (toastText?.Contains("no resources to transfer", StringComparison.OrdinalIgnoreCase) == true)
             {
-                UpdateHeroInventoryCache(new HeroInventoryResources());
+                UpdateHeroInventoryCache(
+                    new HeroInventoryResources(),
+                    HeroInventoryObservationSource.EmptyToast);
                 Notify($"[hero-inventory] resource dialog reported an empty inventory at {label}.");
                 return;
             }
@@ -97,7 +99,7 @@ public sealed partial class TravianClient
                 return;
             }
 
-            UpdateHeroInventoryCache(resources);
+            UpdateHeroInventoryCache(resources, HeroInventoryObservationSource.TransferDialog);
             Notify(
                 $"[hero-inventory] loaded from resource dialog at {label}: "
                 + $"wood={resources.Wood} clay={resources.Clay} iron={resources.Iron} crop={resources.Crop}.");
@@ -301,19 +303,37 @@ public sealed partial class TravianClient
             }
         }
 
-        // Proactive gate: if we already know (from the cached inventory) the hero cannot fully cover
-        // the missing resources, skip without opening the dialog — a partial transfer would spend
-        // hero resources without unblocking the upgrade. With no cache yet we fall through to the
-        // reactive behaviour (open the dialog and let Travian decide).
-        var cachedInventory = TryGetCachedHeroInventory();
+        // Proactive gate: a current cached inventory that cannot fully cover the missing resources
+        // skips without opening the dialog, because a partial transfer would not unblock the upgrade.
+        // An empty snapshot becomes eligible for one current-build-page refresh after its persisted
+        // cooldown; external adventure/raid rewards can refill it without any observable local event.
+        var cachedSnapshot = TryGetCachedHeroInventorySnapshot();
+        var cachedInventory = cachedSnapshot?.Resources;
         if (cachedInventory is not null && shortfall is not null)
         {
             if (!HeroCoversShortfall(cachedInventory, shortfall))
             {
-                Notify($"[hero-transfer] skip at {label}. Cached hero inventory cannot cover the shortfall "
-                    + $"(need wood={shortfall.Wood} clay={shortfall.Clay} iron={shortfall.Iron} crop={shortfall.Crop}; "
-                    + $"hero has wood={cachedInventory.Wood} clay={cachedInventory.Clay} iron={cachedInventory.Iron} crop={cachedInventory.Crop}).");
-                return false;
+                var now = DateTimeOffset.UtcNow;
+                if (cachedSnapshot is null || !HeroInventoryProbePolicy.ShouldProbe(cachedSnapshot, now))
+                {
+                    var nextProbe = cachedSnapshot?.NextProbeAtUtc is { } next
+                        ? $" nextProbe={next:O}"
+                        : string.Empty;
+                    Notify($"[hero-transfer] skip at {label}. Cached hero inventory cannot cover the shortfall "
+                        + $"(need wood={shortfall.Wood} clay={shortfall.Clay} iron={shortfall.Iron} crop={shortfall.Crop}; "
+                        + $"hero has wood={cachedInventory.Wood} clay={cachedInventory.Clay} iron={cachedInventory.Iron} crop={cachedInventory.Crop})."
+                        + nextProbe);
+                    return false;
+                }
+
+                if (!TryReserveEmptyHeroInventoryProbe(cachedSnapshot, now, out var reservedUntil))
+                {
+                    Notify($"[hero-transfer] stale empty-inventory probe was already reserved at {label}; skipping.");
+                    return false;
+                }
+
+                Notify($"[hero-transfer] cached empty inventory is stale at {label}; "
+                    + $"checking the current build-page transfer dialog (next probe after {reservedUntil:O}).");
             }
         }
 
@@ -356,7 +376,9 @@ public sealed partial class TravianClient
                     // Cache the empty inventory so the proactive gate above skips the next attempts
                     // without clicking, until a real inventory read refreshes the cache.
                     Notify($"[hero-transfer] hero inventory is empty at {label} (server: '{toastText}'); caching empty inventory and skipping.");
-                    UpdateHeroInventoryCache(new HeroInventoryResources(0, 0, 0, 0));
+                    UpdateHeroInventoryCache(
+                        new HeroInventoryResources(0, 0, 0, 0),
+                        HeroInventoryObservationSource.EmptyToast);
                 }
                 else
                 {
@@ -422,7 +444,7 @@ public sealed partial class TravianClient
         if (actualInventory is not null)
         {
             Notify($"[hero-transfer] inventory resynced from dialog: wood={actualInventory.Wood} clay={actualInventory.Clay} iron={actualInventory.Iron} crop={actualInventory.Crop}");
-            UpdateHeroInventoryCache(actualInventory);
+            UpdateHeroInventoryCache(actualInventory, HeroInventoryObservationSource.TransferDialog);
         }
 
         // The dialog now reports what the hero actually carries. If that still cannot cover the shortfall
@@ -955,7 +977,7 @@ public sealed partial class TravianClient
     // analyzed value until a later inventory/dialog read replaces it.
 
     private static readonly object HeroInventoryCacheSync = new();
-    private static readonly Dictionary<string, HeroInventoryResources> CachedHeroInventoryByKey =
+    private static readonly Dictionary<string, HeroInventorySnapshot> CachedHeroInventoryByKey =
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Raised whenever the cached hero inventory changes (read or transfer). The string is
@@ -1141,6 +1163,9 @@ public sealed partial class TravianClient
 
     /// <summary>Returns the last known hero inventory for this account, or null if never read.</summary>
     public HeroInventoryResources? TryGetCachedHeroInventory()
+        => TryGetCachedHeroInventorySnapshot()?.Resources;
+
+    private HeroInventorySnapshot? TryGetCachedHeroInventorySnapshot()
     {
         var key = BuildHeroInventoryCacheKey();
         lock (HeroInventoryCacheSync)
@@ -1151,7 +1176,7 @@ public sealed partial class TravianClient
             }
         }
 
-        if (!_heroInventorySnapshotStore.TryLoad(AccountName, ServerUrl, out var stored)
+        if (!_heroInventorySnapshotStore.TryLoadSnapshot(AccountName, ServerUrl, out var stored)
             || stored is null)
         {
             return null;
@@ -1164,23 +1189,43 @@ public sealed partial class TravianClient
 
         Notify(
             $"[hero-inventory] restored persisted snapshot: "
-            + $"wood={stored.Wood} clay={stored.Clay} iron={stored.Iron} crop={stored.Crop}.");
-        HeroInventoryUpdated?.Invoke(AccountName, stored);
+            + $"wood={stored.Resources.Wood} clay={stored.Resources.Clay} iron={stored.Resources.Iron} crop={stored.Resources.Crop} "
+            + $"observed={stored.UpdatedAtUtc:O} source={stored.Source}.");
+        HeroInventoryUpdated?.Invoke(AccountName, stored.Resources);
         return stored;
     }
 
     // Stores the latest full read in memory and on disk, then notifies listeners.
-    private void UpdateHeroInventoryCache(HeroInventoryResources resources)
+    private void UpdateHeroInventoryCache(
+        HeroInventoryResources resources,
+        HeroInventoryObservationSource source = HeroInventoryObservationSource.HeroInventoryPage)
     {
         var key = BuildHeroInventoryCacheKey();
+        var now = DateTimeOffset.UtcNow;
+        HeroInventorySnapshot snapshot;
         lock (HeroInventoryCacheSync)
         {
-            CachedHeroInventoryByKey[key] = resources;
+            CachedHeroInventoryByKey.TryGetValue(key, out var previous);
+            var consecutiveEmptyObservations = HeroInventoryProbePolicy.IsEmpty(resources)
+                ? Math.Max(1, (previous?.ConsecutiveEmptyObservations ?? 0) + 1)
+                : 0;
+            DateTimeOffset? nextProbeAt = HeroInventoryProbePolicy.IsEmpty(resources)
+                ? now + HeroInventoryProbePolicy.GetEmptyProbeDelay(
+                    consecutiveEmptyObservations,
+                    Random.Shared.NextDouble())
+                : null;
+            snapshot = new HeroInventorySnapshot(
+                resources,
+                now,
+                source,
+                consecutiveEmptyObservations,
+                nextProbeAt);
+            CachedHeroInventoryByKey[key] = snapshot;
         }
 
         try
         {
-            _heroInventorySnapshotStore.Save(AccountName, ServerUrl, resources);
+            _heroInventorySnapshotStore.SaveSnapshot(AccountName, ServerUrl, snapshot);
         }
         catch (Exception ex)
         {
@@ -1188,6 +1233,42 @@ public sealed partial class TravianClient
         }
 
         HeroInventoryUpdated?.Invoke(AccountName, resources);
+    }
+
+    private bool TryReserveEmptyHeroInventoryProbe(
+        HeroInventorySnapshot expected,
+        DateTimeOffset now,
+        out DateTimeOffset reservedUntil)
+    {
+        var key = BuildHeroInventoryCacheKey();
+        HeroInventorySnapshot reserved;
+        lock (HeroInventoryCacheSync)
+        {
+            if (!CachedHeroInventoryByKey.TryGetValue(key, out var current)
+                || current != expected
+                || !HeroInventoryProbePolicy.ShouldProbe(current, now))
+            {
+                reservedUntil = current?.NextProbeAtUtc ?? now;
+                return false;
+            }
+
+            reservedUntil = now + HeroInventoryProbePolicy.GetEmptyProbeDelay(
+                Math.Max(1, current.ConsecutiveEmptyObservations),
+                Random.Shared.NextDouble());
+            reserved = current with { NextProbeAtUtc = reservedUntil };
+            CachedHeroInventoryByKey[key] = reserved;
+        }
+
+        try
+        {
+            _heroInventorySnapshotStore.SaveSnapshot(AccountName, ServerUrl, reserved);
+        }
+        catch (Exception ex)
+        {
+            Notify($"[hero-inventory] could not persist empty-inventory probe reservation: {ex.Message}");
+        }
+
+        return true;
     }
 
     // Subtracts the just-transferred amounts from the cache (floored at 0) and notifies listeners.
@@ -1207,6 +1288,6 @@ public sealed partial class TravianClient
             Math.Max(0, current.Crop - transferred.Crop));
 
         Notify($"[hero-transfer] cached inventory updated: wood={updated.Wood} clay={updated.Clay} iron={updated.Iron} crop={updated.Crop}");
-        UpdateHeroInventoryCache(updated);
+        UpdateHeroInventoryCache(updated, HeroInventoryObservationSource.TransferDeduction);
     }
 }

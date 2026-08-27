@@ -220,6 +220,22 @@ public sealed record HeroInventoryResources(
     int Iron = 0,
     int Crop = 0);
 
+public enum HeroInventoryObservationSource
+{
+    Unknown = 0,
+    HeroInventoryPage = 1,
+    TransferDialog = 2,
+    EmptyToast = 3,
+    TransferDeduction = 4,
+}
+
+public sealed record HeroInventorySnapshot(
+    HeroInventoryResources Resources,
+    DateTimeOffset UpdatedAtUtc,
+    HeroInventoryObservationSource Source = HeroInventoryObservationSource.Unknown,
+    int ConsecutiveEmptyObservations = 0,
+    DateTimeOffset? NextProbeAtUtc = null);
+
 public sealed record HeroAdventureDispatchResult(
     bool IsInHomeVillage,
     string? StatusText,

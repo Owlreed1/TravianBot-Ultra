@@ -27,6 +27,21 @@ public sealed class HeroInventorySnapshotStore
         out HeroInventoryResources? resources)
     {
         resources = null;
+        if (!TryLoadSnapshot(accountName, serverUrl, out var snapshot) || snapshot is null)
+        {
+            return false;
+        }
+
+        resources = snapshot.Resources;
+        return true;
+    }
+
+    public bool TryLoadSnapshot(
+        string accountName,
+        string? serverUrl,
+        out HeroInventorySnapshot? snapshot)
+    {
+        snapshot = null;
         var filePath = AccountStoragePaths.HeroInventorySnapshotPath(_projectRoot, accountName, serverUrl);
         if (!File.Exists(filePath))
         {
@@ -51,7 +66,12 @@ public sealed class HeroInventorySnapshotStore
                 return false;
             }
 
-            resources = cached.Resources;
+            snapshot = new HeroInventorySnapshot(
+                cached.Resources,
+                cached.UpdatedAtUtc,
+                cached.Source,
+                cached.ConsecutiveEmptyObservations,
+                cached.NextProbeAtUtc);
             return true;
         }
         catch
@@ -61,13 +81,25 @@ public sealed class HeroInventorySnapshotStore
     }
 
     public void Save(string accountName, string? serverUrl, HeroInventoryResources resources)
+        => SaveSnapshot(
+            accountName,
+            serverUrl,
+            new HeroInventorySnapshot(
+                resources,
+                DateTimeOffset.UtcNow,
+                HeroInventoryObservationSource.HeroInventoryPage));
+
+    public void SaveSnapshot(string accountName, string? serverUrl, HeroInventorySnapshot snapshot)
     {
         var filePath = AccountStoragePaths.HeroInventorySnapshotPath(_projectRoot, accountName, serverUrl);
         var cached = new CachedHeroInventorySnapshot(
             accountName,
             serverUrl ?? string.Empty,
-            resources,
-            DateTimeOffset.UtcNow);
+            snapshot.Resources,
+            snapshot.UpdatedAtUtc,
+            snapshot.Source,
+            snapshot.ConsecutiveEmptyObservations,
+            snapshot.NextProbeAtUtc);
         AtomicFile.WriteAllText(filePath, JsonSerializer.Serialize(cached, JsonOptions));
     }
 
@@ -75,5 +107,8 @@ public sealed class HeroInventorySnapshotStore
         string AccountName,
         string ServerUrl,
         HeroInventoryResources Resources,
-        DateTimeOffset UpdatedAtUtc);
+        DateTimeOffset UpdatedAtUtc,
+        HeroInventoryObservationSource Source = HeroInventoryObservationSource.Unknown,
+        int ConsecutiveEmptyObservations = 0,
+        DateTimeOffset? NextProbeAtUtc = null);
 }
