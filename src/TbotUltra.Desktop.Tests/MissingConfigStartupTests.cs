@@ -30,7 +30,10 @@ public sealed class MissingConfigStartupTests
             });
 
             Assert.NotNull(process);
-            var exited = process.WaitForExit(milliseconds: 5_000);
+            // A fresh Windows runner can spend several seconds scanning the copied executable and
+            // framework files before WPF reaches startup. Keep the assertion bounded, but allow the
+            // cold process enough time to exercise the missing-config shutdown path.
+            var exited = process.WaitForExit(milliseconds: 30_000);
             var unhandledLogPath = Path.Combine(isolatedDirectory, "logs", "desktop-unhandled.log");
             var unhandledLog = File.Exists(unhandledLogPath)
                 ? File.ReadAllText(unhandledLogPath)
