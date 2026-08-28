@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Core.Travian;
 using TbotUltra.Worker.Domain;
@@ -31,6 +32,44 @@ public sealed record DeferredUpgradeEvaluation(bool ResourcesEnough, int WaitSec
 // WPF window; all members are static and stateless, so the move is behavior-preserving.
 public static class DeferredWaitCalculator
 {
+    public static bool TryMergeDeferredUpgradePayload(
+        string message,
+        IReadOnlyDictionary<string, string> basePayload,
+        out Dictionary<string, string> updatedPayload)
+    {
+        updatedPayload = new Dictionary<string, string>(basePayload, StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        var changed = false;
+        if (Regex.IsMatch(
+            message,
+            $@"(?<!\S){Regex.Escape(BotOptionPayloadKeys.UpgradeBlockedLabel)}=\S+",
+            RegexOptions.IgnoreCase))
+        {
+            foreach (var key in DeferredUpgradeSnapshotKeys)
+            {
+                changed |= updatedPayload.Remove(key);
+            }
+        }
+
+        foreach (var key in DeferredUpgradePayloadKeys)
+        {
+            var match = Regex.Match(message, $@"(?<!\S){Regex.Escape(key)}=(?<value>\S+)", RegexOptions.IgnoreCase);
+            if (!match.Success)
+            {
+                continue;
+            }
+
+            updatedPayload[key] = match.Groups["value"].Value.Trim();
+            changed = true;
+        }
+
+        return changed;
+    }
+
     public static Dictionary<string, long> ReadCurrentResourcesFromStatus(VillageStatus status)
     {
         var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
@@ -327,6 +366,28 @@ public static class DeferredWaitCalculator
         BotOptionPayloadKeys.QueueHumanizeExtraSeconds,
         BotOptionPayloadKeys.ContinuousFarmNextListIndex,
         BotOptionPayloadKeys.BuildingConstructSlotId,
+    ];
+
+    private static readonly string[] DeferredUpgradeSnapshotKeys =
+    [
+        BotOptionPayloadKeys.UpgradeBlockedLabel,
+        BotOptionPayloadKeys.UpgradeRequiredWood,
+        BotOptionPayloadKeys.UpgradeRequiredClay,
+        BotOptionPayloadKeys.UpgradeRequiredIron,
+        BotOptionPayloadKeys.UpgradeRequiredCrop,
+        BotOptionPayloadKeys.UpgradeCurrentWood,
+        BotOptionPayloadKeys.UpgradeCurrentClay,
+        BotOptionPayloadKeys.UpgradeCurrentIron,
+        BotOptionPayloadKeys.UpgradeCurrentCrop,
+        BotOptionPayloadKeys.UpgradeProductionWood,
+        BotOptionPayloadKeys.UpgradeProductionClay,
+        BotOptionPayloadKeys.UpgradeProductionIron,
+        BotOptionPayloadKeys.UpgradeProductionCrop,
+        BotOptionPayloadKeys.UpgradeWarehouseCapacity,
+        BotOptionPayloadKeys.UpgradeGranaryCapacity,
+        BotOptionPayloadKeys.UpgradeStorageCapacityKind,
+        BotOptionPayloadKeys.UpgradeWaitSeconds,
+        BotOptionPayloadKeys.UpgradeWaitReason,
     ];
 
     private static readonly IReadOnlyDictionary<string, string> DeferredRequirementKeys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

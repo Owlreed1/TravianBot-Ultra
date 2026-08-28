@@ -8,10 +8,19 @@ namespace TbotUltra.Worker.Services;
 // Building overview navigation, DOM snapshots and parsing entrypoints.
 public sealed partial class TravianClient
 {
-    private async Task<IReadOnlyList<Building>> ReadBuildingsAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<Building>> ReadBuildingsAsync(
+        CancellationToken cancellationToken,
+        bool reuseFreshCurrentOverview = false)
     {
         using var trace = _browserTrace.BeginOperation("READ", "buildings-overview", "scope=dorf2");
-        await GotoAsync(Paths.Buildings, cancellationToken);
+        if (!reuseFreshCurrentOverview || !IsCurrentUrlForPath(Paths.Buildings) || await IsPageMarkedStaleAsync())
+        {
+            await GotoAsync(Paths.Buildings, cancellationToken);
+        }
+        else
+        {
+            Notify("[build:verbose] reusing current fresh dorf2 overview.");
+        }
 
         await EnsureLoggedInAsync(cancellationToken: cancellationToken);
 

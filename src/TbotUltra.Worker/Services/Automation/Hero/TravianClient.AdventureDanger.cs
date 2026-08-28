@@ -575,6 +575,10 @@ public sealed partial class TravianClient
         // The first click can be swallowed by a consentmanager overlay that pops with
         // the ad request; we only re-click when such an overlay was found and accepted between attempts, so
         // a click is never sent into an already-playing ad (which could toggle pause).
+        var playbackStartObservationStartedUtc = DateTimeOffset.UtcNow;
+        Notify(
+            $"{logPrefix} {label}: player appeared; waiting up to "
+            + $"{BonusVideoPlaybackPolicy.MinimumPrePlayObservationSeconds}s for autoplay or a safe play control.");
         for (var clickAttempt = 1; clickAttempt <= 2; clickAttempt++)
         {
             DateTimeOffset? clickConfirmedAtUtc = null;
@@ -582,7 +586,10 @@ public sealed partial class TravianClient
             try
             {
                 var clickedPlayControl = false;
-                for (var findAttempt = 1; findAttempt <= 8 && !clickedPlayControl; findAttempt++)
+                string? visibleFailure = null;
+                while (!clickedPlayControl
+                    && !BonusVideoPlaybackPolicy.MayGiveUpWaitingForPlaybackStart(
+                        (DateTimeOffset.UtcNow - playbackStartObservationStartedUtc).TotalSeconds))
                 {
                     foreach (var frame in _page.Frames)
                     {
@@ -606,40 +613,41 @@ public sealed partial class TravianClient
 
                     if (!clickedPlayControl)
                     {
+                        if (await IsBonusVideoPlaybackActiveAsync(cancellationToken))
+                        {
+                            clickConfirmedAtUtc = DateTimeOffset.UtcNow;
+                            Notify(
+                                $"{logPrefix} {label}: provider autoplay is active; "
+                                + "continuing without a play-button click.");
+                            break;
+                        }
+
+                        visibleFailure ??= await TryReadVisibleBonusVideoFailureAsync(cancellationToken);
                         await Task.Delay(250, cancellationToken);
                     }
                 }
 
-                if (clickedPlayControl)
+                if (clickConfirmedAtUtc is not null)
                 {
                     await TryClickBonusVideoSkipAdAsync(label, logPrefix, cancellationToken);
                     await MuteBonusVideoAsync(label, logPrefix, cancellationToken);
                 }
                 else
                 {
-                    var visibleFailure = await TryReadVisibleBonusVideoFailureAsync(cancellationToken);
+                    visibleFailure ??= await TryReadVisibleBonusVideoFailureAsync(cancellationToken);
                     if (visibleFailure is not null)
                     {
                         Notify($"{logPrefix} {label}: {visibleFailure}");
-                        return null;
-                    }
-
-                    if (await IsBonusVideoPlaybackActiveAsync(cancellationToken))
-                    {
-                        clickConfirmedAtUtc = DateTimeOffset.UtcNow;
-                        Notify(
-                            $"{logPrefix} {label}: provider autoplay is active; " +
-                            "continuing without a play-button click.");
-                        await TryClickBonusVideoSkipAdAsync(label, logPrefix, cancellationToken);
-                        await MuteBonusVideoAsync(label, logPrefix, cancellationToken);
                     }
                     else
                     {
                         Notify(
-                            $"{logPrefix} {label}: no safe visible play control appeared and playback was not active; " +
-                            "video area was left untouched.");
-                        return null;
+                            $"{logPrefix} {label}: no safe visible play control appeared and playback was not active "
+                            + $"during the {BonusVideoPlaybackPolicy.MinimumPrePlayObservationSeconds}s observation; "
+                            + "video area was left untouched.");
                     }
+
+                    return null;
                 }
             }
             catch (PlaywrightException ex) when (IsBonusVideoNavigationTransition(ex))
@@ -669,6 +677,7 @@ public sealed partial class TravianClient
             }
 
             Notify($"{logPrefix} {label}: consent dialog intercepted the click; accepted and retrying.");
+            playbackStartObservationStartedUtc = DateTimeOffset.UtcNow;
         }
 
         Notify($"{logPrefix} {label}: play could not be confirmed after consent retry.");

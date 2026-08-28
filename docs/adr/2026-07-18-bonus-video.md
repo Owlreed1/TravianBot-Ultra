@@ -13,6 +13,8 @@ Active decision, extracted from `ENGINEERING_NOTES.md` on 2026-07-18.
 - Construct, resource, production, and hero bonus videos share one post-play policy: the protected 60-second
   interval begins only after verified active HTML-media autoplay or a trusted play click; post-play verification
   times out after 120 seconds.
+- After the player appears, keep a 20-second pre-play observation window and continuously check for verified autoplay
+  or a safe play control before classifying the attempt as unavailable.
 - A trusted play click targets only the exact visible provider play control after ancestry, geometry, and center
   hit-testing. Never click the video-area or iframe center as fallback; during slow rendering that point may belong
   to an advertiser link and open an external tab.

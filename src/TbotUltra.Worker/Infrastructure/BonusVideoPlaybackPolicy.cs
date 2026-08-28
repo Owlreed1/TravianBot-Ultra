@@ -2,6 +2,7 @@ namespace TbotUltra.Worker.Infrastructure;
 
 internal static class BonusVideoPlaybackPolicy
 {
+    internal const int MinimumPrePlayObservationSeconds = 20;
     internal const int MinimumPostPlaySeconds = 60;
     internal const int PostPlayTimeoutSeconds = 120;
     internal const int ProviderFailureConfirmations = 2;
@@ -11,6 +12,9 @@ internal static class BonusVideoPlaybackPolicy
 
     internal static bool MayComplete(double elapsedPostPlaySeconds)
         => elapsedPostPlaySeconds >= MinimumPostPlaySeconds;
+
+    internal static bool MayGiveUpWaitingForPlaybackStart(double elapsedPrePlaySeconds)
+        => elapsedPrePlaySeconds >= MinimumPrePlayObservationSeconds;
 
     internal static bool MayAcceptProviderFailure(
         double elapsedPostPlaySeconds,

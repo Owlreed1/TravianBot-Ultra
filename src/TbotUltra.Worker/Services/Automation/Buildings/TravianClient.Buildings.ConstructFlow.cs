@@ -50,7 +50,7 @@ public sealed partial class TravianClient : IBuildingClient
             // A queued construct can become stale when the user builds the requested building manually,
             // possibly in a different slot. Run this village-wide identity check before queue and pacing
             // defers so an already-completed task is removed immediately instead of waiting another cycle.
-            var liveBuildings = await ReadBuildingsAsync(cancellationToken);
+            var liveBuildings = await ReadBuildingsAsync(cancellationToken, reuseFreshCurrentOverview: true);
             var existingVillageBuilding = FindExistingBuildingThatMakesConstructRedundant(
                 liveBuildings,
                 slotId,
@@ -622,7 +622,7 @@ public sealed partial class TravianClient : IBuildingClient
         IReadOnlySet<int> excludedSlots,
         CancellationToken cancellationToken)
     {
-        var buildings = await ReadBuildingsAsync(cancellationToken);
+        var buildings = await ReadBuildingsAsync(cancellationToken, reuseFreshCurrentOverview: true);
         var occupiedSlots = buildings
             .Where(item => item.SlotId is >= 19 and <= 38)
             .Where(item => (item.Gid ?? 0) > 0

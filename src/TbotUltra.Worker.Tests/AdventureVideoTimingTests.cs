@@ -6,6 +6,23 @@ namespace TbotUltra.Worker.Tests;
 public sealed class AdventureVideoTimingTests
 {
     [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    [InlineData(19.999)]
+    public void PlaybackStartCannotBeRejectedDuringTwentySecondObservation(double elapsedSeconds)
+    {
+        Assert.False(BonusVideoPlaybackPolicy.MayGiveUpWaitingForPlaybackStart(elapsedSeconds));
+    }
+
+    [Theory]
+    [InlineData(20)]
+    [InlineData(25)]
+    public void PlaybackStartMayBeRejectedAfterTwentySecondObservation(double elapsedSeconds)
+    {
+        Assert.True(BonusVideoPlaybackPolicy.MayGiveUpWaitingForPlaybackStart(elapsedSeconds));
+    }
+
+    [Theory]
     [InlineData(8)]
     [InlineData(45)]
     [InlineData(59)]

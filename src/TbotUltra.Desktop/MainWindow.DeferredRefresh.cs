@@ -37,28 +37,7 @@ public partial class MainWindow
     }
 
     private bool TryExtractDeferredUpgradePayload(string message, Dictionary<string, string> basePayload, out Dictionary<string, string> updatedPayload)
-    {
-        updatedPayload = new Dictionary<string, string>(basePayload, StringComparer.OrdinalIgnoreCase);
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            return false;
-        }
-
-        var changed = false;
-        foreach (var key in DeferredWaitCalculator.DeferredUpgradePayloadKeys)
-        {
-            var match = Regex.Match(message, $@"(?<!\S){Regex.Escape(key)}=(?<value>\S+)", RegexOptions.IgnoreCase);
-            if (!match.Success)
-            {
-                continue;
-            }
-
-            updatedPayload[key] = match.Groups["value"].Value.Trim();
-            changed = true;
-        }
-
-        return changed;
-    }
+        => DeferredWaitCalculator.TryMergeDeferredUpgradePayload(message, basePayload, out updatedPayload);
 
     private static bool TryExtractPayloadInt(string? message, string key, out int value)
     {

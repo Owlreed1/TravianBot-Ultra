@@ -365,6 +365,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - A confirmed empty overview gives the first stale resource `page_timer` head one immediate live validation so a
   free slot cannot idle behind an obsolete timer. Hero inventory is never polled for this: only an observed inventory
   increase wakes the first resource-deferred construction head per village; identical reads and transfer deductions do not.
+- A new resource-defer snapshot replaces the previous snapshot's costs, current stock, production and capacity fields.
+  If the live page cannot expose new costs, never reuse old requirements to wake that `page_timer` early.
 - Construction follows visible per-village queue order. A deferred head blocks later construction in that village;
   verified automatic prerequisite repair may be promoted only when a live slot is available.
 - Check storage, prerequisites, available slots, and resources before a Build/Upgrade click.
@@ -392,7 +394,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   by another slot, never apply an unknown-slot same-name row to the target; use exact slot identity.
 - Existing buildings and level-zero sites are distinct. Select exact building types and verify active village,
   target slot, and result before considering an action successful.
-- Immediately before constructing any building, read the complete live dorf2 overview. Remove a stale construct
+- Immediately before constructing any building, read the complete live dorf2 overview. Reuse the current dorf2 only
+  when its path is correct and the page is not marked stale; otherwise navigate/reload before reading. Remove a stale construct
   when its exact target slot already has the intended building, when a single-instance building exists anywhere,
   or when a level-gated duplicate has not reached its required level; rebind dependent upgrades to the confirmed
   live slot. Keep the construct when an additional copy is legal.
@@ -583,7 +586,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   may instead be muted through its media properties. Never click its wrapper, the video area, use force/JS click
   fallback, or let a missing, unsafe, or failed audio control interrupt or fail the video lifecycle.
   The provider may autoplay without rendering a play button. Verified active HTML-media playback is a trusted start
-  signal: begin the normal protected completion wait and attempt optional muting instead of closing the isolated browser.
+  signal: poll for autoplay or a safe play control for at least 20 seconds after the player appears, then begin the
+  normal protected completion wait and attempt optional muting instead of closing the isolated browser.
 - One `activate_production_bonus` run is a contiguous four-resource batch: after its initial cooldown gate,
   attempt every resource found activatable before returning control to other automation. A failure or newly
   created internal video cooldown for one resource must not stop the remaining resources in that same batch.

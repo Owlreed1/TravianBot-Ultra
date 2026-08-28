@@ -182,6 +182,34 @@ public sealed class DeferredWaitCalculatorTests
         Assert.InRange(result.WaitSeconds, 30, 60);
     }
 
+    [Fact]
+    public void MergeUpgradePayload_clears_previous_resource_snapshot_when_new_cost_is_unreadable()
+    {
+        var previous = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [BotOptionPayloadKeys.UpgradeRequiredWood] = "1000",
+            [BotOptionPayloadKeys.UpgradeCurrentWood] = "900",
+            [BotOptionPayloadKeys.UpgradeProductionWood] = "100",
+            [BotOptionPayloadKeys.UpgradeWarehouseCapacity] = "1200",
+            [BotOptionPayloadKeys.BuildingConstructSlotId] = "27",
+        };
+        var message =
+            "Resource slot 4 blocked. "
+            + $"{BotOptionPayloadKeys.UpgradeBlockedLabel}=Resource_slot_4 "
+            + $"{BotOptionPayloadKeys.UpgradeWaitReason}=page_timer "
+            + $"{BotOptionPayloadKeys.UpgradeWaitSeconds}=300 "
+            + $"{BotOptionPayloadKeys.UpgradeProductionWood}=15575";
+
+        var changed = DeferredWaitCalculator.TryMergeDeferredUpgradePayload(message, previous, out var merged);
+
+        Assert.True(changed);
+        Assert.False(merged.ContainsKey(BotOptionPayloadKeys.UpgradeRequiredWood));
+        Assert.False(merged.ContainsKey(BotOptionPayloadKeys.UpgradeCurrentWood));
+        Assert.False(merged.ContainsKey(BotOptionPayloadKeys.UpgradeWarehouseCapacity));
+        Assert.Equal("15575", merged[BotOptionPayloadKeys.UpgradeProductionWood]);
+        Assert.Equal("27", merged[BotOptionPayloadKeys.BuildingConstructSlotId]);
+    }
+
     // ---- IsVillageResourcesFull ----
 
     [Fact]

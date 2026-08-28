@@ -71,6 +71,20 @@ public sealed class BonusVideoMuteSourceTests
         Assert.Contains("MuteBonusVideoAsync(", method[autoplayCheck..missingPlayFailure], StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PlaybackStart_PollsForAutoplayThroughoutTheMinimumObservationWindow()
+    {
+        var method = ReadMethod(
+            "Hero",
+            "TravianClient.AdventureDanger.cs",
+            "StartBonusVideoPlayerAsync",
+            "DateTimeOffset?");
+
+        Assert.Contains("MayGiveUpWaitingForPlaybackStart", method, StringComparison.Ordinal);
+        Assert.Contains("IsBonusVideoPlaybackActiveAsync", method, StringComparison.Ordinal);
+        Assert.Contains("for autoplay or a safe play control", method, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("Buildings", "TravianClient.ConstructFaster.cs", "WaitForConstructFasterVideoCompletionAsync")]
     [InlineData("Features", "TravianClient.ProductionBonus.cs", "WaitForProductionBonusVideoCompletionAsync")]
