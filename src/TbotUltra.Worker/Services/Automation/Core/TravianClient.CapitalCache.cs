@@ -52,8 +52,13 @@ public sealed partial class TravianClient
                 """
                 () => {
                   const clean = (value) => (value || '').replace(/\s+/g, ' ').trim();
-                  const parseCoordinate = (value) => {
-                    const match = clean(value).replace(/[−–—]/g, '-').match(/-?\d+/);
+                  const parseCoordinate = (value, axis) => {
+                    const source = clean(value)
+                      .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '')
+                      .replace(/[−–—]/g, '-');
+                    const query = source.match(new RegExp(`[?&]${axis}=(-?\\d+)`, 'i'));
+                    if (query) return Number.parseInt(query[1], 10);
+                    const match = source.match(/-?\d+/);
                     return match ? Number.parseInt(match[0], 10) : null;
                   };
                   const capitals = [];
@@ -66,8 +71,12 @@ public sealed partial class TravianClient
                       row.querySelector('td.name a, td.village a, td.name, td.village, td:first-child')?.textContent || '')
                       .replace(/\s*\(capital\)\s*/i, '')
                       .trim();
-                    const x = parseCoordinate(row.querySelector('td.coordinates .coordinateX, .coordinateX')?.textContent || '');
-                    const y = parseCoordinate(row.querySelector('td.coordinates .coordinateY, .coordinateY')?.textContent || '');
+                    const coordAnchor = row.querySelector('td.coordinates a[href*="x="][href*="y="], a[href*="karte.php?x="]');
+                    const coordHref = coordAnchor?.getAttribute('href') || '';
+                    const x = parseCoordinate(coordHref, 'x')
+                      ?? parseCoordinate(row.querySelector('td.coordinates .coordinateX, .coordinateX')?.textContent || '', 'x');
+                    const y = parseCoordinate(coordHref, 'y')
+                      ?? parseCoordinate(row.querySelector('td.coordinates .coordinateY, .coordinateY')?.textContent || '', 'y');
                     if (!name || x === null || y === null) continue;
                     capitals.push({ name, isCapital: true, x, y });
                   }
@@ -229,12 +238,21 @@ public sealed partial class TravianClient
                   if (!rowText.includes(wanted)) return 'false';
 
                   if (Number.isInteger(target.x) && Number.isInteger(target.y)) {
-                    const parseCoordinate = (value) => {
-                      const match = clean(value).replace(/[−–—]/g, '-').match(/-?\d+/);
+                    const parseCoordinate = (value, axis) => {
+                      const source = clean(value)
+                        .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '')
+                        .replace(/[−–—]/g, '-');
+                      const query = source.match(new RegExp(`[?&]${axis}=(-?\\d+)`, 'i'));
+                      if (query) return Number.parseInt(query[1], 10);
+                      const match = source.match(/-?\d+/);
                       return match ? Number.parseInt(match[0], 10) : null;
                     };
-                    const rowX = parseCoordinate(row.querySelector('.coordinateX, .coordinate.x')?.textContent || '');
-                    const rowY = parseCoordinate(row.querySelector('.coordinateY, .coordinate.y')?.textContent || '');
+                    const coordAnchor = row.querySelector('td.coordinates a[href*="x="][href*="y="], a[href*="karte.php?x="]');
+                    const coordHref = coordAnchor?.getAttribute('href') || '';
+                    const rowX = parseCoordinate(coordHref, 'x')
+                      ?? parseCoordinate(row.querySelector('.coordinateX, .coordinate.x')?.textContent || '', 'x');
+                    const rowY = parseCoordinate(coordHref, 'y')
+                      ?? parseCoordinate(row.querySelector('.coordinateY, .coordinate.y')?.textContent || '', 'y');
                     if (rowX === null || rowY === null) return 'unknown';
                     return rowX === target.x && rowY === target.y ? 'true' : 'false';
                   }

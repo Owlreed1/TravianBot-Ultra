@@ -32,8 +32,8 @@
                 Margin="0,0,0,14"
                 Padding="14"
                 CornerRadius="7"
-                Background="{DynamicResource SuccessBgBrush}"
-                BorderBrush="{DynamicResource SuccessBorderBrush}"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -44,7 +44,7 @@
                            VerticalAlignment="Center"
                            FontSize="11"
                            FontWeight="SemiBold"
-                           Foreground="{DynamicResource SuccessTextBrush}" />
+                           Foreground="{DynamicResource TextMutedBrush}" />
                 <ComboBox x:Name="SourceVillageComboBox"
                           Grid.Column="1"
                           MinWidth="220"
@@ -107,11 +107,6 @@
         </Border>
 
         <Grid Grid.Row="3" Margin="0,16,0,0">
-            <TextBlock Text="The village ON switch is not copied. Changes are saved when you click Save in Troop settings."
-                       MaxWidth="260"
-                       TextWrapping="Wrap"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource TextSubtleBrush}" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Width="120"
                         Height="30"
