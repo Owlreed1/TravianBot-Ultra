@@ -1203,6 +1203,55 @@ public sealed class TravianClientHelperTests
     }
 
     [Fact]
+    public void CapitalStateResolver_AppliesDefinitiveResourceFieldEvidenceToVillageList()
+    {
+        var villages = new[]
+        {
+            new Village("LILAC", "dorf1.php?newdid=1", IsCapital: false, CoordX: 159, CoordY: -114),
+            new Village("T1", "dorf1.php?newdid=2", IsCapital: true, CoordX: 158, CoordY: -114),
+        };
+        var fields = new[]
+        {
+            new ResourceField(4, "iron", "Iron mine", 11, "/build.php?id=4"),
+            new ResourceField(5, "crop", "Cropland", 10, "/build.php?id=5"),
+        };
+
+        var updated = CapitalStateResolver.ApplyDefinitiveResourceFieldEvidence(
+            villages,
+            fields,
+            159,
+            -114);
+
+        Assert.True(updated.Single(village => village.Name == "LILAC").IsCapital);
+        Assert.False(updated.Single(village => village.Name == "T1").IsCapital);
+    }
+
+    [Fact]
+    public void CapitalStateResolver_DoesNotInferNonCapitalFromFieldsAtLevelTenOrBelow()
+    {
+        var villages = new[]
+        {
+            new Village("LILAC", "dorf1.php?newdid=1", IsCapital: true, CoordX: 159, CoordY: -114),
+            new Village("T1", "dorf1.php?newdid=2", IsCapital: false, CoordX: 158, CoordY: -114),
+        };
+        var fields = new[]
+        {
+            new ResourceField(11, "iron", "Iron mine", 10, "/build.php?id=11"),
+            new ResourceField(12, "crop", "Cropland", 9, "/build.php?id=12"),
+        };
+
+        var updated = CapitalStateResolver.ApplyDefinitiveResourceFieldEvidence(
+            villages,
+            fields,
+            158,
+            -114);
+
+        Assert.Same(villages, updated);
+        Assert.True(updated.Single(village => village.Name == "LILAC").IsCapital);
+        Assert.False(updated.Single(village => village.Name == "T1").IsCapital);
+    }
+
+    [Fact]
     public void CapitalStateResolver_RequiresProfileVerificationWhenCapitalIsMissingOrConflicting()
     {
         var missing = new[]

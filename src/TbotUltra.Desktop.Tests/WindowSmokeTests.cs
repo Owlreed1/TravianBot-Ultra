@@ -1,8 +1,10 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
+using TbotUltra.Desktop.ViewModels;
 using TbotUltra.Desktop.Views;
 using Xunit;
 
@@ -21,6 +23,41 @@ public sealed class WindowSmokeTests
     public WindowSmokeTests(WpfSmokeFixture wpf)
     {
         _wpf = wpf;
+    }
+
+    [Fact]
+    public void TroopSettingsWindows_LoadWithSyncControlsAndAllTargetsSelected()
+    {
+        _wpf.Run(() =>
+        {
+            var payload = TroopTrainingQuickSettings.FromOptions(new BotOptions());
+            var rows = new[]
+            {
+                new TroopTrainingQuickVillageRow("v1", "Village 1", true, payload, "Teutons"),
+                new TroopTrainingQuickVillageRow("v2", "Village 2", false, payload, "Teutons"),
+            };
+            var optionsWindow = new TroopTrainingOptionsWindow(rows);
+            var syncWindow = new TroopTrainingSettingsSyncWindow(rows);
+            try
+            {
+                optionsWindow.Measure(new Size(980, 600));
+                optionsWindow.Arrange(new Rect(0, 0, 980, 600));
+                syncWindow.Measure(new Size(520, 520));
+                syncWindow.Arrange(new Rect(0, 0, 520, 520));
+
+                var syncButton = Assert.IsType<Button>(optionsWindow.FindName("SyncSettingsButton"));
+                var source = Assert.IsType<ComboBox>(syncWindow.FindName("SourceVillageComboBox"));
+                Assert.Equal("Sync settings", syncButton.Content);
+                Assert.Equal(2, source.Items.Count);
+                Assert.All(syncWindow.Targets, item => Assert.True(item.IsSelected));
+                Assert.Single(syncWindow.Targets, item => item.IsSource);
+            }
+            finally
+            {
+                syncWindow.Close();
+                optionsWindow.Close();
+            }
+        });
     }
 
     [Fact]
@@ -149,6 +186,30 @@ public sealed class WindowSmokeTests
 
                 Assert.True(requested);
                 Assert.Equal("Move red/yellow farms", button.Content);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void DebugWindow_ProvidesCheckCapitalAction()
+    {
+        _wpf.Run(() =>
+        {
+            var window = new FunctionTestWindow();
+            try
+            {
+                var requested = false;
+                window.CheckCapitalRequested += (_, _) => requested = true;
+                var button = Assert.IsType<Button>(window.FindName("CheckCapitalButton"));
+
+                button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+                Assert.True(requested);
+                Assert.Equal("Check capital", button.Content);
             }
             finally
             {

@@ -15,7 +15,7 @@ public sealed class TroopTrainingBuildingOption : INotifyPropertyChanged
     private string _maxQueueMode = "no_limit";
     private string _amountMode = "maximum";
     private int _keepResourcesPercent = 10;
-    private string _runMode = "timed";
+    private string _runMode = "resource_percent";
     private bool _minimumTroopsEnabled;
     private int _minimumTroops = 20;
     private int _maximumMinimumTroops = 100;
@@ -27,7 +27,7 @@ public sealed class TroopTrainingBuildingOption : INotifyPropertyChanged
     private bool _checkWood = true;
     private bool _checkClay = true;
     private bool _checkIron = true;
-    private bool _checkCrop = true;
+    private bool _checkCrop;
     private bool _exists;
     private int? _queueRemainingSeconds;
     private string _queueStatusText = "Queue not loaded.";

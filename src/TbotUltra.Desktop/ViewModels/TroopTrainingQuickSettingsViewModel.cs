@@ -113,6 +113,25 @@ public sealed class TroopTrainingQuickVillageRow : BaseViewModel
         };
     }
 
+    /// <summary>
+    /// Copies the editable Barracks, Stable and Workshop rules plus the shared trigger settings from
+    /// another village. The village-level Build troops toggle remains local to the target village.
+    /// </summary>
+    public void SyncSettingsFrom(TroopTrainingQuickVillageRow source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var sourcePayload = source.BuildPayload();
+
+        ApplyBuildingSettings(Barracks, sourcePayload.Barracks);
+        ApplyBuildingSettings(Stable, sourcePayload.Stable);
+        ApplyBuildingSettings(Workshop, sourcePayload.Workshop);
+        CheckWood = source.CheckWood;
+        CheckClay = source.CheckClay;
+        CheckIron = source.CheckIron;
+        CheckCrop = source.CheckCrop;
+        FallbackCooldownSeconds = source.FallbackCooldownSeconds;
+    }
+
     private TroopTrainingBuildingPayload ApplyCell(
         TroopTrainingBuildingPayload source,
         TroopTrainingBuildingOption cell)
@@ -176,6 +195,28 @@ public sealed class TroopTrainingQuickVillageRow : BaseViewModel
         cell.TimedMinMinutes = building.TimedMinMinutes;
         cell.TimedMaxMinutes = building.TimedMaxMinutes;
         return cell;
+    }
+
+    private static void ApplyBuildingSettings(
+        TroopTrainingBuildingOption target,
+        TroopTrainingBuildingPayload source)
+    {
+        target.IsEnabled = source.Enabled;
+        if (target.TroopOptions.Any(item => string.Equals(item, source.TroopType, StringComparison.OrdinalIgnoreCase)))
+        {
+            target.SelectedTroop = source.TroopType;
+        }
+
+        target.MaxQueueMode = source.MaxQueueHours;
+        target.AmountMode = source.AmountMode;
+        target.KeepResourcesPercent = source.KeepResourcesPercent;
+        target.RunMode = source.RunMode;
+        target.MinimumTroopsEnabled = source.MinimumTroopsEnabled;
+        target.MinimumTroops = source.MinimumTroops;
+        target.MaximumMinimumTroops = source.MaximumMinimumTroops;
+        target.MinimumResourcesPercent = source.MinimumResourcesPercent;
+        target.TimedMinMinutes = source.TimedMinMinutes;
+        target.TimedMaxMinutes = source.TimedMaxMinutes;
     }
 
     // Same allowed set as the Troops tab's Fallback wait combo (TroopTrainingViewModel).

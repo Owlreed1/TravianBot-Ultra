@@ -121,7 +121,7 @@ public static class BotOptionsFactory
             TroopTrainingBarracksCheckWood = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingBarracksCheckWood, true),
             TroopTrainingBarracksCheckClay = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingBarracksCheckClay, true),
             TroopTrainingBarracksCheckIron = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingBarracksCheckIron, true),
-            TroopTrainingBarracksCheckCrop = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingBarracksCheckCrop, true),
+            TroopTrainingBarracksCheckCrop = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingBarracksCheckCrop, false),
             TroopTrainingStableEnabled = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingStableEnabled, false),
             TroopTrainingStableTroopType = configuration[BotOptionPayloadKeys.TroopTrainingStableTroopType] ?? string.Empty,
             TroopTrainingStableMaxQueueHours = configuration[BotOptionPayloadKeys.TroopTrainingStableMaxQueueHours] ?? "no_limit",
@@ -137,7 +137,7 @@ public static class BotOptionsFactory
             TroopTrainingStableCheckWood = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingStableCheckWood, true),
             TroopTrainingStableCheckClay = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingStableCheckClay, true),
             TroopTrainingStableCheckIron = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingStableCheckIron, true),
-            TroopTrainingStableCheckCrop = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingStableCheckCrop, true),
+            TroopTrainingStableCheckCrop = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingStableCheckCrop, false),
             TroopTrainingWorkshopEnabled = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingWorkshopEnabled, false),
             TroopTrainingWorkshopTroopType = configuration[BotOptionPayloadKeys.TroopTrainingWorkshopTroopType] ?? string.Empty,
             TroopTrainingWorkshopMaxQueueHours = configuration[BotOptionPayloadKeys.TroopTrainingWorkshopMaxQueueHours] ?? "no_limit",
@@ -153,7 +153,7 @@ public static class BotOptionsFactory
             TroopTrainingWorkshopCheckWood = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingWorkshopCheckWood, true),
             TroopTrainingWorkshopCheckClay = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingWorkshopCheckClay, true),
             TroopTrainingWorkshopCheckIron = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingWorkshopCheckIron, true),
-            TroopTrainingWorkshopCheckCrop = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingWorkshopCheckCrop, true),
+            TroopTrainingWorkshopCheckCrop = configuration.GetValue(BotOptionPayloadKeys.TroopTrainingWorkshopCheckCrop, false),
             TroopTrainingFallbackCooldownSeconds = ClampTroopTrainingFallbackCooldownSeconds(configuration.GetValue(BotOptionPayloadKeys.TroopTrainingFallbackCooldownSeconds, 120)),
             BreweryAutoCelebrationEnabled = configuration.GetValue(BotOptionPayloadKeys.BreweryAutoCelebrationEnabled, false),
             NpcTradeEnabled = GetValueOrDefault(configuration, BotOptionPayloadKeys.NpcTradeEnabled, defaultValue: false),
@@ -355,7 +355,8 @@ public static class BotOptionsFactory
     }
 
     private static string NormalizeTroopTrainingRunMode(string? value)
-        => string.Equals(value, "resource_percent", StringComparison.OrdinalIgnoreCase)
+        => string.IsNullOrWhiteSpace(value)
+            || string.Equals(value, "resource_percent", StringComparison.OrdinalIgnoreCase)
             ? "resource_percent"
             : "timed";
 

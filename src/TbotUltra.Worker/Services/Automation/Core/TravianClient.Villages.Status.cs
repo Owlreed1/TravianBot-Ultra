@@ -122,6 +122,12 @@ public sealed partial class TravianClient
         NotifyResourceRead($"Resource read: storage wh={FormatResourceLogNumber(capacities.Warehouse)} gr={FormatResourceLogNumber(capacities.Granary)} | stock {BuildResourceValueLog(resources)} | prod {BuildProductionValueLog(productionByHour)}{(usingCachedProduction ? " (cached production)" : string.Empty)}");
 
         var resourceFields = await ReadResourceFieldsAsync(cancellationToken);
+        var capitalState = ApplyCapitalEvidenceFromResourceFields(
+            activeVillage,
+            activeCoords,
+            resourceFields,
+            villages);
+        villages = capitalState.Villages;
 
         // Persist the per-village resource snapshot here too. This full status read runs on dorf1 right
         // after a village switch and is often the only place production is read for a freshly-switched
@@ -168,7 +174,7 @@ public sealed partial class TravianClient
             ActiveBuildCount: activeBuildCount,
             BuildQueueRemainingSeconds: remaining,
             BuildQueueRemainingText: remaining is int left ? TravianParsing.FormatDuration(left) : string.Empty,
-            IsCapital: TryGetCachedCapitalState(activeVillage, activeCoords.X, activeCoords.Y),
+            IsCapital: capitalState.IsCapital,
             ServerTimeUtc: _serverTimeUtc,
             UnreadMessages: unreadInbox.UnreadMessages,
             UnreadReports: unreadInbox.UnreadReports,

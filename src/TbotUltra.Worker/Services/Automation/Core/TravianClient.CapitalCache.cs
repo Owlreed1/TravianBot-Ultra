@@ -137,6 +137,58 @@ public sealed partial class TravianClient
         await TryEmitUiSyncSnapshotAsync(cancellationToken, force: true);
     }
 
+    private (IReadOnlyList<Village> Villages, bool? IsCapital) ApplyCapitalEvidenceFromResourceFields(
+        string activeVillage,
+        (int? X, int? Y) activeCoords,
+        IReadOnlyList<ResourceField> resourceFields,
+        IReadOnlyList<Village> villages)
+    {
+        var cachedIsCapital = TryGetCachedCapitalState(activeVillage, activeCoords.X, activeCoords.Y);
+        if (!resourceFields.Any(field => field.Level > 10))
+        {
+            return (villages, cachedIsCapital);
+        }
+
+        if (!activeCoords.X.HasValue || !activeCoords.Y.HasValue)
+        {
+            Notify($"[capital] resource field above level 10 in '{activeVillage}', but active village coordinates were unavailable; capital state was not changed.");
+            return (villages, cachedIsCapital);
+        }
+
+        var villageListAlreadyResolved = villages.Count(village => village.IsCapital == true) == 1
+            && villages.Any(village => village.IsCapital == true
+                && village.CoordX == activeCoords.X
+                && village.CoordY == activeCoords.Y);
+        if (cachedIsCapital == true && villageListAlreadyResolved)
+        {
+            return (villages, true);
+        }
+
+        if (cachedIsCapital != true)
+        {
+            SaveCachedVillageState(activeVillage, true, activeCoords.X, activeCoords.Y);
+        }
+
+        var updatedVillages = CapitalStateResolver.ApplyDefinitiveResourceFieldEvidence(
+            villages,
+            resourceFields,
+            activeCoords.X.Value,
+            activeCoords.Y.Value);
+        if (!ReferenceEquals(updatedVillages, villages))
+        {
+            UpdateCachedVillages(updatedVillages);
+        }
+        ConfirmCapitalProfileVerification();
+
+        if (cachedIsCapital != true)
+        {
+            var highestLevel = resourceFields.Max(field => field.Level ?? 0);
+            Notify($"[capital] '{activeVillage}' ({activeCoords.X}|{activeCoords.Y}) set as capital from live Dorf1 resource field level {highestLevel}.");
+        }
+
+        return (updatedVillages, true);
+    }
+
     private async Task<bool?> ReadIsCapitalAsync(
         string villageName,
         int? coordX,

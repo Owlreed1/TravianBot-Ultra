@@ -143,7 +143,7 @@
                             <Button x:Name="CheckCapitalButton"
                                     Style="{DynamicResource DebugActionButtonStyle}"
                                     Content="Check capital"
-                                    ToolTip="Reads the player profile and asks before applying the verified capital village to the UI state."
+                                    ToolTip="Reads the player profile and applies the verified capital village to the UI state."
                                     ToolTipService.InitialShowDelay="500"
                                     Click="CheckCapitalButton_Click" />
                             <Button x:Name="TestIncreaseAdventuresToHardButton"

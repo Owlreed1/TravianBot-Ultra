@@ -79,6 +79,20 @@ public partial class TroopTrainingOptionsWindow : Window
             .ToList();
     }
 
+    private void SyncSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new TroopTrainingSettingsSyncWindow(Rows) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.SourceRow is null)
+        {
+            return;
+        }
+
+        foreach (var target in dialog.TargetRows)
+        {
+            target.SyncSettingsFrom(dialog.SourceRow);
+        }
+    }
+
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
         var invalid = Rows

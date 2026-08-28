@@ -114,6 +114,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   lookup is valid only when exactly one cached village has that name; duplicate names never use last-write-wins.
   A storage-only or non-dorf1 read with unknown production must preserve that coordinate-keyed village's last-known
   production rates, so cache persistence and login restore cannot turn valid forecasts into `-/h` / `Not filling`.
+- A live Dorf1 resource-field level above 10 is definitive positive capital evidence. Apply it immediately by
+  coordinates to the capital cache, shared village list, and returned UI status, clearing any former capital flag;
+  levels at or below 10 never prove that a village is non-capital. Player-profile scans remain the account-wide check.
 - Queue status transitions are gated. `MarkDeferred` accepts only RUNNING items; Pending items use
   `UpdateDeferred`/`UpdatePending`. Check the returned boolean.
 - Manual queue reordering persists through `CreatedAt` and therefore controls FIFO selection in both Auto Queue
@@ -501,6 +504,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Build troops `% resources` checkboxes use OR semantics: at least one resource must be selected, any selected
   resource at or above the percentage threshold releases training, and deferred waits use the earliest selected
   resource ETA. This trigger never replaces the normal all-resource affordability, NPC, or hero-resource checks.
+- New Build troops settings default all three training buildings to `% resources` at 90%, with Wood, Clay and Iron
+  selected and Crop unselected. Troop-settings sync copies all three building rules plus shared resource/fallback
+  settings from one source village to selected targets, but never changes a target village's Build troops ON toggle.
 - Build troops `maximum` amount mode must click Travian's numeric `.details .cta a[href='#']` shortcut beside the
   selected troop input and verify Travian filled the advertised amount; do not type that maximum manually. The
   existing paced Train-button click remains the submit action after the shortcut succeeds.

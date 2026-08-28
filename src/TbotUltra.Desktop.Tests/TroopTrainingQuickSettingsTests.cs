@@ -116,6 +116,31 @@ public sealed class TroopTrainingQuickSettingsTests
     }
 
     [Fact]
+    public void SyncSettingsFrom_CopiesAllThreeBuildingsAndSharedSettingsWithoutChangingVillageToggle()
+    {
+        var source = new TroopTrainingQuickVillageRow("source", "Source", true, BuildSourcePayload(), "Teutons");
+        source.CheckWood = true;
+        source.CheckClay = false;
+        source.CheckIron = true;
+        source.CheckCrop = false;
+        source.FallbackCooldownSeconds = 120;
+
+        var different = BuildSourcePayload();
+        var targetPayload = different with
+        {
+            Barracks = different.Barracks with { Enabled = true, TroopType = "Spearman", MinimumResourcesPercent = 10 },
+            Stable = different.Stable with { Enabled = false, TroopType = "Teutonic Knight", MinimumResourcesPercent = 20 },
+            Workshop = different.Workshop with { Enabled = false, TroopType = "Catapult", MinimumResourcesPercent = 30 },
+        };
+        var target = new TroopTrainingQuickVillageRow("target", "Target", false, targetPayload, "Teutons");
+
+        target.SyncSettingsFrom(source);
+
+        Assert.False(target.IsBuildTroopsEnabled);
+        Assert.Equal(source.BuildPayload(), target.BuildPayload());
+    }
+
+    [Fact]
     public void VillageRows_UseTheirOwnTribeTroops()
     {
         var source = BuildSourcePayload();

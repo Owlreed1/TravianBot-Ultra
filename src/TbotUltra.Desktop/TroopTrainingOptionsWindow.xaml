@@ -81,16 +81,27 @@
 
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Troop training by village"
-                           FontSize="18"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextPrimaryBrush}"
-                           VerticalAlignment="Center" />
-                <ContentControl Style="{DynamicResource InfoTooltipIconStyle}"
-                                Margin="8,2,0,0"
-                                ToolTip="Per-village troop training. The compact row toggles which training buildings are active and picks the troop each one builds. Click the arrow on a row to edit all settings for that village (max queue, amount mode, run trigger, timed min/max, resource checks, fallback wait)." />
-            </StackPanel>
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Troop training by village"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               VerticalAlignment="Center" />
+                    <ContentControl Style="{DynamicResource InfoTooltipIconStyle}"
+                                    Margin="8,2,0,0"
+                                    ToolTip="Per-village troop training. The compact row toggles which training buildings are active and picks the troop each one builds. Click the arrow on a row to edit all settings for that village (max queue, amount mode, run trigger, timed min/max, resource checks, fallback wait)." />
+                </StackPanel>
+                <Button x:Name="SyncSettingsButton"
+                        Content="Sync settings"
+                        Width="120"
+                        Height="30"
+                        HorizontalAlignment="Right"
+                        Click="SyncSettingsButton_Click"
+                        Background="{DynamicResource SuccessBgBrush}"
+                        BorderBrush="{DynamicResource SuccessBorderBrush}"
+                        Foreground="{DynamicResource SuccessTextBrush}" />
+            </Grid>
             <TextBlock x:Name="SubtitleTextBlock"
                        Foreground="{DynamicResource TextSubtleBrush}"
                        TextWrapping="Wrap"
@@ -492,7 +503,6 @@
                                                                     <TextBox Width="58" Height="26" TextAlignment="Center" VerticalContentAlignment="Center"
                                                                              IsEnabled="{Binding MinimumTroopsEnabled}"
                                                                              Text="{Binding MaximumMinimumTroopsText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
-                                                                    <TextBlock Text="(1–10,000)" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
                                                                 </StackPanel>
                                                             </Grid>
                                                         </DataTemplate>

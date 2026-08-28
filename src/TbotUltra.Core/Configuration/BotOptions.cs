@@ -167,7 +167,7 @@ public sealed record BotOptions
     public int TroopTrainingBarracksKeepResourcesPercent { get; init; } = 10;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingBarracksRunMode)]
-    public string TroopTrainingBarracksRunMode { get; init; } = "timed";
+    public string TroopTrainingBarracksRunMode { get; init; } = "resource_percent";
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingBarracksMinimumTroopsEnabled)]
     public bool TroopTrainingBarracksMinimumTroopsEnabled { get; init; }
@@ -197,7 +197,7 @@ public sealed record BotOptions
     public bool TroopTrainingBarracksCheckIron { get; init; } = true;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingBarracksCheckCrop)]
-    public bool TroopTrainingBarracksCheckCrop { get; init; } = true;
+    public bool TroopTrainingBarracksCheckCrop { get; init; }
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingStableEnabled)]
     public bool TroopTrainingStableEnabled { get; init; }
@@ -215,7 +215,7 @@ public sealed record BotOptions
     public int TroopTrainingStableKeepResourcesPercent { get; init; } = 10;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingStableRunMode)]
-    public string TroopTrainingStableRunMode { get; init; } = "timed";
+    public string TroopTrainingStableRunMode { get; init; } = "resource_percent";
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingStableMinimumTroopsEnabled)]
     public bool TroopTrainingStableMinimumTroopsEnabled { get; init; }
@@ -245,7 +245,7 @@ public sealed record BotOptions
     public bool TroopTrainingStableCheckIron { get; init; } = true;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingStableCheckCrop)]
-    public bool TroopTrainingStableCheckCrop { get; init; } = true;
+    public bool TroopTrainingStableCheckCrop { get; init; }
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingWorkshopEnabled)]
     public bool TroopTrainingWorkshopEnabled { get; init; }
@@ -263,7 +263,7 @@ public sealed record BotOptions
     public int TroopTrainingWorkshopKeepResourcesPercent { get; init; } = 10;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingWorkshopRunMode)]
-    public string TroopTrainingWorkshopRunMode { get; init; } = "timed";
+    public string TroopTrainingWorkshopRunMode { get; init; } = "resource_percent";
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingWorkshopMinimumTroopsEnabled)]
     public bool TroopTrainingWorkshopMinimumTroopsEnabled { get; init; }
@@ -293,7 +293,7 @@ public sealed record BotOptions
     public bool TroopTrainingWorkshopCheckIron { get; init; } = true;
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingWorkshopCheckCrop)]
-    public bool TroopTrainingWorkshopCheckCrop { get; init; } = true;
+    public bool TroopTrainingWorkshopCheckCrop { get; init; }
 
     [ConfigurationKeyName(BotOptionPayloadKeys.TroopTrainingFallbackCooldownSeconds)]
     public int TroopTrainingFallbackCooldownSeconds { get; init; } = 300;

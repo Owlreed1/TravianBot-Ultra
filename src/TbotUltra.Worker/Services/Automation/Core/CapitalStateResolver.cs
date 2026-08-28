@@ -48,4 +48,15 @@ internal static class CapitalStateResolver
             .Select(village => village with { IsCapital = village.CoordX == coordX && village.CoordY == coordY })
             .ToList();
     }
+
+    internal static IReadOnlyList<Village> ApplyDefinitiveResourceFieldEvidence(
+        IReadOnlyList<Village> villages,
+        IReadOnlyList<ResourceField> resourceFields,
+        int coordX,
+        int coordY)
+    {
+        return resourceFields.Any(field => field.Level > 10)
+            ? ApplyVerifiedCapital(villages, coordX, coordY)
+            : villages;
+    }
 }

@@ -56,7 +56,7 @@ public sealed partial class TroopTrainingViewModel : BaseViewModel
     private bool _checkWood = true;
     private bool _checkClay = true;
     private bool _checkIron = true;
-    private bool _checkCrop = true;
+    private bool _checkCrop;
     private int _fallbackCooldownSeconds = 300;
     private bool _autoCelebrationEnabled;
     private bool _autoCelebrationExplicitlyConfigured;

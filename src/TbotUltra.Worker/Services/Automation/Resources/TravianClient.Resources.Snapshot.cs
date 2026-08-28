@@ -315,11 +315,12 @@ public sealed partial class TravianClient
             ? liveResourceFields
             : cachedSnapshot?.ResourceFields ?? liveResourceFields;
 
-        var cachedIsCapital = TryGetCachedCapitalState(activeVillage, activeCoords.X, activeCoords.Y);
-        if (cachedIsCapital != true && resourceFields.Any(f => f.Level > 10))
-        {
-            Notify($"[capital:verbose] resource field above level 10 in '{activeVillage}' ({activeCoords.X}|{activeCoords.Y}); capital remains unconfirmed until a live player-profile scan.");
-        }
+        var capitalState = ApplyCapitalEvidenceFromResourceFields(
+            activeVillage,
+            activeCoords,
+            liveResourceFields,
+            villages);
+        villages = capitalState.Villages;
 
         SaveCachedVillageResourceSnapshot(
             activeVillage,
@@ -345,7 +346,7 @@ public sealed partial class TravianClient
             ActiveBuildCount: activeBuildCount,
             BuildQueueRemainingSeconds: remaining,
             BuildQueueRemainingText: remaining is int left ? TravianParsing.FormatDuration(left) : string.Empty,
-            IsCapital: cachedIsCapital,
+            IsCapital: capitalState.IsCapital,
             ServerTimeUtc: _serverTimeUtc,
             UnreadMessages: unreadInbox.UnreadMessages,
             UnreadReports: unreadInbox.UnreadReports,

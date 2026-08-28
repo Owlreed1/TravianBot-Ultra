@@ -853,22 +853,6 @@ public partial class MainWindow
                 await EnsureChromiumInstalledAsync();
                 AppendLog($"[{operationId}] reading the player profile for the capital village.");
                 var capital = await _botService.CheckCapitalFromProfileAsync(options, AppendLog, operationToken);
-                var choice = AppDialog.ShowCustom(
-                    (Window?)_resourceTestFunctionsWindow ?? this,
-                    $"Player profile identified '{capital.VillageName}' ({capital.CoordX}|{capital.CoordY}) as the capital.\n\nApply this capital state to the UI?",
-                    "Set capital state",
-                    [("Set capital state", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.No)],
-                    MessageBoxImage.Question,
-                    MessageBoxResult.No,
-                    MessageBoxResult.No,
-                    successResult: MessageBoxResult.Yes,
-                    dangerResult: MessageBoxResult.No);
-                if (choice != MessageBoxResult.Yes)
-                {
-                    AppendLog($"[{operationId}] capital state update canceled by user.");
-                    return "Capital state was not changed.";
-                }
-
                 await _botService.SetVerifiedCapitalStateAsync(options, capital, AppendLog, operationToken);
                 var summary = $"Capital state set to '{capital.VillageName}' ({capital.CoordX}|{capital.CoordY}).";
                 AppendLog($"[{operationId}] {summary}");

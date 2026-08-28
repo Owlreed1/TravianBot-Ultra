@@ -67,8 +67,10 @@ Aktivt beslut, 2026-06-20. Detaljerna bakom de korta reglerna i
   per by (`PersistTroopTrainingForSelectedVillage` -> `BuildVillageTrainingPayload`). Konto-vida falt (NPC
   trade, guld, brewery celebration) ligger kvar i `settings.json` (`WriteToConfig`/`PersistTroopTrainingConfig`)
   och skrivs INTE per by.
-- "Training options"-popupen ar samma per-by-data i en byoversikt och bara enabled/troop-val; bada ytor synkar
-  (popup-save -> reload tab; tab-edit -> popup laser override vid oppning). Truppdropdownen ar per byggnad:
+- "Training options"-popupen ar samma per-by-data i en byoversikt med alla byggnadsregler; bada ytor synkar
+  (popup-save -> reload tab; tab-edit -> popup laser override vid oppning). `Sync settings` kopierar Barracks,
+  Stable, Workshop samt gemensamma resurs-/fallbackval fran en kallby till valda malbyar men lamnar byns ON-toggle.
+  Truppdropdownen ar per byggnad:
   `TroopCatalog.ResolveTroopTypesForTribe(tribe, buildingType)` (Barracks far inte visa Stable/Workshop-trupper)
   — galler bade tab och popup. Popup-toggles anvander `ToggleSwitchBlueStyle`.
 

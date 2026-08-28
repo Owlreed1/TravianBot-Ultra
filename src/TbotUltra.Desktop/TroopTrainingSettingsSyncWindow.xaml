@@ -1,0 +1,132 @@
+<Window x:Class="TbotUltra.Desktop.TroopTrainingSettingsSyncWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Sync troop settings"
+        Width="520"
+        Height="520"
+        MinWidth="440"
+        MinHeight="420"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppBackgroundBrush}">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="Sync troop settings"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <TextBlock Text="Copy Barracks, Stable and Workshop settings from one village to the selected villages."
+                       Margin="0,4,0,0"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextSubtleBrush}" />
+        </StackPanel>
+
+        <Border Grid.Row="1"
+                Margin="0,0,0,14"
+                Padding="14"
+                CornerRadius="7"
+                Background="{DynamicResource SuccessBgBrush}"
+                BorderBrush="{DynamicResource SuccessBorderBrush}"
+                BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="86" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="SOURCE"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource SuccessTextBrush}" />
+                <ComboBox x:Name="SourceVillageComboBox"
+                          Grid.Column="1"
+                          MinWidth="220"
+                          DisplayMemberPath="VillageName"
+                          SelectionChanged="SourceVillageComboBox_SelectionChanged" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2"
+                CornerRadius="8"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Border Padding="14,11"
+                        BorderBrush="{DynamicResource BorderSubtleBrush}"
+                        BorderThickness="0,0,0,1">
+                    <DockPanel>
+                        <TextBlock Text="SYNC TO"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextMutedBrush}" />
+                        <TextBlock Text="All villages are selected by default"
+                                   HorizontalAlignment="Right"
+                                   Foreground="{DynamicResource TextSubtleBrush}" />
+                    </DockPanel>
+                </Border>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Targets}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="14,10"
+                                        BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                        BorderThickness="0,0,0,1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox Content="{Binding VillageName}"
+                                                  IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  IsEnabled="{Binding CanSelect}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="SOURCE"
+                                                   FontSize="10"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource SuccessTextBrush}"
+                                                   Visibility="{Binding SourceVisibility}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="3" Margin="0,16,0,0">
+            <TextBlock Text="The village ON switch is not copied. Changes are saved when you click Save in Troop settings."
+                       MaxWidth="260"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextSubtleBrush}" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Width="120"
+                        Height="30"
+                        Margin="0,0,8,0"
+                        Content="Sync settings"
+                        IsDefault="True"
+                        Click="SyncButton_Click"
+                        Background="{DynamicResource SuccessBgBrush}"
+                        BorderBrush="{DynamicResource SuccessBorderBrush}"
+                        Foreground="{DynamicResource SuccessTextBrush}" />
+                <Button Width="80"
+                        Height="30"
+                        Content="Cancel"
+                        IsCancel="True" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

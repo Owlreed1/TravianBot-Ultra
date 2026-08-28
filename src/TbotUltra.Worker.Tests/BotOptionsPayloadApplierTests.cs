@@ -755,6 +755,36 @@ public sealed class BotOptionsPayloadApplierTests
     }
 
     [Fact]
+    public void FromConfiguration_UsesResourcePercentTroopTrainingDefaultsWithoutCrop()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["server_name"] = "srv",
+                ["base_url"] = "https://example.com",
+            })
+            .Build();
+
+        var options = BotOptionsFactory.FromConfiguration(configuration);
+        var defaults = new[]
+        {
+            (options.TroopTrainingBarracksRunMode, options.TroopTrainingBarracksMinimumResourcesPercent, options.TroopTrainingBarracksCheckWood, options.TroopTrainingBarracksCheckClay, options.TroopTrainingBarracksCheckIron, options.TroopTrainingBarracksCheckCrop),
+            (options.TroopTrainingStableRunMode, options.TroopTrainingStableMinimumResourcesPercent, options.TroopTrainingStableCheckWood, options.TroopTrainingStableCheckClay, options.TroopTrainingStableCheckIron, options.TroopTrainingStableCheckCrop),
+            (options.TroopTrainingWorkshopRunMode, options.TroopTrainingWorkshopMinimumResourcesPercent, options.TroopTrainingWorkshopCheckWood, options.TroopTrainingWorkshopCheckClay, options.TroopTrainingWorkshopCheckIron, options.TroopTrainingWorkshopCheckCrop),
+        };
+
+        Assert.All(defaults, building =>
+        {
+            Assert.Equal("resource_percent", building.Item1);
+            Assert.Equal(90, building.Item2);
+            Assert.True(building.Item3);
+            Assert.True(building.Item4);
+            Assert.True(building.Item5);
+            Assert.False(building.Item6);
+        });
+    }
+
+    [Fact]
     public void FromConfiguration_UsesConservativePacingDefaults()
     {
         var configuration = new ConfigurationBuilder()
