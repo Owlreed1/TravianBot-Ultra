@@ -556,12 +556,30 @@
                                                    Foreground="{DynamicResource TextSubtleBrush}"
                                                    Margin="0,3,0,0" />
                                     </StackPanel>
-                                    <Button Grid.Column="1"
-                                            Content="Toggle all villages"
-                                            Padding="10,3"
-                                            VerticalAlignment="Center"
-                                            Click="ToggleAllHeroResources_Click"
-                                            ToolTip="Turn hero resources on or off for every village." />
+                                    <StackPanel x:Name="HeroResourceHeaderActionsPanel"
+                                                Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Text="Max per resource"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   VerticalAlignment="Center" />
+                                        <ContentControl Style="{DynamicResource InfoTooltipIconStyle}"
+                                                        Margin="6,1,0,0"
+                                                        ToolTip="Maximum hero inventory resources used per resource for one action." />
+                                        <TextBox x:Name="HeroResourceMaxLimitTextBox"
+                                                 Width="96"
+                                                 Margin="10,0,16,0"
+                                                 Padding="6,4"
+                                                 Text="5000"
+                                                 BorderBrush="{DynamicResource BorderSubtleBrush}" />
+                                        <Button x:Name="ToggleAllHeroResourcesButton"
+                                                Content="Toggle all villages"
+                                                Padding="10,3"
+                                                VerticalAlignment="Center"
+                                                Click="ToggleAllHeroResources_Click"
+                                                ToolTip="Turn hero resources on or off for every village." />
+                                    </StackPanel>
                                 </Grid>
 
                                 <ScrollViewer HorizontalScrollBarVisibility="Auto"
@@ -641,18 +659,10 @@
                                 </ScrollViewer>
 
                                 <Grid Margin="14,10,14,12">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Text="Max per resource" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                                        <ContentControl Style="{DynamicResource InfoTooltipIconStyle}" Margin="6,1,0,0"
-                                                        ToolTip="Maximum hero inventory resources used per resource for one action." />
-                                        <TextBox x:Name="HeroResourceMaxLimitTextBox" Width="96" Margin="10,0,0,0"
-                                                 Padding="6,4" Text="5000" BorderBrush="{DynamicResource BorderSubtleBrush}" />
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                        <TextBlock x:Name="HeroResourceSettingsStatusText"
-                                                   VerticalAlignment="Center" Foreground="{DynamicResource SuccessTextBrush}" />
-                                    </StackPanel>
+                                    <TextBlock x:Name="HeroResourceSettingsStatusText"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource SuccessTextBrush}" />
                                 </Grid>
                             </StackPanel>
                         </Border>

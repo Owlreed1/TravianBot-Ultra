@@ -374,7 +374,12 @@ public sealed class PanelSmokeTests
             var refresh = Assert.IsType<Button>(inventoryPanel.FindName("RefreshHeroInventoryButton"));
             Assert.Null(refresh.Content);
             Assert.Same(Application.Current.FindResource("RefreshIconButtonStyle"), refresh.Style);
-            Assert.IsType<TextBox>(inventoryPanel.FindName("HeroResourceMaxLimitTextBox"));
+            var maxPerResource = Assert.IsType<TextBox>(inventoryPanel.FindName("HeroResourceMaxLimitTextBox"));
+            var toggleAllVillages = Assert.IsType<Button>(inventoryPanel.FindName("ToggleAllHeroResourcesButton"));
+            var headerActions = Assert.IsType<StackPanel>(inventoryPanel.FindName("HeroResourceHeaderActionsPanel"));
+            Assert.Same(headerActions, VisualTreeHelper.GetParent(maxPerResource));
+            Assert.Same(headerActions, VisualTreeHelper.GetParent(toggleAllVillages));
+            Assert.True(headerActions.Children.IndexOf(maxPerResource) < headerActions.Children.IndexOf(toggleAllVillages));
             Assert.DoesNotContain(
                 FindVisualChildren<Button>(inventoryPanel),
                 button => Equals(button.Content, "Save changes"));

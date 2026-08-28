@@ -727,30 +727,9 @@ public sealed partial class TravianClient : IFarmingClient
         LossDestinationResolution destination,
         CancellationToken cancellationToken)
     {
-        var farmRow = ResolveFarmListLossRowLocator(row);
-        var menuTrigger = farmRow.Locator("td.openContextMenu a, td.openContextMenu button, td.openContextMenu").First;
-        if (!await TryRealClickFarmButtonAsync(
-                menuTrigger,
-                () => JsOpenFarmListRowMenuAsync(row),
-                $"open loss-row menu for combined move slot '{row.SlotId}'",
-                cancellationToken))
+        var editEntry = await TryOpenFarmListEditMenuAsync(row, cancellationToken);
+        if (editEntry is null)
         {
-            return false;
-        }
-
-        Notify($"[farm-list] combined move: menu opened for slot '{row.SlotId}'; selecting Edit target.");
-        var editEntry = _page.Locator("button.entry.edit[title='Edit target']:visible").First;
-        try
-        {
-            await editEntry.WaitForAsync(new LocatorWaitForOptions
-            {
-                State = WaitForSelectorState.Visible,
-                Timeout = _config.TimeoutMs,
-            }).WaitAsync(cancellationToken);
-        }
-        catch (PlaywrightException ex)
-        {
-            Notify($"[farm-list] Edit target was not visible for slot '{row.SlotId}': {ex.Message}");
             return false;
         }
 
@@ -811,6 +790,58 @@ public sealed partial class TravianClient : IFarmingClient
         }
     }
 
+    private async Task<ILocator?> TryOpenFarmListEditMenuAsync(
+        FarmListLossRowJs row,
+        CancellationToken cancellationToken)
+    {
+        var editEntry = _page
+            .Locator(".contextMenu.from.defaultButtons:visible button.entry.edit[title='Edit target']")
+            .First;
+        for (var attempt = 1; attempt <= 2; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var menuTriggered = attempt == 1
+                ? await TryRealClickFarmButtonAsync(
+                    ResolveFarmListLossRowLocator(row)
+                        .Locator("td.openContextMenu a, td.openContextMenu button, td.openContextMenu")
+                        .First,
+                    () => JsOpenFarmListRowMenuAsync(row),
+                    $"open loss-row menu for combined move slot '{row.SlotId}'",
+                    cancellationToken)
+                : await JsOpenFarmListRowMenuAsync(row);
+            if (!menuTriggered)
+            {
+                Notify($"[farm-list] combined move: menu trigger failed for slot '{row.SlotId}' attempt {attempt}/2.");
+                continue;
+            }
+
+            try
+            {
+                await editEntry.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Visible,
+                    Timeout = Math.Min(_config.TimeoutMs, 3000),
+                }).WaitAsync(cancellationToken);
+                Notify($"[farm-list] combined move: verified menu for slot '{row.SlotId}' on attempt {attempt}/2; selecting Edit target.");
+                return editEntry;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (TimeoutException ex)
+            {
+                Notify($"[farm-list] combined move: Edit target timed out for slot '{row.SlotId}' attempt {attempt}/2: {ex.Message}");
+            }
+            catch (PlaywrightException ex)
+            {
+                Notify($"[farm-list] combined move: Edit target was not actionable for slot '{row.SlotId}' attempt {attempt}/2: {ex.Message}");
+            }
+        }
+
+        return null;
+    }
+
     // Wait for the ordinary completed move OR Travian's duplicate-target confirmation. Both are
     // observed in the same bounded loop, so a normal move is not delayed while a late dialog can
     // still appear and be confirmed before the overall move-verification deadline expires.
@@ -824,6 +855,7 @@ public sealed partial class TravianClient : IFarmingClient
             .Locator(".dialogContainer:visible .confirmationDialogContent")
             .Filter(new LocatorFilterOptions { HasTextString = duplicateMessage })
             .First;
+        var duplicateConfirmed = false;
 
         for (var attempt = 0; attempt < 4; attempt++)
         {
@@ -834,7 +866,8 @@ public sealed partial class TravianClient : IFarmingClient
                     """
                     (candidate) => {
                       const duplicateShown = Array.from(document.querySelectorAll('.dialogContainer .confirmationDialogContent'))
-                        .some(dialog => (dialog.textContent || '').includes(candidate.duplicateMessage));
+                        .some(dialog => dialog.closest('.dialogContainer')?.getClientRects().length > 0
+                          && (dialog.textContent || '').includes(candidate.duplicateMessage));
                       if (duplicateShown) return true;
                       const wrapper = Array.from(document.querySelectorAll('#rallyPointFarmList .farmListWrapper'))
                         .find(item => item.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') === candidate.destinationId);
@@ -860,8 +893,35 @@ public sealed partial class TravianClient : IFarmingClient
                 continue;
             }
 
-            if (await confirmation.CountAsync() > 0)
+            if (await IsFarmListMoveConfirmedOnCurrentPageAsync(row, destination))
             {
+                return true;
+            }
+
+            if (await confirmation.CountAsync() > 0 && await confirmation.IsVisibleAsync())
+            {
+                if (duplicateConfirmed)
+                {
+                    Notify($"[farm-list] duplicate target override is still closing for slot '{row.SlotId}'; waiting without clicking it again.");
+                    try
+                    {
+                        await confirmation.WaitForAsync(new LocatorWaitForOptions
+                        {
+                            State = WaitForSelectorState.Hidden,
+                            Timeout = 3000,
+                        }).WaitAsync(cancellationToken);
+                    }
+                    catch (TimeoutException)
+                    {
+                        // The final refresh below is authoritative when the React dialog remains stale.
+                    }
+                    catch (PlaywrightException)
+                    {
+                        // The final refresh below is authoritative when the React dialog is detached mid-wait.
+                    }
+                    continue;
+                }
+
                 var confirmButton = confirmation
                     .Locator("button.textButtonV2.buttonFramed.rectangle.withText.green")
                     .First;
@@ -874,15 +934,67 @@ public sealed partial class TravianClient : IFarmingClient
                     Notify($"[farm-list] duplicate target override could not be confirmed target='{row.TargetName}' slot='{row.SlotId}'.");
                     return false;
                 }
+                duplicateConfirmed = true;
                 Notify($"[farm-list] confirmed duplicate target override target='{row.TargetName}' slot='{row.SlotId}'.");
+                try
+                {
+                    await confirmation.WaitForAsync(new LocatorWaitForOptions
+                    {
+                        State = WaitForSelectorState.Hidden,
+                        Timeout = 3000,
+                    }).WaitAsync(cancellationToken);
+                }
+                catch (TimeoutException)
+                {
+                    Notify($"[farm-list] duplicate target override dialog remained visible for slot '{row.SlotId}'; continuing observation without another click.");
+                }
+                catch (PlaywrightException ex)
+                {
+                    Notify($"[farm-list] duplicate target override dialog changed while closing for slot '{row.SlotId}': {ex.Message}");
+                }
                 continue;
             }
-
-            return true;
         }
 
-        Notify($"[farm-list] move did not confirm target='{row.TargetName}' slot='{row.SlotId}' within {4 * 5}s.");
-        return false;
+        return await VerifyFarmListMoveAfterRefreshAsync(row, destination, cancellationToken);
+    }
+
+    private async Task<bool> VerifyFarmListMoveAfterRefreshAsync(
+        FarmListLossRowJs row,
+        LossDestinationResolution destination,
+        CancellationToken cancellationToken)
+    {
+        Notify($"[farm-list] move confirmation remained ambiguous for target='{row.TargetName}' slot='{row.SlotId}'; refreshing once before any mutation retry.");
+        await ReloadOrGotoAsync(Paths.RallyPointFarmLists, cancellationToken);
+        await EnsureLoggedInAsync(cancellationToken: cancellationToken);
+        await WaitForFarmListsRenderedAsync(cancellationToken);
+        await EnsureOfficialFarmListsExpandedAsync(cancellationToken);
+        var confirmed = await IsFarmListMoveConfirmedOnCurrentPageAsync(row, destination);
+        Notify(confirmed
+            ? $"[farm-list] move confirmed after refresh target='{row.TargetName}' slot='{row.SlotId}' destination='{destination.Name}'."
+            : $"[farm-list] move still unconfirmed after refresh target='{row.TargetName}' slot='{row.SlotId}' destination='{destination.Name}'.");
+        return confirmed;
+    }
+
+    private async Task<bool> IsFarmListMoveConfirmedOnCurrentPageAsync(
+        FarmListLossRowJs row,
+        LossDestinationResolution destination)
+    {
+        return await _page.EvaluateAsync<bool>(
+            """
+            (candidate) => {
+              const wrapper = Array.from(document.querySelectorAll('#rallyPointFarmList .farmListWrapper'))
+                .find(item => item.querySelector('.dragAndDrop[data-list]')?.getAttribute('data-list') === candidate.destinationId);
+              const input = wrapper?.querySelector(`tr.slot input[data-slot-id="${CSS.escape(candidate.slotId)}"]`);
+              const movedRow = input?.closest('tr.slot');
+              return !!movedRow && movedRow.classList.contains('disabled');
+            }
+            """,
+            new
+            {
+                slotId = row.SlotId ?? string.Empty,
+                destinationId = destination.Id,
+            });
     }
 
     private ILocator ResolveFarmListLossRowLocator(FarmListLossRowJs row)
@@ -1522,6 +1634,10 @@ public sealed partial class TravianClient : IFarmingClient
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (TimeoutException ex)
+        {
+            Notify($"[farm-list] real click timed out ({reason}); using fallback action: {ex.Message}");
         }
         catch (PlaywrightException ex)
         {

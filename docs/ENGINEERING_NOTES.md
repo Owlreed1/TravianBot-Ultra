@@ -530,6 +530,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   contract: `td.openContextMenu` → `.entry.edit` → `.dialog.basic.slotDialog`, then
   `select[name='listId']`, `input[name='isActive']`, and `button.save`. Keep the list `lid` as the stable
   destination identity; display name is only for rebind/recreation when a configured list disappears.
+  If the React context menu does not render, retry opening it once with the existing synthetic fallback and
+  treat both Playwright and system timeouts as a row-level retry. Confirm a duplicate override at most once;
+  if the saved state remains ambiguous, refresh once and verify slot id, destination list id, and disabled state
+  before allowing another mutation attempt.
 - Analyzed farm lists persist per account (`FarmListsSnapshotPath`) and are restored into the panel at
   startup / account switch so it is never blank; restored timers are re-based on the capture time and
   `_lastFarmListsAnalysisAt` stays `MinValue` so a real re-analyze still fires when due.
