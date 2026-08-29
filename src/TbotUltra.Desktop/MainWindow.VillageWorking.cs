@@ -1202,6 +1202,11 @@ public partial class MainWindow
                 .Select(item => item.Finish!)
                 .OrderBy(item => item.FinishUtc)
                 .FirstOrDefault();
+            var mergedBuildings = ConstructionQueueState.MergeObservedBuildingLevels(
+                existing?.Buildings ?? [],
+                observation.ActiveConstructions);
+            var buildingLevelsAdvanced = existing is not null
+                && !ReferenceEquals(mergedBuildings, existing.Buildings);
 
             var status = found && existing is not null
                 ? existing with
@@ -1214,6 +1219,7 @@ public partial class MainWindow
                     ActiveConstructions = observation.ActiveConstructions,
                     BuildQueueFinish = shortestFinish,
                     ActiveConstructionsFromOverview = true,
+                    Buildings = mergedBuildings,
                     ActiveVillageCoordX = observation.CoordX ?? existing.ActiveVillageCoordX,
                     ActiveVillageCoordY = observation.CoordY ?? existing.ActiveVillageCoordY,
                 }
@@ -1235,6 +1241,13 @@ public partial class MainWindow
                     ActiveVillageCoordY: observation.CoordY);
 
             StoreVillageStatusCacheEntry(name, status);
+            if (buildingLevelsAdvanced)
+            {
+                _villageCacheStore.Save(_villageStatusCache.Snapshot);
+                AppendLog(
+                    $"[construction-ui] retained completed building levels for village='{name}' " +
+                    "from the authoritative overview queue.");
+            }
             InvalidateVillageOverview();
             SetActiveWorkingVillage(villageKey, name);
             RefreshVillageActivityIndicatorsOnDashboard();

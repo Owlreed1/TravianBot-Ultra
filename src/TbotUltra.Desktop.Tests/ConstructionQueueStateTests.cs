@@ -10,6 +10,50 @@ public sealed class ConstructionQueueStateTests
     private static readonly DateTimeOffset Now = new(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void MergeObservedBuildingLevels_PromotesCachedLevelToCompletedLevelBeforeActiveUpgrade()
+    {
+        var buildings = new[]
+        {
+            new Building(25, "Town Hall", 1, "/build.php?id=25", 24),
+        };
+        var active = new[]
+        {
+            new ActiveConstruction(
+                ConstructionKind.Building,
+                "Town Hall",
+                10,
+                30,
+                null,
+                SlotId: 25,
+                Gid: 24),
+        };
+
+        var result = ConstructionQueueState.MergeObservedBuildingLevels(buildings, active);
+
+        Assert.Equal(9, Assert.Single(result).Level);
+    }
+
+    [Fact]
+    public void MergeObservedBuildingLevels_DoesNotDowngradeOrApplyMismatchedBuilding()
+    {
+        var buildings = new[]
+        {
+            new Building(25, "Town Hall", 9, "/build.php?id=25", 24),
+            new Building(26, "Warehouse", 7, "/build.php?id=26", 10),
+        };
+        var active = new[]
+        {
+            new ActiveConstruction(ConstructionKind.Building, "Town Hall", 8, 30, null, SlotId: 25, Gid: 24),
+            new ActiveConstruction(ConstructionKind.Building, "Granary", 12, 30, null, SlotId: 26, Gid: 11),
+        };
+
+        var result = ConstructionQueueState.MergeObservedBuildingLevels(buildings, active);
+
+        Assert.Same(buildings, result);
+        Assert.Equal([9, 7], result.Select(building => building.Level));
+    }
+
+    [Fact]
     public void ResolveLoopWait_FullQueueUsesExactDeferredTaskTimerWhenSnapshotTimerIsMissing()
     {
         var deferred = new QueueItem

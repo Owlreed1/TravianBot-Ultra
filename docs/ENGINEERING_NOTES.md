@@ -486,6 +486,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   an upgrade reports QueuedOrInProgress on every climb pass and a build that finishes while the loop is on
   another village returns AlreadySatisfied, so skipping the dorf2 read froze the cached building level (a
   Marketplace shown as 12 in the UI while it had reached 20 in-game).
+- An authoritative Dorf1/Dorf2 construction-overview row reports the target level being built. The desktop may
+  therefore promote the matching cached building (same slot and gid/name) to at least `target - 1`, but must
+  never downgrade it. Persist that confirmed floor so clearing an optimistic queue target cannot reveal an old
+  pre-queue level while the long-running worker task is still active.
 - Same rule for resource fields (dorf1): after a resource-upgrade task,
   `RefreshResourceStatusAfterResourceMutationAsync` re-reads the just-worked village's fields
   (`resourceOnly:true, forceCurrentVillage:true`) and `CacheVillageStatus`es them, repainting the resource

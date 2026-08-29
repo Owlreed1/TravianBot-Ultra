@@ -58,6 +58,64 @@ public static class ConstructionQueueState
     public const string CurrentDeferClassificationVersion = "3";
     private const string PageTimerWaitReason = "page_timer";
 
+    public static IReadOnlyList<Building> MergeObservedBuildingLevels(
+        IReadOnlyList<Building> buildings,
+        IReadOnlyList<ActiveConstruction> activeConstructions)
+    {
+        if (buildings.Count == 0 || activeConstructions.Count == 0)
+        {
+            return buildings;
+        }
+
+        var completedLevelsBySlot = activeConstructions
+            .Where(item => item.Kind == ConstructionKind.Building
+                && item.SlotId is not null
+                && item.Level is > 0)
+            .GroupBy(item => item.SlotId!.Value)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(item => item.Level).First());
+        if (completedLevelsBySlot.Count == 0)
+        {
+            return buildings;
+        }
+
+        var changed = false;
+        var merged = buildings
+            .Select(building =>
+            {
+                if (building.SlotId is not int slotId
+                    || !completedLevelsBySlot.TryGetValue(slotId, out var active)
+                    || !IsSameBuilding(building, active))
+                {
+                    return building;
+                }
+
+                // Travian's overview reports the target level currently under construction. Therefore
+                // target - 1 is already complete and safe to retain even if a queued UI projection is cleared.
+                var completedLevel = active.Level!.Value - 1;
+                if (completedLevel <= (building.Level ?? 0))
+                {
+                    return building;
+                }
+
+                changed = true;
+                return building with { Level = completedLevel };
+            })
+            .ToList();
+        return changed ? merged : buildings;
+    }
+
+    private static bool IsSameBuilding(Building building, ActiveConstruction active)
+    {
+        if (building.Gid is int buildingGid && active.Gid is int activeGid)
+        {
+            return buildingGid == activeGid;
+        }
+
+        return string.Equals(building.Name?.Trim(), active.Name?.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
     public static bool IsActiveQueueStatus(QueueStatus status)
     {
         return status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused;
