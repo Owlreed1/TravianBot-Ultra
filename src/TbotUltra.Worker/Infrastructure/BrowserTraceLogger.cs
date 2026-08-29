@@ -149,7 +149,8 @@ public sealed class BrowserTraceLogger
             {
                 TraceDomEvent(message.Text[DomEventConsolePrefix.Length..], page.Url);
             }
-            else if (string.Equals(message.Type, "error", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(message.Type, "error", StringComparison.OrdinalIgnoreCase)
+                && !IsNoisyExternalConsoleError(message.Text))
             {
                 Event("ERROR", "console-error", "failed", message.Text, page.Url);
             }
@@ -163,6 +164,9 @@ public sealed class BrowserTraceLogger
             }
         };
     }
+
+    internal static bool IsNoisyExternalConsoleError(string? message)
+        => message?.Contains("Failed to load resource: net::ERR_FAILED", StringComparison.OrdinalIgnoreCase) == true;
 
     private void TraceDomEvent(string json, string url)
     {

@@ -50,6 +50,8 @@ public sealed class TroopTrainingOptionsWindowSourceTests
 
         Assert.DoesNotContain("SuccessBgBrush", sourcePanel, StringComparison.Ordinal);
         Assert.DoesNotContain("SuccessBorderBrush", sourcePanel, StringComparison.Ordinal);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(xaml, "Text=\"SYNC FROM\"").Count);
+        Assert.DoesNotContain("Text=\"SOURCE\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("The village ON switch is not copied", xaml, StringComparison.Ordinal);
     }
 }

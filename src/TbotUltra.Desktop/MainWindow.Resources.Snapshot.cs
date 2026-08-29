@@ -552,6 +552,10 @@ public partial class MainWindow
         {
             throw;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             // A page caught mid-navigation reports login state 'unknown' and self-heals on the next
@@ -665,6 +669,10 @@ public partial class MainWindow
         catch (AccountAccessException ex)
         {
             await HoldAccountAutomationAsync(ex);
+            return;
+        }
+        catch (OperationCanceledException)
+        {
             return;
         }
         catch (Exception ex)

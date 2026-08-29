@@ -253,7 +253,7 @@ public partial class MainWindow
     private string DescribeNextTask(QueueItem item)
     {
         var name = BuildQueueDisplayName(item);
-        var village = NormalizeVillageName(GetQueueItemVillageName(item));
+        var village = NormalizeVillageName(GetQueueItemCurrentVillageName(item));
         return village is null ? name : $"{name} ({village})";
     }
 

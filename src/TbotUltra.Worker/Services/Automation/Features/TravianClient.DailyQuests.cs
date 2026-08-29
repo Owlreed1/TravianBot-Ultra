@@ -316,7 +316,7 @@ public sealed partial class TravianClient
                       && rect.width > 0
                       && rect.height > 0;
                   };
-                  return Array.from(document.querySelectorAll('button.textButtonV2.collect.collectable, button.collect.collectable'))
+                  return Array.from(document.querySelectorAll('button.textButtonV2.collect.collectable:not(.collected), button.collect.collectable:not(.collected)'))
                     .some(button => isVisible(button));
                 }
                 """,
@@ -351,7 +351,7 @@ public sealed partial class TravianClient
             try
             {
                 clicked = await TryClickFirstVisibleEnabledAsync(
-                    "button.textButtonV2.collect.collectable, button.collect.collectable",
+                    "button.textButtonV2.collect.collectable:not(.collected), button.collect.collectable:not(.collected)",
                     cancellationToken,
                     requiredText: "Collect",
                     requireExactText: true,
@@ -377,7 +377,7 @@ public sealed partial class TravianClient
                           && rect.width > 0
                           && rect.height > 0;
                       };
-                      const buttons = Array.from(document.querySelectorAll('button.textButtonV2.collect.collectable, button.collect.collectable'));
+                      const buttons = Array.from(document.querySelectorAll('button.textButtonV2.collect.collectable:not(.collected), button.collect.collectable:not(.collected)'));
                       for (const button of buttons) {
                         const className = button.className || '';
                         const disabled = button.disabled

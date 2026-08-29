@@ -789,7 +789,9 @@ public sealed partial class TravianClient : IBuildingClient
         string operationLabel,
         CancellationToken cancellationToken)
     {
-        for (var attempt = 1; attempt <= 2; attempt++)
+        var restoredExpectedSlot = false;
+        const int attempts = 3;
+        for (var attempt = 1; attempt <= attempts; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var ready = false;
@@ -818,13 +820,25 @@ public sealed partial class TravianClient : IBuildingClient
                 return;
             }
 
-            Notify($"{operationLabel} expected construct choices for slot {slotId}/gid {gid}, but current url is '{_page.Url}'. Reopening attempt {attempt}/2.");
-            await GotoAsync(constructUrl, cancellationToken);
-            await EnsureLoggedInAsync(cancellationToken: cancellationToken);
+            if (!TravianUrls.IsBuildPageForSlot(_page.Url, slotId) && !restoredExpectedSlot)
+            {
+                restoredExpectedSlot = true;
+                Notify($"{operationLabel} left construct slot {slotId}; restoring the expected page once.");
+                await GotoAsync(constructUrl, cancellationToken);
+                await EnsureLoggedInAsync(cancellationToken: cancellationToken);
+                continue;
+            }
+
+            if (attempt < attempts)
+            {
+                Notify($"{operationLabel} construct choices for slot {slotId}/gid {gid} are not rendered yet; waiting for DOM settle ({attempt}/{attempts - 1}).");
+                await Task.Delay(250 * attempt, cancellationToken);
+            }
         }
 
         throw new InvalidOperationException(
-            $"{operationLabel} could not load the construct-choice page for slot {slotId}/gid {gid}; current url is '{_page.Url}'.");
+            $"{operationLabel} loaded slot {slotId}, but no construct choice for gid {gid} became available; "
+            + $"the building may already exist or its requirements may no longer be met. Current url is '{_page.Url}'.");
     }
 
 

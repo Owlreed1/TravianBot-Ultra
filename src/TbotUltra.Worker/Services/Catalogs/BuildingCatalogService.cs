@@ -100,6 +100,7 @@ public static class BuildingCatalogService
 
     private static readonly HashSet<int> SingleInstanceGids =
     [
+        5, 6, 7, 8, 9,
         13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29, 30, 34, 35, 36, 37, 40, 41, 44, 45, 46, 48, 49,
         31, 32, 33, 42, 43, 47,
     ];

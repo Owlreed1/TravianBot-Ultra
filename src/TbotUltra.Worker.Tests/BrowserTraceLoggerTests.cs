@@ -95,4 +95,18 @@ public sealed class BrowserTraceLoggerTests
         var end = Assert.Single(lines, line => line.Contains("event=FLOW_END", StringComparison.Ordinal));
         Assert.Contains($"result={outcome}", end);
     }
+
+    [Theory]
+    [InlineData("Failed to load resource: net::ERR_FAILED")]
+    [InlineData("Failed to load resource: net::ERR_FAILED at https://example.invalid/ad.js")]
+    public void ExternalResourceFailure_IsIgnoredAsConsoleNoise(string message)
+    {
+        Assert.True(BrowserTraceLogger.IsNoisyExternalConsoleError(message));
+    }
+
+    [Fact]
+    public void ScriptConsoleError_RemainsVisible()
+    {
+        Assert.False(BrowserTraceLogger.IsNoisyExternalConsoleError("Uncaught TypeError: value is undefined"));
+    }
 }

@@ -40,7 +40,7 @@
                     <ColumnDefinition Width="86" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="SOURCE"
+                <TextBlock Text="SYNC FROM"
                            VerticalAlignment="Center"
                            FontSize="11"
                            FontWeight="SemiBold"
@@ -92,7 +92,7 @@
                                                   IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                   IsEnabled="{Binding CanSelect}" />
                                         <TextBlock Grid.Column="1"
-                                                   Text="SOURCE"
+                                                   Text="SYNC FROM"
                                                    FontSize="10"
                                                    FontWeight="SemiBold"
                                                    Foreground="{DynamicResource SuccessTextBrush}"

@@ -175,6 +175,24 @@ public sealed class BuildingUpgradeSlotRebindPlannerTests
     }
 
     [Fact]
+    public void FindExistingConstruct_FindsProductionBuildingMovedToAnotherSlot()
+    {
+        var construct = Item(
+            "construct_building",
+            new BuildingConstructPayload(27, 6, "Brickyard").ToDictionary());
+        var status = Status(
+            new Building(27, "Sawmill", 1, "/build.php?id=27", 5),
+            new Building(28, "Brickyard", 2, "/build.php?id=28", 6));
+
+        var match = Assert.IsType<BuildingConstructLiveMatch>(
+            BuildingUpgradeSlotRebindPlanner.FindExistingConstruct(status, construct));
+
+        Assert.Equal(27, match.QueuedSlotId);
+        Assert.Equal(28, match.LiveSlotId);
+        Assert.Equal(2, match.LiveLevel);
+    }
+
+    [Fact]
     public void PlanUpgradeFromLiveStatus_ReportsSameSlotIdentityForMissingBuildingRecovery()
     {
         var upgrade = Item(

@@ -63,6 +63,24 @@ internal static class BuildingDomParser
         return new BuildPageTitleInfo(string.IsNullOrWhiteSpace(name) ? null : name, level);
     }
 
+    internal static int? ReadUnderConstructionTargetLevelFromHtmlForTests(string html)
+    {
+        var row = Regex.Match(
+            html ?? string.Empty,
+            @"<(?:tr|div)\b[^>]*class=[""'][^""']*\bunderConstruction\b[^""']*[""'][^>]*>(?<content>[\s\S]*?)</(?:tr|div)>",
+            RegexOptions.IgnoreCase);
+        if (!row.Success)
+        {
+            return null;
+        }
+
+        var text = CleanHtmlText(Regex.Replace(row.Groups["content"].Value, "<[^>]+>", " "));
+        var level = Regex.Match(text, @"\b(?:to\s+)?level\s*(?<level>\d{1,3})\b", RegexOptions.IgnoreCase);
+        return level.Success && int.TryParse(level.Groups["level"].Value, out var parsedLevel)
+            ? parsedLevel
+            : null;
+    }
+
     /// <summary>
     /// C# mirror of the empty-construction-slot heuristic in <c>TravianClient.DetectBuildPageStateAsync</c>.
     /// A slot is empty when the page lists construction choices (<c>id="contract_building*"</c>) but has no

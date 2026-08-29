@@ -237,6 +237,27 @@ public sealed partial class TravianClient
     {
         try
         {
+            if (slotId is 39 or 40)
+            {
+                Notify($"[construct-faster] verifying fixed-slot result on fresh build page — slot={slotId}.");
+                await GotoAsync(Paths.BuildBySlot(slotId), cancellationToken);
+                await WaitForPageReadyAsync(cancellationToken);
+
+                var observedLevel = await TryReadSlotLevelOnCurrentPageAsync(slotId);
+                if (observedLevel is int fixedSlotLevel && fixedSlotLevel > previousLevel)
+                {
+                    return (true, $"fixed-slot level {fixedSlotLevel}");
+                }
+
+                var queuedTargetLevel = await TryReadUnderConstructionTargetLevelOnCurrentBuildPageAsync(slotId);
+                if (queuedTargetLevel is int queuedLevel && queuedLevel >= targetLevel)
+                {
+                    return (true, $"fixed-slot under construction to level {queuedLevel}");
+                }
+
+                return (false, $"fixed-slot target level {targetLevel} was neither reached nor under construction");
+            }
+
             Notify($"[construct-faster] verifying result on fresh dorf2 — slot={slotId}.");
             await GotoAsync(ResolveConstructFasterVerificationPath(ConstructionKind.Building), cancellationToken);
             var progress = await WaitForBuildingLevelAdvanceAsync(

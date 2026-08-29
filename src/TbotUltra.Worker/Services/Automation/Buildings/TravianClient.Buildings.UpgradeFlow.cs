@@ -1424,6 +1424,38 @@ public sealed partial class TravianClient : IBuildingClient
     }
 
     /// <summary>
+    /// Reads the target level from the fixed-slot build page while Travian is actively extending it.
+    /// Walls and the Rally Point are not reliably represented by the normal dorf2 slot/queue probes.
+    /// </summary>
+    private async Task<int?> TryReadUnderConstructionTargetLevelOnCurrentBuildPageAsync(int slotId)
+    {
+        try
+        {
+            return await _page.EvaluateAsync<int?>(
+                """
+                (slotId) => {
+                  const url = new URL(location.href);
+                  if (!url.pathname.toLowerCase().endsWith('/build.php')
+                      || Number(url.searchParams.get('id')) !== slotId) {
+                    return null;
+                  }
+
+                  const row = document.querySelector('#build tr.underConstruction, #build .underConstruction');
+                  const text = (row?.textContent || '').replace(/\s+/g, ' ').trim();
+                  const match = text.match(/\b(?:to\s+)?level\s*(\d{1,3})\b/i);
+                  return match ? Number(match[1]) : null;
+                }
+                """,
+                slotId);
+        }
+        catch (Exception ex) when (IsTransientExecutionContextException(ex))
+        {
+            Notify($"[construct-faster:verbose] slot {slotId}: fixed-slot progress read hit transient navigation: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Confirms whether the slot's build page already shows an EXISTING building (not a construct-choice
     /// page) and returns its name + level. Used by construct to detect a slot that is already occupied
     /// (e.g. a special fixed slot like Rally Point/Wall, or a building that was built since the task was

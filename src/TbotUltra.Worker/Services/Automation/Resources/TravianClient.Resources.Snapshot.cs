@@ -378,8 +378,11 @@ public sealed partial class TravianClient
             cancellationToken.ThrowIfCancellationRequested();
             await EnsureAccountAccessAllowedAsync(cancellationToken);
 
-            var snapshot = await _page.EvaluateAsync<ResourceSnapshotDomReadResult>(
-                """
+            ResourceSnapshotDomReadResult? snapshot;
+            try
+            {
+                snapshot = await _page.EvaluateAsync<ResourceSnapshotDomReadResult>(
+                    """
                 () => {
                   const clean = (value) => String(value || '').replace(/[\u202A-\u202E\u2066-\u2069]/g, '').replace(/\s+/g, ' ').trim();
                   const compact = (value) => clean(value).replace(/\s+/g, '');
@@ -446,6 +449,14 @@ public sealed partial class TravianClient
                   };
                 }
                 """);
+            }
+            catch (Exception ex) when (attempt < attempts && BrowserFailureClassifier.IsTransientNavigation(ex))
+            {
+                Notify($"Resource snapshot read hit transient navigation on attempt {attempt}/{attempts}; waiting for the new page before retrying.");
+                await WaitForPageReadyAsync(cancellationToken);
+                await WaitForResourceSnapshotWidgetsAsync(cancellationToken);
+                continue;
+            }
 
             var resources = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             AddResourceIfPresent(resources, "wood", snapshot?.Wood);
@@ -471,7 +482,7 @@ public sealed partial class TravianClient
             {
                 if (attempt > 1)
                 {
-                    Notify($"Resource read recovered on attempt {attempt}/4: {snapshot?.Diagnostics ?? "-"}");
+                    Notify($"Resource read recovered on attempt {attempt}/{attempts}: {snapshot?.Diagnostics ?? "-"}");
                 }
 
                 return (resources, capacities, productionByHour);

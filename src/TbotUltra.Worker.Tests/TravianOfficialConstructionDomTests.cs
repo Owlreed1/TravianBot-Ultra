@@ -175,6 +175,20 @@ public sealed class TravianOfficialConstructionDomTests
     }
 
     [Fact]
+    public void FixedSlotBuildPage_ReadsQueuedTargetLevelFromUnderConstructionRow()
+    {
+        const string html = """
+            <h1 class="titleInHeader">Makeshift Wall <span class="level">Level 19</span></h1>
+            <div id="build" class="gid43 level19">
+              <table><tr class="underConstruction"><th>Currently upgrading to level 20:</th></tr></table>
+              <div class="upgradeBuilding completed">Makeshift Wall is being extended completely.</div>
+            </div>
+            """;
+
+        Assert.Equal(20, BuildingDomParser.ReadUnderConstructionTargetLevelFromHtmlForTests(html));
+    }
+
+    [Fact]
     public void OfficialUpgradeDom_ExcludesGreenOpenShopPaymentDecoy_AndKeepsRealUpgradeButton()
     {
         // Regression: on a resource-blocked field the only green control can be the payment-wizard

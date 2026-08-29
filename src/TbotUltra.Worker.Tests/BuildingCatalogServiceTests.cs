@@ -192,6 +192,17 @@ public sealed class BuildingCatalogServiceTests
         Assert.Equal(2, BuildingCatalogService.CategoryIndexFor(13));
     }
 
+    [Theory]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(9)]
+    public void ResourceProductionBuildings_AreSingleInstance(int gid)
+    {
+        Assert.True(BuildingCatalogService.IsSingleInstance(gid));
+    }
+
     [Fact]
     public void CatalogNames_MatchServerDisplayNames()
     {

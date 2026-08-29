@@ -25,6 +25,24 @@ public sealed class BanDetectionTimingSourceTests
         Assert.Contains("await EnsureAccountAccessAllowedAsync(cancellationToken);", widgetLoop, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ResourceSnapshotRead_RetriesWhenNavigationDestroysExecutionContext()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "TbotUltra.Worker",
+            "Services",
+            "Automation",
+            "Resources",
+            "TravianClient.Resources.Snapshot.cs"));
+        var readLoop = SliceMethod(source, "ProductionByHour)> ReadResourceSnapshotAsync", "HasAnyProduction");
+
+        Assert.Contains("BrowserFailureClassifier.IsTransientNavigation(ex)", readLoop, StringComparison.Ordinal);
+        Assert.Contains("await WaitForResourceSnapshotWidgetsAsync(cancellationToken);", readLoop, StringComparison.Ordinal);
+    }
+
     private static string SliceMethod(string source, string startMarker, string endMarker)
     {
         var start = source.IndexOf(startMarker, StringComparison.Ordinal);
