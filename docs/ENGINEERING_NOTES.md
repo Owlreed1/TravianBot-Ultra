@@ -94,6 +94,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   their normal all-matching-fields behavior. While editing a template, selecting a building or target level runs the
   same configured storage-capacity preflight as the normal construction queue; after confirmation, required Warehouse
   and Granary rows are inserted immediately before the affected row instead of waiting until the template is queued.
+  Queueing an older template combines storage prerequisites from resource-field and building actions into one
+  confirmation; planning remains stepwise and no queue items are written before that combined confirmation succeeds.
+  Saving also runs the full template and storage preflight. Accepted storage repairs are inserted before their
+  dependent rows but are not persisted until the user reviews the repaired template and clicks Save again.
 - New settings require the complete pipeline: model, defaults, load/save, ViewModel, UI, and tests.
 - Portable Settings profiles use the versioned `.tbot-settings.json` format and an explicit scalar/allowed-hours
   allowlist. They must remain anonymous and portable: never include account/server/proxy identity or credentials,

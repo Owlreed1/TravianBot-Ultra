@@ -445,6 +445,34 @@ public sealed class BuildingTemplatePlannerTests
     }
 
     [Fact]
+    public void PlanStoragePrerequisiteInsertions_PlacesRowsBeforeTheAffectedTemplateRow()
+    {
+        var status = Status(
+            "Teutons",
+            Building(19, "Warehouse", 1, 10),
+            Building(20, "Granary", 1, 11),
+            Building(21, "Main Building", 1, 15)) with
+        {
+            WarehouseCapacity = 1_200,
+            GranaryCapacity = 1_200,
+        };
+        var target = Row(15, "Main Building", 20, preferredSlot: 21);
+
+        var result = _planner.PlanStoragePrerequisiteInsertions([target], status, 1, 1);
+
+        Assert.Null(result.CannotPlanReason);
+        var insertion = Assert.Single(result.Insertions);
+        Assert.Equal(target.Id, insertion.BeforeRowId);
+        Assert.Contains(insertion.Rows, row => row.Gid == 10 && row.TargetLevel > 1);
+        Assert.Contains(insertion.Rows, row => row.Gid == 11 && row.TargetLevel > 1);
+        Assert.NotEmpty(insertion.Upgrades);
+
+        var repaired = insertion.Rows.Append(target).ToList();
+        var secondPass = _planner.PlanStoragePrerequisiteInsertions(repaired, status, 1, 1);
+        Assert.Empty(secondPass.Insertions);
+    }
+
+    [Fact]
     public void RowView_MissingRequirementOption_IsInvokableButNotDirectlySelectable()
     {
         var available = new BuildingTemplateTargetOption(23, "Cranny", "Infrastructure", null, null);

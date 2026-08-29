@@ -95,7 +95,7 @@ public sealed class BuildingTemplatesWindowSourceTests
     }
 
     [Fact]
-    public void SaveAllowsDraftsAndQueueValidationFailureIsShownExplicitly()
+    public void SaveValidatesTemplateAndQueueValidationFailureIsShownExplicitly()
     {
         var root = ProjectRootLocator.FindProjectRoot();
         var code = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "BuildingTemplatesWindow.xaml.cs"));
@@ -107,9 +107,24 @@ public sealed class BuildingTemplatesWindowSourceTests
 
         var saveHandler = code[saveHandlerStart..queueHandlerStart];
         var queueHandler = code[queueHandlerStart..closeHandlerStart];
-        Assert.Contains("SaveAllTemplates(skipValidation: true)", saveHandler, StringComparison.Ordinal);
+        Assert.Contains("SaveAllTemplates(skipValidation: false)", saveHandler, StringComparison.Ordinal);
         Assert.Contains("AppDialog.Show(", queueHandler, StringComparison.Ordinal);
         Assert.Contains("\"Cannot queue template\"", queueHandler, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SaveRunsFullPreflightAndRequiresASecondSaveAfterStorageRowsAreInserted()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var code = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "BuildingTemplatesWindow.xaml.cs"));
+        var saveHandlerStart = code.IndexOf("private void SaveButton_Click", StringComparison.Ordinal);
+        var queueHandlerStart = code.IndexOf("private void QueueTemplateButton_Click", saveHandlerStart, StringComparison.Ordinal);
+        var saveHandler = code[saveHandlerStart..queueHandlerStart];
+
+        Assert.Contains("TryPrepareTemplateForSave()", saveHandler, StringComparison.Ordinal);
+        Assert.Contains("SaveAllTemplates(skipValidation: false)", saveHandler, StringComparison.Ordinal);
+        Assert.Contains("click Save again", code, StringComparison.Ordinal);
+        Assert.Contains("PlanStoragePrerequisiteInsertions", code, StringComparison.Ordinal);
     }
 
     [Fact]

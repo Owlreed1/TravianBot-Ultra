@@ -225,7 +225,8 @@ public partial class MainWindow
                         item.Request.Payload,
                         out var stagedRequests,
                         out var stagedStorageUpgrades,
-                        priorTemplateRequests))
+                        precedingTemplateRequests: priorTemplateRequests,
+                        confirmUpgrades: false))
                 {
                     BuildingsInfoTextBlock.Text = "Building template cancelled by storage capacity preflight.";
                     return;
@@ -251,7 +252,8 @@ public partial class MainWindow
         if (!TryPrepareConstructionStoragePreflight(
                 finalRequests,
                 out var fullyPlannedRequests,
-                out var additionalStorageUpgrades))
+                out var additionalStorageUpgrades,
+                confirmUpgrades: false))
         {
             BuildingsInfoTextBlock.Text = "Building template cancelled by construction storage preflight.";
             return;
@@ -269,6 +271,11 @@ public partial class MainWindow
             return request with { Payload = payload };
         }).ToList();
         storageUpgrades = storageUpgrades.Concat(additionalStorageUpgrades).ToList();
+        if (!ConfirmBuildingTemplateStoragePreflight(storageUpgrades))
+        {
+            BuildingsInfoTextBlock.Text = "Building template cancelled by storage capacity preflight.";
+            return;
+        }
 
         IReadOnlyList<QueueItem> created;
         try

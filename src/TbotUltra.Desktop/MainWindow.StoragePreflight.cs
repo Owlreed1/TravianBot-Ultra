@@ -13,7 +13,8 @@ public partial class MainWindow
     private bool TryPrepareConstructionStoragePreflight(
         IReadOnlyList<QueueItemCreateRequest> requestedItems,
         out IReadOnlyList<QueueItemCreateRequest> plannedRequests,
-        out IReadOnlyList<StoragePreflightUpgrade> upgrades)
+        out IReadOnlyList<StoragePreflightUpgrade> upgrades,
+        bool confirmUpgrades = true)
     {
         plannedRequests = [];
         upgrades = [];
@@ -65,33 +66,28 @@ public partial class MainWindow
         upgrades = result.Upgrades;
         if (upgrades.Count > 0)
         {
-            var stages = upgrades
-                .GroupBy(
-                    upgrade => upgrade.RequiredBy ?? "the next blocked construction",
-                    StringComparer.OrdinalIgnoreCase)
-                .Select((group, index) => CreateStoragePreflightStage(
-                    $"STEP {index + 1}",
-                    $"Before {group.Key}",
-                    group.ToList()))
-                .ToList();
-            var content = new StoragePreflightPlanView(
-                "The queue reaches one or more storage-capacity limits. Each card identifies the exact " +
-                "building or resource level that requires the actions shown beneath it." +
-                FormatStorageBufferSetting(storageUpgradeLevelsAhead),
-                stages);
-            var choice = AppDialog.ShowCustomContent(
-                this,
-                content,
-                "Storage upgrades required",
-                [("Add required storage upgrades", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
-                MessageBoxImage.Warning,
-                MessageBoxResult.Yes,
-                MessageBoxResult.Cancel,
-                successResult: MessageBoxResult.Yes,
-                width: 600);
-            if (choice != MessageBoxResult.Yes)
+            if (confirmUpgrades)
             {
-                return false;
+                var stages = StoragePreflightPlanView.CreateStages(upgrades);
+                var content = new StoragePreflightPlanView(
+                    "The queue reaches one or more storage-capacity limits. Each card identifies the exact " +
+                    "building or resource level that requires the actions shown beneath it." +
+                    FormatStorageBufferSetting(storageUpgradeLevelsAhead),
+                    stages);
+                var choice = AppDialog.ShowCustomContent(
+                    this,
+                    content,
+                    "Storage upgrades required",
+                    [("Add required storage upgrades", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
+                    MessageBoxImage.Warning,
+                    MessageBoxResult.Yes,
+                    MessageBoxResult.Cancel,
+                    successResult: MessageBoxResult.Yes,
+                    width: 600);
+                if (choice != MessageBoxResult.Yes)
+                {
+                    return false;
+                }
             }
 
             var planId = Guid.NewGuid().ToString();
@@ -110,7 +106,8 @@ public partial class MainWindow
         Dictionary<string, string> parentPayload,
         out IReadOnlyList<QueueItemCreateRequest> plannedRequests,
         out IReadOnlyList<StoragePreflightUpgrade> upgrades,
-        IReadOnlyList<QueueItemCreateRequest>? precedingTemplateRequests = null)
+        IReadOnlyList<QueueItemCreateRequest>? precedingTemplateRequests = null,
+        bool confirmUpgrades = true)
     {
         plannedRequests = [];
         upgrades = [];
@@ -165,11 +162,11 @@ public partial class MainWindow
         }
 
         upgrades = result.Upgrades;
-        if (upgrades.Count > 0)
+        if (upgrades.Count > 0 && confirmUpgrades)
         {
             var stages = result.Stages
                 .Where(stage => stage.StorageUpgradesBefore.Count > 0)
-                .Select(stage => CreateStoragePreflightStage(
+                .Select(stage => StoragePreflightPlanView.CreateStage(
                     $"LEVEL {stage.ResourceTargetLevel}",
                     $"Before all resource fields advance to level {stage.ResourceTargetLevel}",
                     stage.StorageUpgradesBefore))
@@ -235,58 +232,30 @@ public partial class MainWindow
         return true;
     }
 
-    private static StoragePreflightPlanStage CreateStoragePreflightStage(
-        string badge,
-        string heading,
-        IReadOnlyList<StoragePreflightUpgrade> upgrades)
+    private bool ConfirmBuildingTemplateStoragePreflight(IReadOnlyList<StoragePreflightUpgrade> upgrades)
     {
-        var actions = new List<StoragePreflightPlanAction>();
-        foreach (var upgrade in upgrades)
+        if (upgrades.Count == 0)
         {
-            var capacityBefore = upgrade.ProjectedCapacity;
-            if (upgrade.RequiresConstruction)
-            {
-                var capacityAfterConstruction = capacityBefore
-                    + StorageCapacityDependencyPlanner.CapacityAtLevel(1)
-                    - StorageCapacityDependencyPlanner.CapacityAtLevel(0);
-                actions.Add(new StoragePreflightPlanAction(
-                    "Construct",
-                    "CONSTRUCT",
-                    upgrade.Kind.ToString(),
-                    $"Free building slot {upgrade.SlotId} · Level 1",
-                    FormatCapacityChange(capacityBefore, capacityAfterConstruction)));
-                capacityBefore = capacityAfterConstruction;
-
-                if (upgrade.TargetLevel <= 1)
-                {
-                    continue;
-                }
-            }
-
-            var currentLevel = Math.Max(1, upgrade.CurrentLevel);
-            var capacityAfterUpgrade = capacityBefore
-                + StorageCapacityDependencyPlanner.CapacityAtLevel(upgrade.TargetLevel)
-                - StorageCapacityDependencyPlanner.CapacityAtLevel(currentLevel);
-            actions.Add(new StoragePreflightPlanAction(
-                "Upgrade",
-                "UPGRADE",
-                upgrade.Kind.ToString(),
-                $"Level {currentLevel} → {upgrade.TargetLevel} · Slot {upgrade.SlotId}",
-                FormatCapacityChange(capacityBefore, capacityAfterUpgrade)));
+            return true;
         }
 
-        var requirements = upgrades
-            .Select(upgrade => $"{upgrade.Kind} needs {upgrade.RequiredCapacity:N0}")
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-        return new StoragePreflightPlanStage(
-            badge,
-            heading,
-            $"Required capacity: {string.Join("  ·  ", requirements)}",
-            actions);
+        var storageUpgradeLevelsAhead = LoadBotOptions().ConstructionStorageUpgradeLevelsAhead;
+        var content = new StoragePreflightPlanView(
+            "This template reaches storage-capacity limits in resource fields and/or buildings. " +
+            "All required Warehouse and Granary actions are shown together below." +
+            FormatStorageBufferSetting(storageUpgradeLevelsAhead),
+            StoragePreflightPlanView.CreateStages(upgrades));
+        return AppDialog.ShowCustomContent(
+            this,
+            content,
+            "Storage upgrades required",
+            [("Add required storage upgrades", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
+            MessageBoxImage.Warning,
+            MessageBoxResult.Yes,
+            MessageBoxResult.Cancel,
+            successResult: MessageBoxResult.Yes,
+            width: 600) == MessageBoxResult.Yes;
     }
-
-    private static string FormatCapacityChange(long before, long after) =>
-        $"{before:N0} → {after:N0}";
 
     private static string FormatStorageBufferSetting(int storageUpgradeLevelsAhead) =>
         storageUpgradeLevelsAhead > ConstructionDefaults.StorageUpgradeLevelsAhead

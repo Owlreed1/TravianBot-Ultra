@@ -56,6 +56,16 @@ public sealed record BuildingTemplateStoragePrerequisitePlan(
     IReadOnlyList<StoragePreflightUpgrade> Upgrades,
     string? CannotPlanReason = null);
 
+public sealed record BuildingTemplateStorageInsertion(
+    Guid BeforeRowId,
+    string TargetName,
+    IReadOnlyList<BuildingTemplateRow> Rows,
+    IReadOnlyList<StoragePreflightUpgrade> Upgrades);
+
+public sealed record BuildingTemplateStorageInsertionPlan(
+    IReadOnlyList<BuildingTemplateStorageInsertion> Insertions,
+    string? CannotPlanReason = null);
+
 public sealed class BuildingTemplatePlanner
 {
     private const string HighestSingleResourceStrategy = "highest-single";
@@ -241,6 +251,66 @@ public sealed class BuildingTemplatePlanner
         }
 
         return new BuildingTemplateStoragePrerequisitePlan(rows, preflight.Upgrades);
+    }
+
+    public BuildingTemplateStorageInsertionPlan PlanStoragePrerequisiteInsertions(
+        IReadOnlyList<BuildingTemplateRow> rows,
+        VillageStatus status,
+        double serverSpeed,
+        int mainBuildingLevel,
+        int storageUpgradeLevelsAhead = ConstructionDefaults.StorageUpgradeLevelsAhead)
+    {
+        var insertions = new List<BuildingTemplateStorageInsertion>();
+        var precedingRows = new List<BuildingTemplateRow>();
+        foreach (var targetRow in rows ?? [])
+        {
+            var precedingStorage = PlanStoragePrerequisites(
+                precedingRows,
+                status,
+                serverSpeed,
+                mainBuildingLevel,
+                storageUpgradeLevelsAhead);
+            var requiredStorage = PlanStoragePrerequisites(
+                precedingRows.Append(targetRow).ToList(),
+                status,
+                serverSpeed,
+                mainBuildingLevel,
+                storageUpgradeLevelsAhead);
+            if (!string.IsNullOrWhiteSpace(requiredStorage.CannotPlanReason))
+            {
+                return new BuildingTemplateStorageInsertionPlan(insertions, requiredStorage.CannotPlanReason);
+            }
+
+            var precedingTargets = precedingStorage.Rows
+                .GroupBy(row => (row.Gid, row.PreferredSlotId))
+                .ToDictionary(group => group.Key, group => group.Max(row => row.TargetLevel));
+            var rowsToInsert = requiredStorage.Rows
+                .Where(row => row.TargetLevel > precedingTargets.GetValueOrDefault((row.Gid, row.PreferredSlotId)))
+                .ToList();
+            if (rowsToInsert.Count > 0)
+            {
+                var precedingUpgradeTargets = precedingStorage.Upgrades
+                    .GroupBy(upgrade => (upgrade.Kind, upgrade.SlotId))
+                    .ToDictionary(group => group.Key, group => group.Max(upgrade => upgrade.TargetLevel));
+                var upgrades = requiredStorage.Upgrades
+                    .GroupBy(upgrade => (upgrade.Kind, upgrade.SlotId))
+                    .Select(group => group.OrderByDescending(upgrade => upgrade.TargetLevel).First())
+                    .Where(upgrade => upgrade.TargetLevel > precedingUpgradeTargets.GetValueOrDefault((upgrade.Kind, upgrade.SlotId)))
+                    .ToList();
+                var targetName = string.IsNullOrWhiteSpace(targetRow.BuildingName)
+                    ? "template row"
+                    : targetRow.BuildingName;
+                insertions.Add(new BuildingTemplateStorageInsertion(
+                    targetRow.Id,
+                    targetName,
+                    rowsToInsert,
+                    upgrades));
+            }
+
+            precedingRows.Add(targetRow);
+        }
+
+        return new BuildingTemplateStorageInsertionPlan(insertions);
     }
 
     private static void AddTemplateSlotFallbackMetadata(IReadOnlyList<BuildingTemplatePlanAction> actions)

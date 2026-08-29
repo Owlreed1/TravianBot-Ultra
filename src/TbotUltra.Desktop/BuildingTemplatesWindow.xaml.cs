@@ -10,8 +10,10 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Microsoft.Win32;
+using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
+using TbotUltra.Desktop.Views;
 using TbotUltra.Worker.Domain;
 using TbotUltra.Worker.Services;
 
@@ -920,12 +922,112 @@ public partial class BuildingTemplatesWindow : Window, INotifyPropertyChanged
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!SaveAllTemplates(skipValidation: true))
+        if (!TryPrepareTemplateForSave()
+            || !SaveAllTemplates(skipValidation: false))
         {
             return;
         }
 
         StatusText = "Saved template.";
+    }
+
+    private bool TryPrepareTemplateForSave()
+    {
+        _planPreviewTimer.Stop();
+        _pendingStorageCheckRows.Clear();
+        var rows = BuildTemplateRowsFromUi();
+        var plan = _planner.Plan(rows, _status, _serverSpeed, _mainBuildingLevel);
+        if (plan.Errors.Count > 0)
+        {
+            StatusText = string.Join(" ", plan.Errors.Take(2));
+            RefreshPlanPreview(plan);
+            AppDialog.Show(
+                this,
+                string.Join("\n", plan.Errors),
+                "Cannot save template",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return false;
+        }
+
+        var storagePlan = _planner.PlanStoragePrerequisiteInsertions(
+            rows,
+            _status,
+            _serverSpeed,
+            _mainBuildingLevel,
+            _storageUpgradeLevelsAhead);
+        if (!string.IsNullOrWhiteSpace(storagePlan.CannotPlanReason))
+        {
+            StatusText = storagePlan.CannotPlanReason;
+            AppDialog.Show(
+                this,
+                $"The storage requirement could not be planned safely.\n\n{storagePlan.CannotPlanReason}",
+                "Cannot save template",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return false;
+        }
+
+        if (storagePlan.Insertions.Count == 0)
+        {
+            return true;
+        }
+
+        var upgrades = storagePlan.Insertions.SelectMany(insertion => insertion.Upgrades).ToList();
+        var bufferText = _storageUpgradeLevelsAhead > ConstructionDefaults.StorageUpgradeLevelsAhead
+            ? $" Construction setting: {_storageUpgradeLevelsAhead} storage levels ahead."
+            : string.Empty;
+        var content = new StoragePreflightPlanView(
+            "This template needs Warehouse and/or Granary rows before the affected resource or building actions. " +
+            "All required storage actions are shown together below." + bufferText,
+            StoragePreflightPlanView.CreateStages(upgrades));
+        var choice = AppDialog.ShowCustomContent(
+            this,
+            content,
+            "Storage upgrades required",
+            [("Add required storage upgrades", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
+            MessageBoxImage.Warning,
+            MessageBoxResult.Yes,
+            MessageBoxResult.Cancel,
+            successResult: MessageBoxResult.Yes,
+            width: 600);
+        if (choice != MessageBoxResult.Yes)
+        {
+            StatusText = "Template was not saved.";
+            return false;
+        }
+
+        _isApplyingStoragePrerequisites = true;
+        try
+        {
+            foreach (var insertion in storagePlan.Insertions)
+            {
+                var targetRow = Rows.FirstOrDefault(row => row.Id == insertion.BeforeRowId);
+                if (targetRow is null)
+                {
+                    StatusText = $"Could not locate {insertion.TargetName} while inserting storage prerequisites.";
+                    return false;
+                }
+                var targetIndex = Rows.IndexOf(targetRow);
+
+                foreach (var storageRow in insertion.Rows)
+                {
+                    var rowView = BuildingTemplateRowView.From(storageRow, BuildingOptions, ResourceOptions);
+                    rowView.SetOptionSources(BuildingOptions, ResourceOptions);
+                    Rows.Insert(targetIndex++, rowView);
+                }
+
+                _dismissedStoragePrompts.Remove(insertion.BeforeRowId);
+            }
+        }
+        finally
+        {
+            _isApplyingStoragePrerequisites = false;
+        }
+
+        RefreshPlanPreview();
+        StatusText = $"Inserted {storagePlan.Insertions.Sum(item => item.Rows.Count)} storage prerequisite row(s). Review the template and click Save again.";
+        return false;
     }
 
     private void QueueTemplateButton_Click(object sender, RoutedEventArgs e)
