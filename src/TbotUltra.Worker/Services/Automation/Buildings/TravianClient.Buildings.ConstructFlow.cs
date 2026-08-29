@@ -724,9 +724,9 @@ public sealed partial class TravianClient : IBuildingClient
             .ToList();
         var duplicateAllowed = gid is 23 or 38 or 39;
         var wallGid = gid is 31 or 32 or 33 or 42 or 43;
-        if ((gid is 29 or 30) && status.IsCapital == true)
+        if (!BuildingCatalogService.CanConstructInVillage(gid, status.IsCapital, out var locationReason))
         {
-            throw new InvalidOperationException($"{name} cannot be built in the capital.");
+            throw new InvalidOperationException(locationReason);
         }
 
         var conflictingResidenceFamilyGid = BuildingCatalogService.ResidenceFamilyConflictGidsFor(gid)

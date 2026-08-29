@@ -118,6 +118,13 @@ public sealed class BuildingTemplatePlanner
                 continue;
             }
 
+            if (state.FindExistingBuilding(gid, name) is null
+                && !BuildingCatalogService.CanConstructInVillage(gid, status.IsCapital, out var locationReason))
+            {
+                errors.Add(locationReason);
+                continue;
+            }
+
             var targetLevel = Math.Clamp(Math.Max(1, row.TargetLevel), 1, BuildingCatalogService.MaxLevelFor(gid));
             var requirements = BuildingCatalogService.RequirementsFor(gid);
             var missing = MissingRequirements(requirements, state);
@@ -357,6 +364,11 @@ public sealed class BuildingTemplatePlanner
         }
 
         var state = BuildProjectedState(precedingRows, status, serverSpeed, mainBuildingLevel);
+        if (state.FindExistingBuilding(gid, entry.Name) is null
+            && !BuildingCatalogService.CanConstructInVillage(gid, status.IsCapital, out var locationReason))
+        {
+            return new(BuildingTemplateAvailability.Unavailable, locationReason);
+        }
 
         var missing = MissingRequirements(entry.Requirements, state);
         if (missing.Count > 0)
@@ -921,9 +933,8 @@ public sealed class BuildingTemplatePlanner
     private static bool CanConstructNew(int gid, string name, VillageStatus status, ProjectedVillageState state, out string reason)
     {
         reason = string.Empty;
-        if ((gid is 29 or 30) && status.IsCapital == true)
+        if (!BuildingCatalogService.CanConstructInVillage(gid, status.IsCapital, out reason))
         {
-            reason = $"{name} cannot be built in the capital.";
             return false;
         }
 

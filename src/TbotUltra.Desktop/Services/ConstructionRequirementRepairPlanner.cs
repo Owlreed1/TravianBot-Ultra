@@ -423,9 +423,8 @@ internal static class ConstructionRequirementRepairPlanner
         out string reason)
     {
         reason = string.Empty;
-        if ((gid is 29 or 30) && status.IsCapital == true)
+        if (!BuildingCatalogService.CanConstructInVillage(gid, status.IsCapital, out reason))
         {
-            reason = $"{name} cannot be built in the capital";
             return false;
         }
 

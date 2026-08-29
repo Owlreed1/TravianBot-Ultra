@@ -628,6 +628,14 @@ public partial class MainWindow
                 continue;
             }
 
+            if (!BuildingCatalogService.CanConstructInVillage(entry.Gid, status.IsCapital, out var locationReason))
+            {
+                option.Availability = BuildingConstructAvailability.Unavailable;
+                option.UnavailableReason = locationReason;
+                result.Add(option);
+                continue;
+            }
+
             // World Wonder, Great Warehouse, Great Granary require building plans — not yet supported.
             if (entry.Gid is 38 or 39 or 40)
             {
@@ -635,15 +643,6 @@ public partial class MainWindow
                 option.UnavailableReason = entry.Gid == 40
                     ? "World Wonder requires building plans"
                     : $"{entry.Name} requires building plans";
-                result.Add(option);
-                continue;
-            }
-
-            // Great Barracks (29) and Great Stable (30) cannot be built in the capital village.
-            if ((entry.Gid is 29 or 30) && status.IsCapital == true)
-            {
-                option.Availability = BuildingConstructAvailability.Unavailable;
-                option.UnavailableReason = $"{entry.Name} cannot be built in the capital";
                 result.Add(option);
                 continue;
             }
@@ -739,6 +738,11 @@ public partial class MainWindow
     {
         reason = string.Empty;
         var projectedStatus = BuildProjectedBuildingStatus(sourceStatus);
+        if (!BuildingCatalogService.CanConstructInVillage(selectedBuilding.Gid, projectedStatus.IsCapital, out reason))
+        {
+            return false;
+        }
+
         var occupied = projectedStatus.Buildings.FirstOrDefault(item => item.SlotId == slotId
             && ((item.Level ?? 0) > 0
                 || ((item.Gid ?? 0) > 0 && !IsUnbuiltFixedSpecialSlot(slotId, item, selectedBuilding.Gid))));

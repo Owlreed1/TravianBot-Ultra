@@ -254,6 +254,38 @@ public sealed class BuildingTemplatePlannerTests
     }
 
     [Fact]
+    public void EvaluateBuildingAvailability_StonemasonsLodgeIsUnavailableOutsideCapital()
+    {
+        var status = Status("Romans", Building(19, "Main Building", 5, 15));
+
+        var result = _planner.EvaluateBuildingAvailability(34, [], status, 1, 5);
+
+        Assert.Equal(BuildingTemplateAvailability.Unavailable, result.Availability);
+        Assert.Contains("only be built in the capital", result.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void EvaluateBuildingAvailability_StonemasonsLodgeIsAvailableInCapital()
+    {
+        var status = Status("Romans", Building(19, "Main Building", 5, 15)) with { IsCapital = true };
+
+        var result = _planner.EvaluateBuildingAvailability(34, [], status, 1, 5);
+
+        Assert.Equal(BuildingTemplateAvailability.Available, result.Availability);
+    }
+
+    [Fact]
+    public void Plan_StonemasonsLodgeOutsideCapitalDoesNotCreateQueueActions()
+    {
+        var status = Status("Romans", Building(19, "Main Building", 5, 15));
+
+        var result = _planner.Plan([Row(34, "Stonemason's Lodge", 5)], status, 1, 5);
+
+        Assert.Empty(result.Actions);
+        Assert.Contains(result.Errors, error => error.Contains("only be built in the capital", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void EvaluateBuildingAvailability_CountsOnlyEarlierTemplatePrerequisites()
     {
         var status = Status("Teutons", Building(30, "Main Building", 3, 15));

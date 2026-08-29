@@ -121,6 +121,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - A live Dorf1 resource-field level above 10 is definitive positive capital evidence. Apply it immediately by
   coordinates to the capital cache, shared village list, and returned UI status, clearing any former capital flag;
   levels at or below 10 never prove that a village is non-capital. Player-profile scans remain the account-wide check.
+- Construction location rules are shared through `BuildingCatalogService.CanConstructInVillage` and enforced by
+  pickers, template planning/repair, and the Worker guard. Stonemason's Lodge (gid 34) requires confirmed capital
+  state; unknown is not permission. Great Barracks/Great Stable remain forbidden only in a confirmed capital.
 - Queue status transitions are gated. `MarkDeferred` accepts only RUNNING items; Pending items use
   `UpdateDeferred`/`UpdatePending`. Check the returned boolean.
 - Manual queue reordering persists through `CreatedAt` and therefore controls FIFO selection in both Auto Queue

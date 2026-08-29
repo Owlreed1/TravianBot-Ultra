@@ -213,6 +213,24 @@ public sealed class BuildingCatalogServiceTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(null)]
+    public void CanConstructInVillage_StonemasonsLodgeRequiresConfirmedCapital(bool? isCapital)
+    {
+        var allowed = BuildingCatalogService.CanConstructInVillage(34, isCapital, out var reason);
+
+        Assert.False(allowed);
+        Assert.Contains("only be built in the capital", reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CanConstructInVillage_StonemasonsLodgeAllowsCapital()
+    {
+        Assert.True(BuildingCatalogService.CanConstructInVillage(34, true, out var reason));
+        Assert.Empty(reason);
+    }
+
+    [Theory]
     [InlineData("Stonemason's Lodge", "Stonemason")]
     [InlineData("Hero's Mansion", "Hero Mansion")]
     [InlineData("Blacksmith", "Smithy")]

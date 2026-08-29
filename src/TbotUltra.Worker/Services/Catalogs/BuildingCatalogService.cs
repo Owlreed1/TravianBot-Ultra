@@ -151,6 +151,24 @@ public static class BuildingCatalogService
         return NameToGid.Value.TryGetValue(name.Trim(), out var gid) ? gid : null;
     }
 
+    public static bool CanConstructInVillage(int gid, bool? isCapital, out string reason)
+    {
+        if (gid == 34 && isCapital != true)
+        {
+            reason = "Stonemason's Lodge can only be built in the capital.";
+            return false;
+        }
+
+        if ((gid is 29 or 30) && isCapital == true)
+        {
+            reason = $"{NameForGid(gid)} cannot be built in the capital.";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
+    }
+
     private static IReadOnlyDictionary<string, int> BuildNameToGid()
     {
         var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
