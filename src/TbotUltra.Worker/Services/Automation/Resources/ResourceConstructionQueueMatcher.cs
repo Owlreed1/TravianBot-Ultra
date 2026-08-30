@@ -61,6 +61,15 @@ internal static class ResourceConstructionQueueMatcher
     internal static bool IsTargetAlreadyQueuedOnExactSlot(int targetLevel, int? detectedOfferLevel)
         => detectedOfferLevel is int offerLevel && offerLevel > targetLevel;
 
+    internal static int InferHighestQueuedLevelFromExactSlotOffer(
+        int highestKnownLevel,
+        int? detectedOfferLevel)
+    {
+        return detectedOfferLevel is int offerLevel
+            ? Math.Max(highestKnownLevel, offerLevel - 1)
+            : highestKnownLevel;
+    }
+
     private static bool IsMatch(
         ActiveConstruction item,
         int? slotId,

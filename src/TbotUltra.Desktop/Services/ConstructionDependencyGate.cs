@@ -252,7 +252,12 @@ public static class ConstructionDependencyGate
                 && construct is not null)
             {
                 var name = string.IsNullOrWhiteSpace(construct.Name) ? $"gid {construct.Gid}" : construct.Name;
-                bySlot[construct.SlotId] = new Building(construct.SlotId, name, 0, null, construct.Gid);
+                bySlot[construct.SlotId] = new Building(
+                    construct.SlotId,
+                    name,
+                    construct.TargetLevel,
+                    null,
+                    construct.Gid);
                 continue;
             }
 

@@ -43,4 +43,16 @@ public sealed class ResourceFieldScanParserTests
         Assert.Equal("unknown", row.FieldType);
         Assert.Null(row.Level);
     }
+
+    [Fact]
+    public void ScanStrategies_PreserveQueuedLevelFromUnderConstructionOverlay()
+    {
+        const string json =
+            """[{"slotId":3,"fieldType":"wood","name":"Woodcutter","level":6,"queuedLevel":7,"href":"dorf1.php?a=3"}]""";
+
+        var row = Assert.Single(ResourceFieldScanParser.ParseOfficialMap(json));
+
+        Assert.Equal(6, row.Level);
+        Assert.Equal(7, row.QueuedLevel);
+    }
 }

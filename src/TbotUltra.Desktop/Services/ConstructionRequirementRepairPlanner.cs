@@ -194,17 +194,21 @@ internal static class ConstructionRequirementRepairPlanner
                 && construct is not null)
             {
                 var payload = new Dictionary<string, string>(queuedConstruct.Payload, StringComparer.OrdinalIgnoreCase);
+                if (construct.TargetLevel < targetLevel)
+                {
+                    payload[BotOptionPayloadKeys.BuildingUpgradeTargetLevel] = targetLevel.ToString();
+                }
                 steps.Add(new ConstructionRequirementRepairStep(
                     ConstructionRequirementRepairStepKind.Promote,
                     queuedConstruct.Id,
                     queuedConstruct.TaskName,
                     payload,
-                    $"Promote queued {name} construct",
+                    $"Promote queued {name} construct to level {Math.Max(construct.TargetLevel, targetLevel)}",
                     $"promote queued {name} construct before blocked task",
                     $"{name} {targetLevel}+"));
-                state.ApplyBuilding(construct.SlotId, gid, name, 1);
-                existing = new PlannedBuilding(construct.SlotId, gid, name, 1);
-                existingLevel = 1;
+                existingLevel = Math.Max(construct.TargetLevel, targetLevel);
+                state.ApplyBuilding(construct.SlotId, gid, name, existingLevel);
+                existing = new PlannedBuilding(construct.SlotId, gid, name, existingLevel);
             }
             else
             {
@@ -221,18 +225,18 @@ internal static class ConstructionRequirementRepairPlanner
                     return;
                 }
 
-                var payload = new BuildingConstructPayload(slotId.Value, gid, name).ToDictionary();
+                var payload = new BuildingConstructPayload(slotId.Value, gid, name, targetLevel).ToDictionary();
                 steps.Add(new ConstructionRequirementRepairStep(
                     ConstructionRequirementRepairStepKind.Enqueue,
                     null,
                     "construct_building",
                     payload,
-                    $"Construct {name} to level 1 (slot {slotId.Value})",
+                    $"Construct {name} to level {targetLevel} (slot {slotId.Value})",
                     $"construct missing prerequisite {name} in slot {slotId.Value}",
                     $"{name} {targetLevel}+"));
-                state.ApplyBuilding(slotId.Value, gid, name, 1);
-                existing = new PlannedBuilding(slotId.Value, gid, name, 1);
-                existingLevel = 1;
+                state.ApplyBuilding(slotId.Value, gid, name, targetLevel);
+                existing = new PlannedBuilding(slotId.Value, gid, name, targetLevel);
+                existingLevel = targetLevel;
             }
         }
 

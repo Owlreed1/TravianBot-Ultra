@@ -65,7 +65,7 @@ public static class QueueDisplayNameFormatter
         {
             var slotSuffix = $" (slot {constructPayload.SlotId})";
             return !string.IsNullOrWhiteSpace(constructPayload.Name)
-                ? $"Construct {constructPayload.Name} to level 1{slotSuffix}"
+                ? $"Construct {constructPayload.Name} to level {constructPayload.TargetLevel}{slotSuffix}"
                 : $"Construct building{slotSuffix}";
         }
 

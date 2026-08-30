@@ -453,11 +453,18 @@ public sealed class QueueStoreAndSchedulerTests : IDisposable
         Assert.Equal(21, parsedConstruct!.SlotId);
         Assert.Equal(19, parsedConstruct.Gid);
         Assert.Equal("Barracks", parsedConstruct.Name);
+        Assert.Equal(1, parsedConstruct.TargetLevel);
         var serializedConstruct = parsedConstruct.ToDictionary();
         Assert.Equal(3, serializedConstruct.Count);
         Assert.Equal("21", serializedConstruct[BotOptionPayloadKeys.BuildingConstructSlotId]);
         Assert.Equal("19", serializedConstruct[BotOptionPayloadKeys.BuildingConstructGid]);
         Assert.Equal("Barracks", serializedConstruct[BotOptionPayloadKeys.BuildingConstructName]);
+
+        var chainedConstruct = new BuildingConstructPayload(29, 23, "Cranny", 10);
+        var serializedChain = chainedConstruct.ToDictionary();
+        Assert.Equal("10", serializedChain[BotOptionPayloadKeys.BuildingUpgradeTargetLevel]);
+        Assert.True(BuildingConstructPayload.TryFromDictionary(serializedChain, out var parsedChain));
+        Assert.Equal(10, parsedChain!.TargetLevel);
     }
 
     [Fact]

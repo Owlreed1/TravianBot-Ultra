@@ -40,6 +40,9 @@ internal sealed class ResourceFieldJs
     [JsonPropertyName("level")]
     public int? Level { get; init; }
 
+    [JsonPropertyName("queuedLevel")]
+    public int? QueuedLevel { get; init; }
+
     [JsonPropertyName("href")]
     public string? Href { get; init; }
 }

@@ -130,11 +130,15 @@ internal static class BanRecoveryPlanner
                 var order = BuildingOrder(building, requirementNames);
                 if (currentBuilding is null)
                 {
-                    var constructPayload = new BuildingConstructPayload(slot, building.Gid!.Value, building.Name).ToDictionary();
+                    var constructPayload = new BuildingConstructPayload(
+                        slot,
+                        building.Gid!.Value,
+                        building.Name,
+                        building.Level.Value).ToDictionary();
                     constructPayload[BotOptionPayloadKeys.BuildingConstructAllowSlotFallback] = "false";
                     StampVillage(constructPayload, villageKey, after.ActiveVillage, targetVillage?.Url);
                     villageRequests.Add((order, slot, new QueueItemCreateRequest("construct_building", constructPayload, 0, 3)));
-                    effectiveLevel = 1;
+                    effectiveLevel = building.Level.Value;
                 }
 
                 if (building.Level.Value > effectiveLevel)

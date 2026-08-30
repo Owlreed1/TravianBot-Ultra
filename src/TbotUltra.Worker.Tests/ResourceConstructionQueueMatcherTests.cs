@@ -144,4 +144,20 @@ public sealed class ResourceConstructionQueueMatcherTests
 
         Assert.Equal(expected, result);
     }
+
+    [Theory]
+    [InlineData(6, 8, 7)]
+    [InlineData(7, 7, 7)]
+    [InlineData(7, null, 7)]
+    public void InferHighestQueuedLevelFromExactSlotOffer_UsesPreviousSequentialLevel(
+        int highestKnownLevel,
+        int? detectedOfferLevel,
+        int expected)
+    {
+        var result = ResourceConstructionQueueMatcher.InferHighestQueuedLevelFromExactSlotOffer(
+            highestKnownLevel,
+            detectedOfferLevel);
+
+        Assert.Equal(expected, result);
+    }
 }

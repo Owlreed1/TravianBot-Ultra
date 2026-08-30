@@ -11,7 +11,7 @@ public sealed class ConstructionRequirementRepairPlannerTests
     private static readonly DateTimeOffset Now = new(2026, 7, 7, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Plan_StableWithoutAcademy_ConstructsAndUpgradesAcademy()
+    public void Plan_StableWithoutAcademy_ConstructsAcademyToRequiredLevelAsOneTask()
     {
         var parent = StableConstruct();
         var status = CreateStatus(
@@ -25,11 +25,10 @@ public sealed class ConstructionRequirementRepairPlannerTests
         var plan = ConstructionRequirementRepairPlanner.Plan(parent, status, [], Now);
 
         Assert.Empty(plan.Blockers);
-        Assert.Equal(2, plan.Steps.Count);
-        Assert.Equal("construct_building", plan.Steps[0].TaskName);
-        Assert.Equal("22", plan.Steps[0].Payload[BotOptionPayloadKeys.BuildingConstructGid]);
-        Assert.Equal("upgrade_building_to_level", plan.Steps[1].TaskName);
-        Assert.Equal("5", plan.Steps[1].Payload[BotOptionPayloadKeys.BuildingUpgradeTargetLevel]);
+        var step = Assert.Single(plan.Steps);
+        Assert.Equal("construct_building", step.TaskName);
+        Assert.Equal("22", step.Payload[BotOptionPayloadKeys.BuildingConstructGid]);
+        Assert.Equal("5", step.Payload[BotOptionPayloadKeys.BuildingUpgradeTargetLevel]);
     }
 
     [Fact]
@@ -46,11 +45,11 @@ public sealed class ConstructionRequirementRepairPlannerTests
         var plan = ConstructionRequirementRepairPlanner.Plan(parent, status, [], Now);
 
         Assert.Empty(plan.Blockers);
-        Assert.Equal(4, plan.Steps.Count);
+        Assert.Equal(2, plan.Steps.Count);
         Assert.Equal("Barracks", plan.Steps[0].Payload[BotOptionPayloadKeys.BuildingConstructName]);
-        Assert.Equal("3", plan.Steps[1].Payload[BotOptionPayloadKeys.BuildingUpgradeTargetLevel]);
-        Assert.Equal("Academy", plan.Steps[2].Payload[BotOptionPayloadKeys.BuildingConstructName]);
-        Assert.Equal("5", plan.Steps[3].Payload[BotOptionPayloadKeys.BuildingUpgradeTargetLevel]);
+        Assert.Equal("3", plan.Steps[0].Payload[BotOptionPayloadKeys.BuildingUpgradeTargetLevel]);
+        Assert.Equal("Academy", plan.Steps[1].Payload[BotOptionPayloadKeys.BuildingConstructName]);
+        Assert.Equal("5", plan.Steps[1].Payload[BotOptionPayloadKeys.BuildingUpgradeTargetLevel]);
     }
 
     [Fact]
@@ -96,10 +95,10 @@ public sealed class ConstructionRequirementRepairPlannerTests
         var plan = ConstructionRequirementRepairPlanner.Plan(parent, status, [construct, upgrade], Now);
 
         Assert.Empty(plan.Blockers);
-        Assert.Equal(2, plan.Steps.Count);
-        Assert.All(plan.Steps, step => Assert.Equal(ConstructionRequirementRepairStepKind.Promote, step.Kind));
-        Assert.Equal(construct.Id, plan.Steps[0].ExistingQueueItemId);
-        Assert.Equal(upgrade.Id, plan.Steps[1].ExistingQueueItemId);
+        var step = Assert.Single(plan.Steps);
+        Assert.Equal(ConstructionRequirementRepairStepKind.Promote, step.Kind);
+        Assert.Equal(construct.Id, step.ExistingQueueItemId);
+        Assert.Equal("5", step.Payload[BotOptionPayloadKeys.BuildingUpgradeTargetLevel]);
     }
 
     [Fact]

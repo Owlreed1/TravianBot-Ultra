@@ -132,7 +132,8 @@ public partial class MainWindow
         {
             var gid = TryGetIntPayloadValue(payload, BotOptionPayloadKeys.BuildingConstructGid)
                 ?? BuildingCatalogService.GidForName(GetPayloadValue(payload, BotOptionPayloadKeys.BuildingConstructName));
-            return SumLevels(item, gid, 1, 1, serverSpeed, mainBuildingLevel);
+            var target = TryGetIntPayloadValue(payload, BotOptionPayloadKeys.BuildingUpgradeTargetLevel) ?? 1;
+            return SumLevels(item, gid, 1, target, serverSpeed, mainBuildingLevel);
         }
 
         if (string.Equals(taskName, "upgrade_building_to_level", StringComparison.OrdinalIgnoreCase))

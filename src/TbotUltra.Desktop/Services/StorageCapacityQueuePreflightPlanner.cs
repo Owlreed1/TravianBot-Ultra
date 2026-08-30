@@ -81,41 +81,45 @@ public static class StorageCapacityQueuePreflightPlanner
             {
                 projection.OccupiedBuildingSlots.Add(construct.SlotId);
                 var constructedName = construct.Name ?? BuildingCatalogService.NameForGid(construct.Gid);
-                var failure = EnsureCapacityForCost(
-                    BuildingCatalogService.CostFor(construct.Gid, 1),
-                    $"constructing {constructedName}",
-                    construct.Gid is 10 or 11 ? construct.SlotId : null,
-                    payload,
-                    request,
-                    projection,
-                    buildingsBySlot,
-                    ref projectedWarehouse,
-                    ref projectedGranary,
-                    planned,
-                    allStorageUpgrades,
-                    storageUpgradeLevelsAhead);
-                if (failure is not null)
+                for (var level = 1; level <= construct.TargetLevel; level++)
                 {
-                    return new ConstructionStoragePreflightResult(planned, allStorageUpgrades, failure);
+                    var failure = EnsureCapacityForCost(
+                        BuildingCatalogService.CostFor(construct.Gid, level),
+                        $"constructing {constructedName} to level {level}",
+                        construct.Gid is 10 or 11 ? construct.SlotId : null,
+                        payload,
+                        request,
+                        projection,
+                        buildingsBySlot,
+                        ref projectedWarehouse,
+                        ref projectedGranary,
+                        planned,
+                        allStorageUpgrades,
+                        storageUpgradeLevelsAhead);
+                    if (failure is not null)
+                    {
+                        return new ConstructionStoragePreflightResult(planned, allStorageUpgrades, failure);
+                    }
+
+                    buildingsBySlot[construct.SlotId] = new Building(
+                        construct.SlotId,
+                        constructedName,
+                        level,
+                        null,
+                        construct.Gid);
+                    ApplyStorageBuildingLevelChange(
+                        construct.Gid,
+                        level - 1,
+                        level,
+                        ref projectedWarehouse,
+                        ref projectedGranary);
+                    if (construct.Gid is 10 or 11)
+                    {
+                        projection.StorageBySlot[construct.SlotId] = buildingsBySlot[construct.SlotId];
+                    }
                 }
 
                 planned.Add(CloneRequest(request));
-                buildingsBySlot[construct.SlotId] = new Building(
-                    construct.SlotId,
-                    construct.Name ?? BuildingCatalogService.NameForGid(construct.Gid),
-                    1,
-                    null,
-                    construct.Gid);
-                ApplyStorageBuildingLevelChange(
-                    construct.Gid,
-                    0,
-                    1,
-                    ref projectedWarehouse,
-                    ref projectedGranary);
-                if (construct.Gid is 10 or 11)
-                {
-                    projection.StorageBySlot[construct.SlotId] = buildingsBySlot[construct.SlotId];
-                }
                 continue;
             }
 
@@ -333,7 +337,11 @@ public static class StorageCapacityQueuePreflightPlanner
             var gid = contextualUpgrade.Kind == StorageCapacityKind.Warehouse ? 10 : 11;
             if (contextualUpgrade.RequiresConstruction)
             {
-                var constructPayload = new BuildingConstructPayload(contextualUpgrade.SlotId, gid, name).ToDictionary();
+                var constructPayload = new BuildingConstructPayload(
+                    contextualUpgrade.SlotId,
+                    gid,
+                    name,
+                    contextualUpgrade.TargetLevel).ToDictionary();
                 constructPayload[BotOptionPayloadKeys.BuildingConstructAllowSlotFallback] = bool.TrueString;
                 CopyStorageRequestContext(sourcePayload, constructPayload, batchId);
                 planned.Add(new QueueItemCreateRequest(
@@ -343,7 +351,7 @@ public static class StorageCapacityQueuePreflightPlanner
                     sourceRequest.MaxRetries));
             }
 
-            if (!contextualUpgrade.RequiresConstruction || contextualUpgrade.TargetLevel > 1)
+            if (!contextualUpgrade.RequiresConstruction)
             {
                 var upgradePayload = new BuildingUpgradePayload(contextualUpgrade.SlotId, contextualUpgrade.TargetLevel, name).ToDictionary();
                 CopyStorageRequestContext(sourcePayload, upgradePayload, batchId);
@@ -486,7 +494,7 @@ public static class StorageCapacityQueuePreflightPlanner
                 buildingsBySlot[construct.SlotId] = new Building(
                     construct.SlotId,
                     construct.Name ?? BuildingCatalogService.NameForGid(construct.Gid),
-                    1,
+                    construct.TargetLevel,
                     null,
                     construct.Gid);
                 continue;
@@ -751,10 +759,10 @@ public static class StorageCapacityQueuePreflightPlanner
                     storageBySlot[construct.SlotId] = new Building(
                         construct.SlotId,
                         BuildingCatalogService.NameForGid(construct.Gid),
-                        1,
+                        construct.TargetLevel,
                         null,
                         construct.Gid);
-                    var constructedCapacity = StorageCapacityDependencyPlanner.CapacityAtLevel(1)
+                    var constructedCapacity = StorageCapacityDependencyPlanner.CapacityAtLevel(construct.TargetLevel)
                         - StorageCapacityDependencyPlanner.CapacityAtLevel(0);
                     if (construct.Gid == 10)
                     {

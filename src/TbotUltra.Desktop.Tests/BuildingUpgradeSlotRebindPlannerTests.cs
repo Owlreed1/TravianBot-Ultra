@@ -40,6 +40,42 @@ public sealed class BuildingUpgradeSlotRebindPlannerTests
     }
 
     [Fact]
+    public void ConstructionQueueReconciliation_KeepsCompositeConstructUntilFinalTarget()
+    {
+        var construct = Item(
+            "construct_building",
+            new BuildingConstructPayload(29, 23, "Cranny", 10).ToDictionary());
+
+        var belowTarget = ConstructionQueueReconciliation.Plan(
+            Status(new Building(29, "Cranny", 1, "/build.php?id=29", 23)),
+            [construct]);
+        var atTarget = ConstructionQueueReconciliation.Plan(
+            Status(new Building(29, "Cranny", 10, "/build.php?id=29", 23)),
+            [construct]);
+
+        Assert.False(belowTarget.HasChanges);
+        Assert.Contains(construct.Id, atTarget.Removals);
+    }
+
+    [Fact]
+    public void ConstructionQueueReconciliation_RebindsCompositeConstructWithoutRemovingIt()
+    {
+        var construct = Item(
+            "construct_building",
+            new BuildingConstructPayload(38, 22, "Academy", 5).ToDictionary());
+
+        var plan = ConstructionQueueReconciliation.Plan(
+            Status(new Building(37, "Academy", 1, "/build.php?id=37", 22)),
+            [construct]);
+
+        Assert.Empty(plan.Removals);
+        var update = Assert.Single(plan.Updates);
+        Assert.Equal(construct.Id, update.QueueItemId);
+        Assert.Equal("37", update.Payload[BotOptionPayloadKeys.BuildingConstructSlotId]);
+        Assert.Equal("5", update.Payload[BotOptionPayloadKeys.BuildingUpgradeTargetLevel]);
+    }
+
+    [Fact]
     public void Plan_RebindsAcademyUpgradesWhenLiveDuplicateIsInAnotherSlot()
     {
         var source = Item(

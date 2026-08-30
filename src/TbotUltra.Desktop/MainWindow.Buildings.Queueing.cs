@@ -674,11 +674,12 @@ public partial class MainWindow
         foreach (var item in effectiveQueueItems)
         {
             if (string.Equals(item.TaskName, "construct_building", StringComparison.OrdinalIgnoreCase)
-                && TryReadBuildingConstructPayload(item.Payload, out var constructSlotId, out var constructGid, out var constructName))
+                && BuildingConstructPayload.TryFromDictionary(item.Payload, out var construct)
+                && construct is not null)
             {
-                constructName = string.IsNullOrWhiteSpace(constructName) ? $"gid {constructGid}" : constructName;
-                var projected = new Building(constructSlotId, constructName, 0, null, constructGid);
-                bySlot[constructSlotId] = projected;
+                var constructName = string.IsNullOrWhiteSpace(construct.Name) ? $"gid {construct.Gid}" : construct.Name;
+                var projected = new Building(construct.SlotId, constructName, construct.TargetLevel, null, construct.Gid);
+                bySlot[construct.SlotId] = projected;
                 continue;
             }
 
@@ -754,6 +755,14 @@ public partial class MainWindow
         var result = new Dictionary<int, int>();
         foreach (var item in queueItems ?? GetActiveQueueItems())
         {
+            if (string.Equals(item.TaskName, "construct_building", StringComparison.OrdinalIgnoreCase)
+                && BuildingConstructPayload.TryFromDictionary(item.Payload, out var construct)
+                && construct is { TargetLevel: > 1 })
+            {
+                result[construct.SlotId] = construct.TargetLevel;
+                continue;
+            }
+
             if (!string.Equals(item.TaskName, "upgrade_building_to_level", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(item.TaskName, "upgrade_building_to_max", StringComparison.OrdinalIgnoreCase))
             {
@@ -789,9 +798,14 @@ public partial class MainWindow
             }
 
             if (string.Equals(item.TaskName, "construct_building", StringComparison.OrdinalIgnoreCase)
-                && TryReadBuildingConstructPayload(item.Payload, out var constructSlotId, out _, out _))
+                && BuildingConstructPayload.TryFromDictionary(item.Payload, out var construct)
+                && construct is not null)
             {
-                activeConstructSlots.Add(constructSlotId);
+                activeConstructSlots.Add(construct.SlotId);
+                if (construct.TargetLevel > 1)
+                {
+                    activeUpgradeSlots.Add(construct.SlotId);
+                }
             }
 
             if (IsDemolishQueueItemForSelectedVillage(item)

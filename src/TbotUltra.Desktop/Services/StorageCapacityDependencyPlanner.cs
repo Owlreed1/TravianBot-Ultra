@@ -205,7 +205,7 @@ public static class StorageCapacityDependencyPlanner
         }
         else if (plan.Action == StorageDependencyAction.Construct)
         {
-            payload = new BuildingConstructPayload(plan.SlotId!.Value, gid, name).ToDictionary();
+            payload = new BuildingConstructPayload(plan.SlotId!.Value, gid, name, plan.TargetLevel ?? 1).ToDictionary();
             payload[BotOptionPayloadKeys.BuildingConstructAllowSlotFallback] = bool.TrueString;
         }
         else

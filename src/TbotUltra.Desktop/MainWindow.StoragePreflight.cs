@@ -203,13 +203,17 @@ public partial class MainWindow
                 if (upgrade.RequiresConstruction)
                 {
                     var gid = upgrade.Kind == StorageCapacityKind.Warehouse ? 10 : 11;
-                    var constructPayload = new BuildingConstructPayload(upgrade.SlotId, gid, name).ToDictionary();
+                    var constructPayload = new BuildingConstructPayload(
+                        upgrade.SlotId,
+                        gid,
+                        name,
+                        upgrade.TargetLevel).ToDictionary();
                     constructPayload[BotOptionPayloadKeys.BuildingConstructAllowSlotFallback] = bool.TrueString;
                     ApplyStoragePreflightMetadata(constructPayload, planId, batchId!);
                     requests.Add(new QueueItemCreateRequest("construct_building", constructPayload, 0, 3));
                 }
 
-                if (!upgrade.RequiresConstruction || upgrade.TargetLevel > 1)
+                if (!upgrade.RequiresConstruction)
                 {
                     var payload = new BuildingUpgradePayload(upgrade.SlotId, upgrade.TargetLevel, name).ToDictionary();
                     ApplyStoragePreflightMetadata(payload, planId, batchId!);

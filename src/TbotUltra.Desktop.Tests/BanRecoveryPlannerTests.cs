@@ -44,11 +44,11 @@ public sealed class BanRecoveryPlannerTests
             new Dictionary<string, VillageStatus> { ["xy:1|2"] = after },
             [], []);
 
-        Assert.Equal(2, plan.Requests.Count);
-        Assert.Equal("construct_building", plan.Requests[0].TaskName);
-        Assert.Equal("19", plan.Requests[0].Payload![BotOptionPayloadKeys.BuildingConstructSlotId]);
-        Assert.Equal("false", plan.Requests[0].Payload![BotOptionPayloadKeys.BuildingConstructAllowSlotFallback]);
-        Assert.Equal("upgrade_building_to_level", plan.Requests[1].TaskName);
+        var request = Assert.Single(plan.Requests);
+        Assert.Equal("construct_building", request.TaskName);
+        Assert.Equal("19", request.Payload![BotOptionPayloadKeys.BuildingConstructSlotId]);
+        Assert.Equal("5", request.Payload![BotOptionPayloadKeys.BuildingUpgradeTargetLevel]);
+        Assert.Equal("false", request.Payload![BotOptionPayloadKeys.BuildingConstructAllowSlotFallback]);
         Assert.Contains(plan.Issues, issue => issue.Message.Contains("Granary", StringComparison.Ordinal));
     }
 

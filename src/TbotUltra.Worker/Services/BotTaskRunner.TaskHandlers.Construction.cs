@@ -194,5 +194,27 @@ public sealed partial class BotTaskRunner
         context.Log(result);
         context.RecordTaskResult("construct_building", result);
         ThrowIfTaskBlocked("construct_building", result);
+
+        var targetLevel = context.Options.BuildingUpgradeTargetLevel ?? 1;
+        if (targetLevel <= 1)
+        {
+            return;
+        }
+
+        var effectiveSlotId = context.Options.BuildingConstructSlotId.Value;
+        if (TryExtractResultInt(result, $"{BotOptionPayloadKeys.BuildingConstructSlotId}=", out var reportedSlotId))
+        {
+            effectiveSlotId = reportedSlotId;
+        }
+        var upgradeResult = await new BuildingAutomationOperation(context.Client).ExecuteAsync(
+            new BuildingAutomationRequest(
+                BuildingAutomationAction.UpgradeToLevel,
+                SlotId: effectiveSlotId,
+                TargetLevel: targetLevel,
+                Name: buildingName),
+            context.CancellationToken);
+        context.Log($"[construct-chain] {buildingName} slot {effectiveSlotId} continuing to level {targetLevel}: {upgradeResult}");
+        context.RecordTaskResult("construct_building", upgradeResult);
+        ThrowIfTaskBlocked("construct_building", upgradeResult);
     }
 }

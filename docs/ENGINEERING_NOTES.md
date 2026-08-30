@@ -137,6 +137,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   `UpdateDeferred`/`UpdatePending`. Check the returned boolean.
 - A building upgrade must defer normally while an active `construct_building` item for the same village, slot,
   and building identity remains in the program queue; it must not reach the Worker as an identity-mismatch retry.
+- A new building and its requested final level are one `construct_building` queue item. The construct payload carries
+  the final target, survives slot fallback/reconciliation, and continues from level 1 through that target; templates,
+  recovery, requirement repair, and storage preflight must not split this into separate construct/upgrade rows.
+  Resource-field target upgrades likewise remain one queue item.
 - Manual queue reordering persists through `CreatedAt` and therefore controls FIFO selection in both Auto Queue
   and Continuous Loop. Up/down/top/bottom operate only inside the selected item's queue group and priority and
   ignore history rows. A move that places an explicitly linked construction requirement, or a construct for the
@@ -165,7 +169,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   back to live per-page checks. Refresh the snapshot only after a construction mutation starts a new scan iteration. Rank
   candidates by their projected level including an exact-slot queued upgrade. Retain a level confirmed during the
   current operation even when the refreshed live queue omits its slot identity, so a just-queued field is not probed
-  again ahead of untouched lower-level fields. An upgrade-click redirect to dorf1 receives the normal page-load pacing
+  again ahead of untouched lower-level fields. On dorf1, a resource overlay's exact-slot `underConstruction` class
+  projects `visible level + 1` for planning across deferred task invocations; it does not replace the visible completed
+  level and is not treated as a construction queue row. An upgrade-click redirect to dorf1 receives the normal page-load pacing
   once before the next candidate is selected. Immediately before either the normal resource upgrade click or its
   Construct Faster video action, re-read the live build page and require the requested URL slot, resource gid/name,
   current header/root level, exact next offered level, and button action slot/gid to agree. The offered level must not

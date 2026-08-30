@@ -305,6 +305,7 @@ public sealed partial class TravianClient
                 var activeConstructionsAtScan = await ReadActiveConstructionsAsync(
                     cancellationToken,
                     allowNavigationToBuildings: false);
+                var dorf1QueuedLevelsBySlot = ResourceSnapshotCalculator.BuildDorf1QueuedLevelProjections(resourceFields);
                 var liveQueuedLevelsBySlot = resourceFields
                     .Where(field => field.SlotId is int && field.Level is int)
                     .GroupBy(field => field.SlotId!.Value)
@@ -313,12 +314,15 @@ public sealed partial class TravianClient
                         group =>
                         {
                             var field = group.First();
-                            return ResourceConstructionQueueMatcher.HighestQueuedLevelForSlot(
+                            var queueLevel = ResourceConstructionQueueMatcher.HighestQueuedLevelForSlot(
                                 activeConstructionsAtScan,
                                 buildQueueAtScan,
                                 group.Key,
                                 field.Name,
                                 field.Level!.Value);
+                            return dorf1QueuedLevelsBySlot.TryGetValue(group.Key, out var dorf1QueuedLevel)
+                                ? Math.Max(queueLevel, dorf1QueuedLevel)
+                                : queueLevel;
                         });
                 var queuedLevelsBySlot = ResourceSnapshotCalculator.MergeQueuedLevelProjections(
                     liveQueuedLevelsBySlot,
@@ -542,6 +546,17 @@ public sealed partial class TravianClient
                         skipNavigationIfOnExpectedSlot: true);
                     var cap = actionability.DetectedMaxLevel ?? fallbackMax;
                     var effectiveTarget = Math.Min(targetLevel, cap);
+                    if (ResourceConstructionQueueMatcher.IsTargetAlreadyQueuedOnExactSlot(
+                            effectiveTarget,
+                            actionability.DetectedTargetLevel))
+                    {
+                        anyQueuedTowardTarget = true;
+                        Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} live offer is level {actionability.DetectedTargetLevel}; target {effectiveTarget} is already queued. Skipping to avoid over-building.");
+                        continue;
+                    }
+                    highestQueuedLevel = ResourceConstructionQueueMatcher.InferHighestQueuedLevelFromExactSlotOffer(
+                        highestQueuedLevel,
+                        actionability.DetectedTargetLevel);
                     Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} actionability={actionability.Outcome} effectiveTarget={effectiveTarget} detectedTarget={actionability.DetectedTargetLevel?.ToString() ?? "unknown"} max={actionability.DetectedMaxLevel?.ToString() ?? "unknown"} candidateIndex={actionability.CandidateIndex?.ToString() ?? "-"} reason={actionability.Reason}");
                     if (level >= effectiveTarget)
                     {

@@ -549,6 +549,48 @@ public partial class MainWindow
         }
 
         RebindPendingBuildingUpgrades(item, match.LiveSlotId);
+        if (BuildingConstructPayload.TryFromDictionary(item.Payload, out var construct)
+            && construct is not null
+            && match.LiveLevel < construct.TargetLevel)
+        {
+            if (match.LiveSlotId == match.QueuedSlotId)
+            {
+                AppendLog(
+                    $"[construct-chain] {match.BuildingName} exists at level {match.LiveLevel}; " +
+                    $"keeping the same queue item until target level {construct.TargetLevel}.");
+                return false;
+            }
+
+            if (!_botService.MarkQueueItemDeferred(item.Id, TimeSpan.Zero))
+            {
+                AppendLog(
+                    $"{logPrefix} FAIL {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
+                    $"could not defer composite construct while rebinding slot {match.QueuedSlotId} to {match.LiveSlotId}");
+                return false;
+            }
+
+            var payload = new Dictionary<string, string>(item.Payload, StringComparer.OrdinalIgnoreCase)
+            {
+                [BotOptionPayloadKeys.BuildingConstructSlotId] = match.LiveSlotId.ToString(),
+            };
+            if (!PatchDeferredQueuePayload(item, payload))
+            {
+                AppendLog(
+                    $"{logPrefix} FAIL {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
+                    $"could not persist composite construct slot rebind to {match.LiveSlotId}");
+                return true;
+            }
+
+            item.Payload = payload;
+            RebindPendingBuildingTemplateStep(item, match.LiveSlotId);
+            RequestQueueUiRefresh();
+            AppendLog(
+                $"{logPrefix} DEFER {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
+                $"rebound {match.BuildingName} from slot {match.QueuedSlotId} to {match.LiveSlotId}; " +
+                $"same item will continue to level {construct.TargetLevel}");
+            return true;
+        }
+
         ReconcilePendingBuildingQueueWithLiveStatus(freshStatus);
         _botService.MarkQueueItemSucceeded(item.Id);
         _botService.RemoveQueueItem(item.Id);
@@ -1433,6 +1475,22 @@ public partial class MainWindow
                 if (string.Equals(item.TaskName, "construct_building", StringComparison.OrdinalIgnoreCase)
                     && TryExtractPayloadInt(ex.Message, BotOptionPayloadKeys.BuildingConstructSlotId, out var effectiveConstructSlot))
                 {
+                    if (BuildingConstructPayload.TryFromDictionary(item.Payload, out var construct)
+                        && construct is not null
+                        && construct.SlotId != effectiveConstructSlot)
+                    {
+                        var reboundPayload = new Dictionary<string, string>(item.Payload, StringComparer.OrdinalIgnoreCase)
+                        {
+                            [BotOptionPayloadKeys.BuildingConstructSlotId] = effectiveConstructSlot.ToString(),
+                        };
+                        if (PatchDeferredQueuePayload(item, reboundPayload))
+                        {
+                            item.Payload = reboundPayload;
+                            AppendLog(
+                                $"[construct-chain] persisted effective slot {effectiveConstructSlot} " +
+                                $"for {construct.Name ?? $"gid {construct.Gid}"} target level {construct.TargetLevel}.");
+                        }
+                    }
                     RebindPendingBuildingTemplateStep(item, effectiveConstructSlot);
                 }
 

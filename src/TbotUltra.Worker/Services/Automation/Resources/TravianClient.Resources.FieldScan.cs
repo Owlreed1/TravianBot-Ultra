@@ -68,9 +68,13 @@ public sealed partial class TravianClient
                     const style = el.getAttribute('style') || '';
                     const leftMatch = style.match(/left\s*:\s*(-?\d+(?:\.\d+)?)px/i);
                     const topMatch = style.match(/top\s*:\s*(-?\d+(?:\.\d+)?)px/i);
+                    const level = labelLevel ?? (levelMatch ? parseInt(levelMatch[1], 10) : null);
                     return {
                       gid: gidMatch ? parseInt(gidMatch[1], 10) : null,
-                      level: labelLevel ?? (levelMatch ? parseInt(levelMatch[1], 10) : null),
+                      level,
+                      queuedLevel: /(?:^|\s)underConstruction(?:\s|$)/i.test(cls) && level != null
+                        ? level + 1
+                        : null,
                       left: leftMatch ? parseFloat(leftMatch[1]) : NaN,
                       top: topMatch ? parseFloat(topMatch[1]) : NaN
                     };
@@ -90,6 +94,7 @@ public sealed partial class TravianClient
                         fieldType,
                         name: fieldNames[fieldType] || 'Unknown field',
                         level: overlay ? overlay.level : null,
+                        queuedLevel: overlay ? overlay.queuedLevel : null,
                         href: slot.href
                       });
                     }
@@ -124,6 +129,7 @@ public sealed partial class TravianClient
                         fieldType,
                         name: fieldNames[fieldType] || 'Unknown field',
                         level: overlay ? overlay.level : null,
+                        queuedLevel: overlay ? overlay.queuedLevel : null,
                         href: slot.href
                       });
                     }
@@ -254,6 +260,13 @@ public sealed partial class TravianClient
                 return overlay ? directText(overlay) : '';
               };
 
+              const parseQueuedLevel = (slotId, level) => {
+                const overlay = resourceLevelOverlays[slotId - 1];
+                return overlay && level !== null && /(?:^|\s)underConstruction(?:\s|$)/i.test(overlay.className || '')
+                  ? level + 1
+                  : null;
+              };
+
               const parseLevel = (element, slotId) => {
                 const text = `${localText(element)} ${overlayText(slotId)}`;
                 const match = text.match(/(?:^|\s|_|-)level[_-]?(\d{1,2})(?:\s|$|_|-)/i)
@@ -343,11 +356,13 @@ public sealed partial class TravianClient
                   if (seen.has(key)) continue;
                   seen.add(key);
                   const fieldType = parseType(element, slotId);
+                  const level = parseLevel(element, slotId);
                   fields.push({
                     slotId,
                     fieldType,
                     name: parseName(fieldType, element),
-                    level: parseLevel(element, slotId),
+                    level,
+                    queuedLevel: parseQueuedLevel(slotId, level),
                     href: href || `build.php?id=${slotId}`
                   });
                 }
@@ -522,7 +537,13 @@ public sealed partial class TravianClient
             var name = !string.IsNullOrWhiteSpace(item.Name)
                 ? item.Name!
                 : fieldTypeNames.GetValueOrDefault(fieldType, "Unknown field");
-            return new ResourceField(item.SlotId, fieldType, name, item.Level, ResolveUrl(item.Href));
+            return new ResourceField(
+                item.SlotId,
+                fieldType,
+                name,
+                item.Level,
+                ResolveUrl(item.Href),
+                item.QueuedLevel);
         }).ToList();
 
         var seenSlots = fields.Where(f => f.SlotId is not null).Select(f => f.SlotId!.Value).ToHashSet();

@@ -1,3 +1,5 @@
+using TbotUltra.Core.Configuration;
+using TbotUltra.Core.Tasks;
 using TbotUltra.Worker.Domain;
 
 namespace TbotUltra.Desktop.Services;
@@ -21,6 +23,20 @@ internal static class ConstructionQueueReconciliation
         {
             var construct = BuildingUpgradeSlotRebindPlanner.FindExistingConstruct(status, candidate);
             if (construct is null) continue;
+            if (BuildingConstructPayload.TryFromDictionary(candidate.Payload, out var constructPayload)
+                && constructPayload is not null
+                && construct.LiveLevel < constructPayload.TargetLevel)
+            {
+                if (construct.LiveSlotId != construct.QueuedSlotId)
+                {
+                    var payload = new Dictionary<string, string>(candidate.Payload, StringComparer.OrdinalIgnoreCase)
+                    {
+                        [BotOptionPayloadKeys.BuildingConstructSlotId] = construct.LiveSlotId.ToString(),
+                    };
+                    updates[candidate.Id] = new QueuePayloadUpdate(candidate.Id, payload);
+                }
+                continue;
+            }
             foreach (var rebind in BuildingUpgradeSlotRebindPlanner.Plan(candidate, construct.LiveSlotId, candidates))
             {
                 updates[rebind.QueueItemId] = new QueuePayloadUpdate(rebind.QueueItemId, rebind.Payload);

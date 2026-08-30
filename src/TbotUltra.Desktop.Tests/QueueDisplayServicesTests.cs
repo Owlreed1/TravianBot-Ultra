@@ -40,6 +40,18 @@ public sealed class QueueDisplayServicesTests
     }
 
     [Fact]
+    public void Format_ChainedConstruct_ShowsItsFinalTarget()
+    {
+        var item = Item(
+            "construct_building",
+            new TbotUltra.Core.Tasks.BuildingConstructPayload(29, 23, "Cranny", 10).ToDictionary());
+
+        var displayName = QueueDisplayNameFormatter.Format(item, _ => null, _ => null, 18);
+
+        Assert.Equal("Construct Cranny to level 10 (slot 29)", displayName);
+    }
+
+    [Fact]
     public void Format_Demolish_UsesPayloadBuildingNameInsteadOfSlot()
     {
         var item = Item(

@@ -171,20 +171,12 @@ public sealed class BuildingTemplatePlanner
                 continue;
             }
 
-            var construct = PlanConstruct(slotId.Value, gid, name, serverSpeed, mainBuildingLevel);
+            var construct = PlanConstruct(slotId.Value, gid, name, targetLevel, serverSpeed, mainBuildingLevel);
             var templateStepId = Guid.NewGuid().ToString("N");
             construct.Payload[BotOptionPayloadKeys.BuildingTemplateStepId] = templateStepId;
             actions.Add(construct);
             AddTotals(construct);
             state.ApplyBuilding(slotId.Value, gid, name, Math.Max(1, targetLevel));
-
-            if (targetLevel > 1)
-            {
-                var upgrade = PlanBuildingUpgrade(slotId.Value, gid, name, 1, targetLevel, serverSpeed, mainBuildingLevel);
-                upgrade.Payload[BotOptionPayloadKeys.BuildingTemplateStepId] = templateStepId;
-                actions.Add(upgrade);
-                AddTotals(upgrade);
-            }
         }
 
         AddTemplateSlotFallbackMetadata(actions);
@@ -784,23 +776,35 @@ public sealed class BuildingTemplatePlanner
         int slotId,
         int gid,
         string name,
+        int targetLevel,
         double serverSpeed,
         int mainBuildingLevel)
     {
-        var stats = BuildingCatalogService.CostFor(gid, 1);
-        var payload = new BuildingConstructPayload(slotId, gid, name).ToDictionary();
+        double seconds = 0;
+        long wood = 0, clay = 0, iron = 0, crop = 0;
+        for (var level = 1; level <= targetLevel; level++)
+        {
+            var stats = BuildingCatalogService.CostFor(gid, level);
+            seconds += BuildingCatalogService.BuildSecondsFor(gid, level, serverSpeed, mainBuildingLevel);
+            wood += stats?.Wood ?? 0;
+            clay += stats?.Clay ?? 0;
+            iron += stats?.Iron ?? 0;
+            crop += stats?.Crop ?? 0;
+        }
+
+        var payload = new BuildingConstructPayload(slotId, gid, name, targetLevel).ToDictionary();
         return new BuildingTemplatePlanAction(
             "construct_building",
             payload,
-            $"Construct {name} to level 1 (slot {slotId})",
+            $"Construct {name} to level {targetLevel} (slot {slotId})",
             slotId,
             gid,
-            1,
-            BuildingCatalogService.BuildSecondsFor(gid, 1, serverSpeed, mainBuildingLevel),
-            stats?.Wood ?? 0,
-            stats?.Clay ?? 0,
-            stats?.Iron ?? 0,
-            stats?.Crop ?? 0);
+            targetLevel,
+            seconds,
+            wood,
+            clay,
+            iron,
+            crop);
     }
 
     private static BuildingTemplatePlanAction PlanBuildingUpgrade(

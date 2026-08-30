@@ -67,16 +67,18 @@ public sealed partial class BotTaskRunner
     }
 
     private static bool TryExtractQueueWaitSeconds(string result, out int seconds)
+        => TryExtractResultInt(result, "queue_wait_seconds=", out seconds);
+
+    private static bool TryExtractResultInt(string result, string token, out int value)
     {
-        seconds = 0;
-        const string token = "queue_wait_seconds=";
+        value = 0;
         var index = result.IndexOf(token, StringComparison.OrdinalIgnoreCase);
         if (index < 0) return false;
         var start = index + token.Length;
         var end = start;
         while (end < result.Length && (char.IsDigit(result[end]) || result[end] == '-')) end++;
         if (end == start || !int.TryParse(result.AsSpan(start, end - start), out var parsed)) return false;
-        seconds = parsed;
+        value = parsed;
         return true;
     }
 }

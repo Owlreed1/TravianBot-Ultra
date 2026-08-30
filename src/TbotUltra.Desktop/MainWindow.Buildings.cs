@@ -297,6 +297,10 @@ public partial class MainWindow
                 && action.Gid is int constructGid)
             {
                 SetPendingBuildingConstruct(action.SlotId, action.Payload.GetValueOrDefault(BotOptionPayloadKeys.BuildingConstructName, action.DisplayName), constructGid);
+                if (action.TargetLevel is > 1)
+                {
+                    SetPendingBuildingUpgrade(action.SlotId, action.TargetLevel.Value);
+                }
             }
             else if (string.Equals(action.TaskName, "upgrade_building_to_level", StringComparison.OrdinalIgnoreCase)
                 && action.TargetLevel is int targetLevel
@@ -874,23 +878,19 @@ public partial class MainWindow
             return false;
         }
 
-        var requests = new List<QueueItemCreateRequest>();
-        var constructPayload = new BuildingConstructPayload(slotId, selectedBuilding.Gid, selectedBuilding.Name).ToDictionary();
-        ApplySelectedVillageToPayload(constructPayload);
-        requests.Add(new QueueItemCreateRequest("construct_building", constructPayload, 0, 3));
         var targetLevel = selectedTargetLevel == 0
             ? selectedBuilding.MaxLevel
             : Math.Clamp(selectedTargetLevel, 1, selectedBuilding.MaxLevel);
-        if (targetLevel > 1)
+        var constructPayload = new BuildingConstructPayload(
+            slotId,
+            selectedBuilding.Gid,
+            selectedBuilding.Name,
+            targetLevel).ToDictionary();
+        ApplySelectedVillageToPayload(constructPayload);
+        var requests = new List<QueueItemCreateRequest>
         {
-            var upgradePayload = new BuildingUpgradePayload(slotId, targetLevel, selectedBuilding.Name).ToDictionary();
-            ApplySelectedVillageToPayload(upgradePayload);
-            requests.Add(new QueueItemCreateRequest(
-                selectedTargetLevel == 0 ? "upgrade_building_to_max" : "upgrade_building_to_level",
-                upgradePayload,
-                0,
-                3));
-        }
+            new("construct_building", constructPayload, 0, 3),
+        };
 
         if (!TryPrepareConstructionStoragePreflight(requests, out var plannedRequests, out var storageUpgrades))
         {

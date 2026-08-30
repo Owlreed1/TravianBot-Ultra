@@ -76,6 +76,21 @@ public sealed class ResourceSnapshotCalculatorTests
     }
 
     [Fact]
+    public void OrderUpgradeCandidates_Dorf1QueuedLevelRanksAfterUntouchedFieldAtLowerLevel()
+    {
+        var fields = new[]
+        {
+            new ResourceField(3, "wood", "Woodcutter", 6, "/build.php?id=3", QueuedLevel: 7),
+            new ResourceField(4, "wood", "Woodcutter", 6, "/build.php?id=4"),
+        };
+
+        var queuedLevels = ResourceSnapshotCalculator.BuildDorf1QueuedLevelProjections(fields);
+        var result = ResourceSnapshotCalculator.OrderUpgradeCandidates(fields, null, queuedLevels);
+
+        Assert.Equal(new int?[] { 4, 3 }, result.Select(field => field.SlotId));
+    }
+
+    [Fact]
     public void MergeQueuedLevelProjections_ConfirmedUpgradeSurvivesMissingLiveSlotIdentity()
     {
         var fields = new[]

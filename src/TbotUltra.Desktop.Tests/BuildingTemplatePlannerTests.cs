@@ -217,20 +217,18 @@ public sealed class BuildingTemplatePlannerTests
     }
 
     [Fact]
-    public void Plan_ConstructAndUpgradeShareStableTemplateStepId()
+    public void Plan_NewBuildingUsesOneConstructTaskForTheFullTarget()
     {
         var row = Row(10, "Warehouse", 5);
         var result = _planner.Plan([row], Status("Teutons"), 1, 1);
-        var construct = Assert.Single(result.Actions, item => item.TaskName == "construct_building");
-        var upgrade = Assert.Single(result.Actions, item => item.TaskName == "upgrade_building_to_level");
+        var construct = Assert.Single(result.Actions);
 
+        Assert.Equal("construct_building", construct.TaskName);
+        Assert.Equal("5", construct.Payload[BotOptionPayloadKeys.BuildingUpgradeTargetLevel]);
         Assert.True(Guid.TryParseExact(
             construct.Payload[BotOptionPayloadKeys.BuildingTemplateStepId],
             "N",
             out _));
-        Assert.Equal(
-            construct.Payload[BotOptionPayloadKeys.BuildingTemplateStepId],
-            upgrade.Payload[BotOptionPayloadKeys.BuildingTemplateStepId]);
 
         var secondPlan = _planner.Plan([row], Status("Teutons"), 1, 1);
         var secondConstruct = Assert.Single(secondPlan.Actions, item => item.TaskName == "construct_building");

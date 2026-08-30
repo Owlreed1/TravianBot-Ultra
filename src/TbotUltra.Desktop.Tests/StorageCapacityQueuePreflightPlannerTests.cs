@@ -441,6 +441,32 @@ public sealed class StorageCapacityQueuePreflightPlannerTests
         Assert.InRange(storageIndex, 0, constructIndex - 1);
     }
 
+    [Fact]
+    public void PlanConstructionRequestsStepwise_CompositeConstructRemainsOneTargetTask()
+    {
+        var status = CreateStatusWithoutStorage(
+            [],
+            warehouseCapacity: 80_000,
+            granaryCapacity: 80_000,
+            buildings:
+            [
+                new Building(19, "Warehouse", 20, null, 10),
+                new Building(20, "Granary", 20, null, 11),
+                new Building(21, "Main Building", 10, null, 15),
+            ]);
+        var payload = new BuildingConstructPayload(29, 23, "Cranny", 10).ToDictionary();
+
+        var result = StorageCapacityQueuePreflightPlanner.PlanConstructionRequestsStepwise(
+            status,
+            [],
+            [new QueueItemCreateRequest("construct_building", payload, 0, 3)]);
+
+        Assert.Null(result.CannotPlanReason);
+        var request = Assert.Single(result.Requests);
+        Assert.Equal("construct_building", request.TaskName);
+        Assert.Equal("10", request.Payload![BotOptionPayloadKeys.BuildingUpgradeTargetLevel]);
+    }
+
     private static VillageStatus CreateStatus(
         IReadOnlyList<ResourceField> fields,
         long warehouseCapacity,

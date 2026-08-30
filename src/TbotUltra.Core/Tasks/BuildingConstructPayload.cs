@@ -2,7 +2,7 @@ using TbotUltra.Core.Configuration;
 
 namespace TbotUltra.Core.Tasks;
 
-public sealed record BuildingConstructPayload(int SlotId, int Gid, string? Name = null)
+public sealed record BuildingConstructPayload(int SlotId, int Gid, string? Name = null, int TargetLevel = 1)
 {
     public static bool TryFromDictionary(
         IReadOnlyDictionary<string, string> payload,
@@ -23,11 +23,19 @@ public sealed record BuildingConstructPayload(int SlotId, int Gid, string? Name 
             return false;
         }
 
+        var targetLevel = 1;
+        if (payload.TryGetValue(BotOptionPayloadKeys.BuildingUpgradeTargetLevel, out var targetRaw)
+            && (!int.TryParse(targetRaw, out targetLevel) || targetLevel <= 0))
+        {
+            return false;
+        }
+
         payload.TryGetValue(BotOptionPayloadKeys.BuildingConstructName, out var name);
         result = new BuildingConstructPayload(
             slotId,
             gid,
-            string.IsNullOrWhiteSpace(name) ? null : name.Trim());
+            string.IsNullOrWhiteSpace(name) ? null : name.Trim(),
+            targetLevel);
         return true;
     }
 
@@ -42,6 +50,11 @@ public sealed record BuildingConstructPayload(int SlotId, int Gid, string? Name 
         if (!string.IsNullOrWhiteSpace(Name))
         {
             result[BotOptionPayloadKeys.BuildingConstructName] = Name.Trim();
+        }
+
+        if (TargetLevel > 1)
+        {
+            result[BotOptionPayloadKeys.BuildingUpgradeTargetLevel] = TargetLevel.ToString();
         }
 
         return result;

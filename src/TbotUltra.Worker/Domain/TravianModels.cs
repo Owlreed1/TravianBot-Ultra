@@ -92,7 +92,8 @@ public sealed record ResourceField(
     string FieldType,
     string Name,
     int? Level,
-    string? Url);
+    string? Url,
+    int? QueuedLevel = null);
 
 public sealed record Building(
     int? SlotId,

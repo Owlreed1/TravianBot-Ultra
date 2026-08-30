@@ -81,6 +81,17 @@ internal static class ResourceSnapshotCalculator
         return merged;
     }
 
+    internal static IReadOnlyDictionary<int, int> BuildDorf1QueuedLevelProjections(
+        IEnumerable<ResourceField> fields)
+    {
+        return fields
+            .Where(field => field.SlotId is int && field.QueuedLevel is int)
+            .GroupBy(field => field.SlotId!.Value)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Max(field => field.QueuedLevel!.Value));
+    }
+
     /// <summary>
     /// Identifies resource fields that have the same Official upgrade offer in one bulk-upgrade pass.
     /// </summary>
