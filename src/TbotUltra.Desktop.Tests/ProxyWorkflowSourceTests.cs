@@ -6,6 +6,20 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class ProxyWorkflowSourceTests
 {
     [Fact]
+    public void ProxyFinder_UsesRequestedDefaultsAndGithubButtonText()
+    {
+        var codeBehind = ReadDesktopSource("ProxyFinderWindow.xaml.cs");
+        var stateStore = ReadDesktopServiceSource("ProxyFinderStateStore.cs");
+        var xaml = ReadDesktopSource("ProxyFinderWindow.xaml");
+
+        Assert.Contains("SelectComboByTag(ParallelComboBox, \"500\", \"500\")", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("SelectComboByTag(TopComboBox, \"20\", \"20\")", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("public string Parallel { get; set; } = \"500\";", stateStore, StringComparison.Ordinal);
+        Assert.Contains("public string Top { get; set; } = \"20\";", stateStore, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Proxy list (Github)\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProxyFinderListDownload_UsesCancelableBusyOverlayForWholeOperation()
     {
         var source = ReadDesktopSource("ProxyFinderWindow.xaml.cs");

@@ -125,7 +125,7 @@
 
                 <StackPanel Grid.Column="5" VerticalAlignment="Bottom">
                     <Button x:Name="GetListsButton"
-                            Content="Get proxy list (Github)"
+                            Content="Proxy list (Github)"
                             MinWidth="150"
                             Click="GetListsButton_Click" />
                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0" HorizontalAlignment="Right">

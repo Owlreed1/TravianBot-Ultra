@@ -33,6 +33,25 @@ public sealed class IncomingAttackDomParserTests
     }
 
     [Fact]
+    public void RallyPointRead_FollowsEveryVisibleNextPageAndCombinesMovements()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "TbotUltra.Worker",
+            "Services",
+            "Automation",
+            "Combat",
+            "TravianClient.IncomingAttacks.cs"));
+
+        Assert.Contains("ReadAllIncomingAttackPagesAsync", source, StringComparison.Ordinal);
+        Assert.Contains(".paginatorTop .paginator a.next:has(img[alt='next page'])", source, StringComparison.Ordinal);
+        Assert.Contains("incoming-attacks-next-page", source, StringComparison.Ordinal);
+        Assert.Contains("attacksById.TryAdd", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ParseDorf1HasTroopsAtHome_ReadsNoTroopsAsAuthoritativeEmpty()
     {
         const string html = """

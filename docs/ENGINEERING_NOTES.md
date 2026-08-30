@@ -642,7 +642,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   filter controls, and are read only after the parent `button.iconFilterActive img.filterCategory1` and exactly
   `button.iconFilterActive img.subFilterCategory1` are active while subcategories 2/3 are inactive. Never treat the
   parent `filterCategory1` as an extra subfilter: enabling the parent, enabling subcategory 1, and disabling
-  subcategories 2/3 are separate navigations and must be verified against fresh DOM after each click. A late Rally
+  subcategories 2/3 are separate navigations and must be verified against fresh DOM after each click. When the
+  incoming overview exposes `.paginatorTop .paginator a.next`, follow it until no visible next-page link remains,
+  verify the filter on every page, and combine movements by movement id. A late Rally
   Point result must not restore state cleared by a newer Dorf1 read.
   Filter/read failures never clear known attacks. Exact movements persist per account+world, use the Travian
   movement id when available, and expire at their server-derived absolute arrival. After a successful Rally Point

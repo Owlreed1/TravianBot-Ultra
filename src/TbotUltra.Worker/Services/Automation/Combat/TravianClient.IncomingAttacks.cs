@@ -63,23 +63,76 @@ public sealed partial class TravianClient
             Notify($"[incoming-attacks] Rally Point read failed; using {fallbackArrivals.Count} red Dorf1 timer(s): {ex.Message}");
             return new IncomingAttackSnapshot(activeVillage, resolvedKey, coords.X, coords.Y, dorf1ObservedAtUtc, [], false, fallbackArrivals);
         }
-        var html = await _page.ContentAsync();
-        if (!IncomingAttackDomParser.HasOnlyIncomingFilterActive(html))
-        {
-            throw new InvalidOperationException("Rally Point incoming filter could not be verified; previous attack data was kept.");
-        }
-
         var observedAtUtc = _serverTimeUtc ?? DateTimeOffset.UtcNow;
-        var attacks = IncomingAttackDomParser.ParseIncomingAttacks(
-            html,
+        var attacks = await ReadAllIncomingAttackPagesAsync(
             activeVillage,
             resolvedKey,
             coords.X,
             coords.Y,
-            observedAtUtc);
+            observedAtUtc,
+            cancellationToken);
         Notify($"[incoming-attacks] read {attacks.Count} movement(s) for '{activeVillage}'.");
         trace.Complete("success", $"village={activeVillage} count={attacks.Count}");
         return new IncomingAttackSnapshot(activeVillage, resolvedKey, coords.X, coords.Y, observedAtUtc, attacks, true, fallbackArrivals);
+    }
+
+    private async Task<IReadOnlyList<IncomingAttack>> ReadAllIncomingAttackPagesAsync(
+        string activeVillage,
+        string? resolvedKey,
+        int? coordX,
+        int? coordY,
+        DateTimeOffset observedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var attacksById = new Dictionary<string, IncomingAttack>(StringComparer.Ordinal);
+        var visitedNextLinks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var pageNumber = 1;
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var html = await _page.ContentAsync();
+            if (!IncomingAttackDomParser.HasOnlyIncomingFilterActive(html))
+            {
+                throw new InvalidOperationException("Rally Point incoming filter could not be verified; previous attack data was kept.");
+            }
+
+            var pageAttacks = IncomingAttackDomParser.ParseIncomingAttacks(
+                html,
+                activeVillage,
+                resolvedKey,
+                coordX,
+                coordY,
+                observedAtUtc);
+            foreach (var attack in pageAttacks)
+            {
+                attacksById.TryAdd(attack.Id, attack);
+            }
+
+            Notify($"[incoming-attacks:verbose] Rally Point page {pageNumber}: {pageAttacks.Count} movement(s). total={attacksById.Count}");
+
+            var nextPage = _page.Locator(".paginatorTop .paginator a.next:has(img[alt='next page'])").First;
+            if (await nextPage.CountAsync().WaitAsync(cancellationToken) == 0
+                || !await nextPage.IsVisibleAsync().WaitAsync(cancellationToken))
+            {
+                break;
+            }
+
+            var nextHref = await nextPage.GetAttributeAsync("href").WaitAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(nextHref) || !visitedNextLinks.Add(nextHref))
+            {
+                throw new InvalidOperationException("Rally Point pagination repeated the same next-page link; previous attack data was kept.");
+            }
+
+            await DelayBeforeClickAsync(cancellationToken, "incoming attacks: next page");
+            await ClickLocatorAsync(nextPage, "incoming-attacks-next-page", cancellationToken);
+            await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded).WaitAsync(cancellationToken);
+            pageNumber++;
+        }
+
+        return attacksById.Values
+            .OrderBy(attack => attack.ArrivalAtUtc)
+            .ToList();
     }
 
     private async Task<RallyPointConstructionState> ReadRallyPointConstructionStateAsync(

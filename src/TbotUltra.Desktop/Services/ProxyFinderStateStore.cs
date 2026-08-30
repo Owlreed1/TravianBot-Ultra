@@ -24,9 +24,9 @@ public sealed class ProxyFinderState
 {
     public string ProxyList { get; set; } = string.Empty;
     public string Protocol { get; set; } = "socks5";
-    public string Parallel { get; set; } = "200";
+    public string Parallel { get; set; } = "500";
     public string MaxProxies { get; set; } = "2000";
-    public string Top { get; set; } = "10";
+    public string Top { get; set; } = "20";
     public List<ProxyFinderSavedResult> Results { get; set; } = new();
 }
 

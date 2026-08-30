@@ -50,9 +50,9 @@ public partial class ProxyFinderWindow : Window
         else
         {
             SelectComboByTag(ProtocolComboBox, string.IsNullOrWhiteSpace(initialScheme) ? "socks5" : initialScheme, "socks5");
-            SelectComboByTag(ParallelComboBox, "200", "200");
+            SelectComboByTag(ParallelComboBox, "500", "500");
             SelectComboByTag(MaxProxiesComboBox, "2000", "2000");
-            SelectComboByTag(TopComboBox, "10", "10");
+            SelectComboByTag(TopComboBox, "20", "20");
         }
     }
 
@@ -85,8 +85,8 @@ public partial class ProxyFinderWindow : Window
             return;
         }
 
-        var maxConcurrency = ReadIntTag(ParallelComboBox, 200);
-        var topCount = ReadIntTag(TopComboBox, 10);
+        var maxConcurrency = ReadIntTag(ParallelComboBox, 500);
+        var topCount = ReadIntTag(TopComboBox, 20);
         _busy = true;
         SelectedProxy = null;
         ResultsDataGrid.ItemsSource = null;
@@ -186,9 +186,9 @@ public partial class ProxyFinderWindow : Window
     private void RestoreState(ProxyFinderState saved)
     {
         SelectComboByTag(ProtocolComboBox, saved.Protocol, "socks5");
-        SelectComboByTag(ParallelComboBox, saved.Parallel, "200");
+        SelectComboByTag(ParallelComboBox, saved.Parallel, "500");
         SelectComboByTag(MaxProxiesComboBox, saved.MaxProxies, "2000");
-        SelectComboByTag(TopComboBox, saved.Top, "10");
+        SelectComboByTag(TopComboBox, saved.Top, "20");
         ProxyListTextBox.Text = saved.ProxyList;
 
         if (saved.Results.Count == 0)
@@ -224,9 +224,9 @@ public partial class ProxyFinderWindow : Window
         {
             ProxyList = ProxyListTextBox.Text,
             Protocol = ReadComboTag(ProtocolComboBox, "socks5"),
-            Parallel = ReadComboTag(ParallelComboBox, "200"),
+            Parallel = ReadComboTag(ParallelComboBox, "500"),
             MaxProxies = ReadComboTag(MaxProxiesComboBox, "2000"),
-            Top = ReadComboTag(TopComboBox, "10"),
+            Top = ReadComboTag(TopComboBox, "20"),
             Results = _lastRows
                 .Select(row => new ProxyFinderSavedResult
                 {
