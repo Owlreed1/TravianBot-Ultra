@@ -284,7 +284,7 @@ internal static class ResourceSnapshotCalculator
             AnyQueuedTowardTarget: anyQueuedTowardTarget);
     }
 
-    private static int? ResourceFieldGid(string? fieldType) => fieldType?.Trim().ToLowerInvariant() switch
+    internal static int? ResourceFieldGid(string? fieldType) => fieldType?.Trim().ToLowerInvariant() switch
     {
         "wood" => 1,
         "clay" => 2,

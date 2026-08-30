@@ -26,6 +26,45 @@ public sealed class TravianOfficialConstructionDomTests
         Assert.Equal(50, duration);
     }
 
+    [Theory]
+    [InlineData(10, 3, "Iron Mine", 5, 6, 6, true)]
+    [InlineData(10, 3, "Iron Mine", 5, 6, 5, false)]
+    [InlineData(11, 3, "Iron Mine", 5, 6, 6, false)]
+    [InlineData(10, 2, "Iron Mine", 5, 6, 6, false)]
+    [InlineData(10, 3, "Iron Mine", 4, 6, 6, false)]
+    public void ResourceUpgradePreClickSafety_VerifiesSlotGidNameCurrentLevelAndTarget(
+        int expectedSlot,
+        int expectedGid,
+        string expectedName,
+        int expectedCurrentLevel,
+        int expectedOfferLevel,
+        int targetLevel,
+        bool expectedSafe)
+    {
+        const string html = """
+            <h1 class="titleInHeader">Iron Mine <span class="level">Level 5</span></h1>
+            <div id="build" class="gid3 level5">
+              <div class="upgradeButtonsContainer"><div class="section1">
+                <button value="Upgrade to level 6" class="textButtonV1 green build"
+                        onclick="window.location.href='/dorf1.php?id=10&amp;gid=3&amp;action=build&amp;checksum=safe'">
+                  Upgrade to level 6
+                </button>
+              </div></div>
+            </div>
+            """;
+
+        var result = BuildingDomParser.VerifyResourceUpgradePreClickSafety(
+            html,
+            expectedSlot,
+            expectedGid,
+            expectedName,
+            expectedCurrentLevel,
+            expectedOfferLevel,
+            targetLevel);
+
+        Assert.Equal(expectedSafe, result.IsSafe);
+    }
+
     [Fact]
     public void OfficialBuildingUpgradeDom_SelectsPrimaryUpgradeButtonAndSkipsVideoButton()
     {

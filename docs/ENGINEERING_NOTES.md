@@ -160,7 +160,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   candidates by their projected level including an exact-slot queued upgrade. Retain a level confirmed during the
   current operation even when the refreshed live queue omits its slot identity, so a just-queued field is not probed
   again ahead of untouched lower-level fields. An upgrade-click redirect to dorf1 receives the normal page-load pacing
-  once before the next candidate is selected.
+  once before the next candidate is selected. Immediately before either the normal resource upgrade click or its
+  Construct Faster video action, re-read the live build page and require the requested URL slot, resource gid/name,
+  current header/root level, exact next offered level, and button action slot/gid to agree. The offered level must not
+  exceed the task target; any mismatch stops the action and returns to a fresh Dorf1 pass.
 - Continuous Loop and Auto Queue share runtime-only village batching over the account queue: ready work is drained
   across groups in the verified browser village before normal work elsewhere. Ready Account work or `Priority > 0`
   may preempt, and an interrupted ready village resumes after the urgent work. Attempt count alone must never rotate

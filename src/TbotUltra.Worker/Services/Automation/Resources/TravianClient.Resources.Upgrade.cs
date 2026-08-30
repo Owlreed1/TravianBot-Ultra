@@ -174,23 +174,37 @@ public sealed partial class TravianClient
                 var expectedWaitSeconds = pageAnalysis.DurationSeconds;
                 // Read the population this level grants before clicking (page changes after).
                 var populationDelta = pageAnalysis.PopulationDelta;
+                var nextLevel = Math.Min(effectiveTarget, highestKnownLevel + 1);
+                var clickSafety = await VerifyResourceUpgradePreClickSafetyAsync(
+                    slotId,
+                    field?.FieldType,
+                    resourceName,
+                    currentLevel.Value,
+                    nextLevel,
+                    effectiveTarget,
+                    cancellationToken);
+                if (!clickSafety.IsSafe)
+                {
+                    return $"Resource slot {slotId}: pre-click safety stopped upgrade ({clickSafety.Reason}). "
+                           + "Re-reading live levels before retry. queue_wait_seconds=1";
+                }
                 var constructFaster = await TryUseConstructFasterForResourceAsync(
                     slotId,
                     resourceName,
                     currentLevel.Value,
-                    Math.Min(effectiveTarget, highestKnownLevel + 1),
+                    nextLevel,
                     buildQueueBefore,
                     expectedWaitSeconds,
                     cancellationToken);
                 var usedConstructFasterVideo = constructFaster.BonusConfirmed;
                 if (!constructFaster.ActionRegistered)
                 {
-                    await ClickDetectedUpgradeCandidateAsync(slotId, actionability.CandidateIndex, cancellationToken);
+                    await ClickDetectedUpgradeCandidateAsync(slotId, clickSafety.CandidateIndex, cancellationToken);
                     await NavigateToResourceFieldsAfterUpgradeClickAsync(cancellationToken);
                 }
                 await WaitForPageReadyAsync(cancellationToken); // Wait for page to load
                 upgrades += 1;
-                Notify($"[resources] {(usedConstructFasterVideo ? "25% faster video ok" : "click ok")} — slot={slotId} '{resourceName}' lvl {currentLevel} → {Math.Min(effectiveTarget, highestKnownLevel + 1)} queued (duration~{expectedWaitSeconds}s).");
+                Notify($"[resources] {(usedConstructFasterVideo ? "25% faster video ok" : "click ok")} — slot={slotId} '{resourceName}' lvl {currentLevel} → {nextLevel} queued (duration~{expectedWaitSeconds}s).");
                 if (populationDelta is int popDelta)
                 {
                     await AddPopulationToActiveVillageCacheAsync(popDelta, cancellationToken);
@@ -199,7 +213,7 @@ public sealed partial class TravianClient
                     slotId,
                     currentLevel.Value,
                     resourceName,
-                    Math.Min(effectiveTarget, highestKnownLevel + 1),
+                    nextLevel,
                     buildQueueBefore,
                     expectedWaitSeconds,
                     cancellationToken);
@@ -549,6 +563,19 @@ public sealed partial class TravianClient
                         // Read the population this level grants before clicking (page changes after).
                         var populationDelta = pageAnalysis.PopulationDelta;
                         var nextLevel = Math.Min(effectiveTarget, highestQueuedLevel + 1);
+                        var clickSafety = await VerifyResourceUpgradePreClickSafetyAsync(
+                            slot,
+                            candidate.FieldType,
+                            resourceName,
+                            level,
+                            nextLevel,
+                            effectiveTarget,
+                            cancellationToken);
+                        if (!clickSafety.IsSafe)
+                        {
+                            return $"Resource slot {slot}: pre-click safety stopped upgrade ({clickSafety.Reason}). "
+                                   + "Re-reading live levels before retry. queue_wait_seconds=1";
+                        }
                         var constructFaster = await TryUseConstructFasterForResourceAsync(
                             slot,
                             resourceName,
@@ -560,7 +587,7 @@ public sealed partial class TravianClient
                         var usedConstructFasterVideo = constructFaster.BonusConfirmed;
                         if (!constructFaster.ActionRegistered)
                         {
-                            await ClickDetectedUpgradeCandidateAsync(slot, actionability.CandidateIndex, cancellationToken);
+                            await ClickDetectedUpgradeCandidateAsync(slot, clickSafety.CandidateIndex, cancellationToken);
                             await NavigateToResourceFieldsAfterUpgradeClickAsync(cancellationToken);
                         }
                         await WaitForPageReadyAsync(cancellationToken); // Wait for page to load
@@ -727,6 +754,60 @@ public sealed partial class TravianClient
                 await Task.Delay(300 * transientRetries, cancellationToken);
             }
         }
+    }
+
+    private sealed record ResourceUpgradeClickSafetyCheck(bool IsSafe, int? CandidateIndex, string Reason);
+
+    private async Task<ResourceUpgradeClickSafetyCheck> VerifyResourceUpgradePreClickSafetyAsync(
+        int slotId,
+        string? fieldType,
+        string resourceName,
+        int currentLevel,
+        int expectedOfferLevel,
+        int targetLevel,
+        CancellationToken cancellationToken)
+    {
+        await EnsureExpectedBuildSlotPageAsync(slotId, "resource upgrade final safety check", cancellationToken);
+        var expectedGid = ResourceSnapshotCalculator.ResourceFieldGid(fieldType);
+        if (expectedGid is null)
+        {
+            return new(false, null, $"unknown resource type '{fieldType ?? "unknown"}'");
+        }
+
+        var freshActionability = await AnalyzeUpgradeActionabilityAsync(
+            slotId,
+            cancellationToken,
+            performClick: false,
+            skipNavigationIfOnExpectedSlot: true);
+        if (freshActionability.Outcome != UpgradeAttemptOutcome.CanUpgrade)
+        {
+            return new(false, null, $"fresh page is {freshActionability.Outcome}: {freshActionability.Reason}");
+        }
+        if (freshActionability.DetectedTargetLevel != expectedOfferLevel)
+        {
+            return new(
+                false,
+                null,
+                $"fresh button offers level {freshActionability.DetectedTargetLevel?.ToString() ?? "unknown"}, expected {expectedOfferLevel}");
+        }
+
+        var verification = BuildingDomParser.VerifyResourceUpgradePreClickSafety(
+            await _page.ContentAsync(),
+            slotId,
+            expectedGid.Value,
+            resourceName,
+            currentLevel,
+            expectedOfferLevel,
+            targetLevel);
+        if (!verification.IsSafe)
+        {
+            Notify($"[resources:safety] blocked pre-click resource upgrade: slot={slotId} type={fieldType ?? "unknown"} name='{resourceName}' current={currentLevel} offer={expectedOfferLevel} target={targetLevel} reason={verification.Reason}.");
+            await CaptureFailureArtifactsAsync($"resource-slot-{slotId}-pre-click-safety", cancellationToken);
+            return new(false, null, verification.Reason);
+        }
+
+        Notify($"[resources:safety] verified pre-click resource upgrade: {verification.Reason}.");
+        return new(true, freshActionability.CandidateIndex, verification.Reason);
     }
 
     private async Task NavigateToResourceFieldsAfterUpgradeClickAsync(CancellationToken cancellationToken)

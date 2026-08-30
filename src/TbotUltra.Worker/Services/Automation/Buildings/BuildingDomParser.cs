@@ -17,6 +17,8 @@ internal static class BuildingDomParser
 {
     internal sealed record BuildPageTitleInfo(string? Name, int? Level);
 
+    internal sealed record ResourceUpgradePreClickSafetyResult(bool IsSafe, string Reason);
+
     internal sealed record HtmlButtonCandidate(
         string Text,
         string Classes,
@@ -37,6 +39,93 @@ internal static class BuildingDomParser
             .OrderByDescending(candidate => candidate.InOfficialPrimarySection)
             .ThenByDescending(candidate => candidate.Classes.Contains("green", StringComparison.OrdinalIgnoreCase))
             .FirstOrDefault();
+    }
+
+    internal static ResourceUpgradePreClickSafetyResult VerifyResourceUpgradePreClickSafety(
+        string html,
+        int expectedSlotId,
+        int expectedGid,
+        string expectedName,
+        int expectedCurrentLevel,
+        int expectedOfferLevel,
+        int targetLevel)
+    {
+        var source = html ?? string.Empty;
+        if (expectedOfferLevel > targetLevel)
+        {
+            return new(false, $"offered level {expectedOfferLevel} exceeds target {targetLevel}");
+        }
+
+        var titleMatch = Regex.Match(
+            source,
+            @"<h1\b[^>]*class=[""'][^""']*\btitleInHeader\b[^""']*[""'][^>]*>(?<value>.*?)</h1>",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        var title = ParseBuildPageTitle(titleMatch.Success ? titleMatch.Groups["value"].Value : null);
+        if (!string.Equals(title.Name, expectedName, StringComparison.OrdinalIgnoreCase))
+        {
+            return new(false, $"page title '{title.Name ?? "unknown"}' does not match '{expectedName}'");
+        }
+        if (title.Level != expectedCurrentLevel)
+        {
+            return new(false, $"page title level {title.Level?.ToString() ?? "unknown"} does not match live level {expectedCurrentLevel}");
+        }
+
+        var buildRoot = Regex.Match(
+            source,
+            @"<div\b(?=[^>]*\bid\s*=\s*[""']build[""'])[^>]*\bclass\s*=\s*[""'](?<classes>[^""']*)[""'][^>]*>",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        var classes = buildRoot.Success ? buildRoot.Groups["classes"].Value : string.Empty;
+        var gidMatch = Regex.Match(classes, @"(?:^|\s)gid(?<value>\d{1,2})(?:\s|$)", RegexOptions.IgnoreCase);
+        var levelMatch = Regex.Match(classes, @"(?:^|\s)level(?<value>\d{1,3})(?:\s|$)", RegexOptions.IgnoreCase);
+        var pageGid = gidMatch.Success && int.TryParse(gidMatch.Groups["value"].Value, out var parsedGid) ? parsedGid : (int?)null;
+        var pageLevel = levelMatch.Success && int.TryParse(levelMatch.Groups["value"].Value, out var parsedLevel) ? parsedLevel : (int?)null;
+        if (pageGid != expectedGid)
+        {
+            return new(false, $"page gid {pageGid?.ToString() ?? "unknown"} does not match resource gid {expectedGid}");
+        }
+        if (pageLevel != expectedCurrentLevel)
+        {
+            return new(false, $"page level {pageLevel?.ToString() ?? "unknown"} does not match live level {expectedCurrentLevel}");
+        }
+
+        var candidates = ExtractButtonCandidates(source)
+            .Where(candidate => candidate.InOfficialPrimarySection)
+            .Where(candidate => !candidate.Disabled && !candidate.IsSpeedup && !candidate.IsGold)
+            .Select(candidate => new
+            {
+                Candidate = candidate,
+                LevelMatch = Regex.Match(candidate.Text, @"^Upgrade\s+to\s+level\s+(?<value>\d{1,3})$", RegexOptions.IgnoreCase),
+            })
+            .Where(candidate => candidate.LevelMatch.Success)
+            .ToList();
+        if (candidates.Count != 1)
+        {
+            return new(false, $"expected exactly one primary upgrade button but found {candidates.Count}");
+        }
+
+        var offeredLevel = int.Parse(candidates[0].LevelMatch.Groups["value"].Value, CultureInfo.InvariantCulture);
+        if (offeredLevel != expectedOfferLevel)
+        {
+            return new(false, $"button offers level {offeredLevel}, expected {expectedOfferLevel}");
+        }
+        if (offeredLevel > targetLevel)
+        {
+            return new(false, $"button offers level {offeredLevel}, above target {targetLevel}");
+        }
+
+        var onclick = candidates[0].Candidate.OnClick;
+        var actionSlot = ReadQueryNumber(onclick, "id");
+        var actionGid = ReadQueryNumber(onclick, "gid");
+        if (actionSlot != expectedSlotId)
+        {
+            return new(false, $"button targets slot {actionSlot?.ToString() ?? "unknown"}, expected {expectedSlotId}");
+        }
+        if (actionGid != expectedGid)
+        {
+            return new(false, $"button targets gid {actionGid?.ToString() ?? "unknown"}, expected {expectedGid}");
+        }
+
+        return new(true, $"slot={expectedSlotId} gid={expectedGid} name='{expectedName}' current={expectedCurrentLevel} offer={offeredLevel} target={targetLevel}");
     }
 
     internal static IReadOnlyList<HtmlButtonCandidate> ExtractButtonCandidatesFromHtmlForTests(string html)
@@ -234,6 +323,18 @@ internal static class BuildingDomParser
             attributes ?? string.Empty,
             @"(?:^|\s)disabled(?:\s|=|$)",
             RegexOptions.IgnoreCase | RegexOptions.Singleline);
+    }
+
+    private static int? ReadQueryNumber(string value, string key)
+    {
+        var match = Regex.Match(
+            value ?? string.Empty,
+            $@"(?:[?&]){Regex.Escape(key)}=(?<value>\d+)(?:&|['""\s]|$)",
+            RegexOptions.IgnoreCase);
+        return match.Success
+               && int.TryParse(match.Groups["value"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : null;
     }
 
     private static int LastSectionIndex(string html, string sectionClass)

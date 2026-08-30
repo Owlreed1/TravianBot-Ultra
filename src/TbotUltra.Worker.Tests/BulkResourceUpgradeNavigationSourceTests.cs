@@ -46,6 +46,23 @@ public sealed class BulkResourceUpgradeNavigationSourceTests
         Assert.Contains("after resource upgrade redirect", method, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void SingleAndBulkResourceUpgrades_RunFinalSafetyCheckBeforeAnyAction()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "TbotUltra.Worker",
+            "Services",
+            "Automation",
+            "Resources",
+            "TravianClient.Resources.Upgrade.cs"));
+
+        Assert.Equal(3, source.Split("VerifyResourceUpgradePreClickSafetyAsync", StringSplitOptions.None).Length - 1);
+        Assert.Equal(2, source.Split("clickSafety.CandidateIndex", StringSplitOptions.None).Length - 1);
+        Assert.Equal(2, source.Split("pre-click safety stopped upgrade", StringSplitOptions.None).Length - 1);
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
