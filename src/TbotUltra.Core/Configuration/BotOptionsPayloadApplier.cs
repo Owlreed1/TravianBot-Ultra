@@ -16,6 +16,7 @@ public static class BotOptionsPayloadApplier
         var smithyUpgradeTargets = construction.SmithyUpgradeTargets;
         var buildingUpgradeSlotId = construction.BuildingUpgradeSlotId;
         var buildingUpgradeTargetLevel = construction.BuildingUpgradeTargetLevel;
+        var buildingUpgradeName = construction.BuildingUpgradeName;
         var buildingUpgradeMaxAttempts = construction.BuildingUpgradeMaxAttempts;
         var buildingConstructSlotId = construction.BuildingConstructSlotId;
         var buildingConstructGid = construction.BuildingConstructGid;
@@ -323,6 +324,7 @@ public static class BotOptionsPayloadApplier
             SmithyUpgradeTargets = smithyUpgradeTargets,
             BuildingUpgradeSlotId = buildingUpgradeSlotId,
             BuildingUpgradeTargetLevel = buildingUpgradeTargetLevel,
+            BuildingUpgradeName = buildingUpgradeName,
             BuildingUpgradeMaxAttempts = buildingUpgradeMaxAttempts,
             BuildingConstructSlotId = buildingConstructSlotId,
             BuildingConstructGid = buildingConstructGid,

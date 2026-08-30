@@ -64,7 +64,9 @@ public sealed partial class TravianClient
     // village list (for example during a navigation transition).
     // Used by lightweight refresh paths (e.g. post-upgrade) where the page navigation would
     // appear to the user as an unnecessary refresh.
-    private async Task<IReadOnlyList<Village>> ReadVillagesPreferCacheAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<Village>> ReadVillagesPreferCacheAsync(
+        CancellationToken cancellationToken,
+        bool allowProfileNavigation = true)
     {
         using var trace = _browserTrace.BeginOperation("READ", "villages-prefer-cache", "scope=account source=cache-or-sidebar");
         _browserTrace.Event("CACHE", "villages-check", "observed", "source=current-page-sidebar reason=discover-new-villages");
@@ -76,11 +78,22 @@ public sealed partial class TravianClient
             {
                 if (_cachedVillages is { Count: > 0 } prior)
                 {
+                    var membershipVerifiedVillages = await TryVerifyMissingSidebarVillagesAsync(
+                        sidebar,
+                        prior,
+                        cancellationToken,
+                        allowProfileNavigation);
+                    if (membershipVerifiedVillages is not null)
+                    {
+                        trace.Complete("success", $"source=profile-membership-verification count={membershipVerifiedVillages.Count}");
+                        return membershipVerifiedVillages;
+                    }
+
                     // Fresh sidebar coordinates are authoritative. A partial render must still keep
                     // villages from the last verified list instead of shrinking account automation.
                     var merged = VillageIdentityReconciler.MergeFreshListWithCached(sidebar, prior);
                     UpdateCachedVillages(merged);
-                    if (IsCapitalProfileVerificationDue())
+                    if (allowProfileNavigation && IsCapitalProfileVerificationDue())
                     {
                         Notify("[capital] sidebar capital state is uncertain; refreshing player profile.");
                         var verifiedProfileVillages = await ReadVillagesFromServerAsync(cancellationToken);
@@ -92,7 +105,7 @@ public sealed partial class TravianClient
                 }
 
                 UpdateCachedVillages(sidebar);
-                if (IsCapitalProfileVerificationDue())
+                if (allowProfileNavigation && IsCapitalProfileVerificationDue())
                 {
                     Notify("[capital] sidebar capital state is uncertain; refreshing player profile.");
                     var verifiedProfileVillages = await ReadVillagesFromServerAsync(cancellationToken);
@@ -116,6 +129,12 @@ public sealed partial class TravianClient
             return cached;
         }
 
+        if (!allowProfileNavigation)
+        {
+            trace.Complete("success", "source=empty-no-navigation count=0");
+            return [];
+        }
+
         var profile = await ReadVillagesAsync(cancellationToken);
         trace.Complete("success", $"source=profile-fallback count={profile.Count}");
         return profile;
@@ -137,17 +156,24 @@ public sealed partial class TravianClient
                 var sidebarVillages = await ReadVillagesFromCurrentPageAsync(cancellationToken);
                 if (sidebarVillages.Count > 0)
                 {
+                    if (_cachedVillages is { Count: > 0 } cached)
+                    {
+                        var membershipVerifiedVillages = await TryVerifyMissingSidebarVillagesAsync(
+                            sidebarVillages,
+                            cached,
+                            cancellationToken,
+                            allowProfileNavigation: false);
+                        if (membershipVerifiedVillages is not null)
+                        {
+                            trace.Complete("success", $"source=profile-membership-verification count={membershipVerifiedVillages.Count}");
+                            return membershipVerifiedVillages;
+                        }
+                    }
+
                     var merged = _cachedVillages is { Count: > 0 } prior
                         ? VillageIdentityReconciler.MergeFreshListWithCached(sidebarVillages, prior)
                         : sidebarVillages.ToList();
                     UpdateCachedVillages(merged);
-                    if (IsCapitalProfileVerificationDue())
-                    {
-                        Notify("[capital] sidebar capital state is uncertain; refreshing player profile.");
-                        var verifiedProfileVillages = await ReadVillagesFromServerAsync(cancellationToken);
-                        UpdateCachedVillages(verifiedProfileVillages);
-                        return verifiedProfileVillages;
-                    }
                     trace.Complete("success", $"source=live-sidebar count={_cachedVillages!.Count} attempt={attempt}");
                     return _cachedVillages;
                 }
@@ -171,19 +197,59 @@ public sealed partial class TravianClient
             }
         }
 
+        if (_cachedVillages is { Count: > 0 } cachedFallback)
+        {
+            trace.Complete("success", $"source=cache-fallback count={cachedFallback.Count}");
+            return cachedFallback;
+        }
+
+        trace.Complete("success", "source=empty-no-navigation count=0");
+        return [];
+    }
+
+    private async Task<IReadOnlyList<Village>?> TryVerifyMissingSidebarVillagesAsync(
+        IReadOnlyList<Village> sidebarVillages,
+        IReadOnlyList<Village> cachedVillages,
+        CancellationToken cancellationToken,
+        bool allowProfileNavigation = true)
+    {
+        var observedKeys = sidebarVillages
+            .Select(VillageIdentityReconciler.BuildMembershipKey)
+            .Where(key => key is not null)
+            .Cast<string>()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _session.VerifiedVillageMembershipSuspicions.RemoveWhere(observedKeys.Contains);
+
+        var missingKeys = VillageIdentityReconciler.FindUnverifiedMissingVillageKeys(
+            sidebarVillages,
+            cachedVillages,
+            _session.VerifiedVillageMembershipSuspicions);
+        if (missingKeys.Count == 0 || !allowProfileNavigation)
+        {
+            return null;
+        }
+
+        Notify(
+            $"[village-membership] live sidebar contains {sidebarVillages.Count}/{cachedVillages.Count} cached villages; "
+            + "verifying ownership once on the player profile.");
         var profileVillages = await ReadVillagesFromServerAsync(cancellationToken);
         if (profileVillages.Count == 0)
         {
-            throw new InvalidOperationException("Live village list was empty on both sidebar and profile reads.");
+            Notify("[village-membership] profile verification returned no villages; preserving the cached list.");
+            return null;
         }
 
-        UpdateCachedVillages(profileVillages);
-        if (profileVillages.Any(village => village.Population.HasValue))
+        foreach (var missingKey in missingKeys)
         {
-            _cachedVillagesPopulationAt = DateTimeOffset.UtcNow;
+            _session.VerifiedVillageMembershipSuspicions.Add(missingKey);
         }
 
-        trace.Complete("success", $"source=profile count={profileVillages.Count}");
+        var removalConfirmed = VillageIdentityReconciler.HasMissingCachedVillage(profileVillages, cachedVillages);
+        _villageListRequiresAuthoritativeUiSync |= removalConfirmed;
+        UpdateCachedVillages(profileVillages);
+        Notify(
+            $"[village-membership] profile verification complete: villages={profileVillages.Count} "
+            + $"removedConfirmed={removalConfirmed.ToString().ToLowerInvariant()}.");
         return profileVillages;
     }
 

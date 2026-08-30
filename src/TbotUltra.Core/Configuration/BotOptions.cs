@@ -601,6 +601,9 @@ public sealed record BotOptions
     [ConfigurationKeyName("building_upgrade_target_level")]
     public int? BuildingUpgradeTargetLevel { get; init; }
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.BuildingUpgradeName)]
+    public string BuildingUpgradeName { get; init; } = string.Empty;
+
     [ConfigurationKeyName("building_upgrade_max_attempts")]
     public int BuildingUpgradeMaxAttempts { get; init; } = 30;
 

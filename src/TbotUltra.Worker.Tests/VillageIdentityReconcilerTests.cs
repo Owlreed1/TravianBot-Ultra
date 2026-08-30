@@ -29,6 +29,64 @@ public sealed class VillageIdentityReconcilerTests
     }
 
     [Fact]
+    public void HasMissingCachedVillage_DetectsVillageAbsentFromSidebarByStableIdentity()
+    {
+        Village[] cached =
+        [
+            new("T2", "/dorf1.php?newdid=2", CoordX: 159, CoordY: -113),
+            new("T3", "/dorf1.php?newdid=3", CoordX: 158, CoordY: -113),
+        ];
+        Village[] sidebar =
+        [
+            cached[0] with { Name = "Renamed T2" },
+        ];
+
+        Assert.True(VillageIdentityReconciler.HasMissingCachedVillage(sidebar, cached));
+        Assert.False(VillageIdentityReconciler.HasMissingCachedVillage(cached, cached));
+        Assert.False(VillageIdentityReconciler.HasMissingCachedVillage(
+            [new Village("Live", null)],
+            [new Village("Unknown identity", null)]));
+    }
+
+    [Fact]
+    public void HasMissingCachedVillage_AcceptsMatchingCoordinatesWhenSwitchIdsDiffer()
+    {
+        Village[] cached =
+        [
+            new("ABC", "/dorf1.php?newdid=71640", CoordX: 61, CoordY: 22),
+        ];
+        Village[] sidebar =
+        [
+            new("ABC", "/dorf1.php?newdid=22087", CoordX: 61, CoordY: 22),
+        ];
+
+        Assert.False(VillageIdentityReconciler.HasMissingCachedVillage(sidebar, cached));
+    }
+
+    [Fact]
+    public void FindUnverifiedMissingVillageKeys_ReturnsEachSuspicionOnlyOnce()
+    {
+        Village[] cached =
+        [
+            new("ABC", "/dorf1.php?newdid=1", CoordX: 61, CoordY: 22),
+            new("T3", "/dorf1.php?newdid=2", CoordX: 158, CoordY: -113),
+        ];
+        Village[] sidebar = [cached[0]];
+
+        var first = VillageIdentityReconciler.FindUnverifiedMissingVillageKeys(
+            sidebar,
+            cached,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        var repeated = VillageIdentityReconciler.FindUnverifiedMissingVillageKeys(
+            sidebar,
+            cached,
+            first.ToHashSet(StringComparer.OrdinalIgnoreCase));
+
+        Assert.Equal(["xy:158|-113"], first);
+        Assert.Empty(repeated);
+    }
+
+    [Fact]
     public void FindByNameOrCoordinates_PrefersCoordinatesWhenNamesAreDuplicated()
     {
         Village[] villages =

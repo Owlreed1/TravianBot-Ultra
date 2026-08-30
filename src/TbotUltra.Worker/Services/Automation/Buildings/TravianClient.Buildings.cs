@@ -38,6 +38,19 @@ public sealed partial class TravianClient : IBuildingClient
             ActiveVillageCoordY: activeCoords.Y);
     }
 
+    public async Task<VillageStatus> ReadCurrentBuildingOverviewStatusAsync(CancellationToken cancellationToken = default)
+    {
+        Notify("[build:verbose] ReadCurrentBuildingOverviewStatusAsync started");
+        if (!IsCurrentUrlForPath(Paths.Buildings) || await IsPageMarkedStaleAsync())
+        {
+            throw new InvalidOperationException("The current page is not a fresh Dorf2 building overview.");
+        }
+
+        var buildings = await ReadBuildingsAsync(cancellationToken, reuseFreshCurrentOverview: true);
+        var currentStatus = await ReadCurrentPageStorageStatusAsync(cancellationToken);
+        return currentStatus with { Buildings = buildings };
+    }
+
     internal static IReadOnlyList<Building> ParseBuildingOverviewHtmlForTests(string html)
     {
         var slots = BuildingDomParser.ExtractBuildingSlotHtml(html)

@@ -100,6 +100,17 @@ public sealed partial class TravianClient : IBuildingClient
             var existingBuilding = await TryReadExistingBuildingOnSlotBuildPageAsync(slotId);
             if (existingBuilding is { Level: >= 1 } built)
             {
+                var builtGid = BuildingCatalogService.GidForName(built.Name);
+                if (!BuildingIdentityMatches(gid, buildingName, builtGid, built.Name))
+                {
+                    if (!allowSlotFallback || slotId is < 19 or > 38)
+                    {
+                        throw new InvalidOperationException(
+                            $"Building identity mismatch for slot {slotId}: queued '{buildingName}' (gid {gid}), "
+                            + $"live build page shows '{built.Name}' (gid {builtGid?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}). Refusing to construct or upgrade the wrong building.");
+                    }
+                }
+
                 if (allowSlotFallback && slotId is >= 19 and <= 38)
                 {
                     var excludedSlots = ParseBuildingSlotIds(fallbackExcludedSlots);
@@ -677,6 +688,41 @@ public sealed partial class TravianClient : IBuildingClient
         }
 
         return null;
+    }
+
+    private static bool BuildingIdentityMatches(
+        int expectedGid,
+        string? expectedName,
+        int? actualGid,
+        string? actualName)
+        => actualGid is int gid
+            ? gid == expectedGid
+            : !string.IsNullOrWhiteSpace(actualName)
+                && !string.IsNullOrWhiteSpace(expectedName)
+                && BuildingNames.Same(actualName, expectedName);
+
+    private static void EnsureExpectedBuildingIdentity(int slotId, string? expectedName, BuildingInfo actual)
+    {
+        if (string.IsNullOrWhiteSpace(expectedName))
+        {
+            return;
+        }
+
+        var expectedGid = BuildingCatalogService.GidForName(expectedName);
+        var actualGid = ParseGidFromBuildingCode(actual.BuildingCode)
+            ?? BuildingCatalogService.GidForName(actual.BuildingName);
+        var matches = expectedGid is int gid
+            ? BuildingIdentityMatches(gid, expectedName, actualGid, actual.BuildingName)
+            : BuildingNames.Same(actual.BuildingName, expectedName);
+        if (matches)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Building identity mismatch for slot {slotId}: queued '{expectedName}' "
+            + $"(gid {expectedGid?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}), live dorf2 shows "
+            + $"'{actual.BuildingName}' (gid {actualGid?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}). Refusing to upgrade the wrong building.");
     }
 
     /// <summary>

@@ -29,6 +29,19 @@ public sealed class QueueDisplayProjectionTests
         Assert.Equal(1_500, projection.HistoryItems.Count);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Build_MovesEveryFailedItemToHistory(bool runtimeOnly)
+    {
+        var failed = Item(QueueStatus.Failed, runtimeOnly);
+
+        var projection = QueueDisplayProjection.Build([failed], Row);
+
+        Assert.Empty(projection.ActiveRows);
+        Assert.Same(failed, Assert.Single(projection.HistoryItems));
+    }
+
     [Fact]
     [Trait("Category", "Performance")]
     public void Build_RepresentativeQueueProjectionStaysBelowTheUiBudget()

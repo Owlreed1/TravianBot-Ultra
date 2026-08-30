@@ -147,7 +147,8 @@ public sealed partial class BotTaskRunner
             new BuildingAutomationRequest(
                 BuildingAutomationAction.UpgradeToLevel,
                 SlotId: context.Options.BuildingUpgradeSlotId,
-                TargetLevel: context.Options.BuildingUpgradeTargetLevel),
+                TargetLevel: context.Options.BuildingUpgradeTargetLevel,
+                Name: context.Options.BuildingUpgradeName),
             context.CancellationToken);
         context.Log(result);
         context.RecordTaskResult("upgrade_building_to_level", result);
@@ -165,6 +166,7 @@ public sealed partial class BotTaskRunner
             new BuildingAutomationRequest(
                 BuildingAutomationAction.UpgradeToMax,
                 SlotId: context.Options.BuildingUpgradeSlotId,
+                Name: context.Options.BuildingUpgradeName,
                 MaxAttempts: context.Options.BuildingUpgradeMaxAttempts),
             context.CancellationToken);
         context.Log(result);

@@ -245,6 +245,7 @@ public sealed partial class TravianClient
     // Reset to MinValue on a real village switch to force the next ReadVillagesAsync to re-read
     // population from spieler; otherwise the cache (kept current by incremental updates) is served.
     private DateTimeOffset _cachedVillagesPopulationAt { get => _session.CachedVillagesPopulationAt; set => _session.CachedVillagesPopulationAt = value; }
+    private bool _villageListRequiresAuthoritativeUiSync { get => _session.VillageListRequiresAuthoritativeUiSync; set => _session.VillageListRequiresAuthoritativeUiSync = value; }
     // True once the population baseline has been read from spieler.php this session. Re-armed (set
     // false) on a real village switch so the next active village can seed its own baseline.
     private bool _populationBaselineRead { get => _session.PopulationBaselineRead; set => _session.PopulationBaselineRead = value; }

@@ -320,9 +320,14 @@ public sealed record VillageStatus(
     // coordinates are unique and survive renames, so caches can key on them without name matching.
     int? ActiveVillageCoordX = null,
     int? ActiveVillageCoordY = null,
-    // Null means this page was not an authoritative Dorf1 observation. An empty list means Dorf1 was
-    // inspected and no incoming-attack signal was visible. Partial reads must preserve prior signals.
+    // Null means neither Dorf1 nor a Plus village overview was inspected. An empty list means the
+    // available signal source was inspected and no incoming-attack signal was visible.
     IReadOnlyList<IncomingAttackSignal>? IncomingAttackSignals = null,
+    // Plus village-list signals can be read from any game page. Only a real Dorf1 read may use a
+    // missing active-village signal as authoritative evidence that the active village is clear.
+    bool IncomingAttackActiveVillageReadWasAuthoritative = false,
+    // True only when the complete account-wide Plus village list was available in this page read.
+    bool IncomingAttackPlusOverviewWasRead = false,
     // Null means the Dorf1 unit infobox was not inspected. False is authoritative only for that live
     // Dorf1 read and means Travian rendered #troops td.noTroops (no units currently at home).
     bool? HasTroopsAtHome = null,

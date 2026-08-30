@@ -189,8 +189,7 @@ internal static class QueueMoveSafety
         ?? item.TaskName;
 
     private static bool IsActive(QueueItem item) =>
-        item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused
-        || (item.Status == QueueStatus.Failed && !item.IsRuntimeOnly);
+        item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused;
 
     private sealed record QueueDependency(Guid PrerequisiteId, Guid DependentId, string Description);
 }

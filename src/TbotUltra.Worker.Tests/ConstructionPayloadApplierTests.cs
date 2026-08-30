@@ -20,6 +20,7 @@ public sealed class ConstructionPayloadApplierTests
             [BotOptionPayloadKeys.SmithyUpgradeTargets] = "u1=5",
             [BotOptionPayloadKeys.BuildingUpgradeSlotId] = "20",
             [BotOptionPayloadKeys.BuildingUpgradeTargetLevel] = "10",
+            [BotOptionPayloadKeys.BuildingUpgradeName] = "Warehouse",
             [BotOptionPayloadKeys.BuildingUpgradeMaxAttempts] = "7",
             [BotOptionPayloadKeys.BuildingConstructSlotId] = "21",
             [BotOptionPayloadKeys.BuildingConstructGid] = "23",
@@ -51,6 +52,7 @@ public sealed class ConstructionPayloadApplierTests
         Assert.Equal("u1=5", result.SmithyUpgradeTargets);
         Assert.Equal(20, result.BuildingUpgradeSlotId);
         Assert.Equal(10, result.BuildingUpgradeTargetLevel);
+        Assert.Equal("Warehouse", result.BuildingUpgradeName);
         Assert.Equal(7, result.BuildingUpgradeMaxAttempts);
         Assert.Equal(21, result.BuildingConstructSlotId);
         Assert.Equal(23, result.BuildingConstructGid);

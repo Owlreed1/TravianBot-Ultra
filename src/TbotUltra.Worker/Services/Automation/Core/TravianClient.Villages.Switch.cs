@@ -235,6 +235,26 @@ public sealed partial class TravianClient
         {
             _cachedVillagesAt = DateTimeOffset.MinValue;
             Notify("[village-cache] invalidated after failed verified village switch; next read will inspect the live sidebar.");
+            if (_cachedVillages is { Count: > 0 } cachedVillages)
+            {
+                try
+                {
+                    var sidebarVillages = await ReadVillagesFromCurrentPageAsync(cancellationToken);
+                    await TryVerifyMissingSidebarVillagesAsync(sidebarVillages, cachedVillages, cancellationToken);
+                    if (_villageListRequiresAuthoritativeUiSync)
+                    {
+                        await TryEmitUiSyncSnapshotAsync(cancellationToken, force: true);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    Notify($"[village-membership] profile confirmation unavailable; preserving the cached village: {ex.Message}");
+                }
+            }
             Notify(
                 $"[village-switch] village_missing_suspected requested='{villageName}' " +
                 $"active='{activeVillageAfterSwitch ?? "(unknown)"}'; aborting before task execution.");

@@ -105,7 +105,8 @@ public sealed partial class TravianClient
             (activeCoords.X.HasValue && activeCoords.Y.HasValue
              && village.CoordX == activeCoords.X && village.CoordY == activeCoords.Y)
             || string.Equals(village.Name, activeVillage, StringComparison.OrdinalIgnoreCase))?.Url;
-        var incomingAttackSignals = await ReadIncomingAttackSignalsOnCurrentDorf1Async(
+        var incomingAttackActiveVillageReadWasAuthoritative = IsCurrentUrlForPath(Paths.Resources);
+        var incomingAttackSignalRead = await ReadIncomingAttackSignalsOnCurrentPageAsync(
             activeVillage,
             activeVillageUrl,
             activeCoords.X,
@@ -187,7 +188,9 @@ public sealed partial class TravianClient
             ActiveConstructionsFromOverview: _lastActiveConstructionsFromOverview,
             ActiveVillageCoordX: activeCoords.X,
             ActiveVillageCoordY: activeCoords.Y,
-            IncomingAttackSignals: incomingAttackSignals,
+            IncomingAttackSignals: incomingAttackSignalRead?.Signals,
+            IncomingAttackActiveVillageReadWasAuthoritative: incomingAttackActiveVillageReadWasAuthoritative,
+            IncomingAttackPlusOverviewWasRead: incomingAttackSignalRead?.PlusOverviewWasRead == true,
             HasTroopsAtHome: hasTroopsAtHome,
             TroopPresenceObservedAtUtc: hasTroopsAtHome.HasValue ? CurrentTravianServerTimeUtc() : null);
         trace.Complete(

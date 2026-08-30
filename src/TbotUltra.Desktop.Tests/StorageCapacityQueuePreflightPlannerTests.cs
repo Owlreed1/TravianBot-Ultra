@@ -342,6 +342,11 @@ public sealed class StorageCapacityQueuePreflightPlannerTests
                 == BotOptionPayloadKeys.AutoAddedByStorageCapacityPreflight)
             .ToList();
         Assert.NotEmpty(storageRequests);
+        Assert.All(
+            storageRequests.Where(request => string.Equals(request.TaskName, "construct_building", StringComparison.OrdinalIgnoreCase)),
+            request => Assert.Equal(
+                bool.TrueString,
+                request.Payload![BotOptionPayloadKeys.BuildingConstructAllowSlotFallback]));
         Assert.All(storageRequests, request =>
         {
             Assert.Equal("New village", request.Payload![BotOptionPayloadKeys.TargetVillageName]);

@@ -28,7 +28,8 @@ public sealed partial class TravianClient
         string ActiveVillage,
         int? ActiveVillageCoordX,
         int? ActiveVillageCoordY,
-        IReadOnlyList<UiSyncVillage> Villages);
+        IReadOnlyList<UiSyncVillage> Villages,
+        bool VillagesAreAuthoritative);
 
     private async Task TryEmitUiSyncSnapshotAsync(CancellationToken cancellationToken, bool force = false)
     {
@@ -48,6 +49,10 @@ public sealed partial class TravianClient
             var payload = JsonSerializer.Serialize(snapshot);
             _lastUiSyncAt = now;
             Notify($"[ui-sync] {payload}");
+            if (snapshot.VillagesAreAuthoritative)
+            {
+                _villageListRequiresAuthoritativeUiSync = false;
+            }
         }
         catch (Exception ex) when (BrowserFailureClassifier.IsTransientNavigation(ex))
         {
@@ -76,7 +81,8 @@ public sealed partial class TravianClient
             ActiveVillageCoordY: activeCoordinates.Y,
             Villages: villages
                 .Select(v => new UiSyncVillage(v.Name, v.Url, v.IsCapital, v.CoordX, v.CoordY, v.Population, v.CropFields))
-                .ToList());
+                .ToList(),
+            VillagesAreAuthoritative: _villageListRequiresAuthoritativeUiSync);
     }
 
 }

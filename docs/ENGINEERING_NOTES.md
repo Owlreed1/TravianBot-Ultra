@@ -112,6 +112,12 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Duplicate village names are valid. Fresh Official sidebar `data-did` plus `.coordinateX/.coordinateY` values
   are authoritative: never deduplicate by name, never overwrite fresh coordinates from a name-keyed cache, and
   never accept a same-name village switch without coordinate verification when coordinates are available.
+- A village missing from a readable live sidebar is only a suspicion. Compare by `newdid`/coordinates, verify the
+  account once against the player-profile village table, and only a non-empty profile result may authoritatively
+  remove the village from the live UI, disable its automation, and pause its pending queue items; retention cleanup
+  remains separate. Current-page jitter/UI sync is observation-only and must never navigate while the bot is paused;
+  profile verification runs only from an explicit/login flow or active automation path. Remember a verified missing
+  coordinate for the browser session so stale cache seeding cannot repeat the same profile navigation.
 - The village status cache and queue use canonical coordinate keys. Legacy name-keyed entries are migrated only
   when coordinates can be resolved; active coordinates come from `#villageName[data-x][data-y]`.
 - Per-village runtime caches are shared by the UI and background loop and must be synchronized. A display-name
@@ -483,16 +489,21 @@ Published artifacts belong under `artifacts/`, never beside source files.
   corresponding auto-collect setting and village automation allow it, `collect_tasks` and
   `collect_daily_quests` run before other village work; afterward the selected sweep scope is re-read because
   rewards can change resources.
-- After every building-mutation task the desktop ALWAYS re-reads the full dorf1+dorf2 for the just-worked
-  village (`RefreshConstructionStatusAfterBuildingMutationAsync` → `RefreshConstructionStatusAsync`, then
-  `CacheVillageStatus`). Do not restore the old QueuedOrInProgress/AlreadySatisfied storage-only quick-skip:
-  an upgrade reports QueuedOrInProgress on every climb pass and a build that finishes while the loop is on
-  another village returns AlreadySatisfied, so skipping the dorf2 read froze the cached building level (a
-  Marketplace shown as 12 in the UI while it had reached 20 in-game).
+- After every building-mutation task the desktop re-reads and caches the just-worked village's complete building
+  overview. Prefer the already-loaded post-click Dorf2 only when it supplies all 22 distinct slots, an authoritative
+  construction-queue observation and coordinates matching the queue item. Merge that snapshot with retained Dorf1
+  state; otherwise fall back to the full Dorf1+Dorf2 read. Never use a storage-only quick-skip: an upgrade reports
+  QueuedOrInProgress on every climb pass and a build that finishes while the loop is on another village returns
+  AlreadySatisfied, so omitting the complete Dorf2 read freezes cached building levels.
 - An authoritative Dorf1/Dorf2 construction-overview row reports the target level being built. The desktop may
   therefore promote the matching cached building (same slot and gid/name) to at least `target - 1`, but must
   never downgrade it. Persist that confirmed floor so clearing an optimistic queue target cannot reveal an old
   pre-queue level while the long-running worker task is still active.
+- Before any building construct or upgrade click, verify that the live slot identity matches the queued gid/name
+  (gid first, normalized name fallback). A mismatched occupied slot is never `AlreadyExists` and must never be
+  mutated; fail with both queued and live identities so a stale/rebound payload cannot upgrade another building.
+- `Failed` queue items are history regardless of whether they are runtime-only; they are not active, movable, or
+  included in active queue estimates.
 - Same rule for resource fields (dorf1): after a resource-upgrade task,
   `RefreshResourceStatusAfterResourceMutationAsync` re-reads the just-worked village's fields
   (`resourceOnly:true, forceCurrentVillage:true`) and `CacheVillageStatus`es them, repainting the resource
@@ -612,11 +623,15 @@ Published artifacts belong under `artifacts/`, never beside source files.
   partial output as a successful archive. Screenshots may contain visible game data.
 - The Dashboard active-village border represents verified live browser state only. Queue selection/Running state
   must never pre-mark a task's target village; update it only after a successful browser village verification.
-- Incoming Attack monitoring observes only real Dorf1 reads: the active village requires the hostile red
+- Incoming Attack monitoring processes live observations whenever the user is logged in, independently of whether
+  Continuous Loop or Auto Queue is running. With Plus, the global village-list attack markers are read on every
+  jitter/current-page snapshot and during login even outside Dorf1; only a real Dorf1 read may authoritatively clear
+  the active village. A newly appeared Plus marker triggers one immediate detail read even when that village has
+  confirmed movement history; the unchanged marker does not reopen Rally Point on later jitter reads. The active village's Dorf1 signal requires the hostile red
   `img.att1` marker inside `.villageInfobox.movements #movements` (movement labels and `def1`/`att2` must never
   signal an attack), while a Plus village overview uses
-  `.listEntry.village.attack[data-did]`. A nullable signal list means "Dorf1 was not read" and must preserve
-  prior signals; a completed Dorf1 read without an active-village signal is authoritative for that village and
+  `.listEntry.village.attack[data-did]`. A nullable signal list means neither Dorf1 nor the Plus village overview
+  was read and must preserve prior signals; a completed Dorf1 read without an active-village signal is authoritative for that village and
   immediately clears both pending and confirmed attack rows for it, even if Plus signals another village. Rally
   Point detail reads first inspect the fixed Dorf2 slot 39. An apparently empty slot must be confirmed by one reload;
   a confirmed missing/destroyed Rally Point uses the visible red Dorf1 timers as a non-authoritative fallback and must
@@ -677,7 +692,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   so later navigation still waits for the effective deadline.
 - Every target-specific live confirmation that a building or resource entered Travian's construction queue publishes
   that authoritative overview snapshot to Desktop immediately. Update the coordinate-owned village cache and green
-  construction-slot icons before the enclosing Worker task finishes; retain the normal post-task refresh as backup.
+  construction-slot icons before the enclosing Worker task finishes; retain the validated current-Dorf2 post-task
+  read with full Dorf1+Dorf2 fallback as backup.
 - An automation run captures Worker's actual `BrowserGeneration`; never mirror or synthesize that generation in
   Desktop. Runtime-item reconciliation identifies village scope with `BotOptionPayloadKeys.TargetVillageKey` and
   must preserve an existing pending item's authoritative `NextAttemptAt` when refreshing payload or priority.

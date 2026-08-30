@@ -263,6 +263,7 @@ public static class BotOptionsFactory
             SmithyUpgradeTargets = configuration[BotOptionPayloadKeys.SmithyUpgradeTargets],
             BuildingUpgradeSlotId = configuration.GetValue<int?>(BotOptionPayloadKeys.BuildingUpgradeSlotId),
             BuildingUpgradeTargetLevel = configuration.GetValue<int?>(BotOptionPayloadKeys.BuildingUpgradeTargetLevel),
+            BuildingUpgradeName = configuration[BotOptionPayloadKeys.BuildingUpgradeName] ?? string.Empty,
             BuildingUpgradeMaxAttempts = configuration.GetValue(BotOptionPayloadKeys.BuildingUpgradeMaxAttempts, 30),
             BuildingConstructSlotId = configuration.GetValue<int?>(BotOptionPayloadKeys.BuildingConstructSlotId),
             BuildingConstructGid = configuration.GetValue<int?>(BotOptionPayloadKeys.BuildingConstructGid),

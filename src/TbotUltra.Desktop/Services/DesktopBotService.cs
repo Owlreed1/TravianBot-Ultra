@@ -274,6 +274,11 @@ public Task ExecuteLoginAsync(BotOptions options, Action<string> log, bool keepB
         return _taskRunner.ReadBuildingsStatusAsync(options, log, null, cancellationToken);
     }
 
+    public Task<VillageStatus> ReadCurrentBuildingOverviewStatusAsync(BotOptions options, Action<string> log, CancellationToken cancellationToken)
+    {
+        return _taskRunner.ReadCurrentBuildingOverviewStatusAsync(options, log, null, cancellationToken);
+    }
+
     public Task<IReadOnlyList<TroopTrainingQueueStatus>> ReadTroopTrainingQueuesAsync(BotOptions options, Action<string> log, IReadOnlyList<Building>? knownBuildings, CancellationToken cancellationToken)
     {
         return _taskRunner.ReadTroopTrainingQueuesAsync(options, log, knownBuildings, null, cancellationToken);

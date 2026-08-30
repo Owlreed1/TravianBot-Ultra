@@ -7,6 +7,20 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class IncomingAttackIndicatorSourceTests
 {
     [Fact]
+    public void LiveSignalObservation_IsActiveAfterLoginWithoutRequiringAutomationLoop()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var source = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "MainWindow.IncomingAttacks.cs"));
+        var start = source.IndexOf("private bool IsIncomingAttackMonitoringActive()", StringComparison.Ordinal);
+        var end = source.IndexOf("private void ObserveIncomingAttackSignals", start, StringComparison.Ordinal);
+        var activation = source[start..end];
+
+        Assert.Contains("=> _isLoggedIn;", activation, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsContinuousLoopRunning", activation, StringComparison.Ordinal);
+        Assert.DoesNotContain("_autoQueueRunning", activation, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void VillageIndicator_IsAlwaysVisibleAndPulsesOnlyForIncomingAttacks()
     {
         var root = ProjectRootLocator.FindProjectRoot();

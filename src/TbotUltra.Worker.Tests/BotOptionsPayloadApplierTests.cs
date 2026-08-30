@@ -300,6 +300,7 @@ public sealed class BotOptionsPayloadApplierTests
             ResourceUpgradeTargetLevel = 2,
             BuildingUpgradeSlotId = 3,
             BuildingUpgradeTargetLevel = 4,
+            BuildingUpgradeName = "Old building",
             BuildingConstructSlotId = 5,
             BuildingConstructGid = 6,
             BuildingConstructName = "Main Building",
@@ -340,6 +341,7 @@ public sealed class BotOptionsPayloadApplierTests
             [BotOptionPayloadKeys.ResourceUpgradeTargetLevel] = "10",
             [BotOptionPayloadKeys.BuildingUpgradeSlotId] = "11",
             [BotOptionPayloadKeys.BuildingUpgradeTargetLevel] = "12",
+            [BotOptionPayloadKeys.BuildingUpgradeName] = "Warehouse",
             [BotOptionPayloadKeys.BuildingConstructSlotId] = "13",
             [BotOptionPayloadKeys.BuildingConstructGid] = "14",
             [BotOptionPayloadKeys.BuildingConstructName] = "Barracks",
@@ -386,6 +388,7 @@ public sealed class BotOptionsPayloadApplierTests
         Assert.Equal(10, result.ResourceUpgradeTargetLevel);
         Assert.Equal(11, result.BuildingUpgradeSlotId);
         Assert.Equal(12, result.BuildingUpgradeTargetLevel);
+        Assert.Equal("Warehouse", result.BuildingUpgradeName);
         Assert.Equal(13, result.BuildingConstructSlotId);
         Assert.Equal(14, result.BuildingConstructGid);
         Assert.Equal("Barracks", result.BuildingConstructName);

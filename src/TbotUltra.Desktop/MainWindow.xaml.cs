@@ -72,7 +72,8 @@ public partial class MainWindow : Window
         string? ActiveVillage,
         int? ActiveVillageCoordX,
         int? ActiveVillageCoordY,
-        IReadOnlyList<UiSyncVillagePayload>? Villages);
+        IReadOnlyList<UiSyncVillagePayload>? Villages,
+        bool VillagesAreAuthoritative = false);
 
     private enum ManualExecutionOutcome
     {

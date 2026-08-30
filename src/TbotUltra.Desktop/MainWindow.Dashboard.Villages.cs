@@ -61,7 +61,8 @@ public partial class MainWindow
         IReadOnlyList<UiSyncVillagePayload> villages,
         string? activeVillageName,
         int? activeVillageCoordX,
-        int? activeVillageCoordY)
+        int? activeVillageCoordY,
+        bool allowVillageRemoval = false)
     {
         var items = BuildMergedVillageSelectionItems(villages);
         var activeVillageKey = activeVillageCoordX.HasValue && activeVillageCoordY.HasValue
@@ -82,7 +83,8 @@ public partial class MainWindow
             GetSelectedVillageName(),
             activeVillageName,
             GetSelectedVillageKey(),
-            activeVillageKey);
+            activeVillageKey,
+            allowVillageRemoval);
     }
 
     private void SyncDashboardVillageUi(

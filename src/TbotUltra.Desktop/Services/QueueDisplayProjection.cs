@@ -34,10 +34,8 @@ public static class QueueDisplayProjection
     }
 
     private static bool IsActive(QueueItem item) =>
-        item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused
-        || (item.Status == QueueStatus.Failed && !item.IsRuntimeOnly);
+        item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused;
 
     private static bool IsHistory(QueueItem item) =>
-        item.Status is QueueStatus.Succeeded or QueueStatus.Canceled
-        || (item.Status == QueueStatus.Failed && item.IsRuntimeOnly);
+        item.Status is QueueStatus.Succeeded or QueueStatus.Canceled or QueueStatus.Failed;
 }

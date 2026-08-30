@@ -206,6 +206,7 @@ public static class StorageCapacityDependencyPlanner
         else if (plan.Action == StorageDependencyAction.Construct)
         {
             payload = new BuildingConstructPayload(plan.SlotId!.Value, gid, name).ToDictionary();
+            payload[BotOptionPayloadKeys.BuildingConstructAllowSlotFallback] = bool.TrueString;
         }
         else
         {
@@ -216,6 +217,7 @@ public static class StorageCapacityDependencyPlanner
         CopyIfPresent(parentPayload, payload, TbotUltra.Core.Configuration.BotOptionPayloadKeys.TargetVillageUrl);
         CopyIfPresent(parentPayload, payload, TbotUltra.Core.Configuration.BotOptionPayloadKeys.TargetVillageKey);
         CopyIfPresent(parentPayload, payload, TbotUltra.Core.Configuration.BotOptionPayloadKeys.NpcTradeEnabled);
+        CopyIfPresent(parentPayload, payload, TbotUltra.Core.Configuration.BotOptionPayloadKeys.BuildingConstructFallbackExcludedSlots);
         payload[TbotUltra.Core.Configuration.BotOptionPayloadKeys.StorageDependencyParentId] = parentId.ToString();
         payload[TbotUltra.Core.Configuration.BotOptionPayloadKeys.StorageDependencyKind] = plan.Kind.ToString().ToLowerInvariant();
         return payload;

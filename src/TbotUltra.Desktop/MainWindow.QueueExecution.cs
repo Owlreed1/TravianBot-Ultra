@@ -885,8 +885,8 @@ public partial class MainWindow
 
         if (IsBuildingMutationTask(item.TaskName))
         {
-            var refreshResult = await RefreshConstructionStatusAfterBuildingMutationAsync(cancellationToken);
-            fullConstructionRefreshDone = refreshResult.FullStatusRead;
+            var refreshResult = await RefreshConstructionStatusAfterBuildingMutationAsync(item, cancellationToken);
+            fullConstructionRefreshDone = refreshResult.BuildingsStatusRead;
             if (!refreshResult.StorageStatusRead)
             {
                 await RefreshCurrentPageStorageStatusAsync(options, "construction_success", cancellationToken);
@@ -963,18 +963,68 @@ public partial class MainWindow
         return fullConstructionRefreshDone;
     }
 
-    private async Task<(bool FullStatusRead, bool StorageStatusRead)> RefreshConstructionStatusAfterBuildingMutationAsync(
+    private async Task<(bool BuildingsStatusRead, bool StorageStatusRead)> RefreshConstructionStatusAfterBuildingMutationAsync(
+        QueueItem item,
         CancellationToken cancellationToken)
     {
-        // Always re-read the full dorf1+dorf2 for the village the task just worked, then cache + repaint it.
-        // A building level can change without the desktop otherwise noticing: an upgrade reports
-        // QueuedOrInProgress on every pass while it climbs, and a build that finishes while the loop is on
-        // another village comes back as AlreadySatisfied — both used to skip the dorf2 read, which froze the
-        // cached level (a Marketplace shown as level 12 in the UI while it had reached 20 in-game). The
-        // browser is already on the worked village, so RefreshConstructionStatusAsync reads the correct one
-        // (forceCurrentVillage) and CacheVillageStatus stores it keyed by that village's coordinates.
-        await RefreshConstructionStatusAsync(cancellationToken);
-        return (FullStatusRead: true, StorageStatusRead: false);
+        // A confirmed construct/upgrade redirects to Dorf2. Reuse that already-loaded overview so the
+        // next level can open directly from it instead of forcing Dorf2 -> Dorf1 -> Dorf2. The quick read
+        // is accepted only when all 22 slots, an authoritative construction queue and the exact target
+        // village coordinates are present. Any uncertainty retains the old full refresh as the fallback.
+        try
+        {
+            var options = AutomationExecutionOptions.WithoutImplicitVillageTarget(LoadBotOptions());
+            var currentStatus = await _botService.ReadCurrentBuildingOverviewStatusAsync(
+                options,
+                AppendLog,
+                cancellationToken);
+            var expectedVillageKey = GetQueueItemVillageKey(item);
+            if (!ConstructionMutationRefreshPolicy.CanUseCurrentDorf2Snapshot(currentStatus, expectedVillageKey))
+            {
+                throw new InvalidOperationException(
+                    $"Current Dorf2 snapshot was incomplete or belonged to another village " +
+                    $"(expected={expectedVillageKey ?? "-"}, " +
+                    $"observed={ResolveStatusVillageKey(currentStatus) ?? "-"}, " +
+                    $"slots={currentStatus.Buildings.Count}, " +
+                    $"queueAuthoritative={currentStatus.ActiveConstructionsFromOverview}).");
+            }
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                var existing = ResolveBuildingStatusForQueueItem(item);
+                var merged = existing is null
+                    ? currentStatus
+                    : ConstructionMutationRefreshPolicy.MergeCurrentDorf2Snapshot(existing, currentStatus);
+                SetActiveWorkingVillageFromStatus(merged);
+                CacheVillageStatus(merged);
+                ReconcilePendingBuildingQueueWithLiveStatus(merged);
+                if (!IsStatusForSelectedVillage(merged))
+                {
+                    return;
+                }
+
+                _lastBuildingStatus = merged;
+                ApplyVillageStatusToUi(merged);
+                PopulateBuildingsTab(merged);
+            });
+
+            AppendLog(
+                $"[construction-refresh] reused authoritative current Dorf2 after '{item.TaskName}'; " +
+                "skipped Dorf1 navigation.");
+            return (BuildingsStatusRead: true, StorageStatusRead: true);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppendLog(
+                $"[construction-refresh] current Dorf2 refresh failed ({ex.Message}); " +
+                "falling back to full Dorf1+Dorf2 status.");
+            await RefreshConstructionStatusAsync(cancellationToken);
+            return (BuildingsStatusRead: true, StorageStatusRead: false);
+        }
     }
 
     // dorf1 counterpart of RefreshConstructionStatusAfterBuildingMutationAsync: re-reads the just-worked

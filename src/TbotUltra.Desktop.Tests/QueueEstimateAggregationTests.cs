@@ -20,6 +20,21 @@ public sealed class QueueEstimateAggregationTests
         Assert.Equal(19 * 60 * 60 + 23 * 60 + 16, QueueEstimateAggregation.SumSeconds(rows));
     }
 
+    [Fact]
+    public void SumSeconds_DoesNotCountFailedItems()
+    {
+        var failed = new QueueItemRow
+        {
+            Group = QueueGroup.Construction,
+            Status = QueueStatus.Failed,
+            IsRuntimeOnly = false,
+            HasEstimate = true,
+            EstimateSeconds = 300,
+        };
+
+        Assert.Equal(0, QueueEstimateAggregation.SumSeconds([failed]));
+    }
+
     private static QueueItemRow Row(double seconds) => new()
     {
         Group = QueueGroup.Construction,

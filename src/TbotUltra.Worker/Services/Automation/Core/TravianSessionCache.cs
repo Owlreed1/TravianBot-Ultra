@@ -54,6 +54,9 @@ public sealed class TravianSessionCache
     public System.Collections.Generic.List<Domain.Village>? CachedVillages { get; set; }
     public System.DateTimeOffset CachedVillagesAt { get; set; } = System.DateTimeOffset.MinValue;
     public System.DateTimeOffset CachedVillagesPopulationAt { get; set; } = System.DateTimeOffset.MinValue;
+    public bool VillageListRequiresAuthoritativeUiSync { get; set; }
+    public System.Collections.Generic.HashSet<string> VerifiedVillageMembershipSuspicions { get; } =
+        new(System.StringComparer.OrdinalIgnoreCase);
     public bool PopulationBaselineRead { get; set; }
     public bool CapitalProfileVerificationRequired { get; set; }
     public System.DateTimeOffset CapitalProfileVerificationNotBeforeUtc { get; set; } = System.DateTimeOffset.MinValue;

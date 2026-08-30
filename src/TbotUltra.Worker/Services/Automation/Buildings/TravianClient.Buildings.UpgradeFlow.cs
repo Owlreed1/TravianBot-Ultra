@@ -15,7 +15,7 @@ namespace TbotUltra.Worker.Services;
 public sealed partial class TravianClient : IBuildingClient
 {
 
-    public async Task<string> UpgradeBuildingToLevelAsync(int slotId, int targetLevel, CancellationToken cancellationToken = default)
+    public async Task<string> UpgradeBuildingToLevelAsync(int slotId, int targetLevel, CancellationToken cancellationToken = default, string? expectedBuildingName = null)
     {
         using var navDiagnostics = BeginConstructionNavigationDiagnostics($"upgrade_building_to_level slot={slotId} target={targetLevel}");
         Notify($"[build] upgrade starting — slot={slotId}, target=lvl {targetLevel}");
@@ -58,6 +58,7 @@ public sealed partial class TravianClient : IBuildingClient
             {
                 return $"Slot {slotId}: not found on dorf2. Upgrades performed: {upgrades}.";
             }
+            EnsureExpectedBuildingIdentity(slotId, expectedBuildingName, info);
             var currentLevel = info.Level;
             lastKnownLevel = currentLevel;
             if (currentLevel >= targetLevel)
@@ -909,7 +910,7 @@ public sealed partial class TravianClient : IBuildingClient
         return false;
     }
 
-    public async Task<string> UpgradeBuildingToMaxAsync(int slotId, int maxAttempts = 30, CancellationToken cancellationToken = default)
+    public async Task<string> UpgradeBuildingToMaxAsync(int slotId, int maxAttempts = 30, CancellationToken cancellationToken = default, string? expectedBuildingName = null)
     {
         using var navDiagnostics = BeginConstructionNavigationDiagnostics($"upgrade_building_to_max slot={slotId}");
         Notify($"[build] upgrade-to-max starting — slot={slotId}");
@@ -947,6 +948,7 @@ public sealed partial class TravianClient : IBuildingClient
             {
                 return $"Slot {slotId}: not found on dorf2. Upgrades performed: {upgrades}.";
             }
+            EnsureExpectedBuildingIdentity(slotId, expectedBuildingName, info);
             var currentLevel = info.Level;
             var gid = ParseGidFromBuildingCode(info.BuildingCode);
             var maxLevel = gid is int g ? BuildingCatalogService.MaxLevelFor(g) : 20;

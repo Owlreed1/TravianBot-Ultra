@@ -15,15 +15,16 @@ namespace TbotUltra.Worker.Services;
 public interface IBuildingClient
 {
     Task<VillageStatus> ReadBuildingsStatusAsync(CancellationToken cancellationToken = default);
+    Task<VillageStatus> ReadCurrentBuildingOverviewStatusAsync(CancellationToken cancellationToken = default);
 
     Task<string> DemolishBuildingToLevelAsync(
         string targetBuildingSlotOrName,
         int targetLevel,
         CancellationToken cancellationToken = default);
 
-    Task<string> UpgradeBuildingToLevelAsync(int slotId, int targetLevel, CancellationToken cancellationToken = default);
+    Task<string> UpgradeBuildingToLevelAsync(int slotId, int targetLevel, CancellationToken cancellationToken = default, string? expectedBuildingName = null);
 
-    Task<string> UpgradeBuildingToMaxAsync(int slotId, int maxAttempts = 30, CancellationToken cancellationToken = default);
+    Task<string> UpgradeBuildingToMaxAsync(int slotId, int maxAttempts = 30, CancellationToken cancellationToken = default, string? expectedBuildingName = null);
 
     Task<string> ConstructBuildingAsync(
         int slotId,

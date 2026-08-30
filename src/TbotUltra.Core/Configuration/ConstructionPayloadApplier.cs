@@ -12,6 +12,7 @@ internal sealed record ConstructionPayloadValues(
     string? SmithyUpgradeTargets,
     int? BuildingUpgradeSlotId,
     int? BuildingUpgradeTargetLevel,
+    string BuildingUpgradeName,
     int BuildingUpgradeMaxAttempts,
     int? BuildingConstructSlotId,
     int? BuildingConstructGid,
@@ -47,6 +48,7 @@ internal static class ConstructionPayloadApplier
             source.SmithyUpgradeTargets,
             source.BuildingUpgradeSlotId,
             source.BuildingUpgradeTargetLevel,
+            source.BuildingUpgradeName,
             source.BuildingUpgradeMaxAttempts,
             source.BuildingConstructSlotId,
             source.BuildingConstructGid,
@@ -98,6 +100,8 @@ internal static class ConstructionPayloadApplier
                 result = result with { BuildingUpgradeSlotId = buildingSlot };
             else if (TryReadInt(key, value, BotOptionPayloadKeys.BuildingUpgradeTargetLevel, out var buildingTarget))
                 result = result with { BuildingUpgradeTargetLevel = buildingTarget };
+            else if (key.Equals(BotOptionPayloadKeys.BuildingUpgradeName, StringComparison.OrdinalIgnoreCase))
+                result = result with { BuildingUpgradeName = value };
             else if (TryReadInt(key, value, BotOptionPayloadKeys.BuildingUpgradeMaxAttempts, out var buildingAttempts))
                 result = result with { BuildingUpgradeMaxAttempts = buildingAttempts };
             else if (TryReadInt(key, value, BotOptionPayloadKeys.BuildingConstructSlotId, out var constructSlot))

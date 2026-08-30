@@ -181,7 +181,23 @@ public partial class MainWindow
                     payload.Villages,
                     payload.ActiveVillage,
                     payload.ActiveVillageCoordX,
-                    payload.ActiveVillageCoordY);
+                    payload.ActiveVillageCoordY,
+                    payload.VillagesAreAuthoritative);
+                if (payload.VillagesAreAuthoritative)
+                {
+                    var confirmedVillages = payload.Villages
+                        .Where(village => !string.IsNullOrWhiteSpace(village.Name))
+                        .Select(village => new Village(
+                            village.Name!,
+                            village.Url,
+                            village.IsCapital,
+                            village.CoordX,
+                            village.CoordY,
+                            village.Population,
+                            village.CropFields))
+                        .ToList();
+                    ReconcileConfirmedVillageList(confirmedVillages, "profile_membership_verification");
+                }
             }
         }
         catch

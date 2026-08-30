@@ -120,6 +120,67 @@ internal static class VillageIdentityReconciler
         return merged;
     }
 
+    internal static bool HasMissingCachedVillage(
+        IReadOnlyList<Village> fresh,
+        IReadOnlyList<Village> cached)
+    {
+        return FindMissingCachedVillageKeys(fresh, cached).Count > 0;
+    }
+
+    internal static IReadOnlyList<string> FindUnverifiedMissingVillageKeys(
+        IReadOnlyList<Village> fresh,
+        IReadOnlyList<Village> cached,
+        IReadOnlySet<string> verifiedKeys)
+    {
+        return FindMissingCachedVillageKeys(fresh, cached)
+            .Where(key => !verifiedKeys.Contains(key))
+            .ToList();
+    }
+
+    internal static IReadOnlyList<string> FindMissingCachedVillageKeys(
+        IReadOnlyList<Village> fresh,
+        IReadOnlyList<Village> cached)
+    {
+        var missing = new List<string>();
+        foreach (var cachedVillage in cached)
+        {
+            var cachedKey = BuildMembershipKey(cachedVillage);
+            if (cachedKey is null || fresh.Any(freshVillage => SameMembership(cachedVillage, freshVillage)))
+            {
+                continue;
+            }
+
+            missing.Add(cachedKey);
+        }
+
+        return missing;
+    }
+
+    internal static string? BuildMembershipKey(Village village)
+    {
+        if (village.CoordX.HasValue && village.CoordY.HasValue)
+        {
+            return $"xy:{village.CoordX.Value}|{village.CoordY.Value}";
+        }
+
+        var did = TravianUrls.TryParseNewdid(village.Url);
+        return did.HasValue ? $"did:{did.Value}" : null;
+    }
+
+    private static bool SameMembership(Village left, Village right)
+    {
+        if (SameCoordinates(
+            (left.CoordX, left.CoordY),
+            (right.CoordX, right.CoordY)))
+        {
+            return true;
+        }
+
+        var leftDid = TravianUrls.TryParseNewdid(left.Url);
+        var rightDid = TravianUrls.TryParseNewdid(right.Url);
+        return leftDid.HasValue && rightDid.HasValue && leftDid.Value == rightDid.Value;
+    }
+
     internal static bool HasCoordinates((int? X, int? Y) coordinates) =>
         coordinates.X.HasValue && coordinates.Y.HasValue;
 

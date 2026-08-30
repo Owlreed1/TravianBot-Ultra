@@ -36,11 +36,11 @@ public sealed class BuildingAutomationOperationTests
         var operation = new BuildingAutomationOperation(client);
 
         var result = await operation.ExecuteAsync(
-            new BuildingAutomationRequest(BuildingAutomationAction.UpgradeToMax, SlotId: 21, MaxAttempts: 12),
+            new BuildingAutomationRequest(BuildingAutomationAction.UpgradeToMax, SlotId: 21, Name: "Warehouse", MaxAttempts: 12),
             CancellationToken.None);
 
         Assert.Equal("upgraded", result);
-        Assert.Equal((21, 12), client.UpgradeToMaxRequest);
+        Assert.Equal((21, 12, "Warehouse"), client.UpgradeToMaxRequest);
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public sealed class BuildingAutomationOperationTests
     private sealed class FakeBuildingClient : IBuildingClient
     {
         public (int SlotId, int Gid, string Name, bool AllowFallback, string? ExcludedSlots) ConstructRequest { get; private set; }
-        public (int SlotId, int MaxAttempts) UpgradeToMaxRequest { get; private set; }
+        public (int SlotId, int MaxAttempts, string? ExpectedName) UpgradeToMaxRequest { get; private set; }
         public bool ReadBreweryStatusRequested { get; private set; }
         public IReadOnlyList<Building>? SmithyBuildings { get; private set; }
         public (bool Enabled, double Min, double Max) BreweryRequest { get; private set; }
@@ -154,12 +154,13 @@ public sealed class BuildingAutomationOperationTests
         public List<CancellationToken> CancellationTokens { get; } = [];
 
         public Task<VillageStatus> ReadBuildingsStatusAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<VillageStatus> ReadCurrentBuildingOverviewStatusAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<string> DemolishBuildingToLevelAsync(string targetBuildingSlotOrName, int targetLevel, CancellationToken cancellationToken = default) => Task.FromResult("demolished");
-        public Task<string> UpgradeBuildingToLevelAsync(int slotId, int targetLevel, CancellationToken cancellationToken = default) => Task.FromResult("upgraded");
+        public Task<string> UpgradeBuildingToLevelAsync(int slotId, int targetLevel, CancellationToken cancellationToken = default, string? expectedBuildingName = null) => Task.FromResult("upgraded");
 
-        public Task<string> UpgradeBuildingToMaxAsync(int slotId, int maxAttempts = 30, CancellationToken cancellationToken = default)
+        public Task<string> UpgradeBuildingToMaxAsync(int slotId, int maxAttempts = 30, CancellationToken cancellationToken = default, string? expectedBuildingName = null)
         {
-            UpgradeToMaxRequest = (slotId, maxAttempts);
+            UpgradeToMaxRequest = (slotId, maxAttempts, expectedBuildingName);
             return Task.FromResult("upgraded");
         }
 

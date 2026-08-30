@@ -7,6 +7,32 @@ namespace TbotUltra.Worker.Tests;
 public sealed class IncomingAttackDomParserTests
 {
     [Fact]
+    public void CurrentPageSignalRead_UsesPlusOverviewOutsideDorf1WithoutClaimingAuthoritativeDorf1Read()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "TbotUltra.Worker",
+            "Services",
+            "Automation",
+            "Combat",
+            "TravianClient.IncomingAttacks.cs"));
+        var snapshotSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "TbotUltra.Worker",
+            "Services",
+            "Automation",
+            "Resources",
+            "TravianClient.Resources.Snapshot.cs"));
+
+        Assert.Contains("if (!isDorf1 && _cachedTravianPlusActive != true)", source, StringComparison.Ordinal);
+        Assert.Contains("IncomingAttackActiveVillageReadWasAuthoritative: incomingAttackActiveVillageReadWasAuthoritative", snapshotSource, StringComparison.Ordinal);
+        Assert.Contains("IncomingAttackPlusOverviewWasRead: incomingAttackSignalRead?.PlusOverviewWasRead == true", snapshotSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ParseDorf1HasTroopsAtHome_ReadsNoTroopsAsAuthoritativeEmpty()
     {
         const string html = """
@@ -51,6 +77,14 @@ public sealed class IncomingAttackDomParserTests
         Assert.Contains(signals, signal => signal.VillageName == "SWOLL" && signal.VillageId == 34875);
         Assert.Contains(signals, signal => signal.VillageName == "A4" && signal.VillageId == 39762
                                                    && signal.CoordX == 122 && signal.CoordY == 15);
+        Assert.True(IncomingAttackDomParser.HasPlusVillageOverview(html));
+    }
+
+    [Fact]
+    public void HasPlusVillageOverview_RequiresAStableVillageRow()
+    {
+        Assert.False(IncomingAttackDomParser.HasPlusVillageOverview("<main>loading</main>"));
+        Assert.False(IncomingAttackDomParser.HasPlusVillageOverview("<div class=\"listEntry village\">missing id</div>"));
     }
 
     [Fact]

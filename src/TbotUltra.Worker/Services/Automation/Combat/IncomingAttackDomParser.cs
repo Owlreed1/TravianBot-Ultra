@@ -108,6 +108,15 @@ internal static class IncomingAttackDomParser
             .ToList();
     }
 
+    internal static bool HasPlusVillageOverview(string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return false;
+        return Regex.IsMatch(
+            html,
+            @"<div\b(?=[^>]*\bclass\s*=\s*[\""'](?=[^\""']*\blistEntry\b)(?=[^\""']*\bvillage\b)[^\""']*[\""'])(?=[^>]*\bdata-did\s*=\s*[\""']\d+[\""'])[^>]*>",
+            RegexOptions.IgnoreCase);
+    }
+
     internal static IReadOnlyList<DateTimeOffset> ParseDorf1RedArrivalTimes(string? html, DateTimeOffset observedAtUtc)
     {
         if (string.IsNullOrWhiteSpace(html)) return [];

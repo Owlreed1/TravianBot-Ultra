@@ -5,6 +5,10 @@ namespace TbotUltra.Worker.Services;
 
 public sealed partial class TravianClient
 {
+    private sealed record IncomingAttackSignalRead(
+        IReadOnlyList<IncomingAttackSignal> Signals,
+        bool PlusOverviewWasRead);
+
     public async Task<IncomingAttackSnapshot> ReadIncomingAttacksAsync(
         string villageName,
         string? villageUrl,
@@ -106,14 +110,15 @@ public sealed partial class TravianClient
         }
     }
 
-    private async Task<IReadOnlyList<IncomingAttackSignal>?> ReadIncomingAttackSignalsOnCurrentDorf1Async(
+    private async Task<IncomingAttackSignalRead?> ReadIncomingAttackSignalsOnCurrentPageAsync(
         string activeVillage,
         string? activeVillageUrl,
         int? activeCoordX,
         int? activeCoordY,
         CancellationToken cancellationToken)
     {
-        if (!IsCurrentUrlForPath(Paths.Resources))
+        var isDorf1 = IsCurrentUrlForPath(Paths.Resources);
+        if (!isDorf1 && _cachedTravianPlusActive != true)
         {
             return null;
         }
@@ -128,7 +133,13 @@ public sealed partial class TravianClient
             activeCoordX,
             activeCoordY,
             observedAtUtc);
-        return signals;
+        var plusOverviewWasRead = _cachedTravianPlusActive == true
+                                  && IncomingAttackDomParser.HasPlusVillageOverview(html);
+        if (!isDorf1 && signals.Count > 0)
+        {
+            Notify($"[incoming-attacks:verbose] Plus village overview found {signals.Count} signal(s) on the current page.");
+        }
+        return new IncomingAttackSignalRead(signals, plusOverviewWasRead);
     }
 
     private async Task<bool?> ReadTroopPresenceOnCurrentDorf1Async(CancellationToken cancellationToken)

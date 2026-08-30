@@ -941,6 +941,17 @@ public sealed class TravianClientHelperTests
         Assert.Equal(38, existing!.SlotId);
     }
 
+    [Fact]
+    public void BuildingIdentityMatches_RejectsWarehousePayloadForTownHallSlot()
+    {
+        var method = typeof(TravianClient).GetMethod("BuildingIdentityMatches", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var matches = (bool)method!.Invoke(null, [10, "Warehouse", 24, "Town Hall"])!;
+
+        Assert.False(matches);
+    }
+
     [Theory]
     [InlineData(25, "Residence", 26, "Palace")]
     [InlineData(26, "Palace", 25, "Residence")]

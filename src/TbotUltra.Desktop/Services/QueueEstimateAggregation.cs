@@ -10,8 +10,7 @@ public static class QueueEstimateAggregation
 {
     public static bool CountsTowardTotal(QueueItemRow row) =>
         row.HasEstimate
-        && (row.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused
-            || (row.Status == QueueStatus.Failed && !row.IsRuntimeOnly));
+        && row.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused;
 
     public static double SumSeconds(IEnumerable<QueueItemRow> rows) =>
         rows.Where(CountsTowardTotal).Sum(row => row.EstimateSeconds);

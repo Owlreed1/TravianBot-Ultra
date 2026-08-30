@@ -60,11 +60,13 @@ internal sealed class BuildingAutomationOperation(IBuildingClient client)
             BuildingAutomationAction.UpgradeToLevel => client.UpgradeBuildingToLevelAsync(
                 request.SlotId!.Value,
                 request.TargetLevel!.Value,
-                cancellationToken),
+                cancellationToken,
+                request.Name),
             BuildingAutomationAction.UpgradeToMax => client.UpgradeBuildingToMaxAsync(
                 request.SlotId!.Value,
                 request.MaxAttempts,
-                cancellationToken),
+                cancellationToken,
+                request.Name),
             BuildingAutomationAction.Construct => client.ConstructBuildingAsync(
                 request.SlotId!.Value,
                 request.Gid!.Value,

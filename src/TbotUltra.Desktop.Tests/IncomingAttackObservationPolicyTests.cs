@@ -63,6 +63,21 @@ public sealed class IncomingAttackObservationPolicyTests
     }
 
     [Fact]
+    public void NewPlusMarker_ReadsImmediatelyDespiteConfirmedMovementHistory()
+    {
+        var signal = new IncomingAttackSignal("LILAC");
+
+        var shouldRead = IncomingAttackObservationPolicy.ShouldReadDetails(
+            signal,
+            confirmedMovementCount: 1,
+            Now.AddMinutes(-1),
+            Now,
+            isNewPlusMarker: true);
+
+        Assert.True(shouldRead);
+    }
+
+    [Fact]
     public void UnchangedFallbackSignal_DoesNotRetryOnEveryDorf1Observation()
     {
         var arrivals = new[] { Now.AddMinutes(20), Now.AddMinutes(21) };

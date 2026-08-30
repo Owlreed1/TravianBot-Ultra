@@ -405,6 +405,29 @@ public sealed partial class BotTaskRunner
         return status ?? throw new InvalidOperationException("Could not read buildings status.");
     }
 
+    public async Task<VillageStatus> ReadCurrentBuildingOverviewStatusAsync(
+        BotOptions options,
+        Action<string> log,
+        string? accountName = null,
+        CancellationToken cancellationToken = default)
+    {
+        VillageStatus? status = null;
+        await ExecuteWithClientAsync(
+            options,
+            log,
+            accountName,
+            interactive: false,
+            cancellationToken,
+            async client =>
+            {
+                log($"Reading current Dorf2 status for server {options.ServerName} without navigation.");
+                await client.LoginAsync(cancellationToken);
+                status = await client.ReadCurrentBuildingOverviewStatusAsync(cancellationToken);
+            });
+
+        return status ?? throw new InvalidOperationException("Could not read current Dorf2 status.");
+    }
+
     public async Task NavigateToVillageResourceFieldsAsync(
         BotOptions options,
         Action<string> log,

@@ -17,9 +17,10 @@ public partial class MainWindow
     private readonly Dictionary<string, DateTimeOffset> _incomingAttackLastReadUtc = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _incomingAttackConfirmedMovementCounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _incomingAttackReadsInFlight = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _incomingAttackVisiblePlusMarkerKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _incomingAttackDorf1ClearVersions = new(StringComparer.OrdinalIgnoreCase);
 
-    private bool IsIncomingAttackMonitoringActive() => IsContinuousLoopRunning() || _autoQueueRunning;
+    private bool IsIncomingAttackMonitoringActive() => _isLoggedIn;
 
     private void ObserveIncomingAttackSignals(VillageStatus status)
     {
@@ -47,8 +48,22 @@ public partial class MainWindow
             resolvedSignals.Add(resolved.Value);
         }
 
+        var newPlusMarkerKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (status.IncomingAttackPlusOverviewWasRead)
+        {
+            var visiblePlusMarkerKeys = resolvedSignals
+                .Where(resolved => resolved.Signal.Dorf1ArrivalTimesUtc is null
+                                   && IsIncomingAttackMonitoringEnabled(resolved.Key))
+                .Select(resolved => resolved.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            newPlusMarkerKeys.UnionWith(visiblePlusMarkerKeys.Except(_incomingAttackVisiblePlusMarkerKeys));
+            _incomingAttackVisiblePlusMarkerKeys.IntersectWith(visiblePlusMarkerKeys);
+            _incomingAttackVisiblePlusMarkerKeys.UnionWith(visiblePlusMarkerKeys);
+        }
+
         var activeKey = VillageStatusCache.TryResolveCoordinateKey(status.ActiveVillage, status);
-        if (activeKey is not null
+        if (status.IncomingAttackActiveVillageReadWasAuthoritative
+            && activeKey is not null
             && IsIncomingAttackMonitoringEnabled(activeKey)
             && resolvedSignals.All(signal => !string.Equals(signal.Key, activeKey, StringComparison.OrdinalIgnoreCase)))
         {
@@ -72,7 +87,8 @@ public partial class MainWindow
                 normalizedSignal,
                 confirmedMovementCount,
                 lastReadUtc,
-                nowUtc);
+                nowUtc,
+                isNewPlusMarker: newPlusMarkerKeys.Contains(villageKey));
             _incomingAttackPendingSignals[villageKey] = normalizedSignal;
             if (shouldRead)
             {
@@ -462,6 +478,7 @@ public partial class MainWindow
         }
         _incomingAttacksByVillage.Clear();
         _incomingAttackConfirmedMovementCounts.Clear();
+        _incomingAttackVisiblePlusMarkerKeys.Clear();
         foreach (var pair in state.ConfirmedMovementCounts)
         {
             if (pair.Value >= 0)
@@ -524,6 +541,7 @@ public partial class MainWindow
         _incomingAttackConfirmedMovementCounts.Clear();
         _incomingAttackReadsInFlight.Clear();
         _incomingAttackDorf1ClearVersions.Clear();
+        _incomingAttackVisiblePlusMarkerKeys.Clear();
         _incomingAttackRows.Clear();
         _incomingAttackMonitoringVillages.Clear();
         _incomingAttackMonitoringDisabledKeys.Clear();

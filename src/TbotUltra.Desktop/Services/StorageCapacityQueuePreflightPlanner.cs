@@ -334,6 +334,7 @@ public static class StorageCapacityQueuePreflightPlanner
             if (contextualUpgrade.RequiresConstruction)
             {
                 var constructPayload = new BuildingConstructPayload(contextualUpgrade.SlotId, gid, name).ToDictionary();
+                constructPayload[BotOptionPayloadKeys.BuildingConstructAllowSlotFallback] = bool.TrueString;
                 CopyStorageRequestContext(sourcePayload, constructPayload, batchId);
                 planned.Add(new QueueItemCreateRequest(
                     "construct_building",
@@ -380,6 +381,7 @@ public static class StorageCapacityQueuePreflightPlanner
                      BotOptionPayloadKeys.ConstructFasterMinBuildMinutes,
                      BotOptionPayloadKeys.ConstructFasterRandomEnabled,
                      BotOptionPayloadKeys.ConstructFasterRandomChancePercent,
+                     BotOptionPayloadKeys.BuildingConstructFallbackExcludedSlots,
                  })
         {
             if (source.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))

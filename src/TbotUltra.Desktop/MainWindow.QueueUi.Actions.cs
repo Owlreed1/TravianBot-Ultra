@@ -343,8 +343,7 @@ public partial class MainWindow
 
     private static bool IsActiveQueueItem(QueueItem item)
     {
-        return item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused
-            || (item.Status == QueueStatus.Failed && !item.IsRuntimeOnly);
+        return item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused;
     }
 
     private void ClearHistoryQueueItems()

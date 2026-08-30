@@ -204,6 +204,7 @@ public partial class MainWindow
                 {
                     var gid = upgrade.Kind == StorageCapacityKind.Warehouse ? 10 : 11;
                     var constructPayload = new BuildingConstructPayload(upgrade.SlotId, gid, name).ToDictionary();
+                    constructPayload[BotOptionPayloadKeys.BuildingConstructAllowSlotFallback] = bool.TrueString;
                     ApplyStoragePreflightMetadata(constructPayload, planId, batchId!);
                     requests.Add(new QueueItemCreateRequest("construct_building", constructPayload, 0, 3));
                 }
