@@ -63,6 +63,19 @@ public sealed class IncomingAttackFlowSourceTests
     }
 
     [Fact]
+    public void IncomingAttackUi_PreservesAllVillagesAndGroupsTheirRows()
+    {
+        var source = Read("TbotUltra.Desktop", "MainWindow.IncomingAttacks.cs");
+        var xaml = Read("TbotUltra.Desktop", "Views", "ReinforcementsPanel.xaml");
+
+        Assert.Contains("SelectMany(pair => pair.Value", source, StringComparison.Ordinal);
+        Assert.Contains("PropertyGroupDescription(nameof(IncomingAttackRowItem.TargetVillageName))", source, StringComparison.Ordinal);
+        Assert.Contains("SortDescription(nameof(IncomingAttackRowItem.ArrivalAtUtc)", source, StringComparison.Ordinal);
+        Assert.Contains("<DataGrid.GroupStyle>", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding ItemCount}\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ArrivedAttack_DoesNotCreateAnotherPendingWarning()
     {
         var source = Read("TbotUltra.Desktop", "MainWindow.IncomingAttacks.cs");

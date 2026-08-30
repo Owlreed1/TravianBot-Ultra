@@ -300,11 +300,52 @@
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
                   CanUserAddRows="False"
+                  VirtualizingPanel.IsVirtualizingWhenGrouping="True"
                   HeadersVisibility="Column"
                   SelectionMode="Single"
                   SelectionUnit="FullRow">
+          <DataGrid.GroupStyle>
+            <GroupStyle>
+              <GroupStyle.ContainerStyle>
+                <Style TargetType="GroupItem">
+                  <Setter Property="Template">
+                    <Setter.Value>
+                      <ControlTemplate TargetType="GroupItem">
+                        <StackPanel>
+                          <Border Margin="0,8,0,2"
+                                  Padding="10,7"
+                                  Background="{DynamicResource ControlBackgroundBrush}"
+                                  BorderBrush="{DynamicResource DangerBorderBrush}"
+                                  BorderThickness="3,0,0,0"
+                                  CornerRadius="3">
+                            <Grid>
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                              </Grid.ColumnDefinitions>
+                              <TextBlock Text="{Binding Name}"
+                                         FontSize="13"
+                                         FontWeight="SemiBold"
+                                         Foreground="{DynamicResource TextPrimaryBrush}" />
+                              <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock Text="{Binding ItemCount}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource DangerTextBrush}" />
+                                <TextBlock Text=" incoming"
+                                           Foreground="{DynamicResource SlateTextBrush}" />
+                              </StackPanel>
+                            </Grid>
+                          </Border>
+                          <ItemsPresenter />
+                        </StackPanel>
+                      </ControlTemplate>
+                    </Setter.Value>
+                  </Setter>
+                </Style>
+              </GroupStyle.ContainerStyle>
+            </GroupStyle>
+          </DataGrid.GroupStyle>
           <DataGrid.Columns>
-            <DataGridTextColumn Header="Target village" Binding="{Binding TargetVillageName}" Width="*" />
             <DataGridTemplateColumn Header="Type" Width="90">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate>

@@ -205,9 +205,10 @@ public sealed class PanelSmokeTests
 
             Assert.Equal(3, tabs.Items.Count);
             Assert.Equal("Incoming attacks", attacks.Header);
-            Assert.Equal(7, grid.Columns.Count);
-            Assert.Equal("Player", grid.Columns[2].Header);
-            Assert.Equal("Village", grid.Columns[3].Header);
+            Assert.Equal(6, grid.Columns.Count);
+            Assert.Single(grid.GroupStyle);
+            Assert.Equal("Player", grid.Columns[1].Header);
+            Assert.Equal("Village", grid.Columns[2].Header);
             Assert.Equal("Clear list", clearListButton.Content);
             Assert.Equal("Toggle all", toggleAllButton.Content);
             Assert.Equal(
@@ -231,7 +232,7 @@ public sealed class PanelSmokeTests
             Assert.Equal(38, monitoringToggle.Width);
             Assert.Equal(22, monitoringToggle.Height);
             Assert.Equal(66, monitoredVillagesPanel.MinHeight);
-            var typeColumn = Assert.IsType<DataGridTemplateColumn>(grid.Columns[1]);
+            var typeColumn = Assert.IsType<DataGridTemplateColumn>(grid.Columns[0]);
             var typeCell = Assert.IsType<TextBlock>(typeColumn.CellTemplate.LoadContent());
             var typeTriggers = typeCell.Style.Triggers.OfType<DataTrigger>().ToList();
             var raidTrigger = Assert.Single(typeTriggers, trigger => Equals(trigger.Value, "Raid"));

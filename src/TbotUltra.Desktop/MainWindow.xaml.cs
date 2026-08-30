@@ -447,7 +447,7 @@ public partial class MainWindow : Window
         _incomingAttackStore = new IncomingAttackStore(_projectRoot, AppendLog);
         _incomingAttackMonitoringStore = new IncomingAttackMonitoringSettingsStore(_projectRoot, AppendLog);
         _troopEvasionStore = new TroopEvasionStore(_projectRoot, AppendLog);
-        TroopsHubPanelControl.IncomingAttacksGrid.ItemsSource = _incomingAttackRows;
+        TroopsHubPanelControl.IncomingAttacksGrid.ItemsSource = CreateIncomingAttackRowsView();
         TroopsHubPanelControl.IncomingAttackMonitoringVillages.ItemsSource = _incomingAttackMonitoringVillages;
         TroopsHubPanelControl.EvasionPanel.SettingsChanged += TroopEvasionSettingsChanged;
         TroopsHubPanelControl.EvasionPanel.ValidateRequested += TroopEvasionValidateRequested;

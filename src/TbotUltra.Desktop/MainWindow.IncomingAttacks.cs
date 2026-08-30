@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Worker.Domain;
@@ -19,6 +21,15 @@ public partial class MainWindow
     private readonly HashSet<string> _incomingAttackReadsInFlight = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _incomingAttackVisiblePlusMarkerKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _incomingAttackDorf1ClearVersions = new(StringComparer.OrdinalIgnoreCase);
+
+    private ICollectionView CreateIncomingAttackRowsView()
+    {
+        var view = CollectionViewSource.GetDefaultView(_incomingAttackRows);
+        view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(IncomingAttackRowItem.TargetVillageName)));
+        view.SortDescriptions.Add(new SortDescription(nameof(IncomingAttackRowItem.TargetVillageName), ListSortDirection.Ascending));
+        view.SortDescriptions.Add(new SortDescription(nameof(IncomingAttackRowItem.ArrivalAtUtc), ListSortDirection.Ascending));
+        return view;
+    }
 
     private bool IsIncomingAttackMonitoringActive() => _isLoggedIn;
 
