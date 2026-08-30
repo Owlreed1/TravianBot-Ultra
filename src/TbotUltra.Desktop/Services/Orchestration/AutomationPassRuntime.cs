@@ -45,10 +45,11 @@ internal sealed class AutomationPassRuntime
         string? verifiedVillageKey) =>
         _villageBatch.RecordAttempt(targetVillageKey, verifiedVillageKey);
 
+    internal void RecordUrgentPreemption(string? currentVillageKey, string? targetVillageKey) =>
+        _villageBatch.RecordUrgentPreemption(currentVillageKey, targetVillageKey);
+
+    internal void CompleteUrgentPreemption(string? verifiedVillageKey) =>
+        _villageBatch.CompleteUrgentPreemption(verifiedVillageKey);
+
     internal void ResetVillageBatch() => _villageBatch.Reset();
-
-    internal bool CanAttemptVillageTask(int attemptsAlreadyMade) =>
-        attemptsAlreadyMade < VillageBatchState.MaxAttempts;
-
-    internal int VillageAttemptLimit => VillageBatchState.MaxAttempts;
 }

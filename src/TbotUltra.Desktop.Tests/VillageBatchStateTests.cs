@@ -20,18 +20,17 @@ public sealed class VillageBatchStateTests
     }
 
     [Fact]
-    public void RecordAttempt_ReachesFairnessLimitAfterTenAttempts()
+    public void RecordAttempt_KeepsTrackingAttemptsWithoutEndingTheVillageBatch()
     {
         var state = new VillageBatchState();
 
         VillageBatchSnapshot snapshot = default;
-        for (var index = 0; index < VillageBatchState.MaxAttempts; index++)
+        for (var index = 0; index < 100; index++)
         {
             snapshot = state.RecordAttempt("a", "a");
         }
 
-        Assert.Equal(VillageBatchState.MaxAttempts, snapshot.AttemptCount);
-        Assert.True(snapshot.HasReachedLimit);
+        Assert.Equal(100, snapshot.AttemptCount);
     }
 
     [Fact]
@@ -62,25 +61,58 @@ public sealed class VillageBatchStateTests
     }
 
     [Fact]
-    public void LogRegression_DeferredH03CannotBlockReadyH02()
+    public void UrgentPreemption_PreservesTheInterruptedVillageUntilItCanResume()
     {
-        var h03 = new VillageBatchSnapshot("h03", 9);
+        var state = new VillageBatchState();
+        state.RecordAttempt("a", "a");
 
-        var keepH03 = VillageBatchState.ShouldKeepCurrentVillage(
-            h03,
-            currentVillageHasReadyWork: false,
-            anotherVillageHasReadyWork: true);
+        state.RecordUrgentPreemption("a", "b");
+        state.RecordAttempt("b", "a");
+        state.ObserveVerifiedVillage("a");
+        state.ObserveVerifiedVillage("b");
 
-        Assert.False(keepH03);
+        var interrupted = state.SnapshotFor("b");
+        Assert.Equal("a", interrupted.VillageKey);
+        Assert.Equal("b", interrupted.UrgentTargetVillageKey);
+        Assert.True(interrupted.HasUrgentPreemption);
+
+        state.RecordAttempt("a", "b");
+        state.ObserveVerifiedVillage("a");
+
+        var resumed = state.SnapshotFor("a");
+        Assert.Equal("a", resumed.VillageKey);
+        Assert.Null(resumed.UrgentTargetVillageKey);
+        Assert.False(resumed.HasUrgentPreemption);
     }
 
     [Fact]
-    public void FairnessLimit_RotatesOnlyWhenAnotherVillageIsReady()
+    public void VillageLessUrgentWork_PreservesTheInterruptedVillageAcrossNavigation()
     {
-        var capped = new VillageBatchSnapshot("a", VillageBatchState.MaxAttempts);
+        var state = new VillageBatchState();
+        state.RecordAttempt("a", "a");
 
-        Assert.False(VillageBatchState.ShouldKeepCurrentVillage(capped, true, true));
-        Assert.True(VillageBatchState.ShouldKeepCurrentVillage(capped, true, false));
+        state.RecordUrgentPreemption("a", targetVillageKey: null);
+        state.RecordAttempt(targetVillageKey: null, verifiedVillageKey: "a");
+        state.ObserveVerifiedVillage("b");
+
+        var interrupted = state.SnapshotFor("b");
+        Assert.Equal("a", interrupted.VillageKey);
+        Assert.True(interrupted.HasUrgentPreemption);
+    }
+
+    [Fact]
+    public void CompleteUrgentPreemption_ReleasesACompletedInterruptedVillage()
+    {
+        var state = new VillageBatchState();
+        state.RecordAttempt("a", "a");
+        state.RecordUrgentPreemption("a", "b");
+        state.ObserveVerifiedVillage("b");
+
+        state.CompleteUrgentPreemption("b");
+
+        var completed = state.SnapshotFor("b");
+        Assert.Equal("b", completed.VillageKey);
+        Assert.False(completed.HasUrgentPreemption);
     }
 
     [Theory]

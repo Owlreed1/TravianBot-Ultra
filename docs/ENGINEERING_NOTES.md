@@ -163,8 +163,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   once before the next candidate is selected.
 - Continuous Loop and Auto Queue share runtime-only village batching over the account queue: ready work is drained
   across groups in the verified browser village before normal work elsewhere. Ready Account work or `Priority > 0`
-  may preempt; after 10 execution attempts another ready village gets a turn. Deferred/unknown work never keeps a
-  batch alive, and preview/forecast selection must not mutate the batch owner or attempt count. A single-level
+  may preempt, and an interrupted ready village resumes after the urgent work. Attempt count alone must never rotate
+  away from ready work; deferred/unknown work ends the visit and never keeps a batch alive. Non-urgent utility work
+  waits until no village has ready work, and preview/forecast selection must not mutate batch ownership. A single-level
   construction marked `in_progress` may yield to a later row only until its authoritative retry deadline; once due,
   select it for live revalidation so stale completion state cannot block that village's remaining template rows.
 - Applying Session pacing settings while automation is active must take effect immediately: enabling starts its run
@@ -474,7 +475,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Village scan finishes ready, automation-enabled work for the freshly read village before applying the
   inter-village delay. Task permission still comes from village Auto and group settings. Sweep wait reconciliation
   is awaited before selection so a newly released task runs during the same visit, and selection requires the exact
-  canonical village key.
+  canonical village key. It has no normal per-village attempt cap; already urgent-classified work may preempt and the
+  scanned village then resumes, while each queue item is attempted at most once during that visit.
 - A manual Village scan "Scan now" clears the persisted round deadline. An active continuous loop consumes a
   forced-sweep request at its next safe boundary; without an active loop the scan runs in its own manual operation
   scope and does not start the full continuous loop.

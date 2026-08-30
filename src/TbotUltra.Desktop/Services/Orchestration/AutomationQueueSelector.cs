@@ -7,8 +7,8 @@ internal enum AutomationQueueSelectionReason
 {
     Selected,
     UrgentPreemption,
+    UrgentResume,
     VillageRotationNoReadyWork,
-    VillageRotationFairness,
     ShortVillageHold,
     NoEnabledGroups,
     NoReadyWork,
@@ -27,7 +27,8 @@ internal sealed record AutomationQueueSelectionResult(
     QueueItem? Selected,
     AutomationQueueSelectionReason Reason,
     int ConsideredGroupCount,
-    DateTimeOffset? HoldUntil = null);
+    DateTimeOffset? HoldUntil = null,
+    bool CompleteUrgentPreemption = false);
 
 internal static class AutomationQueueSelector
 {
@@ -39,11 +40,12 @@ internal static class AutomationQueueSelector
             .ToDictionary(candidate => candidate.Item.Id, candidate => candidate.VillageKey);
         var utilitySelection = ContinuousLoopSelector.SelectUtility(
             new ContinuousLoopUtilitySelectionInput(input.Candidates, input.ActiveVillageKey, input.Now));
-        if (utilitySelection.PreferredItem is not null)
+        var urgentUtilityItem = utilitySelection.ReadyItems.FirstOrDefault(ContinuousLoopSelector.IsUrgentItem);
+        if (urgentUtilityItem is not null)
         {
             return new AutomationQueueSelectionResult(
-                utilitySelection.PreferredItem,
-                AutomationQueueSelectionReason.Selected,
+                urgentUtilityItem,
+                AutomationQueueSelectionReason.UrgentPreemption,
                 0);
         }
 
@@ -52,10 +54,17 @@ internal static class AutomationQueueSelector
             input.ConfiguredGroups));
         if (selectionPlan.OrderedGroups.Count == 0)
         {
-            return new AutomationQueueSelectionResult(
-                null,
-                AutomationQueueSelectionReason.NoEnabledGroups,
-                0);
+            return utilitySelection.PreferredItem is not null
+                ? new AutomationQueueSelectionResult(
+                    utilitySelection.PreferredItem,
+                    AutomationQueueSelectionReason.Selected,
+                    0,
+                    CompleteUrgentPreemption: input.VillageBatch.HasUrgentPreemption)
+                : new AutomationQueueSelectionResult(
+                    null,
+                    AutomationQueueSelectionReason.NoEnabledGroups,
+                    0,
+                    CompleteUrgentPreemption: input.VillageBatch.HasUrgentPreemption);
         }
 
         var urgentCandidate = SelectReadyItemAcrossVillages(
@@ -92,14 +101,17 @@ internal static class AutomationQueueSelector
             urgentOnly: false,
             selectReadyConstruction);
 
-        if (VillageBatchState.ShouldKeepCurrentVillage(
-                input.VillageBatch,
-                currentVillageCandidate is not null,
-                otherVillageCandidate is not null))
+        if (currentVillageCandidate is not null)
         {
             return new AutomationQueueSelectionResult(
                 currentVillageCandidate,
-                AutomationQueueSelectionReason.Selected,
+                input.VillageBatch.HasUrgentPreemption
+                    && !string.Equals(
+                        input.VillageBatch.VillageKey,
+                        input.ActiveVillageKey,
+                        StringComparison.OrdinalIgnoreCase)
+                    ? AutomationQueueSelectionReason.UrgentResume
+                    : AutomationQueueSelectionReason.Selected,
                 selectionPlan.OrderedGroups.Count);
         }
 
@@ -107,18 +119,9 @@ internal static class AutomationQueueSelector
         {
             return new AutomationQueueSelectionResult(
                 otherVillageCandidate,
-                currentVillageCandidate is null
-                    ? AutomationQueueSelectionReason.VillageRotationNoReadyWork
-                    : AutomationQueueSelectionReason.VillageRotationFairness,
-                selectionPlan.OrderedGroups.Count);
-        }
-
-        if (currentVillageCandidate is not null)
-        {
-            return new AutomationQueueSelectionResult(
-                currentVillageCandidate,
-                AutomationQueueSelectionReason.Selected,
-                selectionPlan.OrderedGroups.Count);
+                AutomationQueueSelectionReason.VillageRotationNoReadyWork,
+                selectionPlan.OrderedGroups.Count,
+                CompleteUrgentPreemption: input.VillageBatch.HasUrgentPreemption);
         }
 
         var readyUtilityItem = utilitySelection.ReadyItems.FirstOrDefault();
@@ -127,7 +130,8 @@ internal static class AutomationQueueSelector
             return new AutomationQueueSelectionResult(
                 readyUtilityItem,
                 AutomationQueueSelectionReason.Selected,
-                selectionPlan.OrderedGroups.Count);
+                selectionPlan.OrderedGroups.Count,
+                CompleteUrgentPreemption: input.VillageBatch.HasUrgentPreemption);
         }
 
         var holdUntil = ContinuousLoopSelector.ResolveShortVillageHoldUntil(
@@ -140,11 +144,13 @@ internal static class AutomationQueueSelector
                 null,
                 AutomationQueueSelectionReason.ShortVillageHold,
                 selectionPlan.OrderedGroups.Count,
-                holdUntil)
+                holdUntil,
+                CompleteUrgentPreemption: input.VillageBatch.HasUrgentPreemption)
             : new AutomationQueueSelectionResult(
                 null,
                 AutomationQueueSelectionReason.NoReadyWork,
-                selectionPlan.OrderedGroups.Count);
+                selectionPlan.OrderedGroups.Count,
+                CompleteUrgentPreemption: input.VillageBatch.HasUrgentPreemption);
     }
 
     private static QueueItem? SelectReadyItemForVillage(

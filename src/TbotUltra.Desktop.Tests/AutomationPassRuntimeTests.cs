@@ -57,11 +57,14 @@ public sealed class AutomationPassRuntimeTests
     }
 
     [Fact]
-    public void VillageReactionBudget_StopsAtTheSharedBatchLimit()
+    public void UrgentPreemption_IsSharedWithTheNextContinuousPass()
     {
         var runtime = new AutomationPassRuntime();
+        runtime.RecordVillageAttempt("a", "a");
 
-        Assert.True(runtime.CanAttemptVillageTask(runtime.VillageAttemptLimit - 1));
-        Assert.False(runtime.CanAttemptVillageTask(runtime.VillageAttemptLimit));
+        runtime.RecordUrgentPreemption("a", "b");
+        runtime.ObserveVerifiedVillage("b");
+
+        Assert.Equal("a", runtime.SnapshotVillageBatch("b").VillageKey);
     }
 }

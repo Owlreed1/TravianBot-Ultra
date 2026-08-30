@@ -22,7 +22,7 @@ public sealed class AutomationQueueSelectorTests
     }
 
     [Fact]
-    public void Select_KeepsReadyWorkInTheCurrentVillageBeforeTheFairnessLimit()
+    public void Select_KeepsReadyWorkInTheCurrentVillage()
     {
         var current = Candidate("current", "a");
         var other = Candidate("other", "b");
@@ -34,17 +34,87 @@ public sealed class AutomationQueueSelectorTests
     }
 
     [Fact]
-    public void Select_RotatesToAnotherVillageAtTheFairnessLimit()
+    public void Select_DoesNotRotateAwayFromReadyCurrentVillageAfterManyAttempts()
     {
         var current = Candidate("current", "a");
         var other = Candidate("other", "b");
 
         var result = Select(
             [current, other],
-            new VillageBatchSnapshot("a", VillageBatchState.MaxAttempts));
+            new VillageBatchSnapshot("a", 100));
+
+        Assert.Equal(current.Item.Id, result.Selected?.Id);
+        Assert.Equal(AutomationQueueSelectionReason.Selected, result.Reason);
+    }
+
+    [Fact]
+    public void Select_NonUrgentUtilityDoesNotInterruptReadyCurrentVillageWork()
+    {
+        var current = Candidate("current", "a");
+        var utility = Candidate(
+            "collect_tasks",
+            "b",
+            group: QueueGroup.Farming,
+            isUtilityEnabled: true);
+
+        var result = Select([utility, current], new VillageBatchSnapshot("a", 1));
+
+        Assert.Equal(current.Item.Id, result.Selected?.Id);
+        Assert.Equal(AutomationQueueSelectionReason.Selected, result.Reason);
+    }
+
+    [Fact]
+    public void Select_UrgentUtilityStillPreemptsReadyCurrentVillageWork()
+    {
+        var current = Candidate("current", "a");
+        var utility = Candidate(
+            "collect_tasks",
+            "b",
+            group: QueueGroup.Account,
+            isUtilityEnabled: true);
+
+        var result = Select([current, utility], new VillageBatchSnapshot("a", 1));
+
+        Assert.Equal(utility.Item.Id, result.Selected?.Id);
+        Assert.Equal(AutomationQueueSelectionReason.UrgentPreemption, result.Reason);
+    }
+
+    [Fact]
+    public void Select_ResumesInterruptedVillageAfterUrgentWorkCompletes()
+    {
+        var interrupted = Candidate("interrupted", "a");
+        var urgentVillage = Candidate("normal-in-urgent-village", "b");
+
+        var result = Select(
+            [urgentVillage, interrupted],
+            new VillageBatchSnapshot(
+                "a",
+                2,
+                UrgentTargetVillageKey: "b",
+                HasUrgentPreemption: true),
+            activeVillageKey: "b");
+
+        Assert.Equal(interrupted.Item.Id, result.Selected?.Id);
+        Assert.Equal(AutomationQueueSelectionReason.UrgentResume, result.Reason);
+        Assert.False(result.CompleteUrgentPreemption);
+    }
+
+    [Fact]
+    public void Select_CompletesUrgentPreemptionWhenInterruptedVillageHasNoReadyWork()
+    {
+        var other = Candidate("other", "b");
+
+        var result = Select(
+            [other],
+            new VillageBatchSnapshot(
+                "a",
+                2,
+                UrgentTargetVillageKey: "b",
+                HasUrgentPreemption: true),
+            activeVillageKey: "b");
 
         Assert.Equal(other.Item.Id, result.Selected?.Id);
-        Assert.Equal(AutomationQueueSelectionReason.VillageRotationFairness, result.Reason);
+        Assert.True(result.CompleteUrgentPreemption);
     }
 
     [Fact]
@@ -73,12 +143,13 @@ public sealed class AutomationQueueSelectorTests
 
     private static AutomationQueueSelectionResult Select(
         IReadOnlyList<ContinuousLoopSelectionCandidate> candidates,
-        VillageBatchSnapshot batch) => AutomationQueueSelector.Select(
+        VillageBatchSnapshot batch,
+        string activeVillageKey = "a") => AutomationQueueSelector.Select(
         new AutomationQueueSelectionInput(
             candidates,
             [QueueGroup.Construction],
             batch,
-            "a",
+            activeVillageKey,
             Now,
             ShortVillageDeferSeconds: 30,
             Preview: false),
@@ -88,19 +159,21 @@ public sealed class AutomationQueueSelectorTests
         string taskName,
         string villageKey,
         int priority = 0,
-        DateTimeOffset? nextAttemptAt = null)
+        DateTimeOffset? nextAttemptAt = null,
+        QueueGroup group = QueueGroup.Construction,
+        bool isUtilityEnabled = false)
     {
         var item = new QueueItem
         {
             Id = Guid.NewGuid(),
             TaskName = taskName,
-            Group = QueueGroup.Construction,
+            Group = group,
             Priority = priority,
             Status = QueueStatus.Pending,
             CreatedAt = Now,
             UpdatedAt = Now,
             NextAttemptAt = nextAttemptAt ?? Now,
         };
-        return new ContinuousLoopSelectionCandidate(item, villageKey, true, false);
+        return new ContinuousLoopSelectionCandidate(item, villageKey, true, isUtilityEnabled);
     }
 }

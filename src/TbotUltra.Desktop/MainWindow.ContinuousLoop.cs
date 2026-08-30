@@ -257,7 +257,7 @@ public partial class MainWindow
         }
 
         var attempts = 0;
-        foreach (var item in readyItems.Take(VillageBatchState.MaxAttempts))
+        foreach (var item in readyItems)
         {
             cancellationToken.ThrowIfCancellationRequested();
             AppendLog(
@@ -282,13 +282,6 @@ public partial class MainWindow
 
             MarkContinuousBrowserActivity(options);
             await ApplyPostTaskCooldownAsync(item, options, cancellationToken);
-        }
-
-        if (readyItems.Count > attempts)
-        {
-            AppendLog(
-                $"[village-scan] village '{village.Name}' reached the "
-                + $"{VillageBatchState.MaxAttempts}-attempt limit; remaining ready rewards wait for the next pass.");
         }
 
         // Reward collection may change resources and leaves the browser on a task/dialog page.
@@ -441,7 +434,7 @@ public partial class MainWindow
     private async Task<bool> ExecuteReadyVillageStatusSweepTasksAsync(
         BotOptions options,
         VillageSelectionItem village,
-        int attemptsAlreadyMade,
+        int _,
         CancellationToken cancellationToken)
     {
         var villageKey = _villageSettingsStore.ResolveCanonicalKey(GetVillageKey(village));
@@ -451,27 +444,49 @@ public partial class MainWindow
         }
 
         var attemptedItemIds = new HashSet<Guid>();
-        var attempts = attemptsAlreadyMade;
-        while (_automationPassRuntime.CanAttemptVillageTask(attempts))
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var next = SelectNextQueueItemForVillageStatusSweep(villageKey, attemptedItemIds);
+            var urgent = SelectUrgentQueueItemForVillageStatusSweep(options, attemptedItemIds);
+            var next = urgent ?? SelectNextQueueItemForVillageStatusSweep(villageKey, attemptedItemIds);
             if (next is null)
             {
+                if (_automationPassRuntime.SnapshotVillageBatch(_activeWorkingVillageKey).HasUrgentPreemption)
+                {
+                    _automationPassRuntime.CompleteUrgentPreemption(_activeWorkingVillageKey);
+                    AppendLog(
+                        $"[village-scan] urgent work complete; '{village.Name}' has no more ready work.");
+                }
                 return true;
             }
 
             attemptedItemIds.Add(next.Id);
-            AppendLog(
-                $"[village-scan] reacting in '{village.Name}': "
-                + $"group={next.Group}, task={next.TaskName}.");
+            if (urgent is not null
+                && !string.Equals(
+                    GetQueueItemVillageKey(urgent),
+                    _activeWorkingVillageKey,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _automationPassRuntime.RecordUrgentPreemption(
+                    _activeWorkingVillageKey,
+                    GetQueueItemVillageKey(urgent));
+                AppendLog(
+                    $"[village-scan] urgent preemption task='{urgent.TaskName}' "
+                    + $"village='{GetQueueItemVillageName(urgent) ?? "-"}'; "
+                    + $"'{village.Name}' will resume afterward.");
+            }
+            else
+            {
+                AppendLog(
+                    $"[village-scan] reacting in '{village.Name}': "
+                    + $"group={next.Group}, task={next.TaskName}.");
+            }
             await ActionPacer.FromOptions(options, AppendLog).DelayAsync(
                 options.ActionPacingTaskMinSeconds,
                 options.ActionPacingTaskMaxSeconds,
                 cancellationToken,
                 "Village scan: before task");
             RecordVillageBatchAttempt(next, "village-scan");
-            attempts++;
             var shouldContinue = await ExecuteSingleQueueItemAsync(
                 next,
                 options,
@@ -487,14 +502,6 @@ public partial class MainWindow
             await ApplyPostTaskCooldownAsync(next, options, cancellationToken);
         }
 
-        if (SelectNextQueueItemForVillageStatusSweep(villageKey, attemptedItemIds) is not null)
-        {
-            AppendLog(
-                $"[village-scan] village '{village.Name}' reached the "
-                + $"{_automationPassRuntime.VillageAttemptLimit}-attempt limit; continuing the scan round.");
-        }
-
-        return true;
     }
 
     private QueueItem? SelectNextQueueItemForVillageStatusSweep(
@@ -582,6 +589,35 @@ public partial class MainWindow
         {
             AppendLog("[automation] Auto Queue start skipped because another run owns the gate.");
         }
+    }
+
+    private QueueItem? SelectUrgentQueueItemForVillageStatusSweep(
+        BotOptions options,
+        IReadOnlySet<Guid> attemptedItemIds)
+    {
+        var candidates = _botService.GetQueueItemsForDisplay()
+            .Where(item => !attemptedItemIds.Contains(item.Id))
+            .Select(item => new ContinuousLoopSelectionCandidate(
+                item,
+                GetQueueItemVillageKey(item),
+                IsQueueItemAllowedByAutomationSettings(item),
+                ContinuousLoopSelector.IsUtilityTask(item.TaskName)
+                    && IsAutoCollectUtilityTaskEnabledNow(item.TaskName, options)))
+            .ToList();
+        var batch = _automationPassRuntime.SnapshotVillageBatch(_activeWorkingVillageKey);
+        var result = AutomationQueueSelector.Select(
+            new AutomationQueueSelectionInput(
+                candidates,
+                GetContinuousLoopConsideredGroupsInOrder(),
+                batch,
+                _activeWorkingVillageKey,
+                DateTimeOffset.UtcNow,
+                options.ShortVillageDeferSeconds,
+                Preview: true),
+            SelectReadyConstructionForAutomationPass);
+        return result.Reason == AutomationQueueSelectionReason.UrgentPreemption
+            ? result.Selected
+            : null;
     }
 
     private async ValueTask<VillageStatusRoundVisitResult> VisitVillageStatusRoundAsync(
@@ -1833,25 +1869,38 @@ public partial class MainWindow
             SelectReadyConstructionForAutomationPass);
         if (!preview)
         {
-            if (result.Reason == AutomationQueueSelectionReason.UrgentPreemption
+            if (result.CompleteUrgentPreemption)
+            {
+                _automationPassRuntime.CompleteUrgentPreemption(_activeWorkingVillageKey);
+                AppendLog(
+                    $"[village-batch] interrupted village key='{batch.VillageKey ?? "-"}' "
+                    + "has no ready work; urgent preemption completed.");
+            }
+            else if (result.Reason == AutomationQueueSelectionReason.UrgentPreemption
                 && result.Selected is not null
                 && !string.Equals(
                     GetQueueItemVillageKey(result.Selected),
                     _activeWorkingVillageKey,
                     StringComparison.OrdinalIgnoreCase))
             {
+                _automationPassRuntime.RecordUrgentPreemption(
+                    _activeWorkingVillageKey,
+                    GetQueueItemVillageKey(result.Selected));
                 AppendLog(
                     $"[village-batch] urgent preemption task='{result.Selected.TaskName}' "
                     + $"priority={result.Selected.Priority} village='{GetQueueItemVillageName(result.Selected) ?? "-"}'.");
             }
-            else if (result.Reason is AutomationQueueSelectionReason.VillageRotationNoReadyWork
-                or AutomationQueueSelectionReason.VillageRotationFairness)
+            else if (result.Reason == AutomationQueueSelectionReason.UrgentResume)
             {
-                var reason = result.Reason == AutomationQueueSelectionReason.VillageRotationNoReadyWork
-                    ? "current village has no ready work"
-                    : $"reached {VillageBatchState.MaxAttempts}-attempt fairness limit";
                 AppendLog(
-                    $"[village-batch] rotate from '{_activeWorkingVillageName ?? "-"}' because {reason}; "
+                    $"[village-batch] urgent work complete; resuming "
+                    + $"'{GetQueueItemVillageName(result.Selected!) ?? "-"}' "
+                    + $"with task='{result.Selected!.TaskName}'.");
+            }
+            else if (result.Reason == AutomationQueueSelectionReason.VillageRotationNoReadyWork)
+            {
+                AppendLog(
+                    $"[village-batch] complete '{_activeWorkingVillageName ?? "-"}' because it has no ready work; "
                     + $"next='{GetQueueItemVillageName(result.Selected!) ?? "-"}' "
                     + $"task='{result.Selected!.TaskName}'.");
             }
@@ -2811,12 +2860,6 @@ public partial class MainWindow
                 + $"key='{after.VillageKey}' source='{source}'.");
         }
 
-        if (after.AttemptCount == VillageBatchState.MaxAttempts)
-        {
-            AppendLog(
-                $"[village-batch] fairness limit reached for key='{after.VillageKey}' after "
-                + $"{after.AttemptCount} task attempts; rotation will occur when another village is ready.");
-        }
     }
 
     private static bool IsStateChangingTask(string taskName)
