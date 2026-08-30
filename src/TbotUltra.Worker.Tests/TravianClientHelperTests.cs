@@ -920,14 +920,11 @@ public sealed class TravianClientHelperTests
     [InlineData(10, "Warehouse")]
     [InlineData(11, "Granary")]
     [InlineData(23, "Cranny")]
-    public void FindExistingBuildingThatMakesConstructRedundant_BlocksConditionalDuplicateBeforeRequiredLevel(int gid, string name)
+    public void FindExistingBuildingThatMakesConstructRedundant_PreservesConditionalDuplicateBeforeRequiredLevel(int gid, string name)
     {
         var buildings = new List<Building> { new(27, name, 9, null, gid) };
 
-        var existing = InvokeFindExistingBuildingThatMakesConstructRedundant(buildings, 38, gid, name);
-
-        Assert.NotNull(existing);
-        Assert.Equal(27, existing!.SlotId);
+        Assert.Null(InvokeFindExistingBuildingThatMakesConstructRedundant(buildings, 38, gid, name));
     }
 
     [Fact]

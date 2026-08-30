@@ -756,9 +756,7 @@ public sealed partial class TravianClient
         }
     }
 
-    private sealed record ResourceUpgradeClickSafetyCheck(bool IsSafe, int? CandidateIndex, string Reason);
-
-    private async Task<ResourceUpgradeClickSafetyCheck> VerifyResourceUpgradePreClickSafetyAsync(
+    private async Task<UpgradeClickSafetyCheck> VerifyResourceUpgradePreClickSafetyAsync(
         int slotId,
         string? fieldType,
         string resourceName,
@@ -767,47 +765,20 @@ public sealed partial class TravianClient
         int targetLevel,
         CancellationToken cancellationToken)
     {
-        await EnsureExpectedBuildSlotPageAsync(slotId, "resource upgrade final safety check", cancellationToken);
         var expectedGid = ResourceSnapshotCalculator.ResourceFieldGid(fieldType);
         if (expectedGid is null)
         {
-            return new(false, null, $"unknown resource type '{fieldType ?? "unknown"}'");
+            return new(false, null, UpgradeAttemptOutcome.BlockedUnknown, $"unknown resource type '{fieldType ?? "unknown"}'");
         }
-
-        var freshActionability = await AnalyzeUpgradeActionabilityAsync(
-            slotId,
-            cancellationToken,
-            performClick: false,
-            skipNavigationIfOnExpectedSlot: true);
-        if (freshActionability.Outcome != UpgradeAttemptOutcome.CanUpgrade)
-        {
-            return new(false, null, $"fresh page is {freshActionability.Outcome}: {freshActionability.Reason}");
-        }
-        if (freshActionability.DetectedTargetLevel != expectedOfferLevel)
-        {
-            return new(
-                false,
-                null,
-                $"fresh button offers level {freshActionability.DetectedTargetLevel?.ToString() ?? "unknown"}, expected {expectedOfferLevel}");
-        }
-
-        var verification = BuildingDomParser.VerifyResourceUpgradePreClickSafety(
-            await _page.ContentAsync(),
+        return await VerifyUpgradePreClickSafetyAsync(
             slotId,
             expectedGid.Value,
             resourceName,
             currentLevel,
             expectedOfferLevel,
-            targetLevel);
-        if (!verification.IsSafe)
-        {
-            Notify($"[resources:safety] blocked pre-click resource upgrade: slot={slotId} type={fieldType ?? "unknown"} name='{resourceName}' current={currentLevel} offer={expectedOfferLevel} target={targetLevel} reason={verification.Reason}.");
-            await CaptureFailureArtifactsAsync($"resource-slot-{slotId}-pre-click-safety", cancellationToken);
-            return new(false, null, verification.Reason);
-        }
-
-        Notify($"[resources:safety] verified pre-click resource upgrade: {verification.Reason}.");
-        return new(true, freshActionability.CandidateIndex, verification.Reason);
+            targetLevel,
+            "resources",
+            cancellationToken);
     }
 
     private async Task NavigateToResourceFieldsAfterUpgradeClickAsync(CancellationToken cancellationToken)

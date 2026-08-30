@@ -147,6 +147,27 @@ public sealed class BuildingCatalogServiceTests
     }
 
     [Theory]
+    [InlineData(10)]
+    [InlineData(11)]
+    [InlineData(23)]
+    [InlineData(38)]
+    [InlineData(39)]
+    public void AllowsMultipleInstances_UsesCatalogMetadataForEveryDuplicatableBuilding(int gid)
+    {
+        Assert.True(BuildingCatalogService.AllowsMultipleInstances(gid));
+        Assert.False(BuildingCatalogService.IsSingleInstance(gid));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(15)]
+    [InlineData(24)]
+    public void AllowsMultipleInstances_RejectsResourceFieldsAndSingleInstanceBuildings(int gid)
+    {
+        Assert.False(BuildingCatalogService.AllowsMultipleInstances(gid));
+    }
+
+    [Theory]
     [InlineData(25, new[] { 26, 44 })]
     [InlineData(26, new[] { 25, 44 })]
     [InlineData(44, new[] { 25, 26 })]

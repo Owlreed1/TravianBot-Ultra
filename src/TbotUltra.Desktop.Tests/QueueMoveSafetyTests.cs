@@ -47,7 +47,7 @@ public sealed class QueueMoveSafetyTests
     }
 
     [Fact]
-    public void Preview_WarnsWhenCatalogRequirementMovesAfterDependentConstruction()
+    public void Preview_DoesNotWarnForUnlinkedCatalogRelatedTasks()
     {
         var barracks = Item("upgrade_building_to_level", new BuildingUpgradePayload(31, 3, "Barracks").ToDictionary());
         var academy = Item("construct_building", new BuildingConstructPayload(32, 22, "Academy").ToDictionary());
@@ -55,7 +55,7 @@ public sealed class QueueMoveSafetyTests
         var preview = QueueMoveSafety.Preview([barracks, academy], academy.Id, QueueMoveTarget.Top);
 
         Assert.True(preview.CanMove);
-        Assert.Contains(preview.Warnings, warning => warning.Contains("Barracks 3+ requirement", StringComparison.Ordinal));
+        Assert.Empty(preview.Warnings);
     }
 
     private static QueueItem Item(string taskName, Dictionary<string, string> payload) => new()

@@ -115,15 +115,6 @@ internal static class BuildingUpgradeSlotRebindPlanner
         {
             existing = liveMatches.FirstOrDefault();
         }
-        else if (existing is null
-                 && BuildingCatalogService.DuplicateRequiredExistingLevelFor(construct.Gid) is int requiredLevel
-                 && liveMatches.Count > 0
-                 && liveMatches.Max(building => building.Level ?? 0) < requiredLevel)
-        {
-            existing = liveMatches
-                .OrderByDescending(building => building.Level ?? 0)
-                .First();
-        }
 
         if (existing?.SlotId is not int liveSlotId
             || existing.Level is not int liveLevel)

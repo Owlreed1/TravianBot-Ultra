@@ -14,6 +14,59 @@ namespace TbotUltra.Worker.Services;
 
 public sealed partial class TravianClient
 {
+    private sealed record UpgradeClickSafetyCheck(
+        bool IsSafe,
+        int? CandidateIndex,
+        UpgradeAttemptOutcome Outcome,
+        string Reason);
+
+    private async Task<UpgradeClickSafetyCheck> VerifyUpgradePreClickSafetyAsync(
+        int slotId,
+        int expectedGid,
+        string expectedName,
+        int currentLevel,
+        int expectedOfferLevel,
+        int targetLevel,
+        string logScope,
+        CancellationToken cancellationToken)
+    {
+        await EnsureExpectedBuildSlotPageAsync(slotId, $"{logScope} final safety check", cancellationToken);
+        var freshActionability = await AnalyzeUpgradeActionabilityAsync(
+            slotId,
+            cancellationToken,
+            performClick: false,
+            skipNavigationIfOnExpectedSlot: true);
+        if (freshActionability.Outcome != UpgradeAttemptOutcome.CanUpgrade)
+        {
+            return new(false, null, freshActionability.Outcome, $"fresh page is {freshActionability.Outcome}: {freshActionability.Reason}");
+        }
+        if (freshActionability.DetectedTargetLevel != expectedOfferLevel)
+        {
+            var reason = $"fresh button offers level {freshActionability.DetectedTargetLevel?.ToString() ?? "unknown"}, expected {expectedOfferLevel}";
+            Notify($"[{logScope}:safety] blocked pre-click upgrade: slot={slotId} gid={expectedGid} name='{expectedName}' current={currentLevel} offer={expectedOfferLevel} target={targetLevel} reason={reason}.");
+            await CaptureFailureArtifactsAsync($"{logScope}-slot-{slotId}-pre-click-safety", cancellationToken);
+            return new(false, null, freshActionability.Outcome, reason);
+        }
+
+        var verification = BuildingDomParser.VerifyUpgradePreClickSafety(
+            await _page.ContentAsync(),
+            slotId,
+            expectedGid,
+            expectedName,
+            currentLevel,
+            expectedOfferLevel,
+            targetLevel);
+        if (!verification.IsSafe)
+        {
+            Notify($"[{logScope}:safety] blocked pre-click upgrade: slot={slotId} gid={expectedGid} name='{expectedName}' current={currentLevel} offer={expectedOfferLevel} target={targetLevel} reason={verification.Reason}.");
+            await CaptureFailureArtifactsAsync($"{logScope}-slot-{slotId}-pre-click-safety", cancellationToken);
+            return new(false, null, freshActionability.Outcome, verification.Reason);
+        }
+
+        Notify($"[{logScope}:safety] verified pre-click upgrade: {verification.Reason}.");
+        return new(true, freshActionability.CandidateIndex, freshActionability.Outcome, verification.Reason);
+    }
+
     private async Task ClickDetectedUpgradeCandidateAsync(int slotId, int? candidateIndex, CancellationToken cancellationToken)
     {
         if (candidateIndex is null || candidateIndex < 0)

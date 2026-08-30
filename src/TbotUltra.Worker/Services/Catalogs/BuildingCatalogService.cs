@@ -328,8 +328,15 @@ public static class BuildingCatalogService
 
     public static bool IsSingleInstance(int gid)
     {
-        return SingleInstanceGids.Contains(gid);
+        return CatalogData.TryGetValue(gid, out var entry)
+            ? entry.SingleInstance
+            : SingleInstanceGids.Contains(gid);
     }
+
+    public static bool AllowsMultipleInstances(int gid)
+        => CatalogData.TryGetValue(gid, out var entry)
+            ? !entry.SingleInstance && !entry.IsResourceField
+            : gid is 10 or 11 or 23 or 38 or 39;
 
     public static int? DuplicateRequiredExistingLevelFor(int gid)
     {
@@ -483,6 +490,10 @@ public static class BuildingCatalogService
                 var tribe = item.Value.TryGetProperty("tribe", out var tr) && tr.ValueKind == JsonValueKind.String
                     ? tr.GetString()
                     : null;
+                var singleInstance = !item.Value.TryGetProperty("single_instance", out var si)
+                    || si.ValueKind != JsonValueKind.False;
+                var isResourceField = item.Value.TryGetProperty("is_resource_field", out var rf)
+                    && rf.ValueKind == JsonValueKind.True;
 
                 var levels = new List<BuildingLevelStats>();
                 if (item.Value.TryGetProperty("levels", out var levelsArr) && levelsArr.ValueKind == JsonValueKind.Array)
@@ -512,7 +523,14 @@ public static class BuildingCatalogService
                         $"Building gid {gid} has an incomplete level sequence: expected 1-{maxLevel}, found {levels.Count} entries.");
                 }
 
-                result[gid] = new BuildingCatalogEntry(gid, name, tribe, maxLevel, levels);
+                result[gid] = new BuildingCatalogEntry(
+                    gid,
+                    name,
+                    tribe,
+                    maxLevel,
+                    singleInstance,
+                    isResourceField,
+                    levels);
             }
 
             if (result.Count == 0)
@@ -541,6 +559,8 @@ public static class BuildingCatalogService
         string Name,
         string? Tribe,
         int MaxLevel,
+        bool SingleInstance,
+        bool IsResourceField,
         IReadOnlyList<BuildingLevelStats> Levels);
 
     private sealed record CatalogLoadResult(

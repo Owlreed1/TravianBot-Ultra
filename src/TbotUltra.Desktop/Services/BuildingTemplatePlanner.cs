@@ -71,7 +71,6 @@ public sealed class BuildingTemplatePlanner
     private const string HighestSingleResourceStrategy = "highest-single";
     private static readonly HashSet<int> WallGids = [31, 32, 33, 42, 43];
     private static readonly HashSet<int> UnsupportedPlanGids = [38, 39, 40];
-    private static readonly HashSet<int> DuplicateAllowedGids = [10, 11, 23, 38, 39];
     private static readonly HashSet<int> FixedSlotGids = [16, 31, 32, 33, 42, 43];
     private const int RallyPointSlotId = 39;
     private const int WallSlotId = 40;
@@ -954,7 +953,7 @@ public sealed class BuildingTemplatePlanner
             return false;
         }
 
-        if (BuildingCatalogService.IsSingleInstance(gid) && !DuplicateAllowedGids.Contains(gid) && !FixedSlotGids.Contains(gid))
+        if (!BuildingCatalogService.AllowsMultipleInstances(gid) && !FixedSlotGids.Contains(gid))
         {
             reason = $"{name} already exists in this village.";
             return !state.HasGid(gid);

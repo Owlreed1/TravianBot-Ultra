@@ -161,6 +161,56 @@ public sealed class ConstructionDependencyGateTests
         Assert.Contains("Academy 5+", result.Detail);
     }
 
+    [Fact]
+    public void ResolveUpgradeWaitingForConstruct_DefersForSameBuildingAndSlot()
+    {
+        var upgrade = new QueueItem
+        {
+            TaskName = "upgrade_building_to_level",
+            Status = QueueStatus.Pending,
+            Payload = new BuildingUpgradePayload(29, 10, "Cranny").ToDictionary(),
+        };
+        var construct = new QueueItem
+        {
+            TaskName = "construct_building",
+            Status = QueueStatus.Pending,
+            NextAttemptAt = Now.AddMinutes(3),
+            Payload = new BuildingConstructPayload(29, 23, "Cranny").ToDictionary(),
+        };
+
+        var result = ConstructionDependencyGate.ResolveUpgradeWaitingForConstruct(upgrade, [construct], Now);
+
+        Assert.NotNull(result);
+        Assert.Equal(TimeSpan.FromMinutes(3), result!.Delay);
+        Assert.Contains("Cranny construct in slot 29", result.Detail);
+    }
+
+    [Theory]
+    [InlineData(30, 23, "Cranny")]
+    [InlineData(29, 10, "Main Building")]
+    public void ResolveUpgradeWaitingForConstruct_DoesNotMatchDifferentSlotOrBuilding(
+        int constructSlot,
+        int constructGid,
+        string constructName)
+    {
+        var upgrade = new QueueItem
+        {
+            TaskName = "upgrade_building_to_level",
+            Status = QueueStatus.Pending,
+            Payload = new BuildingUpgradePayload(29, 10, "Cranny").ToDictionary(),
+        };
+        var construct = new QueueItem
+        {
+            TaskName = "construct_building",
+            Status = QueueStatus.Pending,
+            Payload = new BuildingConstructPayload(constructSlot, constructGid, constructName).ToDictionary(),
+        };
+
+        var result = ConstructionDependencyGate.ResolveUpgradeWaitingForConstruct(upgrade, [construct], Now);
+
+        Assert.Null(result);
+    }
+
     private static QueueItem CreateStableConstructItem()
     {
         return new QueueItem

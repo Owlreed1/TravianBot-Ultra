@@ -63,6 +63,23 @@ public sealed class BulkResourceUpgradeNavigationSourceTests
         Assert.Equal(2, source.Split("pre-click safety stopped upgrade", StringSplitOptions.None).Length - 1);
     }
 
+    [Fact]
+    public void BuildingUpgradeFlows_RunFinalSafetyCheckAndHaveNoBroadClickFallback()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "TbotUltra.Worker",
+            "Services",
+            "Automation",
+            "Buildings",
+            "TravianClient.Buildings.UpgradeFlow.cs"));
+
+        Assert.Equal(4, source.Split("VerifyUpgradePreClickSafetyAsync", StringSplitOptions.None).Length - 1);
+        Assert.DoesNotContain("anyPattern", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Fallback: any element matching the broader", source, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

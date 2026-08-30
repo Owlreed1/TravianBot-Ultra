@@ -17,7 +17,7 @@ internal static class BuildingDomParser
 {
     internal sealed record BuildPageTitleInfo(string? Name, int? Level);
 
-    internal sealed record ResourceUpgradePreClickSafetyResult(bool IsSafe, string Reason);
+    internal sealed record UpgradePreClickSafetyResult(bool IsSafe, string Reason);
 
     internal sealed record HtmlButtonCandidate(
         string Text,
@@ -41,7 +41,7 @@ internal static class BuildingDomParser
             .FirstOrDefault();
     }
 
-    internal static ResourceUpgradePreClickSafetyResult VerifyResourceUpgradePreClickSafety(
+    internal static UpgradePreClickSafetyResult VerifyUpgradePreClickSafety(
         string html,
         int expectedSlotId,
         int expectedGid,
@@ -61,7 +61,7 @@ internal static class BuildingDomParser
             @"<h1\b[^>]*class=[""'][^""']*\btitleInHeader\b[^""']*[""'][^>]*>(?<value>.*?)</h1>",
             RegexOptions.IgnoreCase | RegexOptions.Singleline);
         var title = ParseBuildPageTitle(titleMatch.Success ? titleMatch.Groups["value"].Value : null);
-        if (!string.Equals(title.Name, expectedName, StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(title.Name) || !BuildingNames.Same(title.Name, expectedName))
         {
             return new(false, $"page title '{title.Name ?? "unknown"}' does not match '{expectedName}'");
         }
@@ -81,7 +81,7 @@ internal static class BuildingDomParser
         var pageLevel = levelMatch.Success && int.TryParse(levelMatch.Groups["value"].Value, out var parsedLevel) ? parsedLevel : (int?)null;
         if (pageGid != expectedGid)
         {
-            return new(false, $"page gid {pageGid?.ToString() ?? "unknown"} does not match resource gid {expectedGid}");
+            return new(false, $"page gid {pageGid?.ToString() ?? "unknown"} does not match expected gid {expectedGid}");
         }
         if (pageLevel != expectedCurrentLevel)
         {

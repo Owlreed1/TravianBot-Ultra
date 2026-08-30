@@ -67,7 +67,7 @@ public sealed class BuildingUpgradeSlotRebindPlannerTests
     }
 
     [Fact]
-    public void ConstructionQueueReconciliation_RemovesWarehouseConstructBeforeLevel20AndRebindsDependentUpgrade()
+    public void ConstructionQueueReconciliation_PreservesWarehouseConstructBeforeLevel20()
     {
         var construct = Item(
             "construct_building",
@@ -80,10 +80,7 @@ public sealed class BuildingUpgradeSlotRebindPlannerTests
             Status(new Building(37, "Warehouse", 12, "/build.php?id=37", 10)),
             [construct, upgrade]);
 
-        Assert.Contains(construct.Id, plan.Removals);
-        var update = Assert.Single(plan.Updates);
-        Assert.Equal(upgrade.Id, update.QueueItemId);
-        Assert.Equal("37", update.Payload[BotOptionPayloadKeys.BuildingUpgradeSlotId]);
+        Assert.False(plan.HasChanges);
     }
 
     [Fact]
@@ -190,6 +187,30 @@ public sealed class BuildingUpgradeSlotRebindPlannerTests
         Assert.Equal(27, match.QueuedSlotId);
         Assert.Equal(28, match.LiveSlotId);
         Assert.Equal(2, match.LiveLevel);
+    }
+
+    [Fact]
+    public void ConstructionQueueReconciliation_PreservesConditionalDuplicateUntilItsOwnSlotExists()
+    {
+        var firstCranny = new Building(28, "Cranny", 6, "/build.php?id=28", 23);
+        var firstConstruct = Item(
+            "construct_building",
+            new BuildingConstructPayload(29, 23, "Cranny").ToDictionary());
+        var firstUpgrade = Item(
+            "upgrade_building_to_level",
+            new BuildingUpgradePayload(29, 10, "Cranny").ToDictionary());
+        var secondConstruct = Item(
+            "construct_building",
+            new BuildingConstructPayload(30, 23, "Cranny").ToDictionary());
+        var secondUpgrade = Item(
+            "upgrade_building_to_level",
+            new BuildingUpgradePayload(30, 10, "Cranny").ToDictionary());
+
+        var plan = ConstructionQueueReconciliation.Plan(
+            Status(firstCranny),
+            [firstConstruct, firstUpgrade, secondConstruct, secondUpgrade]);
+
+        Assert.False(plan.HasChanges);
     }
 
     [Fact]

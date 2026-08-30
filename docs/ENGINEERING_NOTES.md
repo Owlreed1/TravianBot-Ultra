@@ -130,12 +130,18 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Construction location rules are shared through `BuildingCatalogService.CanConstructInVillage` and enforced by
   pickers, template planning/repair, and the Worker guard. Stonemason's Lodge (gid 34) requires confirmed capital
   state; unknown is not permission. Great Barracks/Great Stable remain forbidden only in a confirmed capital.
+- Multi-instance building eligibility comes from the catalog's `single_instance` metadata through
+  `BuildingCatalogService.AllowsMultipleInstances`; UI pickers, template/repair planning, reconciliation, and Worker
+  guards must not maintain separate duplicate allowlists. Resource fields are never treated as constructible copies.
 - Queue status transitions are gated. `MarkDeferred` accepts only RUNNING items; Pending items use
   `UpdateDeferred`/`UpdatePending`. Check the returned boolean.
+- A building upgrade must defer normally while an active `construct_building` item for the same village, slot,
+  and building identity remains in the program queue; it must not reach the Worker as an identity-mismatch retry.
 - Manual queue reordering persists through `CreatedAt` and therefore controls FIFO selection in both Auto Queue
   and Continuous Loop. Up/down/top/bottom operate only inside the selected item's queue group and priority and
-  ignore history rows. A move that places a known construction requirement after its dependent task must require
-  an explicit `Move anyway` confirmation; the runtime construction guard remains the final safety net.
+  ignore history rows. A move that places an explicitly linked construction requirement, or a construct for the
+  same slot, after its dependent task must require an explicit `Move anyway` confirmation. Do not infer a warning
+  from catalog compatibility alone without live proof; the runtime construction guard remains the final safety net.
 - New villages default to Auto enabled. The version-1 migration enables existing villages once; later manual
   Auto-off choices persist.
 
@@ -416,9 +422,14 @@ Published artifacts belong under `artifacts/`, never beside source files.
   target slot, and result before considering an action successful.
 - Immediately before constructing any building, read the complete live dorf2 overview. Reuse the current dorf2 only
   when its path is correct and the page is not marked stale; otherwise navigate/reload before reading. Remove a stale construct
-  when its exact target slot already has the intended building, when a single-instance building exists anywhere,
-  or when a level-gated duplicate has not reached its required level; rebind dependent upgrades to the confirmed
-  live slot. Keep the construct when an additional copy is legal.
+  when its exact target slot already has the intended building or when a single-instance building exists anywhere;
+  rebind dependent upgrades to the confirmed live slot. A level-gated duplicate such as Cranny, Warehouse, or
+  Granary must remain bound to its requested slot while it waits for the existing building to reach the required
+  level; never collapse multiple duplicate constructs onto the existing building.
+- Immediately before a normal building upgrade click or its Construct Faster action, re-read the live build page and
+  require the requested URL slot, building gid/name, current header/root level, exact next offered level, and button
+  action slot/gid to agree. The offered level must not exceed the task target; never fall back to another generic
+  upgrade button when the exact level is absent.
 - A matching active prerequisite below the required level defers its dependent construct until the active step
   finishes, even when Official omits the active slot id. Re-plan the remaining prerequisite levels from the next
   complete live overview; never terminal-fail the dependent construct during that intermediate state.

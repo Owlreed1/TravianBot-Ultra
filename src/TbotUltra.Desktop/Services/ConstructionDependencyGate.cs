@@ -30,6 +30,59 @@ public static class ConstructionDependencyGate
     private static readonly TimeSpan UnknownActivePrerequisiteRetry = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan QueuedPrerequisiteRetry = TimeSpan.FromSeconds(60);
 
+    public static ConstructionDependencyDelay? ResolveUpgradeWaitingForConstruct(
+        QueueItem item,
+        IReadOnlyList<QueueItem> sameVillageQueueItems,
+        DateTimeOffset now)
+    {
+        if ((!string.Equals(item.TaskName, "upgrade_building_to_level", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(item.TaskName, "upgrade_building_to_max", StringComparison.OrdinalIgnoreCase))
+            || !BuildingUpgradePayload.TryFromDictionary(item.Payload, out var upgrade)
+            || upgrade is null)
+        {
+            return null;
+        }
+
+        var expectedGid = BuildingCatalogService.GidForName(upgrade.Name);
+        var dependency = sameVillageQueueItems
+            .Where(candidate => ConstructionQueueState.IsActiveQueueStatus(candidate.Status))
+            .Where(candidate => string.Equals(candidate.TaskName, "construct_building", StringComparison.OrdinalIgnoreCase))
+            .Select(candidate => new
+            {
+                Item = candidate,
+                Parsed = BuildingConstructPayload.TryFromDictionary(candidate.Payload, out var construct)
+                    ? construct
+                    : null,
+            })
+            .FirstOrDefault(candidate => candidate.Parsed is not null
+                && candidate.Parsed.SlotId == upgrade.SlotId
+                && (expectedGid is int gid
+                    ? candidate.Parsed.Gid == gid
+                    : string.Equals(
+                        candidate.Parsed.Name?.Trim(),
+                        upgrade.Name?.Trim(),
+                        StringComparison.OrdinalIgnoreCase)));
+        if (dependency?.Parsed is null)
+        {
+            return null;
+        }
+
+        var delay = dependency.Item.NextAttemptAt is DateTimeOffset retryAt && retryAt > now
+            ? retryAt - now
+            : QueuedPrerequisiteRetry;
+        if (delay < TimeSpan.FromSeconds(1))
+        {
+            delay = TimeSpan.FromSeconds(1);
+        }
+
+        var buildingName = string.IsNullOrWhiteSpace(upgrade.Name)
+            ? $"gid {dependency.Parsed.Gid}"
+            : upgrade.Name;
+        return new ConstructionDependencyDelay(
+            delay,
+            $"{buildingName} construct in slot {upgrade.SlotId}");
+    }
+
     public static ConstructionDependencyDelay? ResolveConstructDelay(
         QueueItem item,
         VillageStatus status,

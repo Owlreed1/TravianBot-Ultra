@@ -22,7 +22,6 @@ namespace TbotUltra.Desktop;
 public partial class MainWindow
 {
     private static HashSet<int> WallGids => BuildingsViewModel.WallGids;
-    private static readonly HashSet<int> DuplicateAllowedGids = [10, 11, 23, 38, 39];
 
     internal async Task OnLoadBuildingsClicked()
     {
@@ -685,7 +684,7 @@ public partial class MainWindow
             }
             var matchesByName = existingNames.Contains(NormalizeBuildingName(entry.Name));
             var alreadyBuilt = ((existingGids.Contains(entry.Gid) || matchesByName)
-                    && !DuplicateAllowedGids.Contains(entry.Gid) && !isWall)
+                    && !BuildingCatalogService.AllowsMultipleInstances(entry.Gid) && !isWall)
                 || (isWall && anyWallExists);
             if (alreadyBuilt)
             {
@@ -763,7 +762,7 @@ public partial class MainWindow
         // (a queued construct projects as level 0, so it is NOT in existingSameGidLevels). Used to block
         // a second copy of a non-duplicatable building (e.g. Hero's Mansion) while one is in the queue.
         var sameGidAlreadyPresent = projectedStatus.Buildings.Any(item => item.Gid == selectedBuilding.Gid);
-        var duplicateAllowed = selectedBuilding.Gid is 23 or 38 or 39;
+        var duplicateAllowed = BuildingCatalogService.AllowsMultipleInstances(selectedBuilding.Gid);
         var wallGid = selectedBuilding.Gid is 31 or 32 or 33 or 42 or 43;
         var rallyPointGid = IsRallyPointGid(selectedBuilding.Gid);
         if (rallyPointGid && slotId != 39)

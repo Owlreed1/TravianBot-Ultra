@@ -1,7 +1,6 @@
 using TbotUltra.Core.Configuration;
 using TbotUltra.Core.Tasks;
 using TbotUltra.Worker.Domain;
-using TbotUltra.Worker.Services;
 
 namespace TbotUltra.Desktop.Services;
 
@@ -87,13 +86,6 @@ internal static class QueueMoveSafety
                     continue;
                 }
 
-                if (ProvidesCatalogRequirement(prerequisite, dependent, out var requirement))
-                {
-                    yield return new QueueDependency(
-                        prerequisite.Id,
-                        dependent.Id,
-                        $"'{Describe(prerequisite)}' provides the {requirement.Name} {requirement.Level}+ requirement for '{Describe(dependent)}'.");
-                }
             }
         }
     }
@@ -107,54 +99,6 @@ internal static class QueueMoveSafety
         && BuildingUpgradePayload.TryFromDictionary(dependent.Payload, out var upgrade)
         && upgrade is not null
         && construct.SlotId == upgrade.SlotId;
-
-    private static bool ProvidesCatalogRequirement(
-        QueueItem prerequisite,
-        QueueItem dependent,
-        out BuildingRequirementEntry requirement)
-    {
-        requirement = null!;
-        if (!string.Equals(dependent.TaskName, "construct_building", StringComparison.OrdinalIgnoreCase)
-            || !BuildingConstructPayload.TryFromDictionary(dependent.Payload, out var construct)
-            || construct is null
-            || !TryReadProvidedBuilding(prerequisite, out var providedName, out var providedLevel))
-        {
-            return false;
-        }
-
-        requirement = BuildingCatalogService.RequirementsFor(construct.Gid)
-            .FirstOrDefault(candidate =>
-                string.Equals(candidate.Name, providedName, StringComparison.OrdinalIgnoreCase)
-                && providedLevel >= candidate.Level)!;
-        return requirement is not null;
-    }
-
-    private static bool TryReadProvidedBuilding(QueueItem item, out string name, out int level)
-    {
-        name = string.Empty;
-        level = 0;
-        if (string.Equals(item.TaskName, "construct_building", StringComparison.OrdinalIgnoreCase)
-            && BuildingConstructPayload.TryFromDictionary(item.Payload, out var construct)
-            && construct is not null)
-        {
-            name = construct.Name ?? BuildingCatalogService.NameForGid(construct.Gid) ?? string.Empty;
-            level = 1;
-            return !string.IsNullOrWhiteSpace(name);
-        }
-
-        if ((string.Equals(item.TaskName, "upgrade_building_to_level", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(item.TaskName, "upgrade_building_to_max", StringComparison.OrdinalIgnoreCase))
-            && BuildingUpgradePayload.TryFromDictionary(item.Payload, out var upgrade)
-            && upgrade is not null
-            && !string.IsNullOrWhiteSpace(upgrade.Name))
-        {
-            name = upgrade.Name;
-            level = upgrade.TargetLevel ?? int.MaxValue;
-            return true;
-        }
-
-        return false;
-    }
 
     private static bool TryReadParentId(QueueItem item, out Guid parentId)
     {

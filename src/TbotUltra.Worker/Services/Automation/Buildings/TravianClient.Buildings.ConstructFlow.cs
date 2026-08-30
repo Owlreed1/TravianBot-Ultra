@@ -678,15 +678,6 @@ public sealed partial class TravianClient : IBuildingClient
             return matches.FirstOrDefault();
         }
 
-        if (BuildingCatalogService.DuplicateRequiredExistingLevelFor(gid) is int requiredLevel
-            && matches.Count > 0
-            && matches.Max(building => building.Level ?? 0) < requiredLevel)
-        {
-            return matches
-                .OrderByDescending(building => building.Level ?? 0)
-                .First();
-        }
-
         return null;
     }
 
@@ -768,7 +759,7 @@ public sealed partial class TravianClient : IBuildingClient
         var existing = status.Buildings
             .Where(building => building.Gid == gid || BuildingNames.Same(building.Name, name))
             .ToList();
-        var duplicateAllowed = gid is 23 or 38 or 39;
+        var duplicateAllowed = BuildingCatalogService.AllowsMultipleInstances(gid);
         var wallGid = gid is 31 or 32 or 33 or 42 or 43;
         if (!BuildingCatalogService.CanConstructInVillage(gid, status.IsCapital, out var locationReason))
         {

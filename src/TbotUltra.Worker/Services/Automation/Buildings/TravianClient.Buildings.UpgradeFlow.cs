@@ -58,6 +58,11 @@ public sealed partial class TravianClient : IBuildingClient
             {
                 return $"Slot {slotId}: not found on dorf2. Upgrades performed: {upgrades}.";
             }
+            if (!info.HasOccupancyEvidence && !info.LevelKnown && info.Level <= 0)
+            {
+                return $"Slot {slotId} is empty — construct the building before upgrading. "
+                    + $"Upgrades performed: {upgrades}.";
+            }
             EnsureExpectedBuildingIdentity(slotId, expectedBuildingName, info);
             var currentLevel = info.Level;
             lastKnownLevel = currentLevel;
@@ -112,22 +117,49 @@ public sealed partial class TravianClient : IBuildingClient
                     cancellationToken);
             }
 
-            // Step 5: click the "Upgrade to level N" button.
-            var constructFaster = await TryUseConstructFasterForBuildAsync(
+            // Step 5: verify the live page one final time, then click "Upgrade to level N".
+            var gid = ParseGidFromBuildingCode(info.BuildingCode)
+                      ?? BuildingCatalogService.GidForName(buildingName);
+            if (gid is null)
+            {
+                return $"Slot {slotId}: pre-click safety could not resolve gid for '{buildingName}'. "
+                       + "Re-reading live levels before retry. queue_wait_seconds=1";
+            }
+            var clickSafety = await VerifyUpgradePreClickSafetyAsync(
                 slotId,
-                ParseGidFromBuildingCode(info.BuildingCode),
+                gid.Value,
                 buildingName,
                 currentLevel,
                 nextLevel,
-                buildQueueBefore,
-                durationSeconds,
-                null,
+                targetLevel,
+                "build",
                 cancellationToken);
-            var clicked = constructFaster.ActionRegistered;
-            var usedConstructFasterVideo = constructFaster.BonusConfirmed;
-            if (!clicked)
+            if (!clickSafety.IsSafe && clickSafety.Outcome == UpgradeAttemptOutcome.CanUpgrade)
             {
-                clicked = await ClickUpgradeToLevelButtonAsync(slotId, nextLevel, cancellationToken);
+                return $"Slot {slotId}: pre-click safety stopped upgrade ({clickSafety.Reason}). "
+                       + "Re-reading live levels before retry. queue_wait_seconds=1";
+            }
+
+            var clicked = false;
+            var usedConstructFasterVideo = false;
+            if (clickSafety.IsSafe)
+            {
+                var constructFaster = await TryUseConstructFasterForBuildAsync(
+                    slotId,
+                    gid,
+                    buildingName,
+                    currentLevel,
+                    nextLevel,
+                    buildQueueBefore,
+                    durationSeconds,
+                    null,
+                    cancellationToken);
+                clicked = constructFaster.ActionRegistered;
+                usedConstructFasterVideo = constructFaster.BonusConfirmed;
+                if (!clicked)
+                {
+                    clicked = await ClickUpgradeToLevelButtonAsync(slotId, nextLevel, cancellationToken);
+                }
             }
             if (!clicked)
             {
@@ -196,21 +228,38 @@ public sealed partial class TravianClient : IBuildingClient
                                 "page-load-pacing",
                                 "after hero transfer reload",
                                 cancellationToken);
-                            var retryConstructFaster = await TryUseConstructFasterForBuildAsync(
+                            var retrySafety = await VerifyUpgradePreClickSafetyAsync(
                                 slotId,
-                                ParseGidFromBuildingCode(info.BuildingCode),
+                                gid.Value,
                                 buildingName,
                                 currentLevel,
                                 nextLevel,
-                                buildQueueBefore,
-                                durationSeconds,
-                                null,
+                                targetLevel,
+                                "build",
                                 cancellationToken);
-                            clicked = retryConstructFaster.ActionRegistered;
-                            usedConstructFasterVideo |= retryConstructFaster.BonusConfirmed;
-                            if (!clicked)
+                            if (!retrySafety.IsSafe && retrySafety.Outcome == UpgradeAttemptOutcome.CanUpgrade)
                             {
-                                clicked = await ClickUpgradeToLevelButtonAsync(slotId, nextLevel, cancellationToken);
+                                return $"Slot {slotId}: pre-click safety stopped upgrade after Hero transfer ({retrySafety.Reason}). "
+                                       + "Re-reading live levels before retry. queue_wait_seconds=1";
+                            }
+                            if (retrySafety.IsSafe)
+                            {
+                                var retryConstructFaster = await TryUseConstructFasterForBuildAsync(
+                                    slotId,
+                                    gid,
+                                    buildingName,
+                                    currentLevel,
+                                    nextLevel,
+                                    buildQueueBefore,
+                                    durationSeconds,
+                                    null,
+                                    cancellationToken);
+                                clicked = retryConstructFaster.ActionRegistered;
+                                usedConstructFasterVideo |= retryConstructFaster.BonusConfirmed;
+                                if (!clicked)
+                                {
+                                    clicked = await ClickUpgradeToLevelButtonAsync(slotId, nextLevel, cancellationToken);
+                                }
                             }
                         }
                     }
@@ -835,7 +884,6 @@ public sealed partial class TravianClient : IBuildingClient
     private async Task<bool> ClickUpgradeToLevelButtonAsync(int slotId, int nextLevel, CancellationToken cancellationToken)
     {
         var pattern = new Regex($@"upgrade\s+to\s+level\s+{nextLevel}\b", RegexOptions.IgnoreCase);
-        var anyPattern = new Regex(@"upgrade\s+to\s+level", RegexOptions.IgnoreCase);
         string? lastError = null;
         var selectors = new[]
         {
@@ -844,39 +892,13 @@ public sealed partial class TravianClient : IBuildingClient
             ".upgradeButtonsContainer .section1 button",
             ".upgradeButtonsContainer .section1 input[type='submit']",
             ".upgradeButtonsContainer .section1 input[type='button']",
-            "div.addHoverClick",
-            "div.button-container",
-            "button.green",
-            "button",
-            "input[type='submit']",
-            "input[type='button']",
-            "a.green",
-            "a",
+            ".upgradeButtonsContainer .section1 a.green",
+            ".upgradeButtonsContainer .section1 a",
         };
 
         foreach (var selector in selectors)
         {
             var locator = _page.Locator(selector).Filter(new LocatorFilterOptions { HasTextRegex = pattern }).First;
-            if (await locator.CountAsync() > 0)
-            {
-                try
-                {
-                    await DelayBeforeClickAsync(cancellationToken); // Action pacing "Click" delay
-                    await locator.ClickAsync(new LocatorClickOptions { Timeout = _config.TimeoutMs });
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    lastError = $"{selector}: {ex.Message}";
-                    // Try next selector.
-                }
-            }
-        }
-
-        // Fallback: any element matching the broader "upgrade to level" pattern.
-        foreach (var selector in selectors)
-        {
-            var locator = _page.Locator(selector).Filter(new LocatorFilterOptions { HasTextRegex = anyPattern }).First;
             if (await locator.CountAsync() > 0)
             {
                 try
@@ -948,6 +970,11 @@ public sealed partial class TravianClient : IBuildingClient
             {
                 return $"Slot {slotId}: not found on dorf2. Upgrades performed: {upgrades}.";
             }
+            if (!info.HasOccupancyEvidence && !info.LevelKnown && info.Level <= 0)
+            {
+                return $"Slot {slotId} is empty — construct the building before upgrading. "
+                    + $"Upgrades performed: {upgrades}.";
+            }
             EnsureExpectedBuildingIdentity(slotId, expectedBuildingName, info);
             var currentLevel = info.Level;
             var gid = ParseGidFromBuildingCode(info.BuildingCode);
@@ -999,22 +1026,47 @@ public sealed partial class TravianClient : IBuildingClient
                     cancellationToken);
             }
 
-            // Step 5: click "Upgrade to level N".
-            var constructFaster = await TryUseConstructFasterForBuildAsync(
+            // Step 5: verify the live page one final time, then click "Upgrade to level N".
+            if (gid is null)
+            {
+                return $"Slot {slotId}: pre-click safety could not resolve gid for '{buildingName}'. "
+                       + $"Upgrades performed: {upgrades}. queue_wait_seconds=1";
+            }
+            var clickSafety = await VerifyUpgradePreClickSafetyAsync(
                 slotId,
-                gid,
+                gid.Value,
                 buildingName,
                 currentLevel,
                 nextLevel,
-                buildQueueBefore,
-                durationSeconds,
-                null,
+                maxLevel,
+                "build",
                 cancellationToken);
-            var clicked = constructFaster.ActionRegistered;
-            var usedConstructFasterVideo = constructFaster.BonusConfirmed;
-            if (!clicked)
+            if (!clickSafety.IsSafe && clickSafety.Outcome == UpgradeAttemptOutcome.CanUpgrade)
             {
-                clicked = await ClickUpgradeToLevelButtonAsync(slotId, nextLevel, cancellationToken);
+                return $"Slot {slotId}: pre-click safety stopped upgrade ({clickSafety.Reason}). "
+                       + $"Upgrades performed: {upgrades}. queue_wait_seconds=1";
+            }
+
+            var clicked = false;
+            var usedConstructFasterVideo = false;
+            if (clickSafety.IsSafe)
+            {
+                var constructFaster = await TryUseConstructFasterForBuildAsync(
+                    slotId,
+                    gid,
+                    buildingName,
+                    currentLevel,
+                    nextLevel,
+                    buildQueueBefore,
+                    durationSeconds,
+                    null,
+                    cancellationToken);
+                clicked = constructFaster.ActionRegistered;
+                usedConstructFasterVideo = constructFaster.BonusConfirmed;
+                if (!clicked)
+                {
+                    clicked = await ClickUpgradeToLevelButtonAsync(slotId, nextLevel, cancellationToken);
+                }
             }
             if (!clicked)
             {
@@ -1083,21 +1135,38 @@ public sealed partial class TravianClient : IBuildingClient
                                 "page-load-pacing",
                                 "after hero transfer reload",
                                 cancellationToken);
-                            var retryConstructFaster = await TryUseConstructFasterForBuildAsync(
+                            var retrySafety = await VerifyUpgradePreClickSafetyAsync(
                                 slotId,
-                                gid,
+                                gid.Value,
                                 buildingName,
                                 currentLevel,
                                 nextLevel,
-                                buildQueueBefore,
-                                durationSeconds,
-                                null,
+                                maxLevel,
+                                "build",
                                 cancellationToken);
-                            clicked = retryConstructFaster.ActionRegistered;
-                            usedConstructFasterVideo |= retryConstructFaster.BonusConfirmed;
-                            if (!clicked)
+                            if (!retrySafety.IsSafe && retrySafety.Outcome == UpgradeAttemptOutcome.CanUpgrade)
                             {
-                                clicked = await ClickUpgradeToLevelButtonAsync(slotId, nextLevel, cancellationToken);
+                                return $"Slot {slotId}: pre-click safety stopped upgrade after Hero transfer ({retrySafety.Reason}). "
+                                       + $"Upgrades performed: {upgrades}. queue_wait_seconds=1";
+                            }
+                            if (retrySafety.IsSafe)
+                            {
+                                var retryConstructFaster = await TryUseConstructFasterForBuildAsync(
+                                    slotId,
+                                    gid,
+                                    buildingName,
+                                    currentLevel,
+                                    nextLevel,
+                                    buildQueueBefore,
+                                    durationSeconds,
+                                    null,
+                                    cancellationToken);
+                                clicked = retryConstructFaster.ActionRegistered;
+                                usedConstructFasterVideo |= retryConstructFaster.BonusConfirmed;
+                                if (!clicked)
+                                {
+                                    clicked = await ClickUpgradeToLevelButtonAsync(slotId, nextLevel, cancellationToken);
+                                }
                             }
                         }
                     }

@@ -53,7 +53,47 @@ public sealed class TravianOfficialConstructionDomTests
             </div>
             """;
 
-        var result = BuildingDomParser.VerifyResourceUpgradePreClickSafety(
+        var result = BuildingDomParser.VerifyUpgradePreClickSafety(
+            html,
+            expectedSlot,
+            expectedGid,
+            expectedName,
+            expectedCurrentLevel,
+            expectedOfferLevel,
+            targetLevel);
+
+        Assert.Equal(expectedSafe, result.IsSafe);
+    }
+
+    [Theory]
+    [InlineData(26, 15, "Main Building", 5, 6, 6, true)]
+    [InlineData(26, 15, "Main Building", 5, 6, 5, false)]
+    [InlineData(27, 15, "Main Building", 5, 6, 6, false)]
+    [InlineData(26, 10, "Main Building", 5, 6, 6, false)]
+    [InlineData(26, 15, "Warehouse", 5, 6, 6, false)]
+    [InlineData(26, 15, "Main Building", 4, 6, 6, false)]
+    public void BuildingUpgradePreClickSafety_VerifiesSlotGidNameCurrentLevelAndTarget(
+        int expectedSlot,
+        int expectedGid,
+        string expectedName,
+        int expectedCurrentLevel,
+        int expectedOfferLevel,
+        int targetLevel,
+        bool expectedSafe)
+    {
+        const string html = """
+            <h1 class="titleInHeader">Main Building <span class="level">Level 5</span></h1>
+            <div id="build" class="gid15 level5">
+              <div class="upgradeButtonsContainer"><div class="section1">
+                <button value="Upgrade to level 6" class="textButtonV1 green build"
+                        onclick="window.location.href='/dorf2.php?id=26&amp;gid=15&amp;action=build&amp;checksum=safe'">
+                  Upgrade to level 6
+                </button>
+              </div></div>
+            </div>
+            """;
+
+        var result = BuildingDomParser.VerifyUpgradePreClickSafety(
             html,
             expectedSlot,
             expectedGid,

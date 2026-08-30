@@ -55,11 +55,6 @@ public partial class MainWindow
         QueueItem item)
     {
         var status = ResolveBuildingStatusForQueueItem(item);
-        if (status is null)
-        {
-            return (null, []);
-        }
-
         var villageKey = GetQueueItemVillageKey(item);
         var sameVillageFilter = BuildSameVillageQueueFilter(item);
         var sameVillageItems = GetActiveQueueItems()
@@ -77,6 +72,36 @@ public partial class MainWindow
             })
             .ToList();
         return (status, sameVillageItems);
+    }
+
+    private bool TryHandleUpgradeWaitingForConstruct(
+        QueueItem item,
+        string logPrefix,
+        Stopwatch timer)
+    {
+        var context = ResolveConstructRequirementContextForQueueItem(item);
+        var dependency = ConstructionDependencyGate.ResolveUpgradeWaitingForConstruct(
+            item,
+            context.SameVillageItems,
+            DateTimeOffset.UtcNow);
+        if (dependency is null)
+        {
+            return false;
+        }
+
+        if (!_botService.MarkQueueItemDeferred(item.Id, dependency.Delay))
+        {
+            AppendLog(
+                $"{logPrefix} FAIL {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
+                $"could not defer upgrade waiting for {dependency.Detail}");
+            return false;
+        }
+
+        RequestQueueUiRefresh();
+        AppendLog(
+            $"{logPrefix} DEFER {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
+            $"waiting for queued {dependency.Detail}; retry in {dependency.Delay.TotalSeconds:F0}s");
+        return true;
     }
 
     private bool ConstructHasQueuedOrActivePrerequisite(QueueItem item, DateTimeOffset now)
@@ -403,6 +428,11 @@ public partial class MainWindow
 
         try
         {
+            if (TryHandleUpgradeWaitingForConstruct(item, logPrefix, tickSw))
+            {
+                return true;
+            }
+
             var constructRefresh =
                 await TryRefreshConstructTargetVillageStatusBeforeGuardAsync(item, options, cancellationToken);
             if (constructRefresh.FreshStatus is not null
