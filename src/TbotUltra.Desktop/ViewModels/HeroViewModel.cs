@@ -533,7 +533,11 @@ public sealed class HeroViewModel : BaseViewModel
         }
 
         AttributesStatusText = $"Free points: {snapshot.FreePoints}";
-        HeroStatusText = FormatHeroStatus(snapshot.HeroState, snapshot.ReviveRemainingSeconds);
+        var terminalStatus = string.Equals(snapshot.HeroState, "Dead", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(snapshot.HeroState, "Reviving", StringComparison.OrdinalIgnoreCase);
+        HeroStatusText = snapshot.HomeVillageHeroAway && !terminalStatus
+            ? string.IsNullOrWhiteSpace(snapshot.MovementState) ? "Away" : snapshot.MovementState.Trim()
+            : FormatHeroStatus(snapshot.HeroState, snapshot.ReviveRemainingSeconds);
     }
 
     private static string FormatHeroStatus(string? state, int? reviveRemainingSeconds)

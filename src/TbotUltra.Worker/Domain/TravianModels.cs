@@ -213,7 +213,11 @@ public sealed record HeroAttributeSnapshot(
     // standing in it. Drives the green (home) vs yellow (away) hero icon on the dashboard.
     bool HomeVillageHeroAway = false,
     int? HomeVillageCoordX = null,
-    int? HomeVillageCoordY = null);
+    int? HomeVillageCoordY = null,
+    // Live movement state and remaining return time read from the same Attributes page. These values let
+    // the login flow project the Hero countdown before automation starts instead of revisiting the page.
+    string? MovementState = null,
+    int? SecondsUntilReturn = null);
 
 public sealed record HeroInventoryResources(
     int Wood = 0,

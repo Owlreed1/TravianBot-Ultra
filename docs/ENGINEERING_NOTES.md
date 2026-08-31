@@ -476,7 +476,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Hero ownership and current location are separate. Scope transfers to the active dialog and verify the target.
 - Read an away Hero's ETA from Hero Attributes, never from Rally Point troop movements. Use the displayed timer
   directly for an explicit return to the home village; double every outbound movement timer (adventure, raid,
-  attack, reinforcement, or another destination) to include the return leg.
+  attack, reinforcement, or another destination) to include the return leg. A live Attributes analysis must project
+  movement, away-state, and return time together with the attribute snapshot and defer an existing due `hero_manage`
+  item immediately, so login updates the Hero countdown without a second Attributes visit after Start.
 - Empty building slots contain one contract per available type; scope cost reads and transfer clicks to the exact
   `#contract_building{gid}`.
 - Cache only data with an owner, invalidation rule, and safe stale behavior. Incomplete refreshes must not erase

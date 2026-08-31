@@ -174,6 +174,55 @@ public partial class MainWindow
         {
             _heroViewModel.AdventureStatusText = adventureStatusText;
         }
+
+        ApplyHeroReturnTimer(snapshot);
+    }
+
+    private void ApplyHeroReturnTimer(HeroAttributeSnapshot snapshot)
+    {
+        if (!snapshot.HomeVillageHeroAway || snapshot.SecondsUntilReturn is not > 0)
+        {
+            return;
+        }
+
+        var remainingSeconds = snapshot.SecondsUntilReturn.Value;
+        var movement = string.IsNullOrWhiteSpace(snapshot.MovementState) ? "Hero away" : snapshot.MovementState.Trim();
+        _heroViewModel.AdventureStatusText = $"{movement}: {FormatCountdown(remainingSeconds)}";
+        if (_heroViewModel.HeroLoopTask is not null)
+        {
+            _heroViewModel.HeroLoopTask.RemainingSeconds = remainingSeconds;
+        }
+
+        if (!_isLoggedIn)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var updated = 0;
+        foreach (var item in _botService.GetQueueItemsForDisplay()
+                     .Where(item => string.Equals(item.TaskName, "hero_manage", StringComparison.OrdinalIgnoreCase))
+                     .Where(item => item.Status == QueueStatus.Pending)
+                     .Where(item => item.NextAttemptAt <= now.AddSeconds(5)
+                         || item.Payload.TryGetValue(HeroDeferReasonKey, out var reason)
+                         && string.Equals(reason, HeroDeferReasonAway, StringComparison.OrdinalIgnoreCase)))
+        {
+            var payload = new Dictionary<string, string>(item.Payload, StringComparer.OrdinalIgnoreCase)
+            {
+                [HeroDeferReasonKey] = HeroDeferReasonAway,
+            };
+            if (_botService.UpdateDeferredQueueItem(item.Id, payload, TimeSpan.FromSeconds(remainingSeconds)))
+            {
+                updated++;
+            }
+        }
+
+        if (updated > 0)
+        {
+            AppendLog($"[hero] Attributes return timer applied after login: {remainingSeconds}s; deferred {updated} hero task(s) without another page visit.");
+            RequestQueueUiRefresh();
+            UpdateAutomationLoopRunningIndicators();
+        }
     }
 
     /// <summary>

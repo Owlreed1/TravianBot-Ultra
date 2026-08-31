@@ -130,6 +130,20 @@ public sealed class HeroViewModelTests
     }
 
     [Fact]
+    public void ApplyAttributeSnapshot_DoesNotReplaceAwayStateWithAlive()
+    {
+        var vm = new HeroViewModel();
+
+        vm.ApplyAttributeSnapshot(new HeroAttributeSnapshot(
+            HeroState: "Alive",
+            HomeVillageHeroAway: true,
+            MovementState: "On the way to adventure",
+            SecondsUntilReturn: 1612));
+
+        Assert.Equal("On the way to adventure", vm.HeroStatusText);
+    }
+
+    [Fact]
     public void HeroReadyText_SaysNoAdventures_WhenHomeAndReadyWithoutAdventures()
     {
         var vm = new HeroViewModel();

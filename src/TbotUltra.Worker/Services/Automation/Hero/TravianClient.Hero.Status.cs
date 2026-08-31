@@ -659,22 +659,52 @@ public sealed partial class TravianClient
         var snapshot = await ReadHeroInventorySnapshotAsync(cancellationToken);
         snapshot = snapshot with { AdventureCount = adventureCount };
 
+        // This page already exposes the movement label and its countdown. Read them in the same pass as
+        // the attributes so post-login UI state cannot be overwritten by the attributes-only "Alive" value.
+        var liveStatus = await ReadHeroStatusAsync(cancellationToken);
+        var liveReviving = string.Equals(liveStatus.State, "Reviving", StringComparison.OrdinalIgnoreCase);
+        var quickReviving = string.Equals(quick.Status.State, "Reviving", StringComparison.OrdinalIgnoreCase);
+        var liveAway = !liveStatus.IsDead
+            && !liveReviving
+            && (!string.IsNullOrWhiteSpace(liveStatus.MovementState) || liveStatus.SecondsUntilReturn is > 0);
+        var quickAway = quick.Status.Exists && !quick.IsInVillage && !quick.Status.IsDead && !quickReviving;
+        var returnSeconds = liveStatus.SecondsUntilReturn;
+        if ((liveAway || quickAway) && returnSeconds is not > 0)
+        {
+            returnSeconds = await ReadHeroReturnSecondsAsync(cancellationToken);
+        }
+
+        snapshot = snapshot with
+        {
+            MovementState = liveStatus.MovementState ?? quick.Status.MovementState,
+            SecondsUntilReturn = returnSeconds,
+        };
+
         // The attributes page names the hero's village ("Hero is currently in village X" when home, or
         // "Home village is village X" when away). Capture name + away-state so the dashboard can show the
         // green (home) vs yellow (away) hero icon. Best-effort: name null when on an adventure (no anchor).
         var heroHome = await ReadHeroHomeVillageInfoAsync(cancellationToken);
+        var heroAway = heroHome.Away || liveAway || quickAway;
+        snapshot = snapshot with { HomeVillageHeroAway = heroAway };
         if (!string.IsNullOrWhiteSpace(heroHome.Name))
         {
             snapshot = snapshot with
             {
                 HomeVillageName = heroHome.Name,
-                HomeVillageHeroAway = heroHome.Away,
                 HomeVillageCoordX = heroHome.X,
                 HomeVillageCoordY = heroHome.Y,
             };
         }
 
-        SaveCachedHeroAttributeSnapshot(snapshot);
+        // Attribute values are cacheable; a relative movement countdown is not. Keep it only in the live
+        // return value so a later session never restores an expired timer from disk or the process cache.
+        SaveCachedHeroAttributeSnapshot(snapshot with
+        {
+            MovementState = null,
+            SecondsUntilReturn = null,
+        });
+        Notify(
+            $"[hero] attributes runtime: away={snapshot.HomeVillageHeroAway} movement='{snapshot.MovementState ?? "unknown"}' returnSeconds={(snapshot.SecondsUntilReturn?.ToString() ?? "unknown")}.");
         Notify(
             $"Hero inventory snapshot: free points={snapshot.FreePoints}, fighting strength={snapshot.FightingStrength}, offence bonus={snapshot.OffenceBonus}, defence bonus={snapshot.DefenceBonus}, resources={snapshot.Resources}, adventures={(snapshot.AdventureCount?.ToString() ?? "?")}.");
         return snapshot;

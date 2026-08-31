@@ -37,6 +37,34 @@ public sealed class HeroAttributePageSnapshotTests
     }
 
     [Fact]
+    public void LiveAttributeRead_AlsoProjectsMovementAndReturnTimerFromTheSamePage()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            ProjectRootLocator.FindProjectRoot(),
+            "src",
+            "TbotUltra.Worker",
+            "Services",
+            "Automation",
+            "Hero",
+            "TravianClient.Hero.Status.cs"));
+        var methodStart = source.IndexOf(
+            "public async Task<HeroAttributeSnapshot> ReadHeroAttributeSnapshotAsync",
+            StringComparison.Ordinal);
+        var methodEnd = source.IndexOf(
+            "private async Task<(string? Name, bool Away, int? X, int? Y)> ReadHeroHomeVillageInfoAsync",
+            methodStart,
+            StringComparison.Ordinal);
+
+        Assert.True(methodStart >= 0 && methodEnd > methodStart);
+        var method = source[methodStart..methodEnd];
+        var attributesNavigation = method.IndexOf("GotoAsync(Paths.HeroAttributes", StringComparison.Ordinal);
+        var runtimeRead = method.IndexOf("ReadHeroStatusAsync(cancellationToken)", StringComparison.Ordinal);
+        Assert.True(runtimeRead > attributesNavigation);
+        Assert.Contains("HomeVillageHeroAway = heroAway", method, StringComparison.Ordinal);
+        Assert.Contains("SecondsUntilReturn = returnSeconds", method, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ToSnapshot_PreservesVerifiedLiveValues()
     {
         var page = new HeroAttributePageSnapshot(
