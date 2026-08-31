@@ -602,11 +602,11 @@
                                         Height="32"
                                         Content="Reset program"
                                         Padding="10,4"
-                                        Background="{DynamicResource WarningButtonBgBrush}"
-                                        Foreground="{DynamicResource OnWarningBrush}"
-                                        BorderBrush="{DynamicResource WarningBorderBrush}"
+                                        Background="{DynamicResource DangerBgBrush}"
+                                        Foreground="{DynamicResource DangerTextBrush}"
+                                        BorderBrush="{DynamicResource DangerBorderBrush}"
                                         Click="ResetProgramButton_Click"
-                                        ToolTip="Restart the browser session: stops running tasks and closes Chromium. Account, settings, queue, cached villages, and saved login are kept." />
+                                        ToolTip="Stop all running operations, close Chromium, and return the program to its startup state. Account, settings, queue, cached villages, and saved login are kept." />
                                 <Button x:Name="OpenResourceTestFunctionsButton"
                                         DockPanel.Dock="Right"
                                         Content="Debug"

@@ -9,6 +9,69 @@ namespace TbotUltra.Worker.Infrastructure;
 
 public sealed partial class BrowserSession : IAsyncDisposable
 {
+    internal const string MainContextConsentUiSuppressionScript =
+        """
+        (() => {
+          if (window.__tbotMainConsentUiSuppressionInstalled) return;
+          window.__tbotMainConsentUiSuppressionInstalled = true;
+
+          const selectors = [
+            '#cmpbox',
+            '#cmpwrapper',
+            '.cmpbox',
+            '[class*="cmpbox" i]',
+            'iframe[src*="consentmanager" i]',
+            '[id*="consent" i][role="dialog"]',
+            '[class*="consent" i][role="dialog"]'
+          ].join(',');
+          const styleId = '__tbot_main_consent_ui_suppression';
+          const reported = new WeakSet();
+
+          const installStyle = () => {
+            if (!document.documentElement || document.getElementById(styleId)) return;
+            const style = document.createElement('style');
+            style.id = styleId;
+            style.textContent = `${selectors} { display: none !important; visibility: hidden !important; pointer-events: none !important; }`;
+            document.documentElement.appendChild(style);
+          };
+
+          const inspect = (node) => {
+            if (!(node instanceof Element)) return;
+            const candidates = [];
+            if (node.matches(selectors)) candidates.push(node);
+            for (const descendant of node.querySelectorAll(selectors)) candidates.push(descendant);
+            for (const candidate of candidates) {
+              if (reported.has(candidate)) continue;
+              reported.add(candidate);
+              if (window.__tbotDetailedBrowserLoggingEnabled === true) {
+                console.debug('__TBOT_BROWSER_TRACE__' + JSON.stringify({
+                  event: 'consent-ui-suppressed',
+                  target: candidate.id ? `#${candidate.id}` : candidate.tagName.toLowerCase(),
+                  field: '-',
+                  valueLength: 0,
+                  trusted: false
+                }));
+              }
+            }
+          };
+
+          installStyle();
+          inspect(document.documentElement);
+          new MutationObserver((mutations) => {
+            installStyle();
+            for (const mutation of mutations) {
+              if (mutation.type === 'attributes') inspect(mutation.target);
+              for (const node of mutation.addedNodes) inspect(node);
+            }
+          }).observe(document, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['id', 'class', 'role', 'src']
+          });
+        })();
+        """;
+
     private const string LocalPlaywrightBrowsersDirectoryName = "ms-playwright";
     private const string LocalPlaywrightDriverDirectoryName = ".playwright";
     private static readonly TimeSpan BonusVideoCleanupStepTimeout = TimeSpan.FromSeconds(5);
@@ -206,7 +269,10 @@ public sealed partial class BrowserSession : IAsyncDisposable
                 TrackTransientExternalOrigin(route.Request.Url);
             }
 
-            if (!ConsentDomainsAllowed && !ManualAuthenticationPopupsAllowed && isAdDomain)
+            if (ShouldBlockMainContextRequest(
+                    isAdDomain,
+                    ConsentDomainsAllowed,
+                    ManualAuthenticationPopupsAllowed))
             {
                 await route.AbortAsync();
                 return;
@@ -214,6 +280,11 @@ public sealed partial class BrowserSession : IAsyncDisposable
 
             await route.ContinueAsync();
         });
+
+        // Manual authentication can leave the game shell primed to recreate its CMP overlay later,
+        // including during a read-only status pass. Install this at document start so the in-page
+        // overlay is hidden before first paint. Bonus videos use a separate browser context.
+        await _context.AddInitScriptAsync(MainContextConsentUiSuppressionScript);
 
         // Some Travian pages spawn short-lived tabs via window.open or target=_blank links. Neutralise
         // those in every document so they are never created. The bot navigates with GotoAsync and
@@ -240,7 +311,8 @@ public sealed partial class BrowserSession : IAsyncDisposable
 
               const isTravianAuthenticationPage = () => {
                 const host = String(location.hostname || '').toLowerCase();
-                return host === 'lobby.legends.travian.com'
+                return host === 'www.travian.com'
+                    || host === 'lobby.legends.travian.com'
                     || host === 'auth.travian.com'
                     || host === 'login.travian.com'
                     || host === 'accounts.travian.com';
@@ -610,12 +682,27 @@ public sealed partial class BrowserSession : IAsyncDisposable
     }
 
     internal static bool ShouldKeepNativePopupBlocker(bool manualLoginAccount)
+        // Manual identity providers may create their authentication tab asynchronously after the
+        // user's click, so Chrome's native blocker would require the user to approve it manually.
+        // The separate request route continues blocking the CMP/ad stack during manual login.
         => !manualLoginAccount;
 
     internal static bool ShouldAllowPopupSourcesInNewContext(
         bool manualLoginAccount,
         bool manualLoginWaitActive)
         => manualLoginAccount && manualLoginWaitActive;
+
+    internal static bool ShouldBlockMainContextRequest(
+        bool isAdDomain,
+        bool bonusVideoConsentAllowed,
+        bool manualLoginWaitActive)
+    {
+        // Manual login permits user-created authentication tabs, not Travian's unrelated CMP/ad
+        // network stack. Letting the manual flag bypass this block allows that stack to create
+        // short-lived Chrome targets long after the login dialog has closed.
+        _ = manualLoginWaitActive;
+        return isAdDomain && !bonusVideoConsentAllowed;
+    }
 
     internal static bool ShouldKeepExtraPageOpen(bool manualLoginWaitActive, string? pageUrl)
         => manualLoginWaitActive;

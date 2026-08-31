@@ -27,6 +27,22 @@ public sealed class LobbyWorldMatcherTests
             TravianClient.ShouldRequestLobbyWorldSelectionAfterAutomaticAttempts(serverName));
     }
 
+    [Theory]
+    [InlineData(1, true, true, true)]
+    [InlineData(2, true, true, false)]
+    [InlineData(1, false, true, false)]
+    [InlineData(1, true, false, false)]
+    public void ShouldRetryPlayNow_RetriesOneUncommittedLobbyClickOnly(
+        int completedAttempts,
+        bool remainsOnLobby,
+        bool worldCardActionable,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            TravianClient.ShouldRetryPlayNow(completedAttempts, remainsOnLobby, worldCardActionable));
+    }
+
     [Fact]
     public void LobbyWorldOption_DisplayTextIncludesCardDetailsAndStableUidPrefix()
     {

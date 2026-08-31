@@ -63,6 +63,49 @@ public sealed class ManualLoginPopupPolicyTests
             BrowserSession.ShouldAllowPopupSourcesInNewContext(manualLoginAccount, manualLoginWaitActive));
     }
 
+    [Theory]
+    [InlineData(true, false, false, true)]
+    [InlineData(true, false, true, true)]
+    [InlineData(true, true, false, false)]
+    [InlineData(false, false, true, false)]
+    public void ManualLoginWait_NeverUnblocksTheConsentAdStack(
+        bool isAdDomain,
+        bool bonusVideoConsentAllowed,
+        bool manualLoginWaitActive,
+        bool expectedBlocked)
+    {
+        Assert.Equal(
+            expectedBlocked,
+            BrowserSession.ShouldBlockMainContextRequest(
+                isAdDomain,
+                bonusVideoConsentAllowed,
+                manualLoginWaitActive));
+    }
+
+    [Fact]
+    public void MainContext_SuppressesConsentUiBeforeCreatingTheVisiblePage()
+    {
+        var source = ReadBrowserSessionSource();
+        var contextStart = source.IndexOf("OpenMainContextPageAsync", StringComparison.Ordinal);
+        var contextEnd = source.IndexOf("RotateMainContextFromSavedStateAsync", contextStart, StringComparison.Ordinal);
+        var context = source[contextStart..contextEnd];
+        var suppression = context.IndexOf("MainContextConsentUiSuppressionScript", StringComparison.Ordinal);
+        var visiblePage = context.IndexOf("NewPageAsync", StringComparison.Ordinal);
+
+        Assert.Contains("#cmpwrapper", BrowserSession.MainContextConsentUiSuppressionScript, StringComparison.Ordinal);
+        Assert.Contains("MutationObserver", BrowserSession.MainContextConsentUiSuppressionScript, StringComparison.Ordinal);
+        Assert.True(suppression >= 0, "The main context must install consent suppression.");
+        Assert.True(visiblePage > suppression, "Consent suppression must be installed before the visible page is created.");
+    }
+
+    [Fact]
+    public void PopupGuard_AllowsTheVisibleTravianLoginPageToOpenAuthenticationTabs()
+    {
+        var source = ReadBrowserSessionSource();
+
+        Assert.Contains("host === 'www.travian.com'", source, StringComparison.Ordinal);
+    }
+
     private static string ReadBrowserSessionSource()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

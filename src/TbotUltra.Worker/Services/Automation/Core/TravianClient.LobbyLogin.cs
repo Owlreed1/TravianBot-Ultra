@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using TbotUltra.Core.Configuration;
 using TbotUltra.Worker.Domain;
+using TbotUltra.Worker.Infrastructure;
 
 namespace TbotUltra.Worker.Services;
 
@@ -313,6 +314,12 @@ public sealed partial class TravianClient
     internal static bool ShouldRequestLobbyWorldSelectionAfterAutomaticAttempts(string? serverName)
         => LobbyWorldSelectionDefaults.IsChooseInLobby(serverName);
 
+    internal static bool ShouldRetryPlayNow(
+        int completedAttempts,
+        bool remainsOnLobby,
+        bool worldCardActionable)
+        => completedAttempts < 2 && remainsOnLobby && worldCardActionable;
+
     private async Task<bool> TryEnterLobbyWorldAsync(
         LobbyWorldCard candidate,
         bool allowServerCorrection,
@@ -330,21 +337,55 @@ public sealed partial class TravianClient
         }
 
         Notify($"[lobby-login] trying world '{candidate.Name}' wuid='{candidate.WorldUid}'.");
-        await TryHandleMobileOptimizationsDialogAsync(cancellationToken);
-        var card = _page.Locator($"{Selectors.LobbyGameWorldCard}[data-wuid='{candidate.WorldUid}']").First;
-        var playNow = card.Locator(Selectors.LobbyPlayNowButton).First;
-        if (await playNow.CountAsync() == 0 || !await playNow.IsVisibleAsync() || !await playNow.IsEnabledAsync())
+        for (var playAttempt = 1; playAttempt <= 2; playAttempt++)
         {
-            Notify($"[lobby-login] Play now is not actionable for '{candidate.Name}'.");
-            return false;
-        }
+            await TryHandleMobileOptimizationsDialogAsync(cancellationToken);
+            var card = _page.Locator($"{Selectors.LobbyGameWorldCard}[data-wuid='{candidate.WorldUid}']").First;
+            var playNow = card.Locator(Selectors.LobbyPlayNowButton).First;
+            var playNowActionable = await playNow.CountAsync() > 0
+                && await playNow.IsVisibleAsync()
+                && await playNow.IsEnabledAsync();
+            if (!playNowActionable)
+            {
+                Notify($"[lobby-login] Play now is not actionable for '{candidate.Name}'.");
+                return false;
+            }
 
-        await DelayBeforeClickAsync(cancellationToken, "lobby Play now");
-        await SuppressConsentUiDuringSsoLandingAsync();
-        await ClickPlayNowAndWaitForGameOriginAsync(playNow, allowServerCorrection, cancellationToken);
-        if (await WaitForMobileOptimizationsDialogAfterWorldSelectionAsync(cancellationToken))
-        {
-            await WaitForGameOriginAfterMobileConfirmationAsync(allowServerCorrection, cancellationToken);
+            await DelayBeforeClickAsync(cancellationToken, $"lobby Play now (attempt {playAttempt}/2)");
+            await SuppressConsentUiDuringSsoLandingAsync();
+            var gameOriginCommitted = await ClickPlayNowAndWaitForGameOriginAsync(
+                playNow,
+                allowServerCorrection,
+                cancellationToken);
+            if (!gameOriginCommitted
+                && await WaitForMobileOptimizationsDialogAfterWorldSelectionAsync(cancellationToken))
+            {
+                await WaitForGameOriginAfterMobileConfirmationAsync(allowServerCorrection, cancellationToken);
+                gameOriginCommitted = IsConfiguredGameOrigin(_page.Url)
+                    || (allowServerCorrection && TryResolveOfficialGameOrigin(_page.Url, out _));
+            }
+
+            if (gameOriginCommitted)
+            {
+                break;
+            }
+
+            var remainsOnLobby = IsLobbyAccountUrl(_page.Url);
+            var freshPlayNow = _page
+                .Locator($"{Selectors.LobbyGameWorldCard}[data-wuid='{candidate.WorldUid}']")
+                .First
+                .Locator(Selectors.LobbyPlayNowButton)
+                .First;
+            var freshPlayNowActionable = remainsOnLobby
+                && await freshPlayNow.CountAsync() > 0
+                && await freshPlayNow.IsVisibleAsync()
+                && await freshPlayNow.IsEnabledAsync();
+            if (!ShouldRetryPlayNow(playAttempt, remainsOnLobby, freshPlayNowActionable))
+            {
+                break;
+            }
+
+            Notify($"[lobby-login] Play now attempt {playAttempt}/2 did not leave the lobby after a network failure; retrying the fresh world card once.");
         }
 
         var configuredOriginReached = IsConfiguredGameOrigin(_page.Url);
@@ -725,12 +766,13 @@ public sealed partial class TravianClient
         return result;
     }
 
-    private async Task ClickPlayNowAndWaitForGameOriginAsync(
+    private async Task<bool> ClickPlayNowAndWaitForGameOriginAsync(
         ILocator playNow,
         bool allowServerCorrection,
         CancellationToken cancellationToken)
     {
         var gameOriginCommitted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var proxyRequestFailed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         void OnFrameNavigated(object? sender, IFrame frame)
         {
             if (ReferenceEquals(frame, _page.MainFrame)
@@ -741,7 +783,19 @@ public sealed partial class TravianClient
             }
         }
 
+        void OnRequestFailed(object? sender, IRequest request)
+        {
+            var isLobbyRequest = Uri.TryCreate(request.Url, UriKind.Absolute, out var requestUri)
+                && (requestUri.Host.Equals("lobby.legends.travian.com", StringComparison.OrdinalIgnoreCase)
+                    || requestUri.Host.Equals("www.travian.com", StringComparison.OrdinalIgnoreCase));
+            if (isLobbyRequest && ProxyParser.LooksLikeProxyError(request.Failure))
+            {
+                proxyRequestFailed.TrySetResult();
+            }
+        }
+
         _page.FrameNavigated += OnFrameNavigated;
+        _page.RequestFailed += OnRequestFailed;
         try
         {
             await playNow.ClickAsync(new LocatorClickOptions
@@ -751,27 +805,35 @@ public sealed partial class TravianClient
             if (IsConfiguredGameOrigin(_page.Url)
                 || (allowServerCorrection && TryResolveOfficialGameOrigin(_page.Url, out _)))
             {
-                return;
+                return true;
             }
 
-            try
+            var timeout = Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+            var completed = await Task.WhenAny(gameOriginCommitted.Task, proxyRequestFailed.Task, timeout);
+            if (completed == gameOriginCommitted.Task)
             {
-                await gameOriginCommitted.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+                await gameOriginCommitted.Task;
+                return true;
             }
-            catch (TimeoutException)
+
+            if (completed == proxyRequestFailed.Task)
             {
-                // The caller reports the final host as an SSO failure.
+                Notify("[lobby-login] Play now request failed through the configured proxy before the game origin committed.");
             }
+
+            await completed;
+            return false;
         }
         finally
         {
             _page.FrameNavigated -= OnFrameNavigated;
+            _page.RequestFailed -= OnRequestFailed;
         }
     }
 
     private async Task SuppressConsentUiDuringSsoLandingAsync()
     {
-        await _page.AddInitScriptAsync(
+        const string suppressionScript =
             """
             (() => {
               const install = () => {
@@ -780,7 +842,7 @@ public sealed partial class TravianClient
                 const style = document.createElement('style');
                 style.id = '__tbot_sso_consent_suppression';
                 style.textContent = `
-                  #cmpbox, .cmpbox, [class*="cmpbox" i],
+                  #cmpbox, #cmpwrapper, .cmpbox, [class*="cmpbox" i],
                   iframe[src*="consentmanager" i],
                   [id*="consent" i][role="dialog"],
                   [class*="consent" i][role="dialog"] {
@@ -801,7 +863,9 @@ public sealed partial class TravianClient
                 }).observe(document, { childList: true, subtree: true });
               }
             })();
-            """);
+            """;
+        await _page.AddInitScriptAsync(suppressionScript);
+        await _page.EvaluateAsync(suppressionScript);
     }
 
     private bool IsConfiguredGameOrigin(string? url)

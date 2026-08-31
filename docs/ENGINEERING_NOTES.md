@@ -77,6 +77,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
 
 - `bot.json` is application-wide; account settings are account-scoped; village settings and queue state are
   village-scoped; runtime snapshots are Worker-owned observations, not user configuration.
+- `Reset program` is an in-process restart boundary: cancel all automation/session work, close Chromium and
+  auxiliary popups, reset pacing plus account-scoped in-memory/UI state, then reload the normal logged-out startup
+  projection. Preserve account files, settings, queues, village caches, and saved login; only an explicit Login may
+  admit a new browser session.
 - Use the existing path provider. Never derive data paths from the executable working directory.
 - `ProjectRootLocator` uses the versioned solution file in source/CI and `config/bot.json` in deployed runtime;
   source tests must not depend on ignored runtime configuration.
@@ -101,14 +105,26 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - New settings require the complete pipeline: model, defaults, load/save, ViewModel, UI, and tests.
 - Account `Manual login` is account-scoped and permits an empty password. It opens the Official lobby
   without submitting credentials, blocks the desktop behind a `Login done`/`Cancel` confirmation, verifies
-  the live lobby before continuing, and temporarily permits browser popups, user-opened tabs, and required
-  consent/authentication network resources for that wait. Manual-login accounts launch without Chromium's
-  native popup blocker so authentication providers can create their pages; source-level popup permission must
-  be derived from the active confirmation wait, never permanently from the account setting. The clean post-login
+  the live lobby before continuing, and temporarily permits browser popups, user-opened tabs, and authentication
+  network resources for that wait. The normal consent/ad-domain block must remain active during manual login;
+  the manual-auth flag must never enable the CMP/ad stack because it can create short-lived Chrome targets after
+  login. `www.travian.com` is the visible lobby login source and must be allowed to call `window.open` for external
+  authentication, while game-world hosts remain blocked outside the manual wait. Manual-login browsers launch without
+  Chromium's native popup blocker because identity providers may open asynchronously after a trusted click; ordinary
+  accounts retain it. This is safe only while the independent route policy keeps CMP/ad domains blocked throughout
+  manual login. Source-level
+  popup permission must be derived from the active confirmation wait, never permanently from the account setting. The clean post-login
   game context restores request, script, and page-handler blocking before it renders Travian, then preloads Dorf1
   before the lobby context closes. Never expose an `about:blank` replacement between those contexts; it looks like
   a consent popup flashing even when no popup page was created. Cancel must disable the exception and close the
-  shared browser.
+  shared browser. Every normal main context also installs CMP UI suppression at document start, before its visible
+  page is created; manual lobby authentication can otherwise prime an in-page consent overlay that is recreated
+  during later read-only status passes. Bonus videos remain isolated in their separate browser context.
+- Lobby `Play now` uses a trusted click and waits for the configured game origin. If a lobby-owned request fails
+  with a verified Chromium proxy error before that origin commits, end the wait early and retry exactly once only
+  while the same fresh world card remains visible and actionable in the lobby. Reapply SSO consent suppression to
+  both the current document (`#cmpwrapper` included) and future navigations before each click; never retry after the
+  game origin commits or from a stale locator.
 - Portable Settings profiles use the versioned `.tbot-settings.json` format and an explicit scalar/allowed-hours
   allowlist. They must remain anonymous and portable: never include account/server/proxy identity or credentials,
   tribe-specific Brewery options, village/list/queue/object identifiers, runtime state or usage, manual server-reset

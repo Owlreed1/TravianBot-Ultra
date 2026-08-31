@@ -921,17 +921,8 @@ public partial class MainWindow
                 AppendLog($"Could not close browser during reset: {ex.Message}");
             }
 
-            _isLoggedIn = false;
-            _browserSessionLikelyOpen = false;
-            _inboxAutoEnabled = false;
-            NotifySessionPacingOnlineStopped();
-            UpdateLoginButtonsVisual(false);
-            UpdateInboxButtons(0, 0);
-            SetLoopIndicator(false);
-            StartLoopButton.Content = "Start bot";
-            StartLoopButton.IsEnabled = true;
-            _activeAutomationTaskName = null;
-            _activeFunctionDisplayName = null;
+            ClosePopupWindows();
+            ResetSessionPacing();
 
             var recovered = _botService.ResetOrphanedRunningQueueItems();
             if (recovered > 0)
@@ -939,10 +930,16 @@ public partial class MainWindow
                 AppendLog($"Recovered {recovered} queue item(s) from Running to Pending after browser session reset.");
             }
 
-            RefreshQueueUi();
-            UpdateExecutionStateIndicator();
+            // Reuse the same in-memory/UI reset as an account switch, while preserving every
+            // account-scoped file. Reloading config-backed snapshots afterwards mirrors a fresh
+            // application start without clearing settings, queues, village cache, or saved login.
+            ClearAccountScopedUiState(clearQueue: false);
+            LoadConfigToUi();
+            SetLoopIndicator(false);
+            StartLoopButton.Content = "Start bot";
+            StartLoopButton.IsEnabled = true;
             StatusTextBlock.Text = "Browser session reset. Press Login to start a new session.";
-            AppendLog("Browser session reset completed. Account, settings, queue, cached villages, and saved login were kept.");
+            AppendLog("Program reset completed. Browser closed and runtime/UI state returned to startup. Account, settings, queue, cached villages, and saved login were kept.");
         }
         catch (Exception ex)
         {
