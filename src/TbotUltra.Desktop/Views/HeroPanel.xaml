@@ -416,6 +416,25 @@
                                 Padding="10"
                                 Margin="0,0,0,8">
                             <StackPanel>
+                                <Grid Margin="10,0,10,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="28" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="54" />
+                                        <ColumnDefinition Width="70" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="2"
+                                               Text="Pts"
+                                               HorizontalAlignment="Center"
+                                               Foreground="{DynamicResource TextMutedBrush}"
+                                               FontSize="10" />
+                                    <TextBlock Grid.Column="3"
+                                               Text="Max"
+                                               HorizontalAlignment="Center"
+                                               Foreground="{DynamicResource TextMutedBrush}"
+                                               FontSize="10"
+                                               ToolTip="Maximum total points for this attribute. Use 0 to skip it." />
+                                </Grid>
                                 <ListBox x:Name="HeroAttributePriorityItemsControl"
                                          HorizontalAlignment="Stretch"
                                          BorderThickness="0"
@@ -443,7 +462,8 @@
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="28" />
                                                         <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="54" />
+                                                        <ColumnDefinition Width="70" />
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Grid.Column="0"
                                                                Text="{Binding Order}"
@@ -462,6 +482,16 @@
                                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                                    FontSize="11" />
                                                     </Border>
+                                                    <TextBox Grid.Column="3"
+                                                             Width="56"
+                                                             Height="24"
+                                                             HorizontalAlignment="Right"
+                                                             VerticalContentAlignment="Center"
+                                                             TextAlignment="Center"
+                                                             Text="{Binding MaxPoints, Mode=OneWay}"
+                                                             LostFocus="HeroAttributeMaximum_LostFocus"
+                                                             KeyDown="HeroAttributeMaximum_KeyDown"
+                                                             ToolTip="Maximum total points (0-100). Empty or invalid values use 100." />
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>

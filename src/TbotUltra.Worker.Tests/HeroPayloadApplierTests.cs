@@ -16,6 +16,7 @@ public sealed class HeroPayloadApplierTests
             [BotOptionPayloadKeys.HeroAutoUseOintments] = "true",
             [BotOptionPayloadKeys.HeroOintmentTargetHpPercent] = "90",
             [BotOptionPayloadKeys.HeroStatPriority] = "resources,offence_bonus",
+            [BotOptionPayloadKeys.HeroStatMaximums] = "resources=40,fighting_strength=0",
             [BotOptionPayloadKeys.HeroAdventurePickOrder] = "hardest",
             [BotOptionPayloadKeys.HeroContinuousAdventures] = "true",
             [BotOptionPayloadKeys.IncreaseAdventuresToHard] = "true",
@@ -43,6 +44,9 @@ public sealed class HeroPayloadApplierTests
         Assert.True(result.HeroAutoUseOintments);
         Assert.Equal(90, result.HeroOintmentTargetHpPercent);
         Assert.Equal("resources,offence_bonus", result.HeroStatPriority);
+        Assert.Equal(
+            "resources=40,fighting_strength=0,offence_bonus=100,defence_bonus=100",
+            result.HeroStatMaximums);
         Assert.Equal("hardest", result.HeroAdventurePickOrder);
         Assert.True(result.HeroContinuousAdventures);
         Assert.True(result.IncreaseAdventuresToHard);

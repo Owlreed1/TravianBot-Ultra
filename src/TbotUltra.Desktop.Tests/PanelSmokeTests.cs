@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
+using TbotUltra.Core.Configuration;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Desktop.ViewModels;
@@ -437,6 +438,35 @@ public sealed class PanelSmokeTests
             Assert.Contains(
                 FindVisualChildren<CheckBox>(attributeAutomation),
                 checkBox => Equals(checkBox.Content, "Auto assign attribute points"));
+        });
+    }
+
+    [Fact]
+    public void HeroPanel_ShowsMaximumEditorAsTheRightmostAttributeColumn()
+    {
+        _wpf.Run(() =>
+        {
+            var vm = new HeroViewModel();
+            vm.LoadSettingsFromConfig(new BotOptions
+            {
+                HeroStatMaximums = "resources=40,fighting_strength=100,offence_bonus=100,defence_bonus=100",
+            });
+            var panel = new HeroPanel { DataContext = vm };
+
+            panel.Measure(new Size(1000, 700));
+            panel.Arrange(new Rect(0, 0, 1000, 700));
+            panel.UpdateLayout();
+
+            Assert.Contains(FindVisualChildren<TextBlock>(panel), text => text.Text == "Max");
+            var editors = FindVisualChildren<TextBox>(panel)
+                .Where(textBox => textBox.DataContext is HeroAttributePriorityItem)
+                .ToList();
+            Assert.Equal(4, editors.Count);
+            Assert.All(editors, editor => Assert.Equal(3, Grid.GetColumn(editor)));
+            Assert.Equal(
+                "40",
+                Assert.Single(editors, editor =>
+                    editor.DataContext is HeroAttributePriorityItem { Key: "resources" }).Text);
         });
     }
 

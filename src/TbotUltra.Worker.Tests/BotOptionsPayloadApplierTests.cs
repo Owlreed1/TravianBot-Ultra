@@ -613,6 +613,7 @@ public sealed class BotOptionsPayloadApplierTests
         var options = BotOptionsFactory.FromConfiguration(configuration);
 
         Assert.Equal("resources,fighting_strength,offence_bonus,defence_bonus", options.HeroStatPriority);
+        Assert.Equal(HeroAttributeMaximums.DefaultSerialized, options.HeroStatMaximums);
     }
 
     [Fact]
@@ -623,6 +624,7 @@ public sealed class BotOptionsPayloadApplierTests
             ["server_name"] = "Official",
             ["base_url"] = "https://ts50.x5.europe.travian.com",
             [BotOptionPayloadKeys.HeroStatPriority] = "offence_bonus,resources,fighting_strength,defence_bonus",
+            [BotOptionPayloadKeys.HeroStatMaximums] = "resources=40,offence_bonus=0",
         };
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(values)
@@ -631,6 +633,9 @@ public sealed class BotOptionsPayloadApplierTests
         var options = BotOptionsFactory.FromConfiguration(configuration);
 
         Assert.Equal("offence_bonus,resources,fighting_strength,defence_bonus", options.HeroStatPriority);
+        Assert.Equal(
+            "resources=40,fighting_strength=100,offence_bonus=0,defence_bonus=100",
+            options.HeroStatMaximums);
     }
 
     [Fact]

@@ -15,7 +15,11 @@ internal static class QueueExecutionOptionsResolver
 
         // Hero tasks can remain queued while the user reorders attributes in the UI. The account
         // configuration loaded for this execution is authoritative; the queued priority is only a snapshot.
-        return resolved with { HeroStatPriority = currentOptions.HeroStatPriority };
+        return resolved with
+        {
+            HeroStatPriority = currentOptions.HeroStatPriority,
+            HeroStatMaximums = currentOptions.HeroStatMaximums,
+        };
     }
 
     internal static bool IsHeroAttributeTask(string taskName)

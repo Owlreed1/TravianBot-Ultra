@@ -108,6 +108,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   "Check all" changes persist each affected row and publish one consolidated settings-changed notification.
 - Farming requires confirmed active Gold Club. Dashboard and Village settings must project Farming as OFF and
   non-clickable when Gold Club is false or unknown, and execution gating must enforce the same rule.
+- Hero attribute automation uses account-scoped absolute maximums (0-100) keyed by attribute; missing or invalid
+  values default to 100. Read the four live Official attribute inputs before every plus click, never cross a maximum,
+  and do not requeue point spending when the latest complete snapshot shows every configured maximum is reached.
 - Demolition is a village-scoped queue group: start one Official `table#demolish` step, persist the server timer plus its random delay as `NextAttemptAt`, and never poll or sleep through it in the browser. It has no per-village group toggle; an explicitly queued demolition is always group-enabled, while the village's master Auto toggle still controls automation.
 - Persist village identity by coordinates/key, not display name. Names may collide or change; queue items retain
   their target village identity.

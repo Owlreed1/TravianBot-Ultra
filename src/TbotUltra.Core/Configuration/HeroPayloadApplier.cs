@@ -7,6 +7,7 @@ internal sealed record HeroPayloadValues(
     bool AutoUseOintments,
     int OintmentTargetHpPercent,
     string StatPriority,
+    string StatMaximums,
     string AdventurePickOrder,
     bool ContinuousAdventures,
     bool IncreaseAdventuresToHard,
@@ -36,6 +37,7 @@ internal static class HeroPayloadApplier
             source.HeroAutoUseOintments,
             source.HeroOintmentTargetHpPercent,
             source.HeroStatPriority,
+            source.HeroStatMaximums,
             source.HeroAdventurePickOrder,
             source.HeroContinuousAdventures,
             source.IncreaseAdventuresToHard,
@@ -78,6 +80,8 @@ internal static class HeroPayloadApplier
                 result = result with { OintmentTargetHpPercent = NormalizeOintmentTarget(ointmentTarget) };
             else if (key.Equals(BotOptionPayloadKeys.HeroStatPriority, StringComparison.OrdinalIgnoreCase))
                 result = result with { StatPriority = value };
+            else if (key.Equals(BotOptionPayloadKeys.HeroStatMaximums, StringComparison.OrdinalIgnoreCase))
+                result = result with { StatMaximums = HeroAttributeMaximums.Serialize(HeroAttributeMaximums.Parse(value)) };
             else if (key.Equals(BotOptionPayloadKeys.HeroAdventurePickOrder, StringComparison.OrdinalIgnoreCase))
                 result = result with { AdventurePickOrder = value };
             else if (TryReadBool(key, value, BotOptionPayloadKeys.HeroContinuousAdventures, out var continuous))

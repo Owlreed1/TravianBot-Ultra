@@ -117,6 +117,7 @@ public static class BotOptionPayloadKeys
     public const string HeroAutoUseOintments = "hero_auto_use_ointments";
     public const string HeroOintmentTargetHpPercent = "hero_ointment_target_hp_percent";
     public const string HeroStatPriority = "hero_stat_priority";
+    public const string HeroStatMaximums = "hero_stat_maximums";
     public const string HeroAdventurePickOrder = "hero_adventure_pick_order"; // "shortest" or "top"
     public const string HeroContinuousAdventures = "hero_continuous_adventures";
     public const string IncreaseAdventuresToHard = "increase_adventures_to_hard";

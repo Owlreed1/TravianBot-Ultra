@@ -416,7 +416,7 @@ public sealed partial class TravianClient : IHeroClient
 
         if (autoAssignPoints && quick.HasUnassignedPointsSignal)
         {
-            var allocated = await TryAllocateHeroPointsAsync(statPriority, cancellationToken);
+            var allocated = await TryAllocateHeroPointsAsync(statPriority, _config.HeroStatMaximums, cancellationToken);
             if (allocated > 0)
             {
                 actions.Add($"points_allocated={allocated}");
@@ -696,7 +696,7 @@ public sealed partial class TravianClient : IHeroClient
         Notify("[hero] spend attribute points starting");
         await EnsureLoggedInAsync(cancellationToken: cancellationToken);
 
-        var allocated = await TryAllocateHeroPointsAsync(statPriority, cancellationToken);
+        var allocated = await TryAllocateHeroPointsAsync(statPriority, _config.HeroStatMaximums, cancellationToken);
         return allocated > 0
             ? $"Hero attribute points spent: {allocated}."
             : "Hero attribute points: no points available.";

@@ -43,6 +43,7 @@ public sealed class BotConfigStore
         BotOptionPayloadKeys.HeroAutoUseOintments,
         BotOptionPayloadKeys.HeroOintmentTargetHpPercent,
         BotOptionPayloadKeys.HeroStatPriority,
+        BotOptionPayloadKeys.HeroStatMaximums,
         BotOptionPayloadKeys.HeroAdventurePickOrder,
         BotOptionPayloadKeys.HeroContinuousAdventures,
         BotOptionPayloadKeys.IncreaseAdventuresToHard,

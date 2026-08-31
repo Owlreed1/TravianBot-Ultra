@@ -42,6 +42,14 @@ public sealed class QueueExecutor
                     $"[queue] refreshed hero attribute priority from current settings before execution: "
                     + $"queued='{queuedPriority}' current='{options.HeroStatPriority}'");
             }
+            if (QueueExecutionOptionsResolver.IsHeroAttributeTask(item.TaskName)
+                && item.Payload.TryGetValue(BotOptionPayloadKeys.HeroStatMaximums, out var queuedMaximums)
+                && !string.Equals(queuedMaximums, options.HeroStatMaximums, StringComparison.OrdinalIgnoreCase))
+            {
+                log(
+                    $"[queue] refreshed hero attribute maximums from current settings before execution: "
+                    + $"queued='{queuedMaximums}' current='{options.HeroStatMaximums}'");
+            }
 
             var result = await _taskRunner.ExecuteOnceAsync(
                 options,

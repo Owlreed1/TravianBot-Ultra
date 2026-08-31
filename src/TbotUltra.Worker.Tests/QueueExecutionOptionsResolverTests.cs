@@ -15,6 +15,7 @@ public sealed class QueueExecutionOptionsResolverTests
         var currentOptions = new BotOptions
         {
             HeroStatPriority = "offence_bonus,resources,fighting_strength,defence_bonus",
+            HeroStatMaximums = "resources=40,fighting_strength=80,offence_bonus=20,defence_bonus=100",
         };
         var item = new QueueItem
         {
@@ -23,6 +24,7 @@ public sealed class QueueExecutionOptionsResolverTests
             {
                 [BotOptionPayloadKeys.HeroStatPriority] =
                     "resources,fighting_strength,offence_bonus,defence_bonus",
+                [BotOptionPayloadKeys.HeroStatMaximums] = HeroAttributeMaximums.DefaultSerialized,
                 [BotOptionPayloadKeys.HeroAutoAssignPoints] = "false",
             },
         };
@@ -30,6 +32,7 @@ public sealed class QueueExecutionOptionsResolverTests
         var result = QueueExecutionOptionsResolver.Resolve(currentOptions, item);
 
         Assert.Equal(currentOptions.HeroStatPriority, result.HeroStatPriority);
+        Assert.Equal(currentOptions.HeroStatMaximums, result.HeroStatMaximums);
         Assert.False(result.HeroAutoAssignPoints);
     }
 

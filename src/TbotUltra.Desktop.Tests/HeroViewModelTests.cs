@@ -47,6 +47,44 @@ public sealed class HeroViewModelTests
             vm.BuildPriorityPayload());
     }
 
+    [Fact]
+    public void LoadSettingsFromConfig_LoadsAttributeMaximumsAndDefaultsMissingValues()
+    {
+        var vm = new HeroViewModel();
+
+        vm.LoadSettingsFromConfig(new BotOptions
+        {
+            HeroStatMaximums = "resources=40,fighting_strength=0",
+        });
+
+        Assert.Equal(40, Assert.Single(vm.AttributePriorityItems, item => item.Key == "resources").MaxPoints);
+        Assert.Equal(0, Assert.Single(vm.AttributePriorityItems, item => item.Key == "fighting_strength").MaxPoints);
+        Assert.Equal(100, Assert.Single(vm.AttributePriorityItems, item => item.Key == "offence_bonus").MaxPoints);
+        Assert.Equal(
+            "resources=40,fighting_strength=0,offence_bonus=100,defence_bonus=100",
+            vm.BuildMaximumsPayload());
+    }
+
+    [Fact]
+    public void AreAllAttributeMaximumsReached_RequiresKnownPointsAndHonorsZeroMaximum()
+    {
+        var vm = new HeroViewModel();
+        vm.LoadSettingsFromConfig(new BotOptions
+        {
+            HeroStatMaximums = "resources=40,fighting_strength=8,offence_bonus=0,defence_bonus=0",
+        });
+
+        Assert.False(vm.AreAllAttributeMaximumsReached());
+
+        vm.ApplyAttributeSnapshot(new HeroAttributeSnapshot(
+            Resources: 40,
+            FightingStrength: 8,
+            OffenceBonus: 0,
+            DefenceBonus: 0));
+
+        Assert.True(vm.AreAllAttributeMaximumsReached());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

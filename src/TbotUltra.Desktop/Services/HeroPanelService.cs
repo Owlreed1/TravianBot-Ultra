@@ -12,6 +12,7 @@ public sealed class HeroPanelService(IHeroPanelClient client, BotConfigStore con
     {
         var config = configStore.Load();
         config[BotOptionPayloadKeys.HeroStatPriority] = viewModel.BuildPriorityPayload();
+        config[BotOptionPayloadKeys.HeroStatMaximums] = viewModel.BuildMaximumsPayload();
         configStore.Save(config);
     }
 
@@ -24,6 +25,7 @@ public sealed class HeroPanelService(IHeroPanelClient client, BotConfigStore con
         config[BotOptionPayloadKeys.HeroAutoUseOintments] = viewModel.AutoUseOintments;
         config[BotOptionPayloadKeys.HeroOintmentTargetHpPercent] = viewModel.OintmentTargetHpPercent;
         config[BotOptionPayloadKeys.HeroStatPriority] = viewModel.BuildPriorityPayload();
+        config[BotOptionPayloadKeys.HeroStatMaximums] = viewModel.BuildMaximumsPayload();
         config[BotOptionPayloadKeys.HeroAdventurePickOrder] = viewModel.AdventurePickOrder;
         config.Remove("hero_hide_mode_enabled");
         config.Remove("hero_hide_mode");
@@ -43,6 +45,7 @@ public sealed class HeroPanelService(IHeroPanelClient client, BotConfigStore con
             AutoUseOintments: viewModel.AutoUseOintments,
             OintmentTargetHpPercent: viewModel.OintmentTargetHpPercent,
             StatPriority: viewModel.BuildPriorityPayload(),
+            StatMaximums: viewModel.BuildMaximumsPayload(),
             AdventurePickOrder: viewModel.AdventurePickOrder).ToDictionary();
         var copies = viewModel.ContinuousAdventures && availableAdventures > 1
             ? Math.Min(availableAdventures, 20)

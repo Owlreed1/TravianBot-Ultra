@@ -40,6 +40,7 @@ public sealed class BotConfigStoreTests : IDisposable
             BotOptionPayloadKeys.PostLoginReadTroopTrainingQueue,
             BotOptionPayloadKeys.PostLoginAnalyzeBrewery,
             BotOptionPayloadKeys.PostLoginAnalyzeNewVillages,
+            BotOptionPayloadKeys.HeroStatMaximums,
             BotOptionPayloadKeys.SessionPacingEnabled,
             BotOptionPayloadKeys.SessionPacingRunMinMinutes,
             BotOptionPayloadKeys.SessionPacingRunMaxMinutes,

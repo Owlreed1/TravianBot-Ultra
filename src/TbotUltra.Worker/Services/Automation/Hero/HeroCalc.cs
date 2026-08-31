@@ -1,4 +1,8 @@
+using TbotUltra.Core.Configuration;
+
 namespace TbotUltra.Worker.Services;
+
+internal sealed record HeroStatAllocationRule(string StatKey, string FieldName, int MaxPoints);
 
 /// <summary>
 /// Stateless hero helpers extracted from <see cref="TravianClient"/>:
@@ -99,6 +103,31 @@ internal static class HeroCalc
         return fields.Count > 0
             ? fields
             : ["productionPoints", "power", "offBonus", "defBonus"];
+    }
+
+    internal static IReadOnlyDictionary<string, int> ParseHeroStatMaximums(string value)
+        => HeroAttributeMaximums.Parse(value);
+
+    internal static IReadOnlyList<HeroStatAllocationRule> BuildHeroStatAllocationRules(
+        string priority,
+        string maximums)
+    {
+        var parsedMaximums = ParseHeroStatMaximums(maximums);
+        return ParseHeroStatPriority(priority)
+            .Select(stat => new HeroStatAllocationRule(
+                stat,
+                OfficialFieldForStat(stat)!,
+                parsedMaximums.GetValueOrDefault(stat, HeroAttributeMaximums.DefaultMaximum)))
+            .ToList();
+    }
+
+    internal static HeroStatAllocationRule? SelectEligibleHeroStat(
+        IEnumerable<HeroStatAllocationRule> rules,
+        IReadOnlyDictionary<string, int> currentValues)
+    {
+        return rules.FirstOrDefault(rule =>
+            currentValues.TryGetValue(rule.FieldName, out var current)
+            && current < rule.MaxPoints);
     }
 
     private static string? OfficialFieldForStat(string stat) => (stat ?? string.Empty).ToLowerInvariant() switch

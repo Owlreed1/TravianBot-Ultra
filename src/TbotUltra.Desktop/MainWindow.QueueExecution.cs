@@ -410,8 +410,13 @@ public partial class MainWindow
             || string.Equals(item.TaskName, "spend_hero_attribute_points", StringComparison.OrdinalIgnoreCase))
         {
             // A continuous-loop tick may have loaded its options before the user reordered Hero attributes.
-            // Reload only the execution-authoritative priority at the last synchronous boundary before running.
-            options = options with { HeroStatPriority = LoadBotOptions().HeroStatPriority };
+            // Reload the execution-authoritative attribute rules at the last synchronous boundary before running.
+            var currentHeroOptions = LoadBotOptions();
+            options = options with
+            {
+                HeroStatPriority = currentHeroOptions.HeroStatPriority,
+                HeroStatMaximums = currentHeroOptions.HeroStatMaximums,
+            };
         }
 
         MarkDueConstructionForPreSleepFill(item);

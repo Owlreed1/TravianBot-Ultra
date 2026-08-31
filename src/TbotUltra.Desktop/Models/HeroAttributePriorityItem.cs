@@ -8,6 +8,7 @@ public sealed class HeroAttributePriorityItem : INotifyPropertyChanged
 {
     private int _order;
     private string _pointsText = "-";
+    private int _maxPoints = 100;
 
     public string Key { get; init; } = string.Empty;
     public string Title { get; init; } = string.Empty;
@@ -38,6 +39,22 @@ public sealed class HeroAttributePriorityItem : INotifyPropertyChanged
             }
 
             _pointsText = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public int MaxPoints
+    {
+        get => _maxPoints;
+        set
+        {
+            var normalized = value is >= 0 and <= 100 ? value : 100;
+            if (_maxPoints == normalized)
+            {
+                return;
+            }
+
+            _maxPoints = normalized;
             OnPropertyChanged();
         }
     }

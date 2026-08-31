@@ -9,6 +9,7 @@ public sealed record HeroPayload(
     bool? AutoUseOintments = null,
     int? OintmentTargetHpPercent = null,
     string? StatPriority = null,
+    string? StatMaximums = null,
     string? AdventurePickOrder = null,
     bool? ContinuousAdventures = null)
 {
@@ -54,6 +55,7 @@ public sealed record HeroPayload(
             autoUseOintments,
             ointmentTarget,
             ReadTrimmed(payload, BotOptionPayloadKeys.HeroStatPriority),
+            ReadTrimmed(payload, BotOptionPayloadKeys.HeroStatMaximums),
             ReadTrimmed(payload, BotOptionPayloadKeys.HeroAdventurePickOrder),
             continuousAdventures);
         return true;
@@ -68,6 +70,7 @@ public sealed record HeroPayload(
         AddIfPresent(result, BotOptionPayloadKeys.HeroAutoUseOintments, FormatBool(AutoUseOintments));
         AddIfPresent(result, BotOptionPayloadKeys.HeroOintmentTargetHpPercent, OintmentTargetHpPercent?.ToString());
         AddIfPresent(result, BotOptionPayloadKeys.HeroStatPriority, StatPriority);
+        AddIfPresent(result, BotOptionPayloadKeys.HeroStatMaximums, StatMaximums);
         AddIfPresent(result, BotOptionPayloadKeys.HeroAdventurePickOrder, AdventurePickOrder);
         AddIfPresent(result, BotOptionPayloadKeys.HeroContinuousAdventures, FormatBool(ContinuousAdventures));
         return result;

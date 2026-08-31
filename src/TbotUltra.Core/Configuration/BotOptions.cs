@@ -672,6 +672,9 @@ public sealed record BotOptions
     [ConfigurationKeyName("hero_stat_priority")]
     public string HeroStatPriority { get; init; } = "resources,fighting_strength,offence_bonus,defence_bonus";
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.HeroStatMaximums)]
+    public string HeroStatMaximums { get; init; } = HeroAttributeMaximums.DefaultSerialized;
+
     [ConfigurationKeyName("hero_adventure_pick_order")]
     public string HeroAdventurePickOrder { get; init; } = "shortest"; // "shortest" or "top"
 

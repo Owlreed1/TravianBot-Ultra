@@ -120,6 +120,7 @@ public partial class MainWindow
             AutoUseOintments: _heroViewModel.AutoUseOintments,
             OintmentTargetHpPercent: _heroViewModel.OintmentTargetHpPercent,
             StatPriority: _heroViewModel.BuildPriorityPayload(),
+            StatMaximums: _heroViewModel.BuildMaximumsPayload(),
             AdventurePickOrder: _heroViewModel.AdventurePickOrder,
             ContinuousAdventures: _heroViewModel.ContinuousAdventures)
             .ToDictionary();

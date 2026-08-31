@@ -37,6 +37,11 @@ internal sealed record HeroAttributePageSnapshot(
     }
 }
 
+internal sealed record HeroAttributeAllocationPageState(
+    int FreePoints = 0,
+    int AttributeCount = 0,
+    Dictionary<string, int>? Values = null);
+
 // Hero attributes and inventory snapshot workflow.
 public sealed partial class TravianClient
 {
@@ -62,7 +67,10 @@ public sealed partial class TravianClient
     // inputs name="power"/"offBonus"/"defBonus"/"productionPoints", a .pointsAvailable counter,
     // per-attribute button.plus / button.minus, and a #savePoints submit (enabled once points are
     // assigned). Allocate by clicking the prioritised attribute's + button, then save.
-    private async Task<int> AllocateHeroPointsOfficialAsync(string priority, CancellationToken cancellationToken)
+    private async Task<int> AllocateHeroPointsOfficialAsync(
+        string priority,
+        string maximums,
+        CancellationToken cancellationToken)
     {
         Notify("[hero:verbose] official hero point allocation entered");
         await GotoAsync(Paths.HeroAttributes, cancellationToken);
@@ -80,58 +88,82 @@ public sealed partial class TravianClient
         {
         }
 
-        var fieldOrder = HeroCalc.MapHeroStatPriorityToOfficialFields(priority).ToList();
-        Notify($"[hero] official allocation priority='{priority}', fieldOrder={string.Join(",", fieldOrder)}");
+        var rules = HeroCalc.BuildHeroStatAllocationRules(priority, maximums);
+        Notify(
+            $"[hero] official allocation priority='{priority}', maximums='{maximums}', "
+            + $"rules={string.Join(",", rules.Select(rule => $"{rule.FieldName}<={rule.MaxPoints}"))}");
 
-        var before = await ReadPointsAvailableAsync();
-        if (before <= 0)
+        var state = await ReadHeroAttributeAllocationPageStateAsync();
+        var before = state.FreePoints;
+        if (state.FreePoints <= 0)
         {
             Notify("[hero] official allocation: no points available.");
             return 0;
         }
 
-        var remaining = before;
-        var used = 0;
         var exhaustedFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var usedFields = new List<string>();
-        while (remaining > 0)
+        while (state.FreePoints > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var activeOrder = fieldOrder.Where(field => !exhaustedFields.Contains(field)).ToList();
-            if (activeOrder.Count == 0)
+            var activeRules = rules.Where(rule => !exhaustedFields.Contains(rule.FieldName)).ToList();
+            var selected = HeroCalc.SelectEligibleHeroStat(
+                activeRules,
+                state.Values ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
+            if (selected is null)
             {
+                Notify(
+                    $"[hero] official allocation: all configured maximums reached; "
+                    + $"free points left={state.FreePoints}, values={FormatHeroAttributeValues(state.Values)}, "
+                    + $"maximums='{maximums}'.");
                 break;
             }
 
-            var fieldClicked = await ClickOfficialHeroAttributePlusAsync(activeOrder, cancellationToken);
+            var currentValue = state.Values!.GetValueOrDefault(selected.FieldName);
+            Notify(
+                $"[hero] official allocation: selected stat={selected.StatKey} field={selected.FieldName} "
+                + $"current={currentValue} max={selected.MaxPoints} free={state.FreePoints}.");
+            var fieldClicked = await ClickOfficialHeroAttributePlusAsync([selected.FieldName], cancellationToken);
             if (string.IsNullOrWhiteSpace(fieldClicked))
             {
-                break;
+                exhaustedFields.Add(selected.FieldName);
+                Notify($"[hero] official allocation: plus control unavailable for field={selected.FieldName}; trying next priority.");
+                continue;
             }
 
             await Task.Delay(500, cancellationToken);
-            var latest = await ReadPointsAvailableAsync();
-            if (latest >= remaining)
+            var latest = await ReadHeroAttributeAllocationPageStateAsync();
+            var latestValue = latest.Values?.GetValueOrDefault(selected.FieldName) ?? currentValue;
+            if (latest.FreePoints >= state.FreePoints || latestValue <= currentValue)
             {
                 await Task.Delay(500, cancellationToken);
-                latest = await ReadPointsAvailableAsync();
+                latest = await ReadHeroAttributeAllocationPageStateAsync();
+                latestValue = latest.Values?.GetValueOrDefault(selected.FieldName) ?? currentValue;
             }
 
-            if (latest >= remaining)
+            if (latest.FreePoints == state.FreePoints && latestValue == currentValue)
             {
                 exhaustedFields.Add(fieldClicked);
                 Notify($"[hero] official allocation: field={fieldClicked} did not consume a point, trying next priority.");
                 continue;
             }
 
-            used += remaining - latest;
-            remaining = latest;
+            if (latest.FreePoints != state.FreePoints - 1 || latestValue != currentValue + 1)
+            {
+                throw new InvalidOperationException(
+                    $"Hero attribute click verification failed for {selected.FieldName}: "
+                    + $"value {currentValue}->{latestValue}, free points {state.FreePoints}->{latest.FreePoints}.");
+            }
+
             usedFields.Add(fieldClicked);
-            Notify($"[hero] official allocation: clicked {fieldClicked}, points remaining={remaining}");
+            state = latest;
+            Notify(
+                $"[hero] official allocation: verified field={fieldClicked} value={latestValue}/{selected.MaxPoints}, "
+                + $"points remaining={state.FreePoints}.");
         }
 
-        var after = await ReadPointsAvailableAsync();
-        used = Math.Max(0, before - after);
+        var after = state.FreePoints;
+        var used = Math.Max(0, before - after);
         Notify($"[hero] official allocation: fields={string.Join(",", usedFields.Distinct(StringComparer.OrdinalIgnoreCase))}, points before={before}, after={after}, used={used}");
         if (used <= 0)
         {
@@ -159,21 +191,58 @@ public sealed partial class TravianClient
               return false;
             }
             """);
-        if (saved)
+        if (!saved)
         {
-            InvalidateCachedHeroAttributeSnapshot();
-            await WaitForPageReadyAsync(cancellationToken); // Wait for page to load
+            throw new InvalidOperationException("Hero attribute changes were prepared, but Save changes was unavailable.");
         }
+
+        InvalidateCachedHeroAttributeSnapshot();
+        await WaitForPageReadyAsync(cancellationToken); // Wait for page to load
 
         Notify($"[hero] official point allocation: assigned {used}, saved={saved}");
         return used;
     }
 
-    private async Task<int> ReadPointsAvailableAsync()
+    private async Task<HeroAttributeAllocationPageState> ReadHeroAttributeAllocationPageStateAsync()
     {
-        return await _page.EvaluateAsync<int>(
-            """() => parseInt((document.querySelector('.pointsAvailable')?.textContent || '0').replace(/[^\d]/g, ''), 10) || 0""");
+        var rawJson = await _page.EvaluateAsync<string>(
+            """
+            () => {
+              const read = name => {
+                const input = document.querySelector(`.heroAttributes input[name="${name}"]`);
+                const value = (input?.value || '').replace(/[^0-9]/g, '');
+                return value ? Number(value) || 0 : 0;
+              };
+              const freeText = (document.querySelector('.heroAttributes .pointsAvailable, .pointsAvailable')?.textContent || '0')
+                .replace(/[^0-9]/g, '');
+              return JSON.stringify({
+                freePoints: freeText ? Number(freeText) || 0 : 0,
+                attributeCount: ['productionPoints', 'power', 'offBonus', 'defBonus']
+                  .filter(name => document.querySelector(`.heroAttributes input[name="${name}"]`)).length,
+                values: {
+                  productionPoints: read('productionPoints'),
+                  power: read('power'),
+                  offBonus: read('offBonus'),
+                  defBonus: read('defBonus')
+                }
+              });
+            }
+            """);
+        var state = JsonSerializer.Deserialize<HeroAttributeAllocationPageState>(
+                rawJson,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? new HeroAttributeAllocationPageState();
+        if (state.AttributeCount != 4 || state.Values is null || state.Values.Count != 4)
+        {
+            throw new InvalidOperationException(
+                $"Hero attribute allocation requires all four live inputs; found {state.AttributeCount}/4.");
+        }
+
+        return state;
     }
+
+    private static string FormatHeroAttributeValues(IReadOnlyDictionary<string, int>? values)
+        => values is null ? "unknown" : string.Join(",", values.Select(pair => $"{pair.Key}={pair.Value}"));
 
     private async Task<string?> ClickOfficialHeroAttributePlusAsync(IReadOnlyList<string> fieldOrder, CancellationToken cancellationToken)
     {
@@ -241,9 +310,12 @@ public sealed partial class TravianClient
             fieldOrder);
     }
 
-    private async Task<int> TryAllocateHeroPointsAsync(string priority, CancellationToken cancellationToken)
+    private async Task<int> TryAllocateHeroPointsAsync(
+        string priority,
+        string maximums,
+        CancellationToken cancellationToken)
     {
-        return await AllocateHeroPointsOfficialAsync(priority, cancellationToken);
+        return await AllocateHeroPointsOfficialAsync(priority, maximums, cancellationToken);
     }
 
     private async Task<bool> WaitForAttributesTableAsync(CancellationToken cancellationToken, int timeoutMs)

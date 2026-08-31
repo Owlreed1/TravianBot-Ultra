@@ -35,6 +35,7 @@ public static class BotOptionsPayloadApplier
         var heroAutoUseOintments = hero.AutoUseOintments;
         var heroOintmentTargetHpPercent = hero.OintmentTargetHpPercent;
         var heroStatPriority = hero.StatPriority;
+        var heroStatMaximums = hero.StatMaximums;
         var heroAdventurePickOrder = hero.AdventurePickOrder;
         var heroContinuousAdventures = hero.ContinuousAdventures;
         var increaseAdventuresToHard = hero.IncreaseAdventuresToHard;
@@ -345,6 +346,7 @@ public static class BotOptionsPayloadApplier
             HeroAutoUseOintments = heroAutoUseOintments,
             HeroOintmentTargetHpPercent = heroOintmentTargetHpPercent,
             HeroStatPriority = heroStatPriority,
+            HeroStatMaximums = heroStatMaximums,
             HeroAdventurePickOrder = heroAdventurePickOrder,
             HeroContinuousAdventures = heroContinuousAdventures,
             IncreaseAdventuresToHard = increaseAdventuresToHard,

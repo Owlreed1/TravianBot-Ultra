@@ -109,6 +109,7 @@ public sealed class PanelServiceContractTests : IDisposable
             AdventureVideoChancePercent = 35,
         };
         vm.LoadPriorityFromConfig("offence_bonus,resources,defence_bonus,fighting_strength");
+        vm.LoadMaximumsFromConfig("resources=40,fighting_strength=80,offence_bonus=0,defence_bonus=100");
         var service = new HeroPanelService(new RecordingHeroClient(), store);
 
         service.PersistSettings(vm);
@@ -122,6 +123,7 @@ public sealed class PanelServiceContractTests : IDisposable
         Assert.True(persisted[BotOptionPayloadKeys.HeroAutoUseOintments]!.GetValue<bool>());
         Assert.Equal(90, persisted[BotOptionPayloadKeys.HeroOintmentTargetHpPercent]!.GetValue<int>());
         Assert.Equal("resources,fighting_strength,offence_bonus,defence_bonus", persisted[BotOptionPayloadKeys.HeroStatPriority]!.GetValue<string>());
+        Assert.Equal("resources=40,fighting_strength=80,offence_bonus=0,defence_bonus=100", persisted[BotOptionPayloadKeys.HeroStatMaximums]!.GetValue<string>());
         Assert.Equal("top", persisted[BotOptionPayloadKeys.HeroAdventurePickOrder]!.GetValue<string>());
         Assert.True(persisted[BotOptionPayloadKeys.HeroContinuousAdventures]!.GetValue<bool>());
         Assert.True(persisted[BotOptionPayloadKeys.IncreaseAdventuresToHard]!.GetValue<bool>());

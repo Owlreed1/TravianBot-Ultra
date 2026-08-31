@@ -779,6 +779,19 @@ public partial class MainWindow
             return;
         }
 
+        var maximumState = Dispatcher.CheckAccess()
+            ? (_heroViewModel.AreAllAttributeMaximumsReached(), _heroViewModel.BuildMaximumsPayload())
+            : Dispatcher.Invoke(() =>
+                (_heroViewModel.AreAllAttributeMaximumsReached(), _heroViewModel.BuildMaximumsPayload()));
+        var maximumsReached = maximumState.Item1;
+        if (maximumsReached)
+        {
+            AppendLog(
+                $"[hero:verbose] attribute allocation not queued because all configured maximums are reached. "
+                + $"maximums='{maximumState.Item2}'.");
+            return;
+        }
+
         var payload = BuildHeroRuntimePayload();
         _botService.EnqueueRuntime("spend_hero_attribute_points", "Hero attribute points", payload, priority: -50, maxRetries: 0);
         AppendLog($"Hero attributes: queued spend_hero_attribute_points because levelUp indicator is visible. priority={payload[BotOptionPayloadKeys.HeroStatPriority]}");

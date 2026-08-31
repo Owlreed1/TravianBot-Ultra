@@ -1178,6 +1178,38 @@ public sealed class TravianClientHelperTests
     }
 
     [Theory]
+    [InlineData("", "resources=100,fighting_strength=100,offence_bonus=100,defence_bonus=100")]
+    [InlineData("resources=40,fighting_strength=0", "resources=40,fighting_strength=0,offence_bonus=100,defence_bonus=100")]
+    [InlineData("resources=101,offence_bonus=broken,unknown=5", "resources=100,fighting_strength=100,offence_bonus=100,defence_bonus=100")]
+    public void ParseHeroStatMaximums_NormalizesKnownValuesAndDefaultsInvalidEntries(string input, string expected)
+    {
+        var result = HeroCalc.ParseHeroStatMaximums(input);
+        Assert.Equal(expected, string.Join(",", result.Select(pair => $"{pair.Key}={pair.Value}")));
+    }
+
+    [Fact]
+    public void SelectEligibleHeroStat_UsesPriorityAndSkipsReachedMaximums()
+    {
+        var rules = HeroCalc.BuildHeroStatAllocationRules(
+            "resources,fighting_strength,offence_bonus,defence_bonus",
+            "resources=40,fighting_strength=100,offence_bonus=0,defence_bonus=100");
+        var currentValues = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["productionPoints"] = 40,
+            ["power"] = 8,
+            ["offBonus"] = 0,
+            ["defBonus"] = 100,
+        };
+
+        var selected = HeroCalc.SelectEligibleHeroStat(rules, currentValues);
+
+        Assert.NotNull(selected);
+        Assert.Equal("fighting_strength", selected.StatKey);
+        Assert.Equal("power", selected.FieldName);
+        Assert.Equal(100, selected.MaxPoints);
+    }
+
+    [Theory]
     [InlineData("Main", "main")]
     [InlineData("  Main  ", "main")]
     [InlineData("HTTPS://Example.com/", "https://example.com/")]

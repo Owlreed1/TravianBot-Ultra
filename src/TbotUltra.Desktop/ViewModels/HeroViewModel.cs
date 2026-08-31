@@ -461,6 +461,7 @@ public sealed class HeroViewModel : BaseViewModel
         HeroResourceUseBrewery = options.HeroResourceUseBrewery;
         HeroResourceUseTownHall = options.HeroResourceUseTownHall;
         LoadPriorityFromConfig(options.HeroStatPriority);
+        LoadMaximumsFromConfig(options.HeroStatMaximums);
     }
 
     /// <summary>
@@ -474,6 +475,8 @@ public sealed class HeroViewModel : BaseViewModel
         var order = ParsePriorityForUi(configuredPriority);
         var existingPoints = AttributePriorityItems
             .ToDictionary(item => item.Key, item => item.PointsText, StringComparer.OrdinalIgnoreCase);
+        var existingMaximums = AttributePriorityItems
+            .ToDictionary(item => item.Key, item => item.MaxPoints, StringComparer.OrdinalIgnoreCase);
         AttributePriorityItems.Clear();
 
         for (var i = 0; i < order.Count; i++)
@@ -484,7 +487,17 @@ public sealed class HeroViewModel : BaseViewModel
                 Title = GetAttributeTitle(order[i]),
                 Order = i + 1,
                 PointsText = existingPoints.GetValueOrDefault(order[i], "-"),
+                MaxPoints = existingMaximums.GetValueOrDefault(order[i], HeroAttributeMaximums.DefaultMaximum),
             });
+        }
+    }
+
+    public void LoadMaximumsFromConfig(string? configuredMaximums)
+    {
+        var maximums = HeroAttributeMaximums.Parse(configuredMaximums);
+        foreach (var item in AttributePriorityItems)
+        {
+            item.MaxPoints = maximums.GetValueOrDefault(item.Key, HeroAttributeMaximums.DefaultMaximum);
         }
     }
 
@@ -538,6 +551,19 @@ public sealed class HeroViewModel : BaseViewModel
         HeroStatusText = snapshot.HomeVillageHeroAway && !terminalStatus
             ? string.IsNullOrWhiteSpace(snapshot.MovementState) ? "Away" : snapshot.MovementState.Trim()
             : FormatHeroStatus(snapshot.HeroState, snapshot.ReviveRemainingSeconds);
+    }
+
+    public string BuildMaximumsPayload()
+    {
+        return HeroAttributeMaximums.Serialize(
+            AttributePriorityItems.Select(item => new KeyValuePair<string, int>(item.Key, item.MaxPoints)));
+    }
+
+    public bool AreAllAttributeMaximumsReached()
+    {
+        return AttributePriorityItems.Count > 0
+            && AttributePriorityItems.All(item =>
+                int.TryParse(item.PointsText, out var points) && points >= item.MaxPoints);
     }
 
     private static string FormatHeroStatus(string? state, int? reviveRemainingSeconds)

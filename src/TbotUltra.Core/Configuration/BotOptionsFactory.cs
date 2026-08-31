@@ -55,6 +55,8 @@ public static class BotOptionsFactory
         var heroStatPriority = string.IsNullOrWhiteSpace(configuration[BotOptionPayloadKeys.HeroStatPriority])
             ? DefaultHeroStatPriority
             : configuration[BotOptionPayloadKeys.HeroStatPriority]!;
+        var heroStatMaximums = HeroAttributeMaximums.Serialize(
+            HeroAttributeMaximums.Parse(configuration[BotOptionPayloadKeys.HeroStatMaximums]));
         var legacyActionPacing = LegacyActionPacingCompatibility.Resolve(configuration);
         var actionPacingDefaults = legacyActionPacing.Fallbacks;
 
@@ -286,6 +288,7 @@ public static class BotOptionsFactory
             HeroAutoUseOintments = configuration.GetValue(BotOptionPayloadKeys.HeroAutoUseOintments, false),
             HeroOintmentTargetHpPercent = NormalizeHeroOintmentTarget(configuration.GetValue(BotOptionPayloadKeys.HeroOintmentTargetHpPercent, 100)),
             HeroStatPriority = heroStatPriority,
+            HeroStatMaximums = heroStatMaximums,
             HeroAdventurePickOrder = configuration[BotOptionPayloadKeys.HeroAdventurePickOrder] ?? "shortest",
             HeroContinuousAdventures = configuration.GetValue(BotOptionPayloadKeys.HeroContinuousAdventures, false),
             IncreaseAdventuresToHard = configuration.GetValue(BotOptionPayloadKeys.IncreaseAdventuresToHard, true),

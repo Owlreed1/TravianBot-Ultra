@@ -248,7 +248,67 @@ public partial class HeroPanel : UserControl
     private void HeroAttributePriorityItemsControl_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         _dragStart = e.GetPosition(HeroAttributePriorityItemsControl);
+        if (FindVisualParent<TextBox>(e.OriginalSource as DependencyObject) is not null)
+        {
+            _dragSource = null;
+            return;
+        }
+
         _dragSource = FindHeroAttributePriorityItem(e.OriginalSource as DependencyObject);
+    }
+
+    private void HeroAttributeMaximum_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox textBox)
+        {
+            PersistHeroAttributeMaximum(textBox);
+        }
+    }
+
+    private void HeroAttributeMaximum_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || sender is not TextBox textBox)
+        {
+            return;
+        }
+
+        PersistHeroAttributeMaximum(textBox);
+        Keyboard.ClearFocus();
+        e.Handled = true;
+    }
+
+    private void PersistHeroAttributeMaximum(TextBox textBox)
+    {
+        if (textBox.DataContext is not HeroAttributePriorityItem item)
+        {
+            return;
+        }
+
+        var maximum = int.TryParse(textBox.Text, out var parsed) && parsed is >= 0 and <= 100
+            ? parsed
+            : 100;
+        var changed = item.MaxPoints != maximum;
+        item.MaxPoints = maximum;
+        textBox.Text = maximum.ToString();
+        if (changed)
+        {
+            Host?.PersistHeroPriorityToConfig();
+        }
+    }
+
+    private static T? FindVisualParent<T>(DependencyObject? source) where T : DependencyObject
+    {
+        while (source is not null)
+        {
+            if (source is T match)
+            {
+                return match;
+            }
+
+            source = VisualTreeHelper.GetParent(source);
+        }
+
+        return null;
     }
 
     private void HeroAttributePriorityItemsControl_PreviewMouseMove(object sender, MouseEventArgs e)
