@@ -65,6 +65,7 @@ public sealed class EnvAccountStore
                     Name = name,
                     Username = values.GetValueOrDefault($"{prefix}USERNAME", string.Empty),
                     Password = values.GetValueOrDefault($"{prefix}PASSWORD", string.Empty),
+                    ManualLogin = ParseBool(values.GetValueOrDefault($"{prefix}MANUAL_LOGIN", string.Empty)),
                     ServerName = values.GetValueOrDefault($"{prefix}SERVER_NAME", string.Empty),
                     ServerUrl = values.GetValueOrDefault($"{prefix}SERVER_URL", string.Empty),
                     ProxyEnabled = ParseBool(values.GetValueOrDefault($"{prefix}PROXY_ENABLED", string.Empty)),
@@ -119,6 +120,7 @@ public sealed class EnvAccountStore
             var prefix = $"TBOT_{normalized.ToUpperInvariant()}_";
             values[$"{prefix}USERNAME"] = account.Username.Trim();
             values[$"{prefix}PASSWORD"] = account.Password;
+            values[$"{prefix}MANUAL_LOGIN"] = account.ManualLogin ? "true" : "false";
             values[$"{prefix}SERVER_NAME"] = account.ServerName.Trim();
             values[$"{prefix}SERVER_URL"] = account.ServerUrl.Trim().TrimEnd('/');
             values[$"{prefix}PROXY_ENABLED"] = account.ProxyEnabled ? "true" : "false";
@@ -169,6 +171,7 @@ public sealed class EnvAccountStore
                 var prefix = $"TBOT_{normalized.ToUpperInvariant()}_";
                 values.Remove($"{prefix}USERNAME");
                 values.Remove($"{prefix}PASSWORD");
+                values.Remove($"{prefix}MANUAL_LOGIN");
                 values.Remove($"{prefix}SERVER_NAME");
                 values.Remove($"{prefix}SERVER_URL");
                 values.Remove($"{prefix}PROXY_ENABLED");
@@ -256,6 +259,8 @@ public sealed class EnvAccountStore
             var prefix = $"TBOT_{name.ToUpperInvariant()}_";
             lines.Add($"{prefix}USERNAME={EnvFileParser.FormatValue(values.GetValueOrDefault($"{prefix}USERNAME", string.Empty))}");
             lines.Add($"{prefix}PASSWORD={EnvFileParser.FormatValue(values.GetValueOrDefault($"{prefix}PASSWORD", string.Empty))}");
+            var manualLogin = ParseBool(values.GetValueOrDefault($"{prefix}MANUAL_LOGIN", string.Empty));
+            lines.Add($"{prefix}MANUAL_LOGIN={(manualLogin ? "true" : "false")}");
             lines.Add($"{prefix}SERVER_NAME={EnvFileParser.FormatValue(values.GetValueOrDefault($"{prefix}SERVER_NAME", string.Empty))}");
             lines.Add($"{prefix}SERVER_URL={EnvFileParser.FormatValue(values.GetValueOrDefault($"{prefix}SERVER_URL", string.Empty))}");
             // Always emit a deterministic true/false so the file never carries an empty enabled flag.

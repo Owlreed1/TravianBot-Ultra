@@ -290,6 +290,14 @@ public partial class MainWindow
             PersistLastFullPostLoginTimestamp();
             CompleteOperation(operationId, operationSw, "Login completed.");
         }
+        catch (ManualLoginCanceledException)
+        {
+            StatusTextBlock.Text = "Manual login canceled.";
+            AppendLog("[manual-login] canceled; closing the browser session.");
+            await _botService.ShutdownAsync(AppendLog);
+            ResetLoggedOutUiState();
+            CompleteOperation(operationId, operationSw, "Manual login canceled and browser closed.");
+        }
         catch (OperationCanceledException)
         {
             StatusTextBlock.Text = "Login paused.";
@@ -600,6 +608,7 @@ public partial class MainWindow
         Name = source.Name,
         Username = source.Username,
         Password = source.Password,
+        ManualLogin = source.ManualLogin,
         ServerName = source.ServerName,
         ServerUrl = source.ServerUrl,
         ProxyEnabled = source.ProxyEnabled,

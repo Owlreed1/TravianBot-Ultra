@@ -41,6 +41,10 @@ public sealed class EnvAccountProvider : IAccountProvider
         var envPrefix = $"TBOT_{selectedName.ToUpperInvariant()}_";
         var username = GetValue($"{envPrefix}USERNAME", envValues);
         var password = GetValue($"{envPrefix}PASSWORD", envValues);
+        var manualLogin = string.Equals(
+            (GetValue($"{envPrefix}MANUAL_LOGIN", envValues) ?? string.Empty).Trim(),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
         var serverName = GetValue($"{envPrefix}SERVER_NAME", envValues) ?? string.Empty;
         var serverUrl = (GetValue($"{envPrefix}SERVER_URL", envValues) ?? string.Empty).TrimEnd('/');
         var proxyEnabled = string.Equals(
@@ -53,14 +57,16 @@ public sealed class EnvAccountProvider : IAccountProvider
             "true",
             StringComparison.OrdinalIgnoreCase);
 
-        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(username) || (!manualLogin && string.IsNullOrWhiteSpace(password)))
         {
             throw new InvalidOperationException(
-                $"Missing credentials for account '{selectedName}'. Add {envPrefix}USERNAME and {envPrefix}PASSWORD to .env."
+                manualLogin
+                    ? $"Missing email for manual-login account '{selectedName}'. Add {envPrefix}USERNAME to .env."
+                    : $"Missing credentials for account '{selectedName}'. Add {envPrefix}USERNAME and {envPrefix}PASSWORD to .env."
             );
         }
 
-        if (ExampleValues.Contains(username) || ExampleValues.Contains(password))
+        if (ExampleValues.Contains(username) || (!manualLogin && ExampleValues.Contains(password ?? string.Empty)))
         {
             throw new InvalidOperationException(
                 $"Credentials for account '{selectedName}' still look like example values. Open .env and add real credentials."
@@ -71,7 +77,8 @@ public sealed class EnvAccountProvider : IAccountProvider
         {
             Name = selectedName,
             Username = username,
-            Password = password,
+            Password = password ?? string.Empty,
+            ManualLogin = manualLogin,
             ServerName = serverName,
             ServerUrl = serverUrl,
             ProxyEnabled = proxyEnabled,

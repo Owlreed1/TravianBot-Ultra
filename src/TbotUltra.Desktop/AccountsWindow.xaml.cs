@@ -41,7 +41,7 @@ public partial class AccountsWindow : Window
     private string _editingOriginalName = string.Empty;
     private string _editingOriginalServerName = string.Empty;
     private string _selectedAccountName = string.Empty;
-    private AccountEditorSnapshot _baselineEditorState = new(string.Empty, string.Empty, string.Empty, false, string.Empty, false);
+    private AccountEditorSnapshot _baselineEditorState = new(string.Empty, string.Empty, false, string.Empty, false, string.Empty, false);
     private bool _suppressSelectionChanged;
     private bool _suppressSavedProxySelection;
     private bool _isClosing;
@@ -184,6 +184,8 @@ public partial class AccountsWindow : Window
         UsernameTextBox.Text = selected.Username;
         PasswordBox.Password = selected.Password;
         PasswordTextBox.Text = selected.Password;
+        ManualLoginCheckBox.IsChecked = selected.ManualLogin;
+        UpdatePasswordEditorAvailability();
         // Set the proxy fields before the InfoTextBlock assignment below so the checkbox handler's
         // hint does not overwrite the "Editing existing account" message.
         // Order matters: UseProxyCheckBox_Changed re-checks "Use proxy" while the previous account's
@@ -500,6 +502,31 @@ public partial class AccountsWindow : Window
         }
 
         UpdateActionButtons();
+    }
+
+    private void ManualLoginCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        UpdatePasswordEditorAvailability();
+        UpdateActionButtons();
+    }
+
+    private void UpdatePasswordEditorAvailability()
+    {
+        var enabled = ManualLoginCheckBox?.IsChecked != true;
+        if (PasswordBox is not null)
+        {
+            PasswordBox.IsEnabled = enabled;
+        }
+
+        if (PasswordTextBox is not null)
+        {
+            PasswordTextBox.IsEnabled = enabled;
+        }
+
+        if (TogglePasswordButton is not null)
+        {
+            TogglePasswordButton.IsEnabled = enabled;
+        }
     }
 
     private void EditorField_Changed(object sender, RoutedEventArgs e)
@@ -1164,6 +1191,7 @@ public partial class AccountsWindow : Window
         return AccountEditorState.BuildAccountEntry(new AccountEditorInput(
             UsernameTextBox.Text,
             password,
+            ManualLoginCheckBox.IsChecked == true,
             serverName,
             serverUrl,
             UseProxyCheckBox.IsChecked == true,
@@ -1192,10 +1220,12 @@ public partial class AccountsWindow : Window
         UsernameTextBox.Text = string.Empty;
         PasswordBox.Password = string.Empty;
         PasswordTextBox.Text = string.Empty;
+        ManualLoginCheckBox.IsChecked = false;
         _showPassword = false;
         PasswordBox.Visibility = Visibility.Visible;
         PasswordTextBox.Visibility = Visibility.Collapsed;
         TogglePasswordButton.Content = "Show";
+        UpdatePasswordEditorAvailability();
         // "Never use own IP" must be cleared FIRST: UseProxyCheckBox_Changed refuses to uncheck the
         // proxy while it is on and re-checks the box, which left a new account with "Use proxy" ticked
         // but every proxy control (including the saved-proxy list) disabled until the user toggled the
@@ -1292,6 +1322,7 @@ public partial class AccountsWindow : Window
         => new(
             UsernameTextBox.Text.Trim(),
             (_showPassword ? PasswordTextBox.Text : PasswordBox.Password) ?? string.Empty,
+            ManualLoginCheckBox.IsChecked == true,
             (ServerComboBox.SelectedItem as ServerOption)?.BaseUrl?.Trim() ?? string.Empty,
             UseProxyCheckBox.IsChecked == true,
             BuildProxyServerString(),

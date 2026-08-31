@@ -34,6 +34,9 @@ public sealed record TravianClientCallbacks
     /// </summary>
     public Action<bool>? SetConsentDomainsAllowed { get; init; }
 
+    /// <summary>Enables the narrowly scoped lobby authentication popup policy.</summary>
+    public Action<bool>? SetManualAuthenticationPopupsAllowed { get; init; }
+
     /// <summary>Cleans up after a bonus-video run on the given page.</summary>
     public Func<IPage, CancellationToken, Task>? CleanupAfterBonusVideoAsync { get; init; }
 
@@ -45,6 +48,9 @@ public sealed record TravianClientCallbacks
 
     /// <summary>Asks the host to resolve which world to select at the lobby.</summary>
     public Func<LobbyWorldSelectionRequest, CancellationToken, Task<string?>>? LobbyWorldSelectionRequested { get; init; }
+
+    /// <summary>Blocks the host UI while the user completes a manual lobby login.</summary>
+    public Func<ManualLoginConfirmationRequest, CancellationToken, Task<bool>>? ManualLoginConfirmationRequested { get; init; }
 
     /// <summary>Notifies the host once a lobby world's server identity is verified.</summary>
     public Func<LobbyWorldServerResolution, CancellationToken, Task>? LobbyWorldServerResolved { get; init; }

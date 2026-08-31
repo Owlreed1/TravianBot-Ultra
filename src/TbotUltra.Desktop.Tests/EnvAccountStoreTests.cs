@@ -133,6 +133,21 @@ public sealed class EnvAccountStoreTests : IDisposable
     }
 
     [Fact]
+    public void SaveAccount_RoundTripsManualLoginWithoutPassword()
+    {
+        var store = new EnvAccountStore(_envPath);
+        var account = Account("manual");
+        account.Password = string.Empty;
+        account.ManualLogin = true;
+
+        store.SaveAccount(account, setActive: true);
+
+        var reloaded = store.ListAccounts().Single();
+        Assert.True(reloaded.ManualLogin);
+        Assert.Equal(string.Empty, reloaded.Password);
+    }
+
+    [Fact]
     public void SaveAccount_NormalizesNameToLowercaseUnderscored()
     {
         var store = new EnvAccountStore(_envPath);

@@ -99,26 +99,37 @@
                 <TextBox x:Name="UsernameTextBox" Grid.Row="0" Grid.Column="1" Margin="0,0,0,8" TextChanged="EditorField_Changed" />
 
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Password" Margin="0,0,8,8" VerticalAlignment="Center" />
-                <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="70" />
-                    </Grid.ColumnDefinitions>
+                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="70" />
+                        </Grid.ColumnDefinitions>
 
-                    <PasswordBox x:Name="PasswordBox"
+                        <PasswordBox x:Name="PasswordBox"
+                                     Grid.Column="0"
+                                     Margin="0,0,8,0"
+                                     PasswordChanged="PasswordBox_PasswordChanged" />
+                        <TextBox x:Name="PasswordTextBox"
                                  Grid.Column="0"
                                  Margin="0,0,8,0"
-                                 PasswordChanged="PasswordBox_PasswordChanged" />
-                    <TextBox x:Name="PasswordTextBox"
-                             Grid.Column="0"
-                             Margin="0,0,8,0"
-                             Visibility="Collapsed"
-                             TextChanged="PasswordTextBox_TextChanged" />
-                    <Button x:Name="TogglePasswordButton"
-                            Grid.Column="1"
-                            Content="Show"
-                            Click="TogglePasswordButton_Click" />
-                </Grid>
+                                 Visibility="Collapsed"
+                                 TextChanged="PasswordTextBox_TextChanged" />
+                        <Button x:Name="TogglePasswordButton"
+                                Grid.Column="1"
+                                Content="Show"
+                                Click="TogglePasswordButton_Click" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <CheckBox x:Name="ManualLoginCheckBox"
+                                  Content="Manual login"
+                                  Checked="ManualLoginCheckBox_Changed"
+                                  Unchecked="ManualLoginCheckBox_Changed" />
+                        <ContentControl Style="{DynamicResource InfoTooltipIconStyle}"
+                                        Margin="6,0,0,0"
+                                        ToolTip="Open the Travian lobby and wait while you sign in manually. Password is optional." />
+                    </StackPanel>
+                </StackPanel>
 
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Server" Margin="0,0,8,8" VerticalAlignment="Center" />
                 <Grid Grid.Row="2" Grid.Column="1" Margin="0,0,0,8">

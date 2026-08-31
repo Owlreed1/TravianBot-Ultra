@@ -167,6 +167,40 @@ public sealed partial class TravianClient
 
                 if (entryState == LobbyEntryState.LoginForm)
                 {
+                    if (_account.ManualLogin)
+                    {
+                        if (_manualLoginConfirmationRequested is null)
+                        {
+                            throw new InvalidOperationException("Manual login requires an interactive confirmation host.");
+                        }
+
+                        Notify("[manual-login] lobby is ready; waiting for the user to complete login in the browser.");
+                        string? validationMessage = null;
+                        while (true)
+                        {
+                            var loginDone = await _manualLoginConfirmationRequested(
+                                new ManualLoginConfirmationRequest(validationMessage),
+                                cancellationToken);
+                            if (!loginDone)
+                            {
+                                throw new ManualLoginCanceledException();
+                            }
+
+                            Notify("[manual-login] Login done clicked; verifying the authenticated lobby.");
+                            if (await WaitForLobbyWorldCardsAsync(
+                                    cancellationToken,
+                                    timeoutSeconds: 5,
+                                    allowCredentialRecovery: false))
+                            {
+                                Notify("[manual-login] authenticated lobby verified.");
+                                return true;
+                            }
+
+                            validationMessage = "Login was not confirmed in the Travian lobby. Finish signing in, then try again.";
+                            Notify("[manual-login] lobby authentication was not confirmed; continuing to wait for the user.");
+                        }
+                    }
+
                     Notify($"[lobby-login] lobby session is not authenticated; submitting credentials (attempt {attempt}/{LobbyLoadAttempts}).");
                     await FillLoginCredentialsWithPacingAsync(cancellationToken);
                     await ClickLoginButtonAsync(cancellationToken);
@@ -487,9 +521,12 @@ public sealed partial class TravianClient
         return state ?? AccountAccessState.LoggedOut;
     }
 
-    private async Task<bool> WaitForLobbyWorldCardsAsync(CancellationToken cancellationToken)
+    private async Task<bool> WaitForLobbyWorldCardsAsync(
+        CancellationToken cancellationToken,
+        int? timeoutSeconds = null,
+        bool allowCredentialRecovery = true)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(Math.Max(10, _config.ManualLoginTimeoutSeconds));
+        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds ?? Math.Max(10, _config.ManualLoginTimeoutSeconds));
         var navigationRetryLogged = false;
         var unexpectedErrorRecoveryAttempted = false;
         var inlineErrorRecoveryAttempts = 0;
@@ -521,7 +558,8 @@ public sealed partial class TravianClient
                 // (data-rule="customErrorExists") and keep the Login button disabled until a field is
                 // edited. Re-entering the credentials clears that custom error and re-enables submit, so
                 // resubmit a bounded number of times before giving up.
-                if (inlineErrorRecoveryAttempts < maxInlineErrorRecoveries
+                if (allowCredentialRecovery
+                    && inlineErrorRecoveryAttempts < maxInlineErrorRecoveries
                     && await IsLobbyLoginUnexpectedErrorBlockingSubmitAsync())
                 {
                     inlineErrorRecoveryAttempts++;

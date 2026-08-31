@@ -53,60 +53,94 @@ public sealed partial class TravianClient : ISessionClient
             }
         }
 
-        if (await TryLoginThroughLobbyAsync(cancellationToken))
+        var manualPopupExceptionEnabled = false;
+        if (_account.ManualLogin)
         {
-            if (_rotateAfterLobbyLoginAsync is not null)
-            {
-                Notify("[lobby-login] SSO confirmed; isolating lobby consent state before normal game automation.");
-                _page = await _rotateAfterLobbyLoginAsync(ServerUrl, cancellationToken);
-                await GotoAsync(Paths.Resources, cancellationToken);
-                if (!await WaitUntilLoggedInAsync(cancellationToken))
-                {
-                    ThrowIfAccountAccessBlocked(await LoginStateAsync());
-                    throw new InvalidOperationException("Lobby login state did not survive the clean browser-context rotation.");
-                }
-
-                Notify("[lobby-login] clean game context verified in the existing browser.");
-            }
-            else if (!await WaitUntilLoggedInAsync(cancellationToken))
-            {
-                throw new InvalidOperationException("Lobby login did not produce an authenticated game session.");
-            }
-
-            if (_pendingLobbyWorldServerResolution is not null)
-            {
-                var resolution = _pendingLobbyWorldServerResolution;
-                _pendingLobbyWorldServerResolution = null;
-                if (_lobbyWorldServerResolved is not null)
-                {
-                    try
-                    {
-                        await _lobbyWorldServerResolved(resolution, cancellationToken);
-                        Notify($"[lobby-login] verified server '{SanitizeHost(resolution.ServerUrl)}' saved for account '{resolution.AccountName}'.");
-                    }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
-                    {
-                        Notify($"[lobby-login] login succeeded but the corrected account server could not be saved: {ex.Message}");
-                    }
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(_pendingLobbyWorldUid))
-            {
-                var worldUid = _pendingLobbyWorldUid;
-                _pendingLobbyWorldUid = null;
-                new AccountAnalysisStore(_projectRoot).SaveWorldUid(_account.Name, ServerUrl, worldUid);
-                Notify($"[lobby-login] clean game context verified and world UID '{worldUid}' saved.");
-            }
-
-            MarkSessionLoggedIn();
-            Notify($"[login] success ({_account.Name}) — entered through the Travian lobby");
-            await ConfirmExpectedLanguageIfEnabledAndRefreshAccountSignalsAsync(cancellationToken);
-            return;
+            _setManualAuthenticationPopupsAllowed?.Invoke(true);
+            manualPopupExceptionEnabled = true;
+            Notify("[manual-login] restricted lobby authentication popups enabled.");
         }
 
-        throw new InvalidOperationException(
-            "Login through the Travian lobby did not reach the configured game world. Direct server login is disabled.");
+        try
+        {
+            if (await TryLoginThroughLobbyAsync(cancellationToken))
+            {
+                if (manualPopupExceptionEnabled)
+                {
+                    _setManualAuthenticationPopupsAllowed?.Invoke(false);
+                    manualPopupExceptionEnabled = false;
+                    Notify("[manual-login] lobby verified; authentication popups disabled before game-context rotation.");
+                }
+
+                if (_rotateAfterLobbyLoginAsync is not null)
+                {
+                    Notify("[lobby-login] SSO confirmed; isolating lobby consent state before normal game automation.");
+                    _page = await _rotateAfterLobbyLoginAsync(ServerUrl, cancellationToken);
+                    if (!IsCurrentUrlForPath(Paths.Resources))
+                    {
+                        await GotoAsync(Paths.Resources, cancellationToken);
+                    }
+                    else
+                    {
+                        Notify("[lobby-login] clean game context already loaded Dorf1; skipped duplicate navigation.");
+                    }
+
+                    if (!await WaitUntilLoggedInAsync(cancellationToken))
+                    {
+                        ThrowIfAccountAccessBlocked(await LoginStateAsync());
+                        throw new InvalidOperationException("Lobby login state did not survive the clean browser-context rotation.");
+                    }
+
+                    Notify("[lobby-login] clean game context verified in the existing browser.");
+                }
+                else if (!await WaitUntilLoggedInAsync(cancellationToken))
+                {
+                    throw new InvalidOperationException("Lobby login did not produce an authenticated game session.");
+                }
+
+                if (_pendingLobbyWorldServerResolution is not null)
+                {
+                    var resolution = _pendingLobbyWorldServerResolution;
+                    _pendingLobbyWorldServerResolution = null;
+                    if (_lobbyWorldServerResolved is not null)
+                    {
+                        try
+                        {
+                            await _lobbyWorldServerResolved(resolution, cancellationToken);
+                            Notify($"[lobby-login] verified server '{SanitizeHost(resolution.ServerUrl)}' saved for account '{resolution.AccountName}'.");
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            Notify($"[lobby-login] login succeeded but the corrected account server could not be saved: {ex.Message}");
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(_pendingLobbyWorldUid))
+                {
+                    var worldUid = _pendingLobbyWorldUid;
+                    _pendingLobbyWorldUid = null;
+                    new AccountAnalysisStore(_projectRoot).SaveWorldUid(_account.Name, ServerUrl, worldUid);
+                    Notify($"[lobby-login] clean game context verified and world UID '{worldUid}' saved.");
+                }
+
+                MarkSessionLoggedIn();
+                Notify($"[login] success ({_account.Name}) — entered through the Travian lobby");
+                await ConfirmExpectedLanguageIfEnabledAndRefreshAccountSignalsAsync(cancellationToken);
+                return;
+            }
+
+            throw new InvalidOperationException(
+                "Login through the Travian lobby did not reach the configured game world. Direct server login is disabled.");
+        }
+        finally
+        {
+            if (manualPopupExceptionEnabled)
+            {
+                _setManualAuthenticationPopupsAllowed?.Invoke(false);
+                Notify("[manual-login] restricted lobby authentication popups disabled.");
+            }
+        }
     }
 
     private void MarkSessionLoggedIn()

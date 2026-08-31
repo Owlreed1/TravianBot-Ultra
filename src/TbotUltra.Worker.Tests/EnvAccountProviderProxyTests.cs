@@ -47,6 +47,23 @@ public sealed class EnvAccountProviderProxyTests : IDisposable
         Assert.Equal(string.Empty, account.ProxyServer);
     }
 
+    [Fact]
+    public void LoadAccount_ManualLoginAllowsMissingPassword()
+    {
+        File.WriteAllText(_envPath, string.Join('\n',
+            "TBOT_ACTIVE_ACCOUNT=alice",
+            "TBOT_ACCOUNTS=alice",
+            "TBOT_ALICE_USERNAME=alice@example.com",
+            "TBOT_ALICE_PASSWORD=",
+            "TBOT_ALICE_MANUAL_LOGIN=true",
+            "TBOT_ALICE_SERVER_URL=https://ts1.travian.eu"));
+
+        var account = new EnvAccountProvider(_envPath).LoadAccount();
+
+        Assert.True(account.ManualLogin);
+        Assert.Equal(string.Empty, account.Password);
+    }
+
     public void Dispose()
     {
         if (File.Exists(_envPath))

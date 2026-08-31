@@ -101,6 +101,11 @@ public sealed partial class BrowserSession : IAsyncDisposable
     /// the Playwright connection thread.</summary>
     public volatile bool ConsentDomainsAllowed;
 
+    /// <summary>Allows only user-initiated Travian lobby authentication popups while the host is
+    /// displaying the blocking manual-login confirmation. This is separate from bonus-video consent
+    /// so enabling manual login never opens the wider ad stack.</summary>
+    public volatile bool ManualAuthenticationPopupsAllowed;
+
     public string StorageStatePath =>
         AccountStoragePaths.BrowserStatePath(_projectRoot, _account.Name);
 
@@ -132,7 +137,8 @@ public sealed partial class BrowserSession : IAsyncDisposable
                     $"cliExists={File.Exists(Path.Combine(driverPath, "package", "cli.js"))}. {ex.Message}");
                 throw;
             }
-            var launchOptions = CreateChromiumLaunchOptions(keepNativePopupBlocker: true);
+            var launchOptions = CreateChromiumLaunchOptions(
+                keepNativePopupBlocker: ShouldKeepNativePopupBlocker(_account.ManualLogin));
             // Record the process this launch creates so a crashed run's browser window can be closed on the
             // next start. The session runs the user's system Chrome, so its processes are indistinguishable
             // from the user's own by name or path — only the recorded identity makes cleanup safe.
@@ -200,7 +206,7 @@ public sealed partial class BrowserSession : IAsyncDisposable
                 TrackTransientExternalOrigin(route.Request.Url);
             }
 
-            if (!ConsentDomainsAllowed && isAdDomain)
+            if (!ConsentDomainsAllowed && !ManualAuthenticationPopupsAllowed && isAdDomain)
             {
                 await route.AbortAsync();
                 return;
@@ -212,6 +218,11 @@ public sealed partial class BrowserSession : IAsyncDisposable
         // Some Travian pages spawn short-lived tabs via window.open or target=_blank links. Neutralise
         // those in every document so they are never created. The bot navigates with GotoAsync and
         // creates its own pages via NewPageAsync, so it does not rely on page script popups.
+        var allowManualPopupSources = ShouldAllowPopupSourcesInNewContext(
+            _account.ManualLogin,
+            ManualAuthenticationPopupsAllowed);
+        await _context.AddInitScriptAsync(
+            $"window.__tbotManualLoginPopupSourcesAllowed = {(allowManualPopupSources ? "true" : "false")};");
         await _context.AddInitScriptAsync(
             """
             (() => {
@@ -227,7 +238,19 @@ public sealed partial class BrowserSession : IAsyncDisposable
                 try { delete navigator.webdriver; } catch (_) { /* ignore */ }
               }
 
-              const blockedOpen = function () { return null; };
+              const isTravianAuthenticationPage = () => {
+                const host = String(location.hostname || '').toLowerCase();
+                return host === 'lobby.legends.travian.com'
+                    || host === 'auth.travian.com'
+                    || host === 'login.travian.com'
+                    || host === 'accounts.travian.com';
+              };
+              const originalWindowOpen = window.open.bind(window);
+              const blockedOpen = function (...args) {
+                return window.__tbotManualLoginPopupSourcesAllowed === true || isTravianAuthenticationPage()
+                    ? originalWindowOpen(...args)
+                    : null;
+              };
               try {
                 Object.defineProperty(window, 'open', {
                   value: blockedOpen,
@@ -239,6 +262,7 @@ public sealed partial class BrowserSession : IAsyncDisposable
               }
 
               const neutralizeTargets = () => {
+                if (window.__tbotManualLoginPopupSourcesAllowed === true || isTravianAuthenticationPage()) return;
                 for (const element of document.querySelectorAll('a[target], form[target]')) {
                   element.removeAttribute('target');
                 }
@@ -246,7 +270,7 @@ public sealed partial class BrowserSession : IAsyncDisposable
 
               const originalAnchorClick = HTMLAnchorElement.prototype.click;
               HTMLAnchorElement.prototype.click = function () {
-                this.removeAttribute('target');
+                if (window.__tbotManualLoginPopupSourcesAllowed !== true && !isTravianAuthenticationPage()) this.removeAttribute('target');
                 return originalAnchorClick.call(this);
               };
 
@@ -256,14 +280,14 @@ public sealed partial class BrowserSession : IAsyncDisposable
               document.addEventListener('click', function (event) {
                 const node = event.target;
                 const anchor = node && node.closest ? node.closest('a[target], area[target]') : null;
-                if (anchor) {
+                if (anchor && window.__tbotManualLoginPopupSourcesAllowed !== true && !isTravianAuthenticationPage()) {
                   anchor.removeAttribute('target');
                 }
               }, true);
 
               const originalFormSubmit = HTMLFormElement.prototype.submit;
               HTMLFormElement.prototype.submit = function () {
-                this.removeAttribute('target');
+                if (window.__tbotManualLoginPopupSourcesAllowed !== true && !isTravianAuthenticationPage()) this.removeAttribute('target');
                 return originalFormSubmit.call(this);
               };
 
@@ -380,6 +404,14 @@ public sealed partial class BrowserSession : IAsyncDisposable
                     return;
                 }
 
+                if (ShouldKeepExtraPageOpen(ManualAuthenticationPopupsAllowed, popup.Url))
+                {
+                    TrackTransientExternalOrigin(popup.Url);
+                    _log?.Invoke($"[browser] leaving user-opened manual-login popup/tab open url='{popup.Url}' reason={reason}");
+                    Interlocked.Exchange(ref closeHandled, 0);
+                    return;
+                }
+
                 if (Interlocked.Exchange(ref closeHandled, 1) == 1)
                 {
                     return;
@@ -458,6 +490,7 @@ public sealed partial class BrowserSession : IAsyncDisposable
 
         _context = null;
         ConsentDomainsAllowed = false;
+        ManualAuthenticationPopupsAllowed = false;
         lock (_transientExternalOriginsGate)
         {
             _transientExternalOrigins.Clear();
@@ -466,9 +499,18 @@ public sealed partial class BrowserSession : IAsyncDisposable
         IPage cleanPage;
         try
         {
-            // Create the replacement before closing the lobby context so the Chromium process always
-            // has a visible window; only the isolated context changes, not the browser process.
+            // Create and load the replacement before closing the lobby context. Closing the old page
+            // while the replacement is still about:blank leaves a visible white/empty browser for
+            // several seconds and looks like a consent popup flashing after login.
             cleanPage = await OpenMainContextPageAsync(cancellationToken);
+            var gamePageUrl = new Uri(effectiveUri, "/dorf1.php").AbsoluteUri;
+            _log?.Invoke("[browser] preloading the clean post-login game page before closing the lobby context.");
+            await cleanPage.GotoAsync(gamePageUrl, new PageGotoOptions
+            {
+                WaitUntil = WaitUntilState.DOMContentLoaded,
+                Timeout = _config.TimeoutMs,
+            }).WaitAsync(cancellationToken);
+            _log?.Invoke("[browser] clean post-login game page loaded; closing the lobby context.");
         }
         catch
         {
@@ -491,8 +533,8 @@ public sealed partial class BrowserSession : IAsyncDisposable
         }
 
         await previousContext.CloseAsync();
-        _browserTrace.Event("PAGE_CONTEXT", "lobby-context-closed", detail: "reason=clean-game-context-opened");
-        _log?.Invoke("[browser] lobby context closed after the clean game context opened; Chromium stayed running.");
+        _browserTrace.Event("PAGE_CONTEXT", "lobby-context-closed", detail: "reason=clean-game-page-loaded");
+        _log?.Invoke("[browser] lobby context closed after the clean game page loaded; Chromium stayed running.");
         return cleanPage;
     }
 
@@ -567,11 +609,29 @@ public sealed partial class BrowserSession : IAsyncDisposable
         return launchOptions;
     }
 
+    internal static bool ShouldKeepNativePopupBlocker(bool manualLoginAccount)
+        => !manualLoginAccount;
+
+    internal static bool ShouldAllowPopupSourcesInNewContext(
+        bool manualLoginAccount,
+        bool manualLoginWaitActive)
+        => manualLoginAccount && manualLoginWaitActive;
+
+    internal static bool ShouldKeepExtraPageOpen(bool manualLoginWaitActive, string? pageUrl)
+        => manualLoginWaitActive;
+
     private async Task<bool> CloseBlockedPopupAsync(IPage popup, string source)
     {
         try
         {
             var url = popup.Url ?? string.Empty;
+            if (ShouldKeepExtraPageOpen(ManualAuthenticationPopupsAllowed, url))
+            {
+                TrackTransientExternalOrigin(url);
+                _log?.Invoke($"[browser] allowed user-opened manual-login popup/tab source={source} url='{url}' pages={TryGetPageCount()}");
+                return false;
+            }
+
             if (!IsBlockedPopupOrConsentUrl(url))
             {
                 return false;

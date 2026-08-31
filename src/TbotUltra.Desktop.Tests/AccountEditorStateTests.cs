@@ -106,6 +106,24 @@ public sealed class AccountEditorStateTests
     }
 
     [Fact]
+    public void BuildAccountEntry_ManualLoginAllowsEmptyPassword()
+    {
+        var result = AccountEditorState.BuildAccountEntry(Input(manualLogin: true, password: string.Empty));
+
+        Assert.True(result.ManualLogin);
+        Assert.Equal(string.Empty, result.Password);
+    }
+
+    [Fact]
+    public void BuildAccountEntry_NormalLoginStillRequiresPassword()
+    {
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            AccountEditorState.BuildAccountEntry(Input(password: string.Empty)));
+
+        Assert.Equal("Username and password are required.", error.Message);
+    }
+
+    [Fact]
     public void BuildAccountEntry_NeverUseOwnIpEnablesValidProxy()
     {
         var result = AccountEditorState.BuildAccountEntry(Input(
@@ -135,16 +153,19 @@ public sealed class AccountEditorStateTests
     private static AccountEditorSnapshot Snapshot(
         string serverUrl = "https://example.com",
         string username = "user")
-        => new(username, "password", serverUrl, true, "socks5://proxy:1080", false);
+        => new(username, "password", false, serverUrl, true, "socks5://proxy:1080", false);
 
     private static AccountEditorInput Input(
         bool proxyEnabled = false,
         bool neverUseOwnIp = false,
         string proxyHost = "",
-        string proxyPort = "")
+        string proxyPort = "",
+        bool manualLogin = false,
+        string password = "password")
         => new(
             "user",
-            "password",
+            password,
+            manualLogin,
             "Official",
             "https://example.com",
             proxyEnabled,

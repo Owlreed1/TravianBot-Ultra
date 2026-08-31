@@ -7,6 +7,7 @@ namespace TbotUltra.Desktop.Services;
 internal sealed record AccountEditorSnapshot(
     string Username,
     string Password,
+    bool ManualLogin,
     string ServerUrl,
     bool ProxyEnabled,
     string ProxyServer,
@@ -41,6 +42,7 @@ internal sealed record SavedProxyOption(
 internal sealed record AccountEditorInput(
     string Username,
     string Password,
+    bool ManualLogin,
     string ServerName,
     string ServerUrl,
     bool ProxyEnabled,
@@ -60,9 +62,11 @@ internal static class AccountEditorState
     {
         var username = input.Username.Trim();
         var password = input.Password;
-        if (username.Length == 0 || password.Length == 0)
+        if (username.Length == 0 || (!input.ManualLogin && password.Length == 0))
         {
-            throw new InvalidOperationException("Username and password are required.");
+            throw new InvalidOperationException(input.ManualLogin
+                ? "Email is required for manual login."
+                : "Username and password are required.");
         }
 
         var proxyEnabled = input.ProxyEnabled;
@@ -105,6 +109,7 @@ internal static class AccountEditorState
                 : AccountKeyNormalizer.MakeCollisionResistantKey(username, input.ServerUrl),
             Username = username,
             Password = password,
+            ManualLogin = input.ManualLogin,
             ServerName = input.ServerName,
             ServerUrl = input.ServerUrl,
             ProxyEnabled = proxyEnabled,
@@ -149,6 +154,7 @@ internal static class AccountEditorState
     {
         return !string.Equals(current.Username, baseline.Username, StringComparison.Ordinal)
             || !string.Equals(current.Password, baseline.Password, StringComparison.Ordinal)
+            || current.ManualLogin != baseline.ManualLogin
             || !string.Equals(current.ServerUrl, baseline.ServerUrl, StringComparison.OrdinalIgnoreCase)
             || current.ProxyEnabled != baseline.ProxyEnabled
             || !string.Equals(current.ProxyServer, baseline.ProxyServer, StringComparison.Ordinal)

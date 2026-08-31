@@ -99,6 +99,16 @@ Published artifacts belong under `artifacts/`, never beside source files.
   Saving also runs the full template and storage preflight. Accepted storage repairs are inserted before their
   dependent rows but are not persisted until the user reviews the repaired template and clicks Save again.
 - New settings require the complete pipeline: model, defaults, load/save, ViewModel, UI, and tests.
+- Account `Manual login` is account-scoped and permits an empty password. It opens the Official lobby
+  without submitting credentials, blocks the desktop behind a `Login done`/`Cancel` confirmation, verifies
+  the live lobby before continuing, and temporarily permits browser popups, user-opened tabs, and required
+  consent/authentication network resources for that wait. Manual-login accounts launch without Chromium's
+  native popup blocker so authentication providers can create their pages; source-level popup permission must
+  be derived from the active confirmation wait, never permanently from the account setting. The clean post-login
+  game context restores request, script, and page-handler blocking before it renders Travian, then preloads Dorf1
+  before the lobby context closes. Never expose an `about:blank` replacement between those contexts; it looks like
+  a consent popup flashing even when no popup page was created. Cancel must disable the exception and close the
+  shared browser.
 - Portable Settings profiles use the versioned `.tbot-settings.json` format and an explicit scalar/allowed-hours
   allowlist. They must remain anonymous and portable: never include account/server/proxy identity or credentials,
   tribe-specific Brewery options, village/list/queue/object identifiers, runtime state or usage, manual server-reset

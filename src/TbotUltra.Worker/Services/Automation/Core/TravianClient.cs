@@ -34,10 +34,12 @@ public sealed partial class TravianClient
     // Flips the browser session's consentmanager route block on/off; used only by the bonus-video flow,
     // which needs GDPR/TCF consent while the rest of the session keeps it blocked (no stray sync tabs).
     private readonly Action<bool>? _setConsentDomainsAllowed;
+    private readonly Action<bool>? _setManualAuthenticationPopupsAllowed;
     private readonly Func<IPage, CancellationToken, Task>? _cleanupAfterBonusVideoAsync;
     private readonly IsolatedBonusVideoRunner? _runInIsolatedBonusVideoBrowserAsync;
     private readonly Func<string, CancellationToken, Task<IPage>>? _rotateAfterLobbyLoginAsync;
     private readonly Func<LobbyWorldSelectionRequest, CancellationToken, Task<string?>>? _lobbyWorldSelectionRequested;
+    private readonly Func<ManualLoginConfirmationRequest, CancellationToken, Task<bool>>? _manualLoginConfirmationRequested;
     private readonly Func<LobbyWorldServerResolution, CancellationToken, Task>? _lobbyWorldServerResolved;
     private string? _resolvedServerUrl;
     private DateTimeOffset? _serverTimeUtc;
@@ -280,10 +282,12 @@ public sealed partial class TravianClient
         _page = page;
         _config = config;
         _setConsentDomainsAllowed = callbacks.SetConsentDomainsAllowed;
+        _setManualAuthenticationPopupsAllowed = callbacks.SetManualAuthenticationPopupsAllowed;
         _cleanupAfterBonusVideoAsync = callbacks.CleanupAfterBonusVideoAsync;
         _runInIsolatedBonusVideoBrowserAsync = callbacks.RunInIsolatedBonusVideoBrowserAsync;
         _rotateAfterLobbyLoginAsync = callbacks.RotateAfterLobbyLoginAsync;
         _lobbyWorldSelectionRequested = callbacks.LobbyWorldSelectionRequested;
+        _manualLoginConfirmationRequested = callbacks.ManualLoginConfirmationRequested;
         _lobbyWorldServerResolved = callbacks.LobbyWorldServerResolved;
         _account = account;
         _interactive = interactive;

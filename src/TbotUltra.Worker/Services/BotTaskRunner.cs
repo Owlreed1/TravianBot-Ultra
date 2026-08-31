@@ -102,6 +102,7 @@ public sealed partial class BotTaskRunner
     }
 
     public Func<LobbyWorldSelectionRequest, CancellationToken, Task<string?>>? LobbyWorldSelectionRequested { get; set; }
+    public Func<ManualLoginConfirmationRequest, CancellationToken, Task<bool>>? ManualLoginConfirmationRequested { get; set; }
     public Func<LobbyWorldServerResolution, CancellationToken, Task>? LobbyWorldServerResolved { get; set; }
     public event Action<FarmLossDestinationChange>? FarmLossDestinationChanged;
     public event Action<VerifiedActiveVillage>? ActiveVillageVerified;
@@ -430,9 +431,17 @@ public sealed partial class BotTaskRunner
         try
         {
             var lease = await AcquireClientLeaseAsync(options, account, log, interactive, cancellationToken);
+            var effectiveSaveStateMode = saveStateMode;
             try
             {
                 await action(lease.Client);
+            }
+            catch (ManualLoginCanceledException)
+            {
+                // Cancel means abandon the incomplete external authentication attempt. Do not persist
+                // partial lobby/auth cookies before Desktop closes the shared browser.
+                effectiveSaveStateMode = BrowserStateSaveMode.Skip;
+                throw;
             }
             catch (Exception ex) when (lease.KeepOpen && BrowserFailureClassifier.IsTargetCrash(ex))
             {
@@ -443,7 +452,7 @@ public sealed partial class BotTaskRunner
             {
                 if (!lease.Invalidated)
                 {
-                    await FinalizeLeaseAsync(lease, log, saveStateMode);
+                    await FinalizeLeaseAsync(lease, log, effectiveSaveStateMode);
                 }
             }
         }
@@ -576,6 +585,7 @@ public sealed partial class BotTaskRunner
 
         var sharedClient = CreateClient(_sharedVisiblePage!, options, account, interactive, log, _sharedVisibleSessionCache,
             setConsentDomainsAllowed: allowed => GetRequiredSharedVisibleSession().ConsentDomainsAllowed = allowed,
+            setManualAuthenticationPopupsAllowed: allowed => GetRequiredSharedVisibleSession().ManualAuthenticationPopupsAllowed = allowed,
             cleanupAfterBonusVideoAsync: (page, ct) => GetRequiredSharedVisibleSession().CleanupAfterBonusVideoAsync(page, ct),
             runInIsolatedBonusVideoBrowserAsync: (action, ct, bypassExistingCooldown) =>
                 GetRequiredSharedVisibleSession().RunInIsolatedBonusVideoBrowserAsync(action, ct, bypassExistingCooldown),
@@ -669,6 +679,7 @@ public sealed partial class BotTaskRunner
         Action<string> log,
         TravianSessionCache? sessionCache = null,
         Action<bool>? setConsentDomainsAllowed = null,
+        Action<bool>? setManualAuthenticationPopupsAllowed = null,
         Func<IPage, CancellationToken, Task>? cleanupAfterBonusVideoAsync = null,
         IsolatedBonusVideoRunner? runInIsolatedBonusVideoBrowserAsync = null,
         Func<string, CancellationToken, Task<IPage>>? rotateAfterLobbyLoginAsync = null,
@@ -688,10 +699,12 @@ public sealed partial class BotTaskRunner
                 ActiveVillageVerified = village => ActiveVillageVerified?.Invoke(village),
                 ConstructionQueueObserved = observation => ConstructionQueueObserved?.Invoke(observation),
                 SetConsentDomainsAllowed = setConsentDomainsAllowed,
+                SetManualAuthenticationPopupsAllowed = setManualAuthenticationPopupsAllowed,
                 CleanupAfterBonusVideoAsync = cleanupAfterBonusVideoAsync,
                 RunInIsolatedBonusVideoBrowserAsync = runInIsolatedBonusVideoBrowserAsync,
                 RotateAfterLobbyLoginAsync = rotateAfterLobbyLoginAsync,
                 LobbyWorldSelectionRequested = LobbyWorldSelectionRequested,
+                ManualLoginConfirmationRequested = ManualLoginConfirmationRequested,
                 LobbyWorldServerResolved = async (resolution, cancellationToken) =>
                 {
                     if (LobbyWorldServerResolved is not null)
