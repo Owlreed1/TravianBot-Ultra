@@ -1271,6 +1271,25 @@ public partial class MainWindow
             }
         }
 
+        // Travian submits the Official demolition form by replacing the current page context.
+        // Normally the worker absorbs that expected transition and confirms the server timer, but
+        // keep the queue idempotent if the navigation race escapes from any later page read. The
+        // next attempt re-reads Dorf2 and the active demolition timer, so consuming a functional
+        // retry here could permanently stop a multi-level demolition after successful clicks.
+        if (IsDemolishQueueItem(item)
+            && BrowserFailureClassifier.IsTransientNavigation(ex))
+        {
+            var retryDelay = TimeSpan.FromSeconds(15);
+            if (_botService.MarkQueueItemDeferred(item.Id, retryDelay))
+            {
+                AppendLog(
+                    $"{logPrefix} DEFER {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
+                    "demolition page changed while confirming the submitted step; " +
+                    $"safe retry in {retryDelay.TotalSeconds:F0}s without consuming retries");
+                return true;
+            }
+        }
+
         if (ex is UnexpectedTravianLanguageException languageException)
         {
             _botService.MarkQueueItemDeferred(item.Id, TimeSpan.Zero);
