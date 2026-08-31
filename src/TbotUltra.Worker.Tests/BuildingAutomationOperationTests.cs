@@ -61,10 +61,10 @@ public sealed class BuildingAutomationOperationTests
         var client = new FakeHeroClient();
         var operation = new HeroAutomationOperation(client);
 
-        var result = await operation.ManageAsync(35, true, false, true, "offense", "longest", 55, CancellationToken.None);
+        var result = await operation.ManageAsync(35, true, false, true, 90, "offense", "longest", 55, CancellationToken.None);
 
         Assert.Equal("managed", result);
-        Assert.Equal((35, true, false, true, "offense", "longest", 55), client.ManageRequest);
+        Assert.Equal((35, true, false, true, 90, "offense", "longest", 55), client.ManageRequest);
     }
 
     [Fact]
@@ -227,7 +227,7 @@ public sealed class BuildingAutomationOperationTests
 
     private sealed class FakeHeroClient : IHeroClient
     {
-        public (int MinHp, bool AutoRevive, bool AutoAssign, bool AutoOintments, string StatPriority, string AdventureOrder, int RegenPercent) ManageRequest { get; private set; }
+        public (int MinHp, bool AutoRevive, bool AutoAssign, bool AutoOintments, int OintmentTarget, string StatPriority, string AdventureOrder, int RegenPercent) ManageRequest { get; private set; }
         public bool IncreaseAdventureDangerRequested { get; private set; }
         public bool ReduceAdventureTimeRequested { get; private set; }
         public List<string> Calls { get; } = [];
@@ -243,9 +243,9 @@ public sealed class BuildingAutomationOperationTests
         public Task<bool> HasClaimableTasksOnCurrentPageAsync(CancellationToken cancellationToken = default) => Record("tasks", cancellationToken, true);
         public Task<bool> HasClaimableDailyQuestsOnCurrentPageAsync(CancellationToken cancellationToken = default) => Record("daily", cancellationToken, false);
 
-        public Task<string> ManageHeroAsync(int minHpForAdventure, bool autoRevive, bool autoAssignPoints, bool autoUseOintments, string statPriority, string adventurePickOrder = "shortest", int heroHpRegenPerDayPercent = 40, CancellationToken cancellationToken = default)
+        public Task<string> ManageHeroAsync(int minHpForAdventure, bool autoRevive, bool autoAssignPoints, bool autoUseOintments, int ointmentTargetHpPercent, string statPriority, string adventurePickOrder = "shortest", int heroHpRegenPerDayPercent = 40, CancellationToken cancellationToken = default)
         {
-            ManageRequest = (minHpForAdventure, autoRevive, autoAssignPoints, autoUseOintments, statPriority, adventurePickOrder, heroHpRegenPerDayPercent);
+            ManageRequest = (minHpForAdventure, autoRevive, autoAssignPoints, autoUseOintments, ointmentTargetHpPercent, statPriority, adventurePickOrder, heroHpRegenPerDayPercent);
             return Task.FromResult("managed");
         }
 

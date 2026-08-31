@@ -2048,6 +2048,11 @@ public partial class MainWindow
             return true;
         }
 
+        if (group == QueueGroup.Farming && CurrentGoldClubAvailability != true)
+        {
+            return false;
+        }
+
         // Village-less (global) tasks like hero_manage are enabled when the group is on for ANY enabled
         // village — so e.g. Hero runs while the hero-home village has it on even
         // though another village is currently selected. Resolve this from the settings store only (no UI

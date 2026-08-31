@@ -308,7 +308,7 @@ public partial class MainWindow
     private void UpdateAutomationLoopRunningIndicators()
     {
         var selectedVillage = GetSelectedVillageKeyInfoOrNull();
-        UpdateBreweryCelebrationToggleAvailability(selectedVillage);
+        UpdateAutomationGroupToggleAvailability(selectedVillage);
 
         // Before login the dashboard shows nothing: no group runs and persisted (deferred) queue items must
         // not surface their countdown timers. Render every card idle with no timer until the user logs in.
@@ -987,14 +987,19 @@ public partial class MainWindow
             return;
         }
 
+        var selectedVillage = GetSelectedVillageKeyInfoOrNull();
         if (QueueGroupCatalog.TryParse(option.TaskName, out var clickedGroup)
-            && clickedGroup == QueueGroup.BreweryCelebration
-            && GetSelectedVillageKeyInfoOrNull()?.IsCapital != true)
+            && !AutomationGroupAvailability.CanToggle(
+                clickedGroup,
+                selectedVillage?.IsCapital == true,
+                CurrentGoldClubAvailability))
         {
             option.CanToggle = false;
             option.IsEnabled = false;
             toggle.IsChecked = false;
-            AppendLog("Brewery Celebration group can only be changed in the capital village.");
+            AppendLog(clickedGroup == QueueGroup.Farming
+                ? "Farming requires an active Gold Club subscription."
+                : "Brewery Celebration group can only be changed in the capital village.");
             RefreshAutomationLoopDashboardUi();
             return;
         }

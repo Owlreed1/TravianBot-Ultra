@@ -140,17 +140,34 @@ public sealed class TravianClientHelperTests
     }
 
     [Theory]
-    [InlineData(null, 30, 10, 0)]
-    [InlineData(30, 30, 10, 0)]
-    [InlineData(31, 30, 10, 0)]
-    [InlineData(20, 30, 10, 10)]
-    [InlineData(20, 30, 5, 5)]
-    [InlineData(0, 1, 10, 1)]
-    [InlineData(99, 150, 10, 1)]
-    [InlineData(20, 30, 0, 0)]
-    public void CalculateOintmentsToUse_UsesOnlyNeededAmount(int? hp, int minHp, int available, int expected)
+    [InlineData(null, 50, 10, 0)]
+    [InlineData(50, 50, 10, 0)]
+    [InlineData(51, 50, 10, 0)]
+    [InlineData(20, 50, 10, 10)]
+    [InlineData(20, 50, 5, 5)]
+    [InlineData(86, 100, 20, 14)]
+    [InlineData(99, 100, 10, 1)]
+    [InlineData(20, 50, 0, 0)]
+    public void CalculateOintmentsToUse_UsesOnlyNeededAmount(int? hp, int targetHp, int available, int expected)
     {
-        Assert.Equal(expected, HeroCalc.CalculateOintmentsToUse(hp, minHp, available));
+        Assert.Equal(expected, HeroCalc.CalculateOintmentsToUse(hp, targetHp, available));
+    }
+
+    [Theory]
+    [InlineData(49, 50, true)]
+    [InlineData(50, 50, true)]
+    [InlineData(51, 50, false)]
+    [InlineData(100, 100, false)]
+    public void ShouldUseOintmentsForAdventure_UsesMinimumAsInclusiveTrigger(int hp, int minimum, bool expected)
+    {
+        Assert.Equal(expected, HeroCalc.ShouldUseOintmentsForAdventure(
+            enabled: true,
+            adventureCount: 1,
+            isHeroHome: true,
+            isHeroDead: false,
+            currentHpPercent: hp,
+            minHpForAdventure: minimum,
+            targetHpPercent: 100));
     }
 
     [Theory]

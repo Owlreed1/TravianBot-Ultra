@@ -118,6 +118,7 @@ public partial class MainWindow
             AutoRevive: _heroViewModel.AutoRevive,
             AutoAssignPoints: _heroViewModel.AutoAssignPoints,
             AutoUseOintments: _heroViewModel.AutoUseOintments,
+            OintmentTargetHpPercent: _heroViewModel.OintmentTargetHpPercent,
             StatPriority: _heroViewModel.BuildPriorityPayload(),
             AdventurePickOrder: _heroViewModel.AdventurePickOrder,
             ContinuousAdventures: _heroViewModel.ContinuousAdventures)

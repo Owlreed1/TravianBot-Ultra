@@ -7,6 +7,7 @@ public sealed record HeroPayload(
     bool? AutoRevive = null,
     bool? AutoAssignPoints = null,
     bool? AutoUseOintments = null,
+    int? OintmentTargetHpPercent = null,
     string? StatPriority = null,
     string? AdventurePickOrder = null,
     bool? ContinuousAdventures = null)
@@ -34,11 +35,24 @@ public sealed record HeroPayload(
             return false;
         }
 
+        int? ointmentTarget = null;
+        if (payload.TryGetValue(BotOptionPayloadKeys.HeroOintmentTargetHpPercent, out var ointmentTargetRaw))
+        {
+            if (!int.TryParse(ointmentTargetRaw, out var parsedTarget)
+                || parsedTarget is not (50 or 60 or 70 or 80 or 90 or 100))
+            {
+                return false;
+            }
+
+            ointmentTarget = parsedTarget;
+        }
+
         result = new HeroPayload(
             minHp,
             autoRevive,
             autoAssignPoints,
             autoUseOintments,
+            ointmentTarget,
             ReadTrimmed(payload, BotOptionPayloadKeys.HeroStatPriority),
             ReadTrimmed(payload, BotOptionPayloadKeys.HeroAdventurePickOrder),
             continuousAdventures);
@@ -52,6 +66,7 @@ public sealed record HeroPayload(
         AddIfPresent(result, BotOptionPayloadKeys.HeroAutoRevive, FormatBool(AutoRevive));
         AddIfPresent(result, BotOptionPayloadKeys.HeroAutoAssignPoints, FormatBool(AutoAssignPoints));
         AddIfPresent(result, BotOptionPayloadKeys.HeroAutoUseOintments, FormatBool(AutoUseOintments));
+        AddIfPresent(result, BotOptionPayloadKeys.HeroOintmentTargetHpPercent, OintmentTargetHpPercent?.ToString());
         AddIfPresent(result, BotOptionPayloadKeys.HeroStatPriority, StatPriority);
         AddIfPresent(result, BotOptionPayloadKeys.HeroAdventurePickOrder, AdventurePickOrder);
         AddIfPresent(result, BotOptionPayloadKeys.HeroContinuousAdventures, FormatBool(ContinuousAdventures));

@@ -9,6 +9,8 @@ public sealed class QueuePanelService(IQueuePanelClient client)
 
     public bool Remove(Guid id) => client.Remove(id);
 
+    public int RemoveMany(IReadOnlyCollection<Guid> ids) => client.RemoveMany(ids);
+
     public bool MoveUp(Guid id) => client.MoveUp(id);
 
     public bool MoveDown(Guid id) => client.MoveDown(id);
@@ -16,6 +18,8 @@ public sealed class QueuePanelService(IQueuePanelClient client)
     public bool MoveToTop(Guid id) => client.MoveToTop(id);
 
     public bool MoveToBottom(Guid id) => client.MoveToBottom(id);
+
+    public bool ApplyOrder(IReadOnlyList<Guid> orderedIds) => client.ApplyOrder(orderedIds);
 
     public bool Pause(Guid id) => client.Pause(id);
 

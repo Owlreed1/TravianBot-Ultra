@@ -16,10 +16,12 @@ public interface IDesktopBotService
     IReadOnlyList<QueueItem> ReplaceActiveQueueGroup(QueueGroup group, IReadOnlyList<QueueItemCreateRequest> requests);
     QueueItem EnqueueRuntime(string taskName, string displayName, Dictionary<string, string>? payload, int priority, int maxRetries);
     bool RemoveQueueItem(Guid id);
+    int RemoveQueueItems(IReadOnlyCollection<Guid> ids);
     bool MoveQueueItemUp(Guid id);
     bool MoveQueueItemDown(Guid id);
     bool MoveQueueItemToTop(Guid id);
     bool MoveQueueItemToBottom(Guid id);
+    bool ApplyQueueOrder(IReadOnlyList<Guid> orderedIds);
     bool PauseQueueItem(Guid id);
     bool ResumeQueueItem(Guid id);
     bool RetryQueueItem(Guid id);

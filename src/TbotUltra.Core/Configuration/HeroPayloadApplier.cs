@@ -5,6 +5,7 @@ internal sealed record HeroPayloadValues(
     bool AutoRevive,
     bool AutoAssignPoints,
     bool AutoUseOintments,
+    int OintmentTargetHpPercent,
     string StatPriority,
     string AdventurePickOrder,
     bool ContinuousAdventures,
@@ -33,6 +34,7 @@ internal static class HeroPayloadApplier
             source.HeroAutoRevive,
             source.HeroAutoAssignPoints,
             source.HeroAutoUseOintments,
+            source.HeroOintmentTargetHpPercent,
             source.HeroStatPriority,
             source.HeroAdventurePickOrder,
             source.HeroContinuousAdventures,
@@ -72,6 +74,8 @@ internal static class HeroPayloadApplier
                 result = result with { AutoAssignPoints = autoAssign };
             else if (TryReadBool(key, value, BotOptionPayloadKeys.HeroAutoUseOintments, out var ointments))
                 result = result with { AutoUseOintments = ointments };
+            else if (TryReadInt(key, value, BotOptionPayloadKeys.HeroOintmentTargetHpPercent, out var ointmentTarget))
+                result = result with { OintmentTargetHpPercent = NormalizeOintmentTarget(ointmentTarget) };
             else if (key.Equals(BotOptionPayloadKeys.HeroStatPriority, StringComparison.OrdinalIgnoreCase))
                 result = result with { StatPriority = value };
             else if (key.Equals(BotOptionPayloadKeys.HeroAdventurePickOrder, StringComparison.OrdinalIgnoreCase))
@@ -115,6 +119,9 @@ internal static class HeroPayloadApplier
 
     private static double ClampDelaySeconds(double value)
         => double.IsNaN(value) || double.IsInfinity(value) ? 0 : Math.Clamp(value, 0, 3600);
+
+    private static int NormalizeOintmentTarget(int value)
+        => value is 50 or 60 or 70 or 80 or 90 or 100 ? value : 100;
 
     private static bool TryReadInt(string key, string value, string expected, out int parsed)
     {

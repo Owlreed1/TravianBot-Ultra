@@ -55,8 +55,12 @@ public partial class MainWindow
     // flag those two would trigger each other in an endless loop.
     private bool _isRefreshingQueueUi;
 
-    private void RefreshQueueUi(Guid? selectId = null)
+    private void RefreshQueueUi(Guid? selectId = null, IReadOnlyCollection<Guid>? selectIds = null)
     {
+        var requestedSelection = selectIds?.Where(id => id != Guid.Empty).ToHashSet()
+            ?? (selectId.HasValue
+                ? new HashSet<Guid> { selectId.Value }
+                : QueueDataGrid.SelectedItems.OfType<QueueItemRow>().Select(row => row.Id).ToHashSet());
         RefreshDemolishStatusForSelectedVillage();
         _isRefreshingQueueUi = true;
         try
@@ -105,12 +109,12 @@ public partial class MainWindow
             RefreshTravianSmithyQueueUi();
             UpdateQueueEstimateTotals(displayedActiveRows);
             SyncPendingResourceTargetsInUi();
-            if (selectId.HasValue)
+            if (requestedSelection.Count > 0)
             {
-                var selected = displayedActiveRows.FirstOrDefault(item => item.Id == selectId.Value);
-                if (selected is not null)
+                QueueDataGrid.SelectedItems.Clear();
+                foreach (var row in _travianQueueViewModel.ActiveQueueRows.Where(row => requestedSelection.Contains(row.Id)))
                 {
-                    QueueDataGrid.SelectedItem = selected;
+                    QueueDataGrid.SelectedItems.Add(row);
                 }
             }
 

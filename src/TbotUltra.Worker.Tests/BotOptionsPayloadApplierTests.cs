@@ -233,6 +233,7 @@ public sealed class BotOptionsPayloadApplierTests
             .Build();
 
         Assert.Equal(50, BotOptionsFactory.FromConfiguration(configuration).HeroMinHpForAdventure);
+        Assert.Equal(100, BotOptionsFactory.FromConfiguration(configuration).HeroOintmentTargetHpPercent);
     }
 
     [Fact]

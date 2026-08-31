@@ -371,6 +371,7 @@ public sealed partial class TravianClient : IHeroClient
         bool autoRevive,
         bool autoAssignPoints,
         bool autoUseOintments,
+        int ointmentTargetHpPercent,
         string statPriority,
         string adventurePickOrder = "shortest",
         int heroHpRegenPerDayPercent = 40,
@@ -461,22 +462,26 @@ public sealed partial class TravianClient : IHeroClient
             ClearHeroOintmentMiss();
         }
 
-        if (autoUseOintments
-            && adventureCount > 0
-            && inVillage
-            && !status.IsDead
-            && hpPercent is >= 0
-            && hpPercent < minHpThreshold)
+        if (HeroCalc.ShouldUseOintmentsForAdventure(
+            autoUseOintments,
+            adventureCount,
+            inVillage,
+            status.IsDead,
+            hpPercent,
+            minHpThreshold,
+            ointmentTargetHpPercent))
         {
             var ointmentResult = await TryUseHeroOintmentsForAdventureAsync(
-                hpPercent.Value,
+                hpPercent!.Value,
                 minHpThreshold,
+                ointmentTargetHpPercent,
                 adventureCount,
                 cancellationToken);
 
             if (ointmentResult.SkippedBySuppression)
             {
-                actions.Add("ointment_check_skipped_cached_miss");
+                // A persisted empty-inventory cooldown is intentionally silent so continuous Hero
+                // automation neither navigates nor repeats a log line on every pass.
             }
             else if (ointmentResult.UsedCount > 0)
             {
@@ -764,7 +769,7 @@ public sealed partial class TravianClient : IHeroClient
         int? HeroHpFromSidebar,
         bool HasUnassignedPointsSignal);
 
-    private sealed record HeroOintmentRetryKey(int AdventureCount, int HpPercent, int MinHpForAdventure);
+    private sealed record HeroOintmentRetryKey(int AdventureCount, int HpPercent, int MinHpForAdventure, int TargetHpPercent);
 
     private sealed record HeroOintmentUseResult(
         int UsedCount,

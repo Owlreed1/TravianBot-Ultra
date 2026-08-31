@@ -343,11 +343,16 @@ public sealed partial class TravianClient
                     const text = (countEl?.textContent || '').replace(/[^0-9]/g, '');
                     return text ? Number(text) || 0 : 0;
                   };
+                  const ointmentItem = document.querySelector('.heroItems .item.item106');
+                  const ointmentSlot = ointmentItem?.closest('.heroItem');
+                  const ointmentText = (ointmentSlot?.querySelector('.count')?.textContent || '').replace(/[^0-9]/g, '');
                   return JSON.stringify({
                     wood: readCount('item145'),
                     clay: readCount('item146'),
                     iron: readCount('item147'),
-                    crop: readCount('item148')
+                    crop: readCount('item148'),
+                    ointmentFound: !!ointmentItem,
+                    ointmentCount: ointmentItem ? (ointmentText ? Number(ointmentText) || 0 : 1) : 0
                   });
                 }
                 """);
@@ -367,13 +372,24 @@ public sealed partial class TravianClient
                 "Hero inventory returned no values; keeping the previous snapshot.");
         }
 
-        var resources = JsonSerializer.Deserialize<HeroInventoryResources>(
+        var pageRead = JsonSerializer.Deserialize<HeroInventoryPageRead>(
                 rawJson,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-            ?? new HeroInventoryResources();
+            ?? new HeroInventoryPageRead();
+        var resources = new HeroInventoryResources(pageRead.Wood, pageRead.Clay, pageRead.Iron, pageRead.Crop);
 
             Notify($"[hero-inventory] wood={resources.Wood} clay={resources.Clay} iron={resources.Iron} crop={resources.Crop}");
             UpdateHeroInventoryCache(resources, HeroInventoryObservationSource.HeroInventoryPage);
+            if (pageRead.OintmentFound && pageRead.OintmentCount > 0)
+            {
+                ClearPersistedHeroOintmentCooldown();
+                Notify($"[hero-ointment] inventory read found {pageRead.OintmentCount}; automatic use is available again.");
+            }
+            else
+            {
+                var retryNotBeforeUtc = PersistEmptyHeroOintmentCooldown(DateTimeOffset.UtcNow);
+                Notify($"[hero-ointment] inventory contains no ointments; next automatic check after {retryNotBeforeUtc:O}.");
+            }
             return resources;
         }
         finally
@@ -384,6 +400,14 @@ public sealed partial class TravianClient
             }
         }
     }
+
+    private sealed record HeroInventoryPageRead(
+        int Wood = 0,
+        int Clay = 0,
+        int Iron = 0,
+        int Crop = 0,
+        bool OintmentFound = false,
+        int OintmentCount = 0);
 
     private async Task<HeroAttributeSnapshot> ReadHeroInventorySnapshotAsync(CancellationToken cancellationToken)
     {

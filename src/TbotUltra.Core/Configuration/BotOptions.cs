@@ -666,6 +666,9 @@ public sealed record BotOptions
     [ConfigurationKeyName(BotOptionPayloadKeys.HeroAutoUseOintments)]
     public bool HeroAutoUseOintments { get; init; }
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.HeroOintmentTargetHpPercent)]
+    public int HeroOintmentTargetHpPercent { get; init; } = 100;
+
     [ConfigurationKeyName("hero_stat_priority")]
     public string HeroStatPriority { get; init; } = "resources,fighting_strength,offence_bonus,defence_bonus";
 

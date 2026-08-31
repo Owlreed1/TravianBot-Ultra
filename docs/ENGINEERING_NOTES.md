@@ -106,6 +106,8 @@ Published artifacts belong under `artifacts/`, never beside source files.
   form draft and remains unsaved until the user uses the normal Settings Save action.
 - Embedded Village settings have no Save step: persist each row or group-toggle change immediately; bulk
   "Check all" changes persist each affected row and publish one consolidated settings-changed notification.
+- Farming requires confirmed active Gold Club. Dashboard and Village settings must project Farming as OFF and
+  non-clickable when Gold Club is false or unknown, and execution gating must enforce the same rule.
 - Demolition is a village-scoped queue group: start one Official `table#demolish` step, persist the server timer plus its random delay as `NextAttemptAt`, and never poll or sleep through it in the browser. It has no per-village group toggle; an explicitly queued demolition is always group-enabled, while the village's master Auto toggle still controls automation.
 - Persist village identity by coordinates/key, not display name. Names may collide or change; queue items retain
   their target village identity.
@@ -141,11 +143,13 @@ Published artifacts belong under `artifacts/`, never beside source files.
   the final target, survives slot fallback/reconciliation, and continues from level 1 through that target; templates,
   recovery, requirement repair, and storage preflight must not split this into separate construct/upgrade rows.
   Resource-field target upgrades likewise remain one queue item.
-- Manual queue reordering persists through `CreatedAt` and therefore controls FIFO selection in both Auto Queue
-  and Continuous Loop. Up/down/top/bottom operate only inside the selected item's queue group and priority and
-  ignore history rows. A move that places an explicitly linked construction requirement, or a construct for the
-  same slot, after its dependent task must require an explicit `Move anyway` confirmation. Do not infer a warning
-  from catalog compatibility alone without live proof; the runtime construction guard remains the final safety net.
+- Manual queue reordering persists atomically through `CreatedAt` and therefore controls FIFO selection in both Auto
+  Queue and Continuous Loop. Extended row selection supports Ctrl/Shift; one move requires one group and priority,
+  preserves selected order, and moves only the selected village's visible rows while hidden villages keep their
+  relative order. A Running aggregate target may move: its already-started server action finishes, while remaining
+  work follows the new position. Evaluate dependencies against the complete final order and show at most one
+  `Move anyway` confirmation only when an explicitly linked requirement, or same-slot construct, crosses its
+  dependent task. Do not infer warnings from catalog compatibility alone; the runtime guard remains final safety.
 - New villages default to Auto enabled. The version-1 migration enables existing villages once; later manual
   Auto-off choices persist.
 
@@ -616,6 +620,12 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Hero Attributes navigation is required only when the sidebar signals new points or no known attribute snapshot
   exists. Successful point allocation invalidates memory and disk, and incomplete DOM reads never overwrite a valid
   snapshot. Hero HP uses the global SVG first and opens Attributes only when that live signal is unavailable.
+- Automatic ointment use is triggered only for a home, living Hero with an available adventure when HP reaches or
+  falls below the configured adventure minimum. Identify the inventory item by Official Travian's `item106`
+  contract (with `inventory_5` as a fixture-backed fallback), pace both clicks, and verify live HP after Use. A
+  confirmed empty ointment inventory creates a silent, persisted 12-hour account+server cooldown; HP regeneration,
+  changed adventure count, and process restart must not bypass it. A later real inventory read finding ointments
+  clears the cooldown immediately.
 - Hero inventory resources are an account+server persisted last-known snapshot. Quick re-login, process restart,
   and account switching restore it; incomplete inventory reads never replace it with fabricated zeroes. When no
   snapshot has ever been captured, construction/resource actions may open their existing resource-transfer dialog,

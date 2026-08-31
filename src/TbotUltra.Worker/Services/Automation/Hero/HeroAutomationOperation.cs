@@ -46,10 +46,10 @@ internal sealed class HeroAutomationOperation(IHeroClient client)
         => client.ReduceAdventuresTimeAsync(cancellationToken);
 
     public Task<string> ManageAsync(
-        int minHp, bool autoRevive, bool autoAssignPoints, bool autoUseOintments,
+        int minHp, bool autoRevive, bool autoAssignPoints, bool autoUseOintments, int ointmentTargetHpPercent,
         string statPriority, string adventurePickOrder, int hpRegenPerDayPercent,
         CancellationToken cancellationToken)
-        => client.ManageHeroAsync(minHp, autoRevive, autoAssignPoints, autoUseOintments,
+        => client.ManageHeroAsync(minHp, autoRevive, autoAssignPoints, autoUseOintments, ointmentTargetHpPercent,
             statPriority, adventurePickOrder, hpRegenPerDayPercent, cancellationToken);
 
     public Task<string> SpendAttributePointsAsync(string statPriority, CancellationToken cancellationToken)

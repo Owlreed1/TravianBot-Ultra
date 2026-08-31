@@ -26,13 +26,49 @@ public sealed partial class TravianClient
         _lastHeroOintmentMissKey = null;
     }
 
+    private void ClearPersistedHeroOintmentCooldown()
+    {
+        try
+        {
+            _heroOintmentAvailabilityStore.Clear(AccountName, ServerUrl);
+        }
+        catch (Exception ex)
+        {
+            Notify($"[hero-ointment] could not clear availability cooldown: {ex.Message}");
+        }
+    }
+
+    private DateTimeOffset PersistEmptyHeroOintmentCooldown(DateTimeOffset observedAtUtc)
+    {
+        var retryNotBeforeUtc = observedAtUtc + HeroOintmentRetryPolicy.EmptyInventoryCooldown;
+        try
+        {
+            _heroOintmentAvailabilityStore.SaveUnavailable(AccountName, ServerUrl, retryNotBeforeUtc);
+        }
+        catch (Exception ex)
+        {
+            Notify($"[hero-ointment] could not persist empty-inventory cooldown: {ex.Message}");
+        }
+
+        return retryNotBeforeUtc;
+    }
+
     private async Task<HeroOintmentUseResult> TryUseHeroOintmentsForAdventureAsync(
         int currentHpPercent,
         int minHpForAdventure,
+        int targetHpPercent,
         int adventureCount,
         CancellationToken cancellationToken)
     {
-        var retryKey = new HeroOintmentRetryKey(adventureCount, currentHpPercent, minHpForAdventure);
+        var now = DateTimeOffset.UtcNow;
+        var availabilityState = _heroOintmentAvailabilityStore.TryLoad(AccountName, ServerUrl);
+        if (!HeroOintmentRetryPolicy.ShouldLookup(availabilityState, now))
+        {
+            return HeroOintmentUseResult.Suppressed;
+        }
+
+        var normalizedTarget = HeroCalc.NormalizeOintmentTargetHp(targetHpPercent);
+        var retryKey = new HeroOintmentRetryKey(adventureCount, currentHpPercent, minHpForAdventure, normalizedTarget);
         if (_lastHeroOintmentMissKey == retryKey)
         {
             Notify($"Hero ointment lookup skipped for unchanged state: hp={currentHpPercent}%, adventures={adventureCount}.");
@@ -46,18 +82,21 @@ public sealed partial class TravianClient
         if (!info.Found || info.Count <= 0)
         {
             _lastHeroOintmentMissKey = retryKey;
-            Notify("Hero ointments not found in inventory. Suppressing repeat inventory checks until hero state changes.");
+            var retryNotBeforeUtc = PersistEmptyHeroOintmentCooldown(now);
+            Notify($"Hero ointments not found in inventory. Next automatic check after {retryNotBeforeUtc:O}.");
             return HeroOintmentUseResult.AttemptedWithoutUse;
         }
 
-        var useCount = HeroCalc.CalculateOintmentsToUse(currentHpPercent, minHpForAdventure, info.Count);
+        ClearPersistedHeroOintmentCooldown();
+
+        var useCount = HeroCalc.CalculateOintmentsToUse(currentHpPercent, normalizedTarget, info.Count);
         if (useCount <= 0)
         {
             ClearHeroOintmentMiss();
             return HeroOintmentUseResult.AttemptedWithoutUse;
         }
 
-        Notify($"Hero ointments found: {info.Count}. Trying to use {useCount}.");
+        Notify($"Hero ointments found: {info.Count}. Trying to use {useCount} to reach {normalizedTarget}% HP.");
         var clicked = await ClickHeroOintmentItemAsync(info.ItemIndex, cancellationToken);
         if (!clicked)
         {
@@ -66,15 +105,31 @@ public sealed partial class TravianClient
             return HeroOintmentUseResult.AttemptedWithoutUse;
         }
 
-        await Task.Delay(500, cancellationToken);
-        var confirmed = await ConfirmHeroOintmentUseAsync(useCount, cancellationToken);
-        await WaitForPageReadyAsync(cancellationToken); // Wait for page to load
-        await Task.Delay(500, cancellationToken);
+        await _page.Locator(".heroConsumablesPopup").WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 5_000,
+        });
+        var submitted = await ConfirmHeroOintmentUseAsync(useCount, cancellationToken);
+        if (!submitted)
+        {
+            _lastHeroOintmentMissKey = retryKey;
+            Notify("Hero ointment dialog opened, but the Use action could not be submitted.");
+            return HeroOintmentUseResult.AttemptedWithoutUse;
+        }
 
-        var refreshedHp = await ReadHeroHpFromCurrentPageAsync(cancellationToken);
-        if (confirmed || refreshedHp > currentHpPercent)
+        await WaitForPageReadyAsync(cancellationToken); // Wait for page to load
+        int? refreshedHp = null;
+        for (var attempt = 0; attempt < 3 && (!refreshedHp.HasValue || refreshedHp.Value <= currentHpPercent); attempt++)
+        {
+            await Task.Delay(500, cancellationToken);
+            refreshedHp = await ReadHeroHpFromCurrentPageAsync(cancellationToken);
+        }
+
+        if (refreshedHp > currentHpPercent)
         {
             ClearHeroOintmentMiss();
+            ClearPersistedHeroOintmentCooldown();
             var observedUsed = refreshedHp > currentHpPercent
                 ? Math.Min(useCount, refreshedHp.Value - currentHpPercent)
                 : useCount;
@@ -134,6 +189,8 @@ public sealed partial class TravianClient
                 return 1;
               };
               const selectors = [
+                '.heroItem:has(.item106)',
+                '.heroItem[data-refkey="inventory_5"]',
                 '#inventory .item',
                 '#items .item',
                 '.inventory .item',
@@ -146,7 +203,9 @@ public sealed partial class TravianClient
               const candidates = nodes
                 .filter(isVisible)
                 .map((node) => ({ node, text: readText(node) }))
-                .filter(item => matchesOintment(item.text));
+                .filter(item => item.node.matches('.heroItem[data-refkey="inventory_5"]')
+                  || !!item.node.querySelector('.item106')
+                  || matchesOintment(item.text));
               if (candidates.length === 0) {
                 return JSON.stringify({ found: false, count: 0, itemIndex: -1 });
               }
@@ -202,6 +261,8 @@ public sealed partial class TravianClient
               };
               const matchesOintment = (text) => /(^|[^a-z])(ointment|ointments|salve|salves|salva|salvor|salbe|salben)([^a-z]|$)/i.test(text);
               const selectors = [
+                '.heroItem:has(.item106)',
+                '.heroItem[data-refkey="inventory_5"]',
                 '#inventory .item',
                 '#items .item',
                 '.inventory .item',
@@ -213,7 +274,9 @@ public sealed partial class TravianClient
               const nodes = Array.from(new Set(selectors.flatMap(selector => Array.from(document.querySelectorAll(selector)))));
               const candidates = nodes
                 .filter(isVisible)
-                .filter(node => matchesOintment(readText(node)));
+                .filter(node => node.matches('.heroItem[data-refkey="inventory_5"]')
+                  || !!node.querySelector('.item106')
+                  || matchesOintment(readText(node)));
               const item = candidates[ointmentIndex];
               if (!item) return false;
               const target = item.querySelector('button:not([disabled]), a, [role="button"], img') || item;
@@ -239,15 +302,18 @@ public sealed partial class TravianClient
                 const rect = node.getBoundingClientRect();
                 return rect.width > 0 && rect.height > 0;
               };
-              const dialog = Array.from(document.querySelectorAll('.dialog, .modal, .popup, .overlay, [role="dialog"]'))
+              const dialog = Array.from(document.querySelectorAll('.heroConsumablesPopup, .dialog, .modal, .popup, .overlay, [role="dialog"]'))
                 .filter(isVisible)
                 .reverse()
-                .find(node => /ointment|ointments|salve|salves|salva|salvor|salbe|salben/i.test(clean(node.textContent || '')));
+                .find(node => node.matches('.heroConsumablesPopup')
+                  || /ointment|ointments|salve|salves|salva|salvor|salbe|salben/i.test(clean(node.textContent || '')));
               if (!dialog) return false;
-              const input = Array.from(dialog.querySelectorAll('input[type="number"], input[type="text"]'))
+              const input = Array.from(dialog.querySelectorAll('#consumableHeroItem input, input[type="number"], input[type="text"]'))
                 .find(node => isVisible(node) && !node.disabled && !node.readOnly);
               if (input) {
-                input.value = String(Math.max(1, useCount));
+                const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+                if (valueSetter) valueSetter.call(input, String(Math.max(1, useCount)));
+                else input.value = String(Math.max(1, useCount));
                 input.dispatchEvent(new Event('input', { bubbles: true }));
                 input.dispatchEvent(new Event('change', { bubbles: true }));
               }
@@ -256,7 +322,7 @@ public sealed partial class TravianClient
               const button = buttons.find(node => {
                 const text = clean((node.value || '') + ' ' + (node.textContent || '') + ' ' + (node.getAttribute('title') || '')).toLowerCase();
                 return /\b(use|apply|confirm|ok|yes|anwenden|benutzen)\b/.test(text);
-              }) || buttons[0];
+              });
               if (!button) return false;
               button.click();
               return true;

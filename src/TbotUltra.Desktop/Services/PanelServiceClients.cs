@@ -36,10 +36,12 @@ public interface IQueuePanelClient
 {
     IReadOnlyList<QueueItem> GetItems();
     bool Remove(Guid id);
+    int RemoveMany(IReadOnlyCollection<Guid> ids);
     bool MoveUp(Guid id);
     bool MoveDown(Guid id);
     bool MoveToTop(Guid id);
     bool MoveToBottom(Guid id);
+    bool ApplyOrder(IReadOnlyList<Guid> orderedIds);
     bool Pause(Guid id);
     bool Resume(Guid id);
     bool Retry(Guid id);
@@ -107,10 +109,12 @@ internal sealed class DesktopQueuePanelClient(IDesktopBotService botService) : I
 {
     public IReadOnlyList<QueueItem> GetItems() => botService.GetQueueItemsForDisplay();
     public bool Remove(Guid id) => botService.RemoveQueueItem(id);
+    public int RemoveMany(IReadOnlyCollection<Guid> ids) => botService.RemoveQueueItems(ids);
     public bool MoveUp(Guid id) => botService.MoveQueueItemUp(id);
     public bool MoveDown(Guid id) => botService.MoveQueueItemDown(id);
     public bool MoveToTop(Guid id) => botService.MoveQueueItemToTop(id);
     public bool MoveToBottom(Guid id) => botService.MoveQueueItemToBottom(id);
+    public bool ApplyOrder(IReadOnlyList<Guid> orderedIds) => botService.ApplyQueueOrder(orderedIds);
     public bool Pause(Guid id) => botService.PauseQueueItem(id);
     public bool Resume(Guid id) => botService.ResumeQueueItem(id);
     public bool Retry(Guid id) => botService.RetryQueueItem(id);

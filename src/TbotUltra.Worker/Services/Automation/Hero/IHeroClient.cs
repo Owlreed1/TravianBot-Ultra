@@ -34,6 +34,7 @@ public interface IHeroClient
         bool autoRevive,
         bool autoAssignPoints,
         bool autoUseOintments,
+        int ointmentTargetHpPercent,
         string statPriority,
         string adventurePickOrder = "shortest",
         int heroHpRegenPerDayPercent = 40,

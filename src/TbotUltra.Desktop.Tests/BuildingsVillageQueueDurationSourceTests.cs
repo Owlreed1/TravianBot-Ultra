@@ -17,7 +17,7 @@ public sealed class BuildingsVillageQueueDurationSourceTests
             "MainWindow.QueueUi.Display.cs"));
 
         var methodStart = source.IndexOf(
-            "private void RefreshQueueUi(Guid? selectId = null)",
+            "private void RefreshQueueUi(Guid? selectId = null, IReadOnlyCollection<Guid>? selectIds = null)",
             StringComparison.Ordinal);
         var nextMethod = source.IndexOf(
             "private QueueDisplayRows BuildQueueDisplayRows",

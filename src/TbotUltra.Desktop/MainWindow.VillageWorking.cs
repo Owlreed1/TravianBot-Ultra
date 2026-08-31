@@ -720,15 +720,21 @@ public partial class MainWindow
         {
             foreach (var option in _automationLoopTasks)
             {
-                var isBreweryGroup = string.Equals(
-                    option.TaskName,
-                    QueueGroupCatalog.GetKey(QueueGroup.BreweryCelebration),
-                    StringComparison.OrdinalIgnoreCase);
-                option.IsEnabled = (!isBreweryGroup || info.IsCapital)
-                    && groups.Contains(option.TaskName, StringComparer.OrdinalIgnoreCase);
+                if (!QueueGroupCatalog.TryParse(option.TaskName, out var group))
+                {
+                    continue;
+                }
+
+                var state = AutomationGroupAvailability.Resolve(
+                    group,
+                    info.IsCapital,
+                    CurrentGoldClubAvailability,
+                    groups.Contains(option.TaskName, StringComparer.OrdinalIgnoreCase));
+                option.CanToggle = state.CanToggle;
+                option.IsEnabled = state.IsEnabled;
             }
 
-            UpdateBreweryCelebrationToggleAvailability(info);
+            UpdateAutomationGroupToggleAvailability(info);
             RefreshAutomationLoopDashboardUi();
         }
         finally
@@ -737,20 +743,23 @@ public partial class MainWindow
         }
     }
 
-    private void UpdateBreweryCelebrationToggleAvailability(VillageSettingsStore.VillageKeyInfo? selectedVillage)
+    private void UpdateAutomationGroupToggleAvailability(VillageSettingsStore.VillageKeyInfo? selectedVillage)
     {
-        var breweryKey = QueueGroupCatalog.GetKey(QueueGroup.BreweryCelebration);
-        var canToggleBrewery = selectedVillage?.IsCapital == true;
         foreach (var option in _automationLoopTasks)
         {
-            if (string.Equals(option.TaskName, breweryKey, StringComparison.OrdinalIgnoreCase))
-            {
-                option.CanToggle = canToggleBrewery;
-            }
-            else
+            if (!QueueGroupCatalog.TryParse(option.TaskName, out var group))
             {
                 option.CanToggle = true;
+                continue;
             }
+
+            var state = AutomationGroupAvailability.Resolve(
+                group,
+                selectedVillage?.IsCapital == true,
+                CurrentGoldClubAvailability,
+                option.IsEnabled);
+            option.CanToggle = state.CanToggle;
+            option.IsEnabled = state.IsEnabled;
         }
     }
 
@@ -764,13 +773,9 @@ public partial class MainWindow
         }
 
         var enabled = _automationLoopTasks
-            .Where(item => item.IsEnabled)
-            .Where(item =>
-                info.IsCapital
-                || !string.Equals(
-                    item.TaskName,
-                    QueueGroupCatalog.GetKey(QueueGroup.BreweryCelebration),
-                    StringComparison.OrdinalIgnoreCase))
+            .Where(item => item.IsEnabled
+                && QueueGroupCatalog.TryParse(item.TaskName, out var group)
+                && AutomationGroupAvailability.CanToggle(group, info.IsCapital, CurrentGoldClubAvailability))
             .Select(item => item.TaskName)
             .ToList();
         _villageSettingsStore.SetEnabledGroups(info, enabled);

@@ -10,6 +10,15 @@ namespace TbotUltra.Desktop;
 // same class, so this is a pure relocation with no behavior change.
 public partial class MainWindow
 {
+    private int _goldClubAvailabilityState = -1;
+
+    private bool? CurrentGoldClubAvailability => Volatile.Read(ref _goldClubAvailabilityState) switch
+    {
+        1 => true,
+        0 => false,
+        _ => null,
+    };
+
     private void UpdateGoldClubInfo(bool? enabled)
     {
         if (!Dispatcher.CheckAccess())
@@ -17,6 +26,10 @@ public partial class MainWindow
             Dispatcher.Invoke(() => UpdateGoldClubInfo(enabled));
             return;
         }
+
+        var nextAvailabilityState = enabled == true ? 1 : enabled == false ? 0 : -1;
+        var availabilityChanged = Interlocked.Exchange(ref _goldClubAvailabilityState, nextAvailabilityState)
+            != nextAvailabilityState;
 
         if (enabled == true)
         {
@@ -38,6 +51,10 @@ public partial class MainWindow
             GoldClubInfoTextBlock.Foreground = System.Windows.Media.Brushes.Gray;
         }
         UpdateAccountInfoLabel(_accountStore.ActiveAccountName());
+        if (availabilityChanged)
+        {
+            ApplyFarmingAvailabilityFromGoldClubStatus(enabled);
+        }
     }
 
     private void ApplyFarmingAvailabilityFromGoldClubStatus(bool? enabled)
@@ -49,13 +66,20 @@ public partial class MainWindow
                 ClearFarmingBlockedState();
             }
 
-            return;
+            ApplyAutomationLoopGroupsForSelectedVillage();
         }
-
-        if (enabled == false
+        else if (enabled == false
             && !string.Equals(_farmingBlockedReasonKey, FarmingBlockedReasonNoGoldClub, StringComparison.OrdinalIgnoreCase))
         {
             SetFarmingBlockedState(FarmingBlockedReasonNoGoldClub, "No goldclub");
+        }
+
+        UpdateAutomationGroupToggleAvailability(GetSelectedVillageKeyInfoOrNull());
+        var hadVillagePanels = DashboardHubPanelControl.HasVillagePanels;
+        if (hadVillagePanels)
+        {
+            ClearDashboardVillagePanels();
+            EnsureDashboardVillagePanels();
         }
     }
 

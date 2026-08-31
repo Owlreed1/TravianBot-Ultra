@@ -58,6 +58,59 @@ public sealed class QueueMoveSafetyTests
         Assert.Empty(preview.Warnings);
     }
 
+    [Fact]
+    public void Preview_MovesSelectedVisibleRowsAndLeavesHiddenVillageRowsInPlace()
+    {
+        var first = Item("status", []);
+        var hidden = Item("status", []);
+        var second = Item("scan_all_villages", []);
+        var third = Item("account_snapshot", []);
+
+        var preview = QueueMoveSafety.Preview(
+            [first, hidden, second, third],
+            [first.Id, second.Id, third.Id],
+            [second.Id, third.Id],
+            QueueMoveTarget.Up);
+
+        Assert.True(preview.CanMove);
+        Assert.Equal([second.Id, hidden.Id, third.Id, first.Id], preview.OrderedScopeIds);
+    }
+
+    [Fact]
+    public void Preview_ToBottomPreservesSelectedOrderAndMakesSelectionContiguous()
+    {
+        var first = Item("status", []);
+        var selectedFirst = Item("scan_all_villages", []);
+        var middle = Item("account_snapshot", []);
+        var selectedSecond = Item("status", []);
+
+        var preview = QueueMoveSafety.Preview(
+            [first, selectedFirst, middle, selectedSecond],
+            [first.Id, selectedFirst.Id, middle.Id, selectedSecond.Id],
+            [selectedFirst.Id, selectedSecond.Id],
+            QueueMoveTarget.Bottom);
+
+        Assert.True(preview.CanMove);
+        Assert.Equal([first.Id, middle.Id, selectedFirst.Id, selectedSecond.Id], preview.OrderedScopeIds);
+    }
+
+    [Fact]
+    public void Preview_RejectsSelectionAcrossPriorities()
+    {
+        var normal = Item("status", []);
+        var urgent = Item("scan_all_villages", []);
+        urgent.Priority = 1;
+
+        var preview = QueueMoveSafety.Preview(
+            [normal, urgent],
+            [normal.Id, urgent.Id],
+            [normal.Id, urgent.Id],
+            QueueMoveTarget.Top);
+
+        Assert.False(preview.CanMove);
+        Assert.Contains("same group and priority", preview.FailureReason, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static QueueItem Item(string taskName, Dictionary<string, string> payload) => new()
     {
         TaskName = taskName,

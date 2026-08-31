@@ -63,6 +63,18 @@ public sealed class HeroViewModelTests
         Assert.Equal(enabled, vm.AutoUseOintments);
     }
 
+    [Theory]
+    [InlineData(50, 50)]
+    [InlineData(90, 90)]
+    [InlineData(100, 100)]
+    [InlineData(75, 100)]
+    public void OintmentTargetHpPercent_AllowsOnlyUiChoices(int requested, int expected)
+    {
+        var vm = new HeroViewModel { OintmentTargetHpPercent = requested };
+
+        Assert.Equal(expected, vm.OintmentTargetHpPercent);
+    }
+
     [Fact]
     public void AdventureVideoChancePercent_DefaultsLoadsAndClamps()
     {

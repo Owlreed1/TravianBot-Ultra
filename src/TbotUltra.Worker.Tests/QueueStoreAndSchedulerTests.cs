@@ -81,6 +81,23 @@ public sealed class QueueStoreAndSchedulerTests : IDisposable
     }
 
     [Fact]
+    public void ApplyOrder_AtomicallyReordersPendingAndRunningItems()
+    {
+        var store = new JsonQueueStore(_queuePath);
+        var scheduler = new PriorityFifoQueueScheduler();
+        var first = store.Add("status", null, priority: 0, maxRetries: 3);
+        var second = store.Add("scan_all_villages", null, priority: 0, maxRetries: 3);
+        var third = store.Add("account_snapshot", null, priority: 0, maxRetries: 3);
+        Assert.True(store.MarkRunning(first.Id));
+
+        Assert.True(store.ApplyOrder([third.Id, first.Id, second.Id]));
+
+        Assert.Equal(
+            [third.Id, first.Id, second.Id],
+            scheduler.OrderForDisplay(store.GetAll()).Select(item => item.Id));
+    }
+
+    [Fact]
     public void MoveUp_IgnoresCompletedItemsThatAreNotInTheActiveQueue()
     {
         var store = new JsonQueueStore(_queuePath);

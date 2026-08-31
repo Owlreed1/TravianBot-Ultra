@@ -284,6 +284,7 @@ public static class BotOptionsFactory
             HeroAutoRevive = configuration.GetValue(BotOptionPayloadKeys.HeroAutoRevive, false),
             HeroAutoAssignPoints = configuration.GetValue(BotOptionPayloadKeys.HeroAutoAssignPoints, false),
             HeroAutoUseOintments = configuration.GetValue(BotOptionPayloadKeys.HeroAutoUseOintments, false),
+            HeroOintmentTargetHpPercent = NormalizeHeroOintmentTarget(configuration.GetValue(BotOptionPayloadKeys.HeroOintmentTargetHpPercent, 100)),
             HeroStatPriority = heroStatPriority,
             HeroAdventurePickOrder = configuration[BotOptionPayloadKeys.HeroAdventurePickOrder] ?? "shortest",
             HeroContinuousAdventures = configuration.GetValue(BotOptionPayloadKeys.HeroContinuousAdventures, false),
@@ -310,6 +311,9 @@ public static class BotOptionsFactory
             UpgradeSelectorProfile = configuration[BotOptionPayloadKeys.UpgradeSelectorProfile] ?? "auto",
         };
     }
+
+    private static int NormalizeHeroOintmentTarget(int value)
+        => value is 50 or 60 or 70 or 80 or 90 or 100 ? value : 100;
 
     public static BotOptions CloneWithOverrides(
         BotOptions source,

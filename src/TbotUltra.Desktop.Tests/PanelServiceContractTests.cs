@@ -23,16 +23,18 @@ public sealed class PanelServiceContractTests : IDisposable
 
         Assert.Same(client.Items, service.GetItems());
         Assert.True(service.Remove(id));
+        Assert.Equal(1, service.RemoveMany([id]));
         Assert.True(service.MoveUp(id));
         Assert.True(service.MoveDown(id));
         Assert.True(service.MoveToTop(id));
         Assert.True(service.MoveToBottom(id));
+        Assert.True(service.ApplyOrder([id, Guid.NewGuid()]));
         Assert.True(service.Pause(id));
         Assert.True(service.Resume(id));
         Assert.True(service.Retry(id));
         var queued = service.Enqueue("send_farmlists", payload, priority: 7, maxRetries: 4);
 
-        Assert.Equal(["get", "remove", "up", "down", "top", "bottom", "pause", "resume", "retry", "enqueue"], client.Calls);
+        Assert.Equal(["get", "remove", "remove-many", "up", "down", "top", "bottom", "apply-order", "pause", "resume", "retry", "enqueue"], client.Calls);
         Assert.All(client.ItemIds, actual => Assert.Equal(id, actual));
         Assert.Same(payload, client.EnqueuedPayload);
         Assert.Equal(("send_farmlists", 7, 4), (client.EnqueuedTaskName, client.EnqueuedPriority, client.EnqueuedMaxRetries));
@@ -99,6 +101,7 @@ public sealed class PanelServiceContractTests : IDisposable
             AutoRevive = false,
             AutoAssignPoints = false,
             AutoUseOintments = true,
+            OintmentTargetHpPercent = 90,
             IsAdventurePickTop = true,
             ContinuousAdventures = true,
             IncreaseAdventuresToHard = true,
@@ -117,6 +120,7 @@ public sealed class PanelServiceContractTests : IDisposable
         Assert.False(persisted[BotOptionPayloadKeys.HeroAutoRevive]!.GetValue<bool>());
         Assert.False(persisted[BotOptionPayloadKeys.HeroAutoAssignPoints]!.GetValue<bool>());
         Assert.True(persisted[BotOptionPayloadKeys.HeroAutoUseOintments]!.GetValue<bool>());
+        Assert.Equal(90, persisted[BotOptionPayloadKeys.HeroOintmentTargetHpPercent]!.GetValue<int>());
         Assert.Equal("resources,fighting_strength,offence_bonus,defence_bonus", persisted[BotOptionPayloadKeys.HeroStatPriority]!.GetValue<string>());
         Assert.Equal("top", persisted[BotOptionPayloadKeys.HeroAdventurePickOrder]!.GetValue<string>());
         Assert.True(persisted[BotOptionPayloadKeys.HeroContinuousAdventures]!.GetValue<bool>());
@@ -131,7 +135,7 @@ public sealed class PanelServiceContractTests : IDisposable
     [Fact]
     public void HeroPanelService_CreatesBoundedIndependentAdventurePayloads()
     {
-        var vm = new HeroViewModel { ContinuousAdventures = true, MinHpForAdventure = 64 };
+        var vm = new HeroViewModel { ContinuousAdventures = true, MinHpForAdventure = 64, OintmentTargetHpPercent = 80 };
         vm.LoadPriorityFromConfig("resources,fighting_strength,offence_bonus,defence_bonus");
         var service = new HeroPanelService(new RecordingHeroClient(), CreateConfigStore());
 
@@ -141,6 +145,7 @@ public sealed class PanelServiceContractTests : IDisposable
         Assert.Equal(20, payloads.Count);
         Assert.Equal("1", payloads[0][BotOptionPayloadKeys.HeroMinHpForAdventure]);
         Assert.Equal("64", payloads[1][BotOptionPayloadKeys.HeroMinHpForAdventure]);
+        Assert.Equal("80", payloads[1][BotOptionPayloadKeys.HeroOintmentTargetHpPercent]);
         Assert.All(payloads, payload => Assert.Equal("resources,fighting_strength,offence_bonus,defence_bonus", payload[BotOptionPayloadKeys.HeroStatPriority]));
         Assert.Single(service.CreateAdventurePayloads(new HeroViewModel(), availableAdventures: 24));
     }
@@ -308,10 +313,12 @@ public sealed class PanelServiceContractTests : IDisposable
 
         public IReadOnlyList<QueueItem> GetItems() { Calls.Add("get"); return Items; }
         public bool Remove(Guid id) => Record("remove", id);
+        public int RemoveMany(IReadOnlyCollection<Guid> ids) { Calls.Add("remove-many"); return ids.Count; }
         public bool MoveUp(Guid id) => Record("up", id);
         public bool MoveDown(Guid id) => Record("down", id);
         public bool MoveToTop(Guid id) => Record("top", id);
         public bool MoveToBottom(Guid id) => Record("bottom", id);
+        public bool ApplyOrder(IReadOnlyList<Guid> orderedIds) { Calls.Add("apply-order"); return orderedIds.Count > 0; }
         public bool Pause(Guid id) => Record("pause", id);
         public bool Resume(Guid id) => Record("resume", id);
         public bool Retry(Guid id) => Record("retry", id);

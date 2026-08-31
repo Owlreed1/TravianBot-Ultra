@@ -22,31 +22,44 @@ public partial class MainWindow
 
     private void QueueRemoveSelected()
     {
-        if (_travianQueueViewModel.SelectedActiveQueueRow is not { } selected)
+        var selectedRows = GetSelectedActiveQueueRows();
+        if (selectedRows.Count == 0)
         {
             AppendLog("Select a queue item first.");
             return;
         }
 
-        var existingItem = _queuePanelService.GetItems().FirstOrDefault(item => item.Id == selected.Id);
+        var selectedIds = selectedRows.Select(row => row.Id).ToHashSet();
+        var snapshotBefore = _queuePanelService.GetItems().ToList();
+        var selectedItems = snapshotBefore.Where(item => selectedIds.Contains(item.Id)).ToList();
+        if (selectedItems.Count != selectedIds.Count)
+        {
+            AppendLog("One or more selected queue items are no longer available. Refresh and try again.");
+            RefreshQueueUi();
+            return;
+        }
 
         // Warn before removing an item that other queued buildings depend on: removing it would cascade-
         // remove those follow-on items too. Show exactly which ones so the user knows the full effect.
-        if (existingItem is not null)
+        var alsoRemoved = ComputeBuildingQueueRemovalPreview(selectedItems);
+        if (selectedItems.Count > 1)
         {
-            var alsoRemoved = ComputeBuildingQueueRemovalPreview(existingItem);
-            if (alsoRemoved.Count > 0 && !ConfirmCascadingQueueRemoval(existingItem, alsoRemoved))
+            if (!ConfirmMultipleQueueRemoval(selectedItems, alsoRemoved))
             {
                 return;
             }
         }
+        else if (alsoRemoved.Count > 0 && !ConfirmCascadingQueueRemoval(selectedItems[0], alsoRemoved))
+        {
+            return;
+        }
 
         // Snapshot the whole queue before removing so the Redo/Restore button can bring back the selected
         // item AND every dependent/higher-level item the cascades drop along with it.
-        var snapshotBefore = _queuePanelService.GetItems().ToList();
-        if (_queuePanelService.Remove(selected.Id))
+        var removed = _queuePanelService.RemoveMany(selectedIds);
+        if (removed > 0)
         {
-            if (existingItem is not null)
+            foreach (var existingItem in selectedItems)
             {
                 ForgetBuildingQueueCachesForItem(existingItem);
 
@@ -62,7 +75,7 @@ public partial class MainWindow
                 }
             }
 
-            AppendLog($"Queue item removed: {selected.TaskName}.");
+            AppendLog($"Removed {removed} selected queue item(s).");
             // Removing a prerequisite (e.g. a Main Building upgrade or a prerequisite construct) can leave
             // dependent building tasks that can no longer be built — drop them too. Also refreshes the UI.
             CascadeRemoveUnsatisfiedBuildingQueueItems();
@@ -72,6 +85,52 @@ public partial class MainWindow
         }
 
         AppendLog("Could not remove queue item.");
+    }
+
+    private IReadOnlyList<QueueItemRow> GetSelectedActiveQueueRows()
+    {
+        var selectedIds = QueueDataGrid.SelectedItems
+            .OfType<QueueItemRow>()
+            .Select(row => row.Id)
+            .ToHashSet();
+        if (selectedIds.Count == 0 && _travianQueueViewModel.SelectedActiveQueueRow is { } selected)
+        {
+            selectedIds.Add(selected.Id);
+        }
+
+        return _travianQueueViewModel.ActiveQueueRows
+            .Where(row => selectedIds.Contains(row.Id))
+            .ToList();
+    }
+
+    private bool ConfirmMultipleQueueRemoval(
+        IReadOnlyList<QueueItem> selectedItems,
+        IReadOnlyList<QueueItem> alsoRemoved)
+    {
+        const int maxListed = 12;
+        var body = string.Join("\n", selectedItems.Take(maxListed).Select(item => $"  • {BuildQueueDisplayName(item)}"));
+        if (selectedItems.Count > maxListed)
+        {
+            body += $"\n  • … and {selectedItems.Count - maxListed} more selected";
+        }
+
+        if (alsoRemoved.Count > 0)
+        {
+            body += $"\n\n{alsoRemoved.Count} dependent queue item(s) will also be removed.";
+        }
+
+        return AppDialog.ShowCustom(
+            this,
+            $"Remove these {selectedItems.Count} selected queue items?\n\n{body}",
+            "Remove selected queue items",
+            new (string, MessageBoxResult)[]
+            {
+                ("Remove all", MessageBoxResult.Yes),
+                ("Cancel", MessageBoxResult.Cancel),
+            },
+            MessageBoxImage.Warning,
+            MessageBoxResult.Cancel,
+            MessageBoxResult.Cancel) == MessageBoxResult.Yes;
     }
 
     // Records the items present before a Remove but gone after (selected + cascaded) as the restorable set.
@@ -142,16 +201,23 @@ public partial class MainWindow
 
     private void MoveSelectedQueueItem(QueueMoveTarget target)
     {
-        if (_travianQueueViewModel.SelectedActiveQueueRow is not { } selected)
+        var selectedRows = GetSelectedActiveQueueRows();
+        if (selectedRows.Count == 0)
         {
             AppendLog("Select a queue item first.");
             return;
         }
 
-        var preview = QueueMoveSafety.Preview(_queuePanelService.GetItems(), selected.Id, target);
+        var selectedIds = selectedRows.Select(row => row.Id).ToList();
+        var visibleIds = _travianQueueViewModel.ActiveQueueRows.Select(row => row.Id).ToList();
+        var preview = QueueMoveSafety.Preview(
+            _queuePanelService.GetItems(),
+            visibleIds,
+            selectedIds,
+            target);
         if (!preview.CanMove)
         {
-            AppendLog("The queue item cannot move farther within its group and priority.");
+            AppendLog(preview.FailureReason ?? "The selected queue item(s) could not be moved.");
             return;
         }
 
@@ -160,22 +226,15 @@ public partial class MainWindow
             return;
         }
 
-        var moved = target switch
-        {
-            QueueMoveTarget.Up => _queuePanelService.MoveUp(selected.Id),
-            QueueMoveTarget.Down => _queuePanelService.MoveDown(selected.Id),
-            QueueMoveTarget.Top => _queuePanelService.MoveToTop(selected.Id),
-            QueueMoveTarget.Bottom => _queuePanelService.MoveToBottom(selected.Id),
-            _ => false,
-        };
+        var moved = _queuePanelService.ApplyOrder(preview.OrderedScopeIds);
         if (!moved)
         {
             AppendLog("The queue item could not be moved.");
             return;
         }
 
-        AppendLog($"Queue item moved {target.ToString().ToLowerInvariant()} within its group and priority.");
-        RefreshQueueUi(selectId: selected.Id);
+        AppendLog($"Moved {selectedIds.Count} queue item(s) {target.ToString().ToLowerInvariant()} within the visible village queue.");
+        RefreshQueueUi(selectIds: selectedIds);
     }
 
     private bool ConfirmUnsafeQueueMove(IReadOnlyList<string> warnings)

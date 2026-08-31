@@ -11,10 +11,12 @@ public interface IQueueStore
     IReadOnlyList<QueueItem> ReplaceActiveGroup(QueueGroup group, IReadOnlyList<QueueItemCreateRequest> requests);
     QueueItem AddRuntime(string taskName, string displayName, Dictionary<string, string>? payload, int priority, int maxRetries);
     bool Remove(Guid id);
+    int RemoveMany(IReadOnlyCollection<Guid> ids);
     bool MoveUp(Guid id);
     bool MoveDown(Guid id);
     bool MoveToTop(Guid id);
     bool MoveToBottom(Guid id);
+    bool ApplyOrder(IReadOnlyList<Guid> orderedIds);
     bool Pause(Guid id);
     bool Resume(Guid id);
     bool Retry(Guid id);

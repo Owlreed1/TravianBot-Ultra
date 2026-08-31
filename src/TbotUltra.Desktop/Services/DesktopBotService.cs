@@ -61,10 +61,12 @@ public sealed class DesktopBotService : IDesktopBotService
     }
 
     public bool RemoveQueueItem(Guid id) => _queueStore.Remove(id);
+    public int RemoveQueueItems(IReadOnlyCollection<Guid> ids) => _queueStore.RemoveMany(ids);
     public bool MoveQueueItemUp(Guid id) => _queueStore.MoveUp(id);
     public bool MoveQueueItemDown(Guid id) => _queueStore.MoveDown(id);
     public bool MoveQueueItemToTop(Guid id) => _queueStore.MoveToTop(id);
     public bool MoveQueueItemToBottom(Guid id) => _queueStore.MoveToBottom(id);
+    public bool ApplyQueueOrder(IReadOnlyList<Guid> orderedIds) => _queueStore.ApplyOrder(orderedIds);
     public bool PauseQueueItem(Guid id) => _queueStore.Pause(id);
     public bool ResumeQueueItem(Guid id) => _queueStore.Resume(id);
     public bool RetryQueueItem(Guid id) => _queueStore.Retry(id);

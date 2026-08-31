@@ -7,14 +7,14 @@ namespace TbotUltra.Worker.Services;
 /// </summary>
 internal static class HeroCalc
 {
-    internal static int CalculateOintmentsToUse(int? currentHpPercent, int minHpForAdventure, int availableOintments)
+    internal static int CalculateOintmentsToUse(int? currentHpPercent, int targetHpPercent, int availableOintments)
     {
         if (currentHpPercent is null || availableOintments <= 0)
         {
             return 0;
         }
 
-        var targetHp = Math.Clamp(minHpForAdventure, 1, 100);
+        var targetHp = NormalizeOintmentTargetHp(targetHpPercent);
         var currentHp = Math.Clamp(currentHpPercent.Value, 0, 100);
         if (currentHp >= targetHp)
         {
@@ -23,6 +23,25 @@ internal static class HeroCalc
 
         return Math.Min(targetHp - currentHp, availableOintments);
     }
+
+    internal static int NormalizeOintmentTargetHp(int value)
+        => value is 50 or 60 or 70 or 80 or 90 or 100 ? value : 100;
+
+    internal static bool ShouldUseOintmentsForAdventure(
+        bool enabled,
+        int adventureCount,
+        bool isHeroHome,
+        bool isHeroDead,
+        int? currentHpPercent,
+        int minHpForAdventure,
+        int targetHpPercent)
+        => enabled
+            && adventureCount > 0
+            && isHeroHome
+            && !isHeroDead
+            && currentHpPercent is >= 0 and < 100
+            && currentHpPercent <= Math.Clamp(minHpForAdventure, 1, 100)
+            && currentHpPercent < NormalizeOintmentTargetHp(targetHpPercent);
 
     internal static IReadOnlyList<string> ParseHeroStatPriority(string value)
     {

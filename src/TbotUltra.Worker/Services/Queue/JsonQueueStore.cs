@@ -189,6 +189,28 @@ public sealed class JsonQueueStore : IQueueStore
         }
     }
 
+    public int RemoveMany(IReadOnlyCollection<Guid> ids)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        var idSet = ids.Where(id => id != Guid.Empty).ToHashSet();
+        if (idSet.Count == 0)
+        {
+            return 0;
+        }
+
+        lock (_sync)
+        {
+            var items = LoadMutable();
+            var removed = items.RemoveAll(item => idSet.Contains(item.Id));
+            if (removed > 0)
+            {
+                SaveMutable(items);
+            }
+
+            return removed;
+        }
+    }
+
     public void Clear()
     {
         lock (_sync)
@@ -215,6 +237,50 @@ public sealed class JsonQueueStore : IQueueStore
     public bool MoveToBottom(Guid id)
     {
         return Move(id, _ => int.MaxValue);
+    }
+
+    public bool ApplyOrder(IReadOnlyList<Guid> orderedIds)
+    {
+        ArgumentNullException.ThrowIfNull(orderedIds);
+        var orderedSet = orderedIds.Where(id => id != Guid.Empty).ToHashSet();
+        if (orderedIds.Count < 2 || orderedSet.Count != orderedIds.Count)
+        {
+            return false;
+        }
+
+        lock (_sync)
+        {
+            var items = LoadMutable();
+            var first = items.FirstOrDefault(item => item.Id == orderedIds[0] && IsMovableQueueItem(item));
+            if (first is null)
+            {
+                return false;
+            }
+
+            var scope = items
+                .Where(item => IsMovableQueueItem(item)
+                    && item.Group == first.Group
+                    && item.Priority == first.Priority)
+                .ToList();
+            if (scope.Count != orderedIds.Count || scope.Any(item => !orderedSet.Contains(item.Id)))
+            {
+                return false;
+            }
+
+            var byId = scope.ToDictionary(item => item.Id);
+            var nextOrder = scope.Min(item => item.CreatedAt);
+            var now = DateTimeOffset.UtcNow;
+            foreach (var id in orderedIds)
+            {
+                var item = byId[id];
+                item.CreatedAt = nextOrder;
+                item.UpdatedAt = now;
+                nextOrder = nextOrder.AddTicks(1);
+            }
+
+            SaveMutable(items);
+            return true;
+        }
     }
 
     private bool Move(Guid id, Func<int, int> resolveDestinationIndex)
@@ -263,6 +329,9 @@ public sealed class JsonQueueStore : IQueueStore
     private static bool IsActiveQueueItem(QueueItem item) =>
         item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused
         || (item.Status == QueueStatus.Failed && !item.IsRuntimeOnly);
+
+    private static bool IsMovableQueueItem(QueueItem item) =>
+        item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused;
 
     public bool Pause(Guid id)
     {

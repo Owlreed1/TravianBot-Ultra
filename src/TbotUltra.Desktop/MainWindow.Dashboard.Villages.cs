@@ -843,18 +843,21 @@ public partial class MainWindow
                 var toggles = groupCards
                     .Select(card =>
                     {
-                        var isBreweryGroup = string.Equals(
-                            card.Key,
-                            QueueGroupCatalog.GetKey(QueueGroup.BreweryCelebration),
-                            StringComparison.OrdinalIgnoreCase);
-                        var canToggle = !isBreweryGroup || keyInfo.IsCapital;
+                        var requestedEnabled = enabledGroups.Contains(card.Key, StringComparer.OrdinalIgnoreCase);
+                        var state = QueueGroupCatalog.TryParse(card.Key, out var group)
+                            ? AutomationGroupAvailability.Resolve(
+                                group,
+                                keyInfo.IsCapital,
+                                CurrentGoldClubAvailability,
+                                requestedEnabled)
+                            : new AutomationGroupToggleState(requestedEnabled, true);
                         return new VillageGroupToggle
                         {
                             GroupKey = card.Key,
                             Title = card.Title,
                             Description = card.Description,
-                            CanToggle = canToggle,
-                            IsEnabled = canToggle && enabledGroups.Contains(card.Key, StringComparer.OrdinalIgnoreCase),
+                            CanToggle = state.CanToggle,
+                            IsEnabled = state.IsEnabled,
                         };
                     })
                     .ToList();
@@ -1232,7 +1235,13 @@ public partial class MainWindow
         var previouslyEnabled = _villageSettingsStore.GetEnabledGroups(row.KeyInfo)
             ?? VillageSettingsStore.DefaultEnabledGroups;
         var enabled = row.GroupToggles
-            .Where(toggle => toggle.IsEnabled && toggle.CanToggle)
+            .Where(toggle => toggle.IsEnabled
+                && toggle.CanToggle
+                && (!QueueGroupCatalog.TryParse(toggle.GroupKey, out var group)
+                    || AutomationGroupAvailability.CanToggle(
+                        group,
+                        row.KeyInfo.IsCapital,
+                        CurrentGoldClubAvailability)))
             .Select(toggle => toggle.GroupKey)
             .ToList();
         _villageSettingsStore.SetEnabledGroups(row.KeyInfo, enabled);

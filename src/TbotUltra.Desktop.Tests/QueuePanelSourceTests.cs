@@ -26,4 +26,14 @@ public sealed class QueuePanelSourceTests
             xaml.IndexOf("x:Name=\"QueueMoveToTopButton\"", StringComparison.Ordinal)
             < xaml.IndexOf("x:Name=\"QueueMoveToBottomButton\"", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void ActiveQueue_UsesExtendedFullRowSelection()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "Views", "QueuePanel.xaml"));
+
+        Assert.Contains("SelectionMode=\"Extended\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectionUnit=\"FullRow\"", xaml, StringComparison.Ordinal);
+    }
 }

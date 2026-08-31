@@ -173,7 +173,7 @@
                       SelectedItem="{Binding SelectedActiveQueueRow, Mode=TwoWay}"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
-                      SelectionMode="Single"
+                      SelectionMode="Extended"
                       SelectionUnit="FullRow"
                       CanUserAddRows="False"
                       CanUserDeleteRows="False"

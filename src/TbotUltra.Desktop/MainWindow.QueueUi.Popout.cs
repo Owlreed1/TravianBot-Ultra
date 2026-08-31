@@ -22,6 +22,8 @@ public partial class MainWindow
         {
             AutoGenerateColumns = false,
             IsReadOnly = true,
+            SelectionMode = DataGridSelectionMode.Extended,
+            SelectionUnit = DataGridSelectionUnit.FullRow,
             CanUserAddRows = false,
             CanUserDeleteRows = false,
             CanUserReorderColumns = false,

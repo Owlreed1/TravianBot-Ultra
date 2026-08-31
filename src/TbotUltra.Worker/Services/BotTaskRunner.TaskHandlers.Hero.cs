@@ -7,6 +7,7 @@ public sealed partial class BotTaskRunner
         var result = await new Automation.HeroAutomationOperation(context.Client).ManageAsync(
             context.Options.HeroMinHpForAdventure, context.Options.HeroAutoRevive,
             context.Options.HeroAutoAssignPoints, context.Options.HeroAutoUseOintments,
+            context.Options.HeroOintmentTargetHpPercent,
             context.Options.HeroStatPriority, context.Options.HeroAdventurePickOrder,
             context.Options.HeroHpRegenPerDayPercent, context.CancellationToken);
         context.Log(result);

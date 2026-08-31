@@ -64,6 +64,7 @@ public sealed class HeroViewModel : BaseViewModel
     private bool _autoRevive = true;
     private bool _autoAssignPoints = true;
     private bool _autoUseOintments;
+    private int _ointmentTargetHpPercent = 100;
     private bool _isAdventurePickTop;
     private bool _isAdventurePickShortest = true;
     private bool _continuousAdventures;
@@ -353,6 +354,16 @@ public sealed class HeroViewModel : BaseViewModel
         set => SetProperty(ref _autoUseOintments, value);
     }
 
+    /// <summary>HP target for automatic ointment use. Allowed values are 50-90 in tens, or 100 (Max).</summary>
+    public int OintmentTargetHpPercent
+    {
+        get => _ointmentTargetHpPercent;
+        set => SetProperty(ref _ointmentTargetHpPercent, NormalizeOintmentTarget(value));
+    }
+
+    private static int NormalizeOintmentTarget(int value)
+        => value is 50 or 60 or 70 or 80 or 90 or 100 ? value : 100;
+
     /// <summary>
     /// Adventure pick order — top of the list. Mutually exclusive with
     /// <see cref="IsAdventurePickShortest"/>.
@@ -428,6 +439,7 @@ public sealed class HeroViewModel : BaseViewModel
         AutoRevive = options.HeroAutoRevive;
         AutoAssignPoints = options.HeroAutoAssignPoints;
         AutoUseOintments = options.HeroAutoUseOintments;
+        OintmentTargetHpPercent = options.HeroOintmentTargetHpPercent;
         var topFirst = string.Equals(options.HeroAdventurePickOrder, "top", StringComparison.OrdinalIgnoreCase);
         if (topFirst)
         {

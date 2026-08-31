@@ -246,23 +246,24 @@ public partial class MainWindow
     // upgrades plus everything the requirement/orphan cascade would then remove. Mirrors the real removal
     // order (same-slot first, then cascade fixpoint) so the preview matches what actually happens. Returns
     // the extra items (selected excluded), in queue order.
-    private List<QueueItem> ComputeBuildingQueueRemovalPreview(QueueItem selected)
+    private List<QueueItem> ComputeBuildingQueueRemovalPreview(IReadOnlyCollection<QueueItem> selectedItems)
     {
         var active = GetActiveQueueItems();
-        var removedIds = new HashSet<Guid> { selected.Id };
+        var selectedIds = selectedItems.Select(item => item.Id).ToHashSet();
+        var removedIds = selectedIds.ToHashSet();
 
         // Same-slot higher upgrades (mirrors CascadeRemoveHigherSameSlotBuildingUpgrades).
-        if (string.Equals(selected.TaskName, "upgrade_building_to_level", StringComparison.OrdinalIgnoreCase)
-            && TryReadBuildingUpgradePayload(selected.Payload, out var selectedSlotId, out var selectedTarget)
-            && selectedTarget.HasValue)
+        foreach (var selected in selectedItems)
         {
+            if (!string.Equals(selected.TaskName, "upgrade_building_to_level", StringComparison.OrdinalIgnoreCase)
+                || !TryReadBuildingUpgradePayload(selected.Payload, out var selectedSlotId, out var selectedTarget)
+                || !selectedTarget.HasValue)
+            {
+                continue;
+            }
+
             foreach (var item in active.Where(IsQueueItemForSelectedVillageOrGlobal))
             {
-                if (removedIds.Contains(item.Id))
-                {
-                    continue;
-                }
-
                 if (string.Equals(item.TaskName, "upgrade_building_to_max", StringComparison.OrdinalIgnoreCase)
                     && TryReadBuildingUpgradePayload(item.Payload, out var maxSlotId, out _)
                     && maxSlotId == selectedSlotId)
@@ -304,7 +305,7 @@ public partial class MainWindow
         }
         while (changed);
 
-        return active.Where(item => item.Id != selected.Id && removedIds.Contains(item.Id)).ToList();
+        return active.Where(item => !selectedIds.Contains(item.Id) && removedIds.Contains(item.Id)).ToList();
     }
 
     // Confirmation popup listing the follow-on items a removal would also drop. Returns true to proceed.
