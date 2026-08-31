@@ -5,7 +5,7 @@
 ![Version](https://img.shields.io/badge/Version-v0.6.8-blue?style=for-the-badge)
 
 <p align="center">
-  <img src="assets/images/tbot_v068.png" alt="Tbot Ultra Dashboard">
+  <img src="assets/images/tbot_v068.jpg" alt="Tbot Ultra Dashboard">
 </p>
 
 ---
