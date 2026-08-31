@@ -17,6 +17,7 @@ public sealed class ConstructionPayloadApplierTests
             [BotOptionPayloadKeys.ResourceUpgradeMaxAttempts] = "8",
             [BotOptionPayloadKeys.ResourceBuildStrategy] = "unknown",
             [BotOptionPayloadKeys.ResourceUpgradeTypes] = "crop",
+            [BotOptionPayloadKeys.ResourceQueuedLevelProjections] = "10:10:1788163200",
             [BotOptionPayloadKeys.SmithyUpgradeTargets] = "u1=5",
             [BotOptionPayloadKeys.BuildingUpgradeSlotId] = "20",
             [BotOptionPayloadKeys.BuildingUpgradeTargetLevel] = "10",
@@ -49,6 +50,7 @@ public sealed class ConstructionPayloadApplierTests
         Assert.Equal(8, result.ResourceUpgradeMaxAttempts);
         Assert.Equal("lowest_first", result.ResourceBuildStrategy);
         Assert.Equal("crop", result.ResourceUpgradeTypes);
+        Assert.Equal("10:10:1788163200", result.ResourceQueuedLevelProjections);
         Assert.Equal("u1=5", result.SmithyUpgradeTargets);
         Assert.Equal(20, result.BuildingUpgradeSlotId);
         Assert.Equal(10, result.BuildingUpgradeTargetLevel);

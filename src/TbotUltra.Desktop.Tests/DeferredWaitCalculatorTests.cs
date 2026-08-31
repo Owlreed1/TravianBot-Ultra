@@ -7,6 +7,27 @@ namespace TbotUltra.Desktop.Tests;
 
 public sealed class DeferredWaitCalculatorTests
 {
+    [Fact]
+    public void Deferred_resource_projection_is_merged_and_none_removes_it()
+    {
+        var original = new Dictionary<string, string>
+        {
+            [BotOptionPayloadKeys.ResourceQueuedLevelProjections] = "10:10:1788163200",
+        };
+
+        Assert.True(DeferredWaitCalculator.TryMergeDeferredUpgradePayload(
+            $"wait queue_wait_seconds=30 {BotOptionPayloadKeys.ResourceQueuedLevelProjections}=11:8:1788163300",
+            original,
+            out var updated));
+        Assert.Equal("11:8:1788163300", updated[BotOptionPayloadKeys.ResourceQueuedLevelProjections]);
+
+        Assert.True(DeferredWaitCalculator.TryMergeDeferredUpgradePayload(
+            $"done queue_wait_seconds=30 {BotOptionPayloadKeys.ResourceQueuedLevelProjections}=none",
+            updated,
+            out var cleared));
+        Assert.DoesNotContain(BotOptionPayloadKeys.ResourceQueuedLevelProjections, cleared);
+    }
+
     // ---- EvaluateDeferredTroopTrainingWait ----
 
     [Fact]

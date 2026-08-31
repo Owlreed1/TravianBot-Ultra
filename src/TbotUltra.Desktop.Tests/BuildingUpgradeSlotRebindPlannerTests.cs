@@ -250,6 +250,132 @@ public sealed class BuildingUpgradeSlotRebindPlannerTests
     }
 
     [Fact]
+    public void ConstructionQueueReconciliation_RebindsOccupiedConstructAndDependentUpgradeToFreeSlot()
+    {
+        var construct = Item(
+            "construct_building",
+            new BuildingConstructPayload(25, 22, "Academy").ToDictionary());
+        var upgrade = Item(
+            "upgrade_building_to_level",
+            new BuildingUpgradePayload(25, 5, "Academy").ToDictionary());
+        var status = CompleteStatus(new Building(25, "Cranny", 1, "/build.php?id=25", 23));
+
+        var plan = ConstructionQueueReconciliation.Plan(status, [construct, upgrade]);
+
+        Assert.Empty(plan.Removals);
+        Assert.Equal(2, plan.Updates.Count);
+        Assert.Equal(
+            "19",
+            Assert.Single(plan.Updates, update => update.QueueItemId == construct.Id)
+                .Payload[BotOptionPayloadKeys.BuildingConstructSlotId]);
+        Assert.Equal(
+            "19",
+            Assert.Single(plan.Updates, update => update.QueueItemId == upgrade.Id)
+                .Payload[BotOptionPayloadKeys.BuildingUpgradeSlotId]);
+    }
+
+    [Fact]
+    public void ConstructionQueueReconciliation_DoesNotRebindOccupiedConstructFromIncompleteOverview()
+    {
+        var construct = Item(
+            "construct_building",
+            new BuildingConstructPayload(25, 22, "Academy").ToDictionary());
+        var status = Status(new Building(25, "Cranny", 1, "/build.php?id=25", 23));
+
+        var plan = ConstructionQueueReconciliation.Plan(status, [construct]);
+
+        Assert.False(plan.HasChanges);
+    }
+
+    [Fact]
+    public void ConstructionQueueReconciliation_DoesNotStealAnotherQueuedConstructSlot()
+    {
+        var conflicted = Item(
+            "construct_building",
+            new BuildingConstructPayload(25, 22, "Academy").ToDictionary());
+        var reserved = Item(
+            "construct_building",
+            new BuildingConstructPayload(19, 13, "Smithy").ToDictionary());
+        var status = CompleteStatus(new Building(25, "Cranny", 1, "/build.php?id=25", 23));
+
+        var plan = ConstructionQueueReconciliation.Plan(status, [conflicted, reserved]);
+
+        var update = Assert.Single(plan.Updates);
+        Assert.Equal(conflicted.Id, update.QueueItemId);
+        Assert.Equal("20", update.Payload[BotOptionPayloadKeys.BuildingConstructSlotId]);
+    }
+
+    [Fact]
+    public void PlanConstructSlotConflict_RebindsCurrentRunningItemForPreExecutionSafety()
+    {
+        var construct = Item(
+            "construct_building",
+            new BuildingConstructPayload(25, 22, "Academy").ToDictionary());
+        construct.Status = QueueStatus.Running;
+        var status = CompleteStatus(new Building(25, "Cranny", 1, "/build.php?id=25", 23));
+
+        var conflict = Assert.IsType<BuildingConstructSlotConflictReconciliation>(
+            BuildingUpgradeSlotRebindPlanner.PlanConstructSlotConflict(status, construct, [construct]));
+
+        Assert.Equal(19, conflict.ReboundSlotId);
+        Assert.Equal(construct.Id, Assert.Single(conflict.Updates).QueueItemId);
+    }
+
+    [Fact]
+    public void PlanConstructSlotConflict_KeepsItemWhenNoSafeFreeSlotExists()
+    {
+        var construct = Item(
+            "construct_building",
+            new BuildingConstructPayload(25, 22, "Academy").ToDictionary());
+        var status = Status(Enumerable.Range(19, 22)
+            .Select(slot => new Building(slot, "Cranny", 1, $"/build.php?id={slot}", 23))
+            .ToArray());
+
+        var conflict = Assert.IsType<BuildingConstructSlotConflictReconciliation>(
+            BuildingUpgradeSlotRebindPlanner.PlanConstructSlotConflict(status, construct, [construct]));
+
+        Assert.Null(conflict.ReboundSlotId);
+        Assert.Empty(conflict.Updates);
+    }
+
+    [Fact]
+    public void ConstructionQueueReconciliation_AssignsUniqueSlotsToMultipleConflictsInQueueOrder()
+    {
+        var first = Item(
+            "construct_building",
+            new BuildingConstructPayload(25, 5, "Sawmill").ToDictionary());
+        var second = Item(
+            "construct_building",
+            new BuildingConstructPayload(26, 6, "Brickyard").ToDictionary());
+        first.Priority = 10;
+        second.Priority = 5;
+        var status = CompleteStatus(
+            new Building(25, "Cranny", 1, "/build.php?id=25", 23),
+            new Building(26, "Cranny", 1, "/build.php?id=26", 23));
+
+        var plan = ConstructionQueueReconciliation.Plan(status, [second, first]);
+
+        Assert.Equal("19", Assert.Single(plan.Updates, update => update.QueueItemId == first.Id)
+            .Payload[BotOptionPayloadKeys.BuildingConstructSlotId]);
+        Assert.Equal("20", Assert.Single(plan.Updates, update => update.QueueItemId == second.Id)
+            .Payload[BotOptionPayloadKeys.BuildingConstructSlotId]);
+    }
+
+    [Fact]
+    public void PlanConstructSlotConflict_HonorsTemplateFallbackExclusions()
+    {
+        var payload = new BuildingConstructPayload(25, 22, "Academy").ToDictionary();
+        payload[BotOptionPayloadKeys.BuildingConstructFallbackExcludedSlots] = "19";
+        var construct = Item("construct_building", payload);
+        var status = CompleteStatus(new Building(25, "Cranny", 1, "/build.php?id=25", 23));
+
+        var conflict = Assert.IsType<BuildingConstructSlotConflictReconciliation>(
+            BuildingUpgradeSlotRebindPlanner.PlanConstructSlotConflict(status, construct, [construct]));
+
+        Assert.Equal(20, conflict.ReboundSlotId);
+    }
+
+    [Fact]
     public void PlanUpgradeFromLiveStatus_ReportsSameSlotIdentityForMissingBuildingRecovery()
     {
         var upgrade = Item(
@@ -287,6 +413,16 @@ public sealed class BuildingUpgradeSlotRebindPlannerTests
         [],
         buildings,
         []);
+
+    private static VillageStatus CompleteStatus(params Building[] occupiedBuildings)
+    {
+        var occupiedBySlot = occupiedBuildings.ToDictionary(building => building.SlotId!.Value);
+        return Status(Enumerable.Range(19, 22)
+            .Select(slot => occupiedBySlot.TryGetValue(slot, out var occupied)
+                ? occupied
+                : new Building(slot, "Empty", 0, $"/build.php?id={slot}"))
+            .ToArray());
+    }
 
     private static QueueItem Item(string taskName, Dictionary<string, string> payload) => new()
     {

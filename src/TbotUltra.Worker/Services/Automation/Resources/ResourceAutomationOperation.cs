@@ -15,6 +15,12 @@ internal sealed class ResourceAutomationOperation(IResourceUpgradeClient client)
         int targetLevel,
         string buildStrategy,
         string? resourceTypes,
+        string? queuedLevelProjections,
         CancellationToken cancellationToken)
-        => client.UpgradeAllResourcesToLevelAsync(targetLevel, buildStrategy, resourceTypes, cancellationToken);
+        => client.UpgradeAllResourcesToLevelAsync(
+            targetLevel,
+            buildStrategy,
+            resourceTypes,
+            queuedLevelProjections,
+            cancellationToken);
 }

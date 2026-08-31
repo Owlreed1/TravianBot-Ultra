@@ -176,7 +176,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   back to live per-page checks. Refresh the snapshot only after a construction mutation starts a new scan iteration. Rank
   candidates by their projected level including an exact-slot queued upgrade. Retain a level confirmed during the
   current operation even when the refreshed live queue omits its slot identity, so a just-queued field is not probed
-  again ahead of untouched lower-level fields. On dorf1, a resource overlay's exact-slot `underConstruction` class
+  again ahead of untouched lower-level fields. Persist that confirmed exact-slot projection on the queue task across
+  defer/retry; clear it when Dorf1 reaches the projected level, or after its bounded review deadline only when the
+  live construction queue is confirmed empty. Never replace this with name-only matching between identical fields.
+  On dorf1, a resource overlay's exact-slot `underConstruction` class
   projects `visible level + 1` for planning across deferred task invocations; it does not replace the visible completed
   level and is not treated as a construction queue row. An upgrade-click redirect to dorf1 receives the normal page-load pacing
   once before the next candidate is selected. Immediately before either the normal resource upgrade click or its
@@ -733,6 +736,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   that authoritative overview snapshot to Desktop immediately. Update the coordinate-owned village cache and green
   construction-slot icons before the enclosing Worker task finishes; retain the validated current-Dorf2 post-task
   read with full Dorf1+Dorf2 fallback as backup.
+- A complete live Dorf2 overview may reconcile a pending ordinary-slot construct whose requested slot was manually
+  occupied by another building. Rebind the construct and its dependent upgrades atomically to the lowest confirmed
+  empty slot 19-38, without stealing slots reserved by other queued constructs. Incomplete or unknown slot state never
+  authorizes a move; when no safe slot exists, keep and defer the item without clicking or consuming failure retries.
 - An automation run captures Worker's actual `BrowserGeneration`; never mirror or synthesize that generation in
   Desktop. Runtime-item reconciliation identifies village scope with `BotOptionPayloadKeys.TargetVillageKey` and
   must preserve an existing pending item's authoritative `NextAttemptAt` when refreshing payload or priority.

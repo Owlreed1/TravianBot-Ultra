@@ -1,5 +1,6 @@
 using Microsoft.Playwright;
 using System.Text.Json;
+using TbotUltra.Core.Configuration;
 using TbotUltra.Core.Tasks;
 using TbotUltra.Worker.Domain;
 
@@ -267,6 +268,7 @@ public sealed partial class TravianClient
         int targetLevel,
         string buildStrategy = "lowest_first",
         string? resourceTypes = null,
+        string? queuedLevelProjections = null,
         CancellationToken cancellationToken = default)
     {
         var selectedTypes = ResourceUpgradeSelection.Parse(resourceTypes);
@@ -282,12 +284,19 @@ public sealed partial class TravianClient
             return "No resource types were selected for this bulk upgrade.";
         }
 
+        var queuedProjectionState = ResourceQueuedLevelProjectionState.Parse(queuedLevelProjections);
+        string WithQueuedLevelProjections(string message) =>
+            $"{message} {BotOptionPayloadKeys.ResourceQueuedLevelProjections}={queuedProjectionState.Serialize()}";
+        if (queuedProjectionState.Count > 0)
+        {
+            Notify($"[UpgradeAllResourcesToLevelAsync] restored {queuedProjectionState.Count} confirmed queued slot projection(s) from the task payload.");
+        }
+
         var upgrades = 0;
         var transientRetries = 0;
         int? currentTransientSlot = null;
         var constructionNpcTradeAttempted = false;
         var heroTransferAttemptedOffers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var confirmedQueuedLevelsBySlot = new Dictionary<int, int>();
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -305,6 +314,25 @@ public sealed partial class TravianClient
                 var activeConstructionsAtScan = await ReadActiveConstructionsAsync(
                     cancellationToken,
                     allowNavigationToBuildings: false);
+                var nowUtc = DateTimeOffset.UtcNow;
+                var resourceQueueObservedEmpty = activeConstructionsAtScan.Count == 0
+                    && buildQueueAtScan.Count == 0;
+                var longestKnownQueueSeconds = activeConstructionsAtScan
+                    .Where(item => item.TimeLeftSeconds is > 0)
+                    .Select(item => item.TimeLeftSeconds!.Value)
+                    .DefaultIfEmpty(0)
+                    .Max();
+                var nextQueueReviewAtUtc = longestKnownQueueSeconds > 0
+                    ? nowUtc.AddSeconds(longestKnownQueueSeconds + 120L)
+                    : (DateTimeOffset?)null;
+                foreach (var change in queuedProjectionState.Reconcile(
+                             resourceFields,
+                             resourceQueueObservedEmpty,
+                             nowUtc,
+                             nextQueueReviewAtUtc))
+                {
+                    Notify($"[UpgradeAllResourcesToLevelAsync] queued projection {change}.");
+                }
                 var dorf1QueuedLevelsBySlot = ResourceSnapshotCalculator.BuildDorf1QueuedLevelProjections(resourceFields);
                 var liveQueuedLevelsBySlot = resourceFields
                     .Where(field => field.SlotId is int && field.Level is int)
@@ -326,7 +354,7 @@ public sealed partial class TravianClient
                         });
                 var queuedLevelsBySlot = ResourceSnapshotCalculator.MergeQueuedLevelProjections(
                     liveQueuedLevelsBySlot,
-                    confirmedQueuedLevelsBySlot);
+                    queuedProjectionState.Levels);
                 // Note: each successful upgrade is already announced by WaitForResourceLevelAdvanceAsync
                 // at the moment the level advances. We deliberately do NOT diff levels again here, as
                 // that produced a duplicate "Resource slot N level increased ..." line per upgrade.
@@ -522,7 +550,7 @@ public sealed partial class TravianClient
                     if (preflightQueueDeferMessage is not null)
                     {
                         Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} deferred by dorf1 queue gate before opening upgrade page. message={preflightQueueDeferMessage}");
-                        return preflightQueueDeferMessage;
+                        return WithQueuedLevelProjections(preflightQueueDeferMessage);
                     }
 
                     // Keep the delay decision on dorf1. If a delay is due, never visit the upgrade
@@ -534,7 +562,7 @@ public sealed partial class TravianClient
                         allowNavigationToBuildings: false);
                     if (humanizeDefer is not null)
                     {
-                        return humanizeDefer;
+                        return WithQueuedLevelProjections(humanizeDefer);
                     }
 
                 ReevaluateCurrentSlot:
@@ -588,8 +616,9 @@ public sealed partial class TravianClient
                             cancellationToken);
                         if (!clickSafety.IsSafe)
                         {
-                            return $"Resource slot {slot}: pre-click safety stopped upgrade ({clickSafety.Reason}). "
-                                   + "Re-reading live levels before retry. queue_wait_seconds=1";
+                            return WithQueuedLevelProjections(
+                                $"Resource slot {slot}: pre-click safety stopped upgrade ({clickSafety.Reason}). "
+                                + "Re-reading live levels before retry. queue_wait_seconds=1");
                         }
                         var constructFaster = await TryUseConstructFasterForResourceAsync(
                             slot,
@@ -623,10 +652,18 @@ public sealed partial class TravianClient
                         Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} click result advanced={progress.Advanced} queued={progress.QueuedOrInProgress} evidence={progress.Evidence}.");
                         if (progress.Advanced || progress.QueuedOrInProgress)
                         {
-                            confirmedQueuedLevelsBySlot[slot] = confirmedQueuedLevelsBySlot.TryGetValue(slot, out var confirmedLevel)
-                                ? Math.Max(confirmedLevel, nextLevel)
-                                : nextLevel;
-                            Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} projected level {confirmedQueuedLevelsBySlot[slot]} retained for the next Dorf1 ranking.");
+                            var activeQueueSeconds = activeConstructionsAtScan
+                                .Where(item => item.TimeLeftSeconds is > 0)
+                                .Sum(item => (long)item.TimeLeftSeconds!.Value);
+                            var projectionReviewSeconds = Math.Clamp(
+                                activeQueueSeconds + Math.Max(0, rawUpgradeSeconds) + 300L,
+                                600L,
+                                7L * 24L * 60L * 60L);
+                            var projectionReviewAtUtc = DateTimeOffset.UtcNow.AddSeconds(projectionReviewSeconds);
+                            queuedProjectionState.Record(slot, nextLevel, projectionReviewAtUtc);
+                            Notify(
+                                $"[UpgradeAllResourcesToLevelAsync] slot={slot} projected level {nextLevel} retained across defer/retry "
+                                + $"until live completion or review at {projectionReviewAtUtc:O}.");
                         }
                         if (!progress.Advanced && !progress.QueuedOrInProgress)
                         {
@@ -640,12 +677,13 @@ public sealed partial class TravianClient
                             if (queueDeferMessage is not null)
                             {
                                 Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} deferred by dorf1 queue gate after unconfirmed click. message={queueDeferMessage}");
-                                return queueDeferMessage;
+                                return WithQueuedLevelProjections(queueDeferMessage);
                             }
 
                             var upgradeWaitSeconds = ComputeResourceUpgradeWaitSeconds(rawUpgradeSeconds);
                             Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} click did not confirm immediately ({progress.Evidence}). Deferring {upgradeWaitSeconds}s before retry.");
-                            return $"Resource slot {slot}: upgrade click did not confirm immediately ({progress.Evidence}). queue_wait_seconds={Math.Max(1, upgradeWaitSeconds)}";
+                            return WithQueuedLevelProjections(
+                                $"Resource slot {slot}: upgrade click did not confirm immediately ({progress.Evidence}). queue_wait_seconds={Math.Max(1, upgradeWaitSeconds)}");
                         }
                         transientRetries = 0;
                         goto NextLoopTick;
@@ -662,7 +700,7 @@ public sealed partial class TravianClient
                         if (queueDeferMessage is not null)
                         {
                             Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} deferred by queue gate after analysis. message={queueDeferMessage}");
-                            return queueDeferMessage;
+                            return WithQueuedLevelProjections(queueDeferMessage);
                         }
 
                         Notify($"[UpgradeAllResourcesToLevelAsync] slot={slot} blocked by queue. Retrying after queue clears.");
@@ -726,18 +764,21 @@ public sealed partial class TravianClient
                         // Nothing left to click, but at least one field still has a queued upgrade reaching the
                         // target. Defer (re-check after it finishes) instead of declaring "all done" prematurely.
                         var queuedWait = await ReadQueuedResourceWaitSecondsAsync(string.Empty, null, null, cancellationToken);
-                        return $"Resource fields: queued upgrade(s) already reaching target level {targetLevel}. Upgrades made: {upgrades}. queue_wait_seconds={queuedWait}";
+                        return WithQueuedLevelProjections(
+                            $"Resource fields: queued upgrade(s) already reaching target level {targetLevel}. Upgrades made: {upgrades}. queue_wait_seconds={queuedWait}");
                     }
 
                     if (blockReasons.Count == 0)
                     {
-                        return $"All resource fields are at or above target level {targetLevel}. Upgrades made: {upgrades}.";
+                        return WithQueuedLevelProjections(
+                            $"All resource fields are at or above target level {targetLevel}. Upgrades made: {upgrades}.");
                     }
 
                     if (earliestResourceWait is not null)
                     {
                         Notify($"[UpgradeAllResourcesToLevelAsync] no affordable resource field found. Deferring until earliest resource deadline in {earliestResourceWait.WaitSeconds}s ({earliestResourceWait.WaitReason}).");
-                        return UpgradeResourceWaitCalculator.BuildBlockedResultMessage(earliestResourceWait);
+                        return WithQueuedLevelProjections(
+                            UpgradeResourceWaitCalculator.BuildBlockedResultMessage(earliestResourceWait));
                     }
 
                     var reasonSuffix = blockReasons.Count > 0 ? $" Blockers: {string.Join(", ", blockReasons)}." : string.Empty;
@@ -746,7 +787,8 @@ public sealed partial class TravianClient
                         await GotoAsync(Paths.Resources, cancellationToken);
                     }
 
-                    return $"No resource slot could be upgraded toward level {targetLevel}. Upgrades made: {upgrades}.{reasonSuffix}";
+                    return WithQueuedLevelProjections(
+                        $"No resource slot could be upgraded toward level {targetLevel}. Upgrades made: {upgrades}.{reasonSuffix}");
                 }
 
                 transientRetries = 0;

@@ -49,10 +49,10 @@ public sealed class BuildingAutomationOperationTests
         var client = new FakeResourceUpgradeClient();
         var operation = new ResourceAutomationOperation(client);
 
-        var result = await operation.UpgradeAllAsync(12, "smart", "wood,crop", CancellationToken.None);
+        var result = await operation.UpgradeAllAsync(12, "smart", "wood,crop", "10:10:1788163200", CancellationToken.None);
 
         Assert.Equal("resources upgraded", result);
-        Assert.Equal((12, "smart", "wood,crop"), client.BulkRequest);
+        Assert.Equal((12, "smart", "wood,crop", "10:10:1788163200"), client.BulkRequest);
     }
 
     [Fact]
@@ -209,7 +209,7 @@ public sealed class BuildingAutomationOperationTests
 
     private sealed class FakeResourceUpgradeClient : IResourceUpgradeClient
     {
-        public (int TargetLevel, string Strategy, string? Types) BulkRequest { get; private set; }
+        public (int TargetLevel, string Strategy, string? Types, string? Projections) BulkRequest { get; private set; }
         public (int SlotId, int TargetLevel) SingleRequest { get; private set; }
 
         public Task<string> UpgradeResourceToLevelAsync(int slotId, int targetLevel, CancellationToken cancellationToken = default)
@@ -218,9 +218,14 @@ public sealed class BuildingAutomationOperationTests
             return Task.FromResult("resource upgraded");
         }
 
-        public Task<string> UpgradeAllResourcesToLevelAsync(int targetLevel, string buildStrategy = "lowest_first", string? resourceTypes = null, CancellationToken cancellationToken = default)
+        public Task<string> UpgradeAllResourcesToLevelAsync(
+            int targetLevel,
+            string buildStrategy = "lowest_first",
+            string? resourceTypes = null,
+            string? queuedLevelProjections = null,
+            CancellationToken cancellationToken = default)
         {
-            BulkRequest = (targetLevel, buildStrategy, resourceTypes);
+            BulkRequest = (targetLevel, buildStrategy, resourceTypes, queuedLevelProjections);
             return Task.FromResult("resources upgraded");
         }
     }

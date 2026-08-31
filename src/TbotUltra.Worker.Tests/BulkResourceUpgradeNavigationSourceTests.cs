@@ -23,7 +23,7 @@ public sealed class BulkResourceUpgradeNavigationSourceTests
         Assert.DoesNotContain("ReadHighestKnownQueuedResourceLevelAsync", candidateScan, StringComparison.Ordinal);
         Assert.Contains("ResourceConstructionQueueMatcher.HighestQueuedLevelForSlot", candidateScan, StringComparison.Ordinal);
         Assert.Contains("queuedLevelsBySlot.TryGetValue", candidateScan, StringComparison.Ordinal);
-        Assert.Contains("confirmedQueuedLevelsBySlot[slot]", candidateScan, StringComparison.Ordinal);
+        Assert.Contains("queuedProjectionState.Record(slot, nextLevel", candidateScan, StringComparison.Ordinal);
     }
 
     [Fact]

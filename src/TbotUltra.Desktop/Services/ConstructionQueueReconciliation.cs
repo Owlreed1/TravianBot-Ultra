@@ -6,7 +6,8 @@ namespace TbotUltra.Desktop.Services;
 
 internal sealed record ConstructionQueueReconciliationPlan(
     IReadOnlyList<Guid> Removals,
-    IReadOnlyList<QueuePayloadUpdate> Updates)
+    IReadOnlyList<QueuePayloadUpdate> Updates,
+    IReadOnlyList<BuildingConstructSlotConflictReconciliation> SlotConflicts)
 {
     public bool HasChanges => Removals.Count > 0 || Updates.Count > 0;
 }
@@ -55,8 +56,37 @@ internal static class ConstructionQueueReconciliation
             updates[reconciliation.QueueItemId] = new QueuePayloadUpdate(reconciliation.QueueItemId, reconciliation.Payload);
         }
 
+        var assignedFallbackSlots = new HashSet<int>();
+        var slotConflicts = new List<BuildingConstructSlotConflictReconciliation>();
+        foreach (var candidate in candidates
+                     .Where(item => !removals.Contains(item.Id) && !updates.ContainsKey(item.Id))
+                     .OrderByDescending(item => item.Priority)
+                     .ThenBy(item => item.CreatedAt))
+        {
+            var conflict = BuildingUpgradeSlotRebindPlanner.PlanConstructSlotConflict(
+                status,
+                candidate,
+                candidates,
+                assignedFallbackSlots);
+            if (conflict?.ReboundSlotId is not int reboundSlotId)
+            {
+                continue;
+            }
+
+            slotConflicts.Add(conflict);
+            assignedFallbackSlots.Add(reboundSlotId);
+            foreach (var update in conflict.Updates)
+            {
+                if (!removals.Contains(update.QueueItemId))
+                {
+                    updates[update.QueueItemId] = update;
+                }
+            }
+        }
+
         return new ConstructionQueueReconciliationPlan(
             removals.ToList(),
-            updates.Values.Where(update => !removals.Contains(update.QueueItemId)).ToList());
+            updates.Values.Where(update => !removals.Contains(update.QueueItemId)).ToList(),
+            slotConflicts);
     }
 }

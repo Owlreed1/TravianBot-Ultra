@@ -64,6 +64,11 @@ public static class DeferredWaitCalculator
             }
 
             updatedPayload[key] = match.Groups["value"].Value.Trim();
+            if (key.Equals(BotOptionPayloadKeys.ResourceQueuedLevelProjections, StringComparison.OrdinalIgnoreCase)
+                && updatedPayload[key].Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                updatedPayload.Remove(key);
+            }
             changed = true;
         }
 
@@ -366,6 +371,7 @@ public static class DeferredWaitCalculator
         BotOptionPayloadKeys.QueueHumanizeExtraSeconds,
         BotOptionPayloadKeys.ContinuousFarmNextListIndex,
         BotOptionPayloadKeys.BuildingConstructSlotId,
+        BotOptionPayloadKeys.ResourceQueuedLevelProjections,
     ];
 
     private static readonly string[] DeferredUpgradeSnapshotKeys =

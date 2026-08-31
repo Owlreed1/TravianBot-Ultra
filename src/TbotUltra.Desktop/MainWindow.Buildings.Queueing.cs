@@ -178,6 +178,13 @@ public partial class MainWindow
                 var item = candidates.FirstOrDefault(candidate => candidate.Id == removal);
                 if (item is not null) ForgetBuildingQueueCachesForItem(item);
             }
+            foreach (var conflict in plan.SlotConflicts)
+            {
+                AppendLog(
+                    $"[building-reconcile] slot conflict: queued {conflict.BuildingName} in slot " +
+                    $"{conflict.QueuedSlotId}, but live dorf2 shows {conflict.OccupyingBuildingName}; " +
+                    $"rebound the construction chain to free slot {conflict.ReboundSlotId}.");
+            }
             AppendLog($"[building-reconcile] applied live dorf2 plan: removed {plan.Removals.Count} queue item(s), rebound {plan.Updates.Count} queue item(s).");
             RequestQueueUiRefresh();
         }

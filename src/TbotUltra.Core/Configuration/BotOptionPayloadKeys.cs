@@ -13,6 +13,9 @@ public static class BotOptionPayloadKeys
     public const string ResourceUpgradeTargetLevel = "resource_upgrade_target_level";
     public const string ResourceBuildStrategy = "resource_build_strategy"; // "lowest_first" or "smart"
     public const string ResourceUpgradeTypes = "resource_upgrade_types"; // comma-separated: wood,clay,iron,crop
+    // Runtime-only bulk-resource state: slot:queued-level:review-at-unix entries. Persisted on the queue item
+    // so a confirmed click survives defer/retry without becoming account or village configuration.
+    public const string ResourceQueuedLevelProjections = "resource_queued_level_projections";
     public const string ResourceUpgradeMaxAttempts = "resource_upgrade_max_attempts";
     public const string ResourceUpgradeName = "resource_upgrade_name";
     public const string UpgradeRequiredWood = "upgrade_required_wood";

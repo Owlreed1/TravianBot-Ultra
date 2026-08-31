@@ -24,6 +24,14 @@ internal sealed record BuildingConstructLiveMatch(
     int LiveSlotId,
     int LiveLevel);
 
+internal sealed record BuildingConstructSlotConflictReconciliation(
+    Guid QueueItemId,
+    string BuildingName,
+    int QueuedSlotId,
+    string OccupyingBuildingName,
+    int? ReboundSlotId,
+    IReadOnlyList<QueuePayloadUpdate> Updates);
+
 internal static class BuildingUpgradeSlotRebindPlanner
 {
     public static IReadOnlyList<BuildingUpgradeLiveReconciliation> PlanFromLiveStatus(
@@ -141,6 +149,102 @@ internal static class BuildingUpgradeSlotRebindPlanner
             .Distinct()
             .Count() == 22;
 
+    public static BuildingConstructSlotConflictReconciliation? PlanConstructSlotConflict(
+        VillageStatus status,
+        QueueItem sourceConstruct,
+        IReadOnlyList<QueueItem> sameVillageItems,
+        IReadOnlySet<int>? additionallyReservedSlots = null)
+    {
+        if (!HasCompleteBuildingOverview(status)
+            || !string.Equals(sourceConstruct.TaskName, "construct_building", StringComparison.OrdinalIgnoreCase)
+            || !BuildingConstructPayload.TryFromDictionary(sourceConstruct.Payload, out var construct)
+            || construct is null
+            || construct.SlotId is < 19 or > 38)
+        {
+            return null;
+        }
+
+        var targetSlot = status.Buildings.FirstOrDefault(building => building.SlotId == construct.SlotId);
+        if (targetSlot is null || IsConfirmedEmptyOrdinarySlot(targetSlot))
+        {
+            return null;
+        }
+
+        var targetGid = targetSlot.Gid ?? BuildingCatalogService.GidForName(targetSlot.Name);
+        if (targetGid == construct.Gid)
+        {
+            return null;
+        }
+
+        // Single-instance buildings that already exist elsewhere are handled by the normal
+        // existing-construct reconciliation. Moving them to another empty slot would create
+        // an impossible duplicate instead of repairing the queued intent.
+        if (BuildingCatalogService.IsSingleInstance(construct.Gid)
+            && FindExistingConstruct(status, sourceConstruct) is not null)
+        {
+            return null;
+        }
+
+        var reservedSlots = sameVillageItems
+            .Where(item => item.Id != sourceConstruct.Id
+                && string.Equals(item.TaskName, "construct_building", StringComparison.OrdinalIgnoreCase)
+                && item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused)
+            .Select(item => BuildingConstructPayload.TryFromDictionary(item.Payload, out var payload)
+                ? payload?.SlotId
+                : null)
+            .Where(slot => slot is >= 19 and <= 38)
+            .Select(slot => slot!.Value)
+            .ToHashSet();
+        if (additionallyReservedSlots is not null)
+        {
+            reservedSlots.UnionWith(additionallyReservedSlots);
+        }
+
+        if (sourceConstruct.Payload.TryGetValue(
+                BotOptionPayloadKeys.BuildingConstructFallbackExcludedSlots,
+                out var excludedSlotsRaw))
+        {
+            reservedSlots.UnionWith(ParseOrdinarySlotIds(excludedSlotsRaw));
+        }
+
+        var reboundSlotId = status.Buildings
+            .Where(IsConfirmedEmptyOrdinarySlot)
+            .Select(building => building.SlotId!.Value)
+            .Where(slot => !reservedSlots.Contains(slot))
+            .OrderBy(slot => slot)
+            .Cast<int?>()
+            .FirstOrDefault();
+        if (reboundSlotId is null)
+        {
+            return new BuildingConstructSlotConflictReconciliation(
+                sourceConstruct.Id,
+                construct.Name ?? $"gid {construct.Gid}",
+                construct.SlotId,
+                targetSlot.Name,
+                null,
+                []);
+        }
+
+        var sourcePayload = new Dictionary<string, string>(sourceConstruct.Payload, StringComparer.OrdinalIgnoreCase)
+        {
+            [BotOptionPayloadKeys.BuildingConstructSlotId] = reboundSlotId.Value.ToString(),
+        };
+        var updates = new List<QueuePayloadUpdate>
+        {
+            new(sourceConstruct.Id, sourcePayload),
+        };
+        updates.AddRange(Plan(sourceConstruct, reboundSlotId.Value, sameVillageItems)
+            .Select(rebind => new QueuePayloadUpdate(rebind.QueueItemId, rebind.Payload)));
+
+        return new BuildingConstructSlotConflictReconciliation(
+            sourceConstruct.Id,
+            construct.Name ?? $"gid {construct.Gid}",
+            construct.SlotId,
+            targetSlot.Name,
+            reboundSlotId,
+            updates);
+    }
+
     public static IReadOnlyList<BuildingUpgradeSlotRebind> Plan(
         QueueItem sourceConstruct,
         int effectiveSlotId,
@@ -190,6 +294,19 @@ internal static class BuildingUpgradeSlotRebindPlanner
             && !string.IsNullOrWhiteSpace(construct.Name)
             && string.Equals(upgradeName.Trim(), construct.Name.Trim(), StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool IsConfirmedEmptyOrdinarySlot(Building building)
+        => building.SlotId is >= 19 and <= 38
+            && (building.Level ?? 0) == 0
+            && (building.Gid ?? 0) == 0
+            && string.Equals(building.Name, "Empty", StringComparison.OrdinalIgnoreCase);
+
+    private static IEnumerable<int> ParseOrdinarySlotIds(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(item => int.TryParse(item, out var slot) ? slot : 0)
+                .Where(slot => slot is >= 19 and <= 38);
 
     private static List<Building> FindLiveMatches(VillageStatus status, int gid)
         => status.Buildings

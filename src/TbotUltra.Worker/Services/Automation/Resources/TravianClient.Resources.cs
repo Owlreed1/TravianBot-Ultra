@@ -8,6 +8,7 @@ internal interface IResourceUpgradeClient
         int targetLevel,
         string buildStrategy = "lowest_first",
         string? resourceTypes = null,
+        string? queuedLevelProjections = null,
         CancellationToken cancellationToken = default);
 }
 

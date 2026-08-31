@@ -639,8 +639,7 @@ public sealed partial class TravianClient : IBuildingClient
             .Where(item => (item.Gid ?? 0) > 0
                 || (item.Level ?? 0) > 0
                 || (!string.IsNullOrWhiteSpace(item.Name)
-                    && !string.Equals(item.Name, "Empty", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(item.Name, "Unknown", StringComparison.OrdinalIgnoreCase)))
+                    && !string.Equals(item.Name, "Empty", StringComparison.OrdinalIgnoreCase)))
             .Select(item => item.SlotId!.Value)
             .ToHashSet();
         return Enumerable.Range(19, 20)

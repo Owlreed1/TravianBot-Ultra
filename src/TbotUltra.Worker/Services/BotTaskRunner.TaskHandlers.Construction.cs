@@ -130,6 +130,7 @@ public sealed partial class BotTaskRunner
             context.Options.ResourceUpgradeTargetLevel.Value,
             context.Options.ResourceBuildStrategy,
             context.Options.ResourceUpgradeTypes,
+            context.Options.ResourceQueuedLevelProjections,
             context.CancellationToken);
         context.Log(result);
         context.RecordTaskResult("upgrade_all_resources_to_level", result);

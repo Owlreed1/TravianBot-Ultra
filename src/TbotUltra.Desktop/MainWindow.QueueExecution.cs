@@ -447,6 +447,17 @@ public partial class MainWindow
                 return true;
             }
 
+            if (constructRefresh.FreshStatus is not null
+                && TryHandleOccupiedConstructSlotBeforeGuards(
+                    item,
+                    constructRefresh.FreshStatus,
+                    logPrefix,
+                    tickSw))
+            {
+                freshBuildingsRefreshDone = true;
+                return true;
+            }
+
             if (constructRefresh.CanUseCache
                 && await TryHandleConstructQueueFullBeforeRequirementGuardAsync(item, logPrefix, tickSw))
             {
@@ -604,6 +615,65 @@ public partial class MainWindow
             $"{logPrefix} SKIP {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
             $"fresh dorf2 confirms {match.BuildingName} at slot {match.LiveSlotId} level {match.LiveLevel}; " +
             $"removed stale construct for slot {match.QueuedSlotId} before queue/requirement delays");
+        return true;
+    }
+
+    private bool TryHandleOccupiedConstructSlotBeforeGuards(
+        QueueItem item,
+        VillageStatus freshStatus,
+        string logPrefix,
+        Stopwatch timer)
+    {
+        var sameVillage = BuildSameVillageQueueFilter(item);
+        var candidates = _buildingsPanelService.GetQueueItems()
+            .Where(sameVillage)
+            .ToList();
+        var conflict = BuildingUpgradeSlotRebindPlanner.PlanConstructSlotConflict(
+            freshStatus,
+            item,
+            candidates);
+        if (conflict is null)
+        {
+            return false;
+        }
+
+        if (conflict.ReboundSlotId is not int reboundSlotId)
+        {
+            _botService.MarkQueueItemDeferred(item.Id, TimeSpan.FromMinutes(5));
+            AppendLog(
+                $"{logPrefix} DEFER {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
+                $"slot {conflict.QueuedSlotId} now contains {conflict.OccupyingBuildingName}, " +
+                $"but complete live dorf2 has no safe free ordinary slot for {conflict.BuildingName}; " +
+                "queue item kept for a later scan");
+            return true;
+        }
+
+        if (!_botService.MarkQueueItemDeferred(item.Id, TimeSpan.Zero))
+        {
+            AppendLog(
+                $"{logPrefix} DEFER {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
+                $"slot conflict was confirmed, but the running item could not be returned to pending; " +
+                "no construct click was attempted");
+            return true;
+        }
+
+        if (!_botService.ApplyPendingQueueReconciliation([], conflict.Updates))
+        {
+            AppendLog(
+                $"{logPrefix} DEFER {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
+                $"slot conflict was confirmed, but the queue changed before slot {reboundSlotId} " +
+                "could be reserved; item kept for a fresh retry");
+            return true;
+        }
+
+        item.Payload = conflict.Updates
+            .Single(update => update.QueueItemId == item.Id)
+            .Payload;
+        RequestQueueUiRefresh();
+        AppendLog(
+            $"[building-reconcile] slot conflict: queued {conflict.BuildingName} in slot " +
+            $"{conflict.QueuedSlotId}, but live dorf2 shows {conflict.OccupyingBuildingName}; " +
+            $"rebound the construction chain to free slot {reboundSlotId}. It will continue on the next pass.");
         return true;
     }
 
