@@ -2,10 +2,10 @@
 
 `Preview` of the program
 
-![Version](https://img.shields.io/badge/Version-v0.6.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-v0.6.8-blue?style=for-the-badge)
 
 <p align="center">
-  <img src="assets/images/tbot_v060.png" alt="Tbot Ultra Dashboard">
+  <img src="assets/images/tbot_v068.png" alt="Tbot Ultra Dashboard">
 </p>
 
 ---
@@ -107,7 +107,7 @@ Compatible with:
 - Easy update to new version via the app (checks at startup and hourly while open)
 - Create a sanitized diagnostics ZIP from Support for manual bug reports
 - Support for community server with multi-tribe accounts
-
+And more!
 
 ## Future functions:
 
