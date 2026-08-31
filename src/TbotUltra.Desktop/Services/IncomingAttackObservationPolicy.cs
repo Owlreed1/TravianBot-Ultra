@@ -13,15 +13,15 @@ public static class IncomingAttackObservationPolicy
         DateTimeOffset nowUtc,
         bool isNewPlusMarker = false)
     {
-        if (isNewPlusMarker)
-        {
-            return true;
-        }
-
         if (confirmedMovementCount.HasValue)
         {
             return signal.Dorf1ArrivalTimesUtc is { } arrivals
                    && arrivals.Count > confirmedMovementCount.Value;
+        }
+
+        if (isNewPlusMarker)
+        {
+            return true;
         }
 
         if (!lastReadUtc.HasValue)

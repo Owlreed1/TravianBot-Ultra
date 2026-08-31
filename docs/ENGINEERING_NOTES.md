@@ -111,7 +111,7 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Hero attribute automation uses account-scoped absolute maximums (0-100) keyed by attribute; missing or invalid
   values default to 100. Read the four live Official attribute inputs before every plus click, never cross a maximum,
   and do not requeue point spending when the latest complete snapshot shows every configured maximum is reached.
-- Demolition is a village-scoped queue group: start one Official `table#demolish` step, persist the server timer plus its random delay as `NextAttemptAt`, and never poll or sleep through it in the browser. It has no per-village group toggle; an explicitly queued demolition is always group-enabled, while the village's master Auto toggle still controls automation.
+- Demolition is a village-scoped queue group: start one Official `table#demolish` step, persist the server timer plus its random delay as `NextAttemptAt`, and never poll or sleep through it in the browser. Submit the Official form with a trusted click, tolerate only its expected navigation-context replacement, wait for the returned Main Building page, and require its active timer as confirmation; never revisit the same Main Building merely to submit. It has no per-village group toggle; an explicitly queued demolition is always group-enabled, while the village's master Auto toggle still controls automation.
 - Persist village identity by coordinates/key, not display name. Names may collide or change; queue items retain
   their target village identity.
 - Duplicate village names are valid. Fresh Official sidebar `data-did` plus `.coordinateX/.coordinateY` values
@@ -663,11 +663,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
   partial output as a successful archive. Screenshots may contain visible game data.
 - The Dashboard active-village border represents verified live browser state only. Queue selection/Running state
   must never pre-mark a task's target village; update it only after a successful browser village verification.
-- Incoming Attack monitoring processes live observations whenever the user is logged in, independently of whether
-  Continuous Loop or Auto Queue is running. With Plus, the global village-list attack markers are read on every
-  jitter/current-page snapshot and during login even outside Dorf1; only a real Dorf1 read may authoritatively clear
-  the active village. A newly appeared Plus marker triggers one immediate detail read even when that village has
-  confirmed movement history; the unchanged marker does not reopen Rally Point on later jitter reads. The active village's Dorf1 signal requires the hostile red
+- Incoming Attack monitoring may navigate to Rally Point only while Continuous Loop or Auto Queue is running; being
+  logged in is not sufficient. With Plus, the global village-list attack markers are read from active automation
+  snapshots even outside Dorf1; only a real Dorf1 read may authoritatively clear the active village. A newly appeared
+  Plus marker triggers an immediate detail read only when that village has no confirmed movement-count history. A
+  confirmed village is read again only when a live red Dorf1 count exceeds its retained high-water mark. The active village's Dorf1 signal requires the hostile red
   `img.att1` marker inside `.villageInfobox.movements #movements` (movement labels and `def1`/`att2` must never
   signal an attack), while a Plus village overview uses
   `.listEntry.village.attack[data-did]`. A nullable signal list means neither Dorf1 nor the Plus village overview
@@ -740,6 +740,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   occupied by another building. Rebind the construct and its dependent upgrades atomically to the lowest confirmed
   empty slot 19-38, without stealing slots reserved by other queued constructs. Incomplete or unknown slot state never
   authorizes a move; when no safe slot exists, keep and defer the item without clicking or consuming failure retries.
+  That unresolved safety stop is actionable: raise a deduplicated alarm containing village, task, queued/live slot
+  identity, and every unknown ordinary slot. Normal resource and construction-slot waits remain non-alarm status.
+  Official empty slots still contain a clickable `a.emptyBuildingSlot`; that link is explicit empty evidence, not
+  occupancy. Treat `emptyBuildingSlot`, `g0`, and `data-gid=0` as empty before applying generic link evidence.
 - An automation run captures Worker's actual `BrowserGeneration`; never mirror or synthesize that generation in
   Desktop. Runtime-item reconciliation identifies village scope with `BotOptionPayloadKeys.TargetVillageKey` and
   must preserve an existing pending item's authoritative `NextAttemptAt` when refreshing payload or priority.

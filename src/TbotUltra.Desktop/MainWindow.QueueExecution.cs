@@ -640,6 +640,24 @@ public partial class MainWindow
         if (conflict.ReboundSlotId is not int reboundSlotId)
         {
             _botService.MarkQueueItemDeferred(item.Id, TimeSpan.FromMinutes(5));
+            var unknownSlots = freshStatus.Buildings
+                .Where(building => building.SlotId is >= 19 and <= 38
+                    && string.Equals(building.Name, "Unknown", StringComparison.OrdinalIgnoreCase))
+                .Select(building => building.SlotId!.Value)
+                .Distinct()
+                .OrderBy(slot => slot)
+                .ToList();
+            var villageName = NormalizeVillageName(GetQueueItemVillageName(item))
+                ?? NormalizeVillageName(freshStatus.ActiveVillage)
+                ?? "-";
+            var unknownSlotText = unknownSlots.Count == 0
+                ? "none"
+                : string.Join(", ", unknownSlots);
+            AppendLog(
+                $"ALARM: construction task '{item.TaskName}' in village '{villageName}' could not continue: " +
+                $"queued slot {conflict.QueuedSlotId} shows '{conflict.OccupyingBuildingName}', and no safe free " +
+                $"ordinary slot was confirmed for {conflict.BuildingName}. Unknown ordinary slots: {unknownSlotText}; " +
+                "no construction click was attempted. The task was deferred for a fresh scan.");
             AppendLog(
                 $"{logPrefix} DEFER {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
                 $"slot {conflict.QueuedSlotId} now contains {conflict.OccupyingBuildingName}, " +

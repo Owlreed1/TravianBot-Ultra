@@ -7,7 +7,7 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class IncomingAttackIndicatorSourceTests
 {
     [Fact]
-    public void LiveSignalObservation_IsActiveAfterLoginWithoutRequiringAutomationLoop()
+    public void LiveSignalObservation_RequiresStartedAutomation()
     {
         var root = ProjectRootLocator.FindProjectRoot();
         var source = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "MainWindow.IncomingAttacks.cs"));
@@ -15,9 +15,21 @@ public sealed class IncomingAttackIndicatorSourceTests
         var end = source.IndexOf("private void ObserveIncomingAttackSignals", start, StringComparison.Ordinal);
         var activation = source[start..end];
 
-        Assert.Contains("=> _isLoggedIn;", activation, StringComparison.Ordinal);
-        Assert.DoesNotContain("IsContinuousLoopRunning", activation, StringComparison.Ordinal);
-        Assert.DoesNotContain("_autoQueueRunning", activation, StringComparison.Ordinal);
+        Assert.Contains("_isLoggedIn", activation, StringComparison.Ordinal);
+        Assert.Contains("IsContinuousLoopRunning()", activation, StringComparison.Ordinal);
+        Assert.Contains("_autoQueueRunning", activation, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RallyPointNavigation_RechecksStartedAutomationAtQueueBoundary()
+    {
+        var root = ProjectRootLocator.FindProjectRoot();
+        var source = File.ReadAllText(Path.Combine(root, "src", "TbotUltra.Desktop", "MainWindow.IncomingAttacks.cs"));
+        var start = source.IndexOf("private void QueueIncomingAttackDetailsRead", StringComparison.Ordinal);
+        var end = source.IndexOf("private async Task ReadIncomingAttackDetailsAsync", start, StringComparison.Ordinal);
+        var queueBoundary = source[start..end];
+
+        Assert.Contains("!IsIncomingAttackMonitoringActive()", queueBoundary, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -31,7 +31,8 @@ public partial class MainWindow
         return view;
     }
 
-    private bool IsIncomingAttackMonitoringActive() => _isLoggedIn;
+    private bool IsIncomingAttackMonitoringActive() =>
+        _isLoggedIn && (IsContinuousLoopRunning() || _autoQueueRunning);
 
     private void ObserveIncomingAttackSignals(VillageStatus status)
     {
@@ -177,7 +178,8 @@ public partial class MainWindow
 
     private void QueueIncomingAttackDetailsRead(string villageKey, IncomingAttackSignal signal)
     {
-        if (!IsIncomingAttackMonitoringEnabled(villageKey))
+        if (!IsIncomingAttackMonitoringActive()
+            || !IsIncomingAttackMonitoringEnabled(villageKey))
         {
             return;
         }

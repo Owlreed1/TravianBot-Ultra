@@ -63,7 +63,7 @@ public sealed class IncomingAttackObservationPolicyTests
     }
 
     [Fact]
-    public void NewPlusMarker_ReadsImmediatelyDespiteConfirmedMovementHistory()
+    public void NewPlusMarker_DoesNotReadAgainWithConfirmedMovementHistory()
     {
         var signal = new IncomingAttackSignal("LILAC");
 
@@ -71,6 +71,21 @@ public sealed class IncomingAttackObservationPolicyTests
             signal,
             confirmedMovementCount: 1,
             Now.AddMinutes(-1),
+            Now,
+            isNewPlusMarker: true);
+
+        Assert.False(shouldRead);
+    }
+
+    [Fact]
+    public void FirstPlusMarker_ReadsWhenNoMovementHistoryExists()
+    {
+        var signal = new IncomingAttackSignal("LILAC");
+
+        var shouldRead = IncomingAttackObservationPolicy.ShouldReadDetails(
+            signal,
+            confirmedMovementCount: null,
+            lastReadUtc: null,
             Now,
             isNewPlusMarker: true);
 

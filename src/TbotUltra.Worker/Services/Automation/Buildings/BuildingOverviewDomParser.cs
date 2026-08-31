@@ -155,9 +155,14 @@ internal static class BuildingOverviewDomParser
         var level = TryParseOverviewLevel(slotSnapshot.LevelText, slotSnapshot.DataLevelText, slotSnapshot.Text);
         var levelKnown = level.HasValue;
         var nameCandidate = SelectBuildingNameCandidate(slotSnapshot.DataNameText, slotSnapshot.NameText, slotSnapshot.TitleText, slotSnapshot.AltText);
-        var hasOccupancyEvidence = slotSnapshot.OccupiedEvidence
-            || !string.IsNullOrWhiteSpace(buildingCode)
-            || !string.IsNullOrWhiteSpace(nameCandidate);
+        var hasExplicitEmptySlotEvidence = classes.Any(className =>
+                string.Equals(className, "g0", StringComparison.OrdinalIgnoreCase))
+            || (slotSnapshot.OuterHtml?.Contains("emptyBuildingSlot", StringComparison.OrdinalIgnoreCase) ?? false)
+            || TryExtractIntFromRegex(BuildingGidDataRegex, slotSnapshot.OuterHtml, "gid") == 0;
+        var hasOccupancyEvidence = !hasExplicitEmptySlotEvidence
+            && (slotSnapshot.OccupiedEvidence
+                || !string.IsNullOrWhiteSpace(buildingCode)
+                || !string.IsNullOrWhiteSpace(nameCandidate));
 
         buildingCode ??= TryResolveBuildingCodeFromName(nameCandidate);
 

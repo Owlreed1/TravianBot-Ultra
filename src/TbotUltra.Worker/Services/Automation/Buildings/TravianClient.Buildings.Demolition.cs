@@ -68,7 +68,6 @@ public sealed partial class TravianClient : IBuildingClient
         }
 
         var started = await TryStartDemolitionStepAsync(
-            mainBuildingSlotId: mainSlot.Value,
             targetSlotId: slotId,
             cancellationToken);
         if (!started)
@@ -76,8 +75,9 @@ public sealed partial class TravianClient : IBuildingClient
             return $"Slot {slotId}: could not start demolition (Main Building did not expose the Official demolish form).";
         }
 
-        // The Official page updates in place after the POST. This is a short DOM settle only; the
-        // long server countdown is returned to the persistent queue below.
+        // The Official form submission navigates back to the Main Building page. Wait for that
+        // navigation before reading the authoritative server countdown from the returned page.
+        await WaitForPageReadyAsync(cancellationToken);
         await Task.Delay(TimeSpan.FromMilliseconds(750), cancellationToken);
         activeSeconds = await ReadActiveDemolitionSecondsOnCurrentPageAsync(cancellationToken);
         if (activeSeconds is not > 0)
@@ -96,12 +96,9 @@ public sealed partial class TravianClient : IBuildingClient
     }
 
     private async Task<bool> TryStartDemolitionStepAsync(
-        int mainBuildingSlotId,
         int targetSlotId,
         CancellationToken cancellationToken)
     {
-        await GotoAsync(Paths.BuildBySlot(mainBuildingSlotId), cancellationToken);
-
         var selected = await _page.EvaluateAsync<bool>(
             """
             (args) => {
@@ -124,15 +121,31 @@ public sealed partial class TravianClient : IBuildingClient
         // Stop demolition can cancel this narrow action scope while the page is being prepared.
         // Do the final check immediately before the state-changing Official click.
         cancellationToken.ThrowIfCancellationRequested();
-        return await _page.EvaluateAsync<bool>(
-            """
-            () => {
-              const button = document.querySelector('form.demolish_building button.textButtonV1.green[value="Demolish"]');
-              if (!button || button.disabled) return false;
-              button.click();
-              return true;
-            }
-            """);
+        var button = _page.Locator(
+            "form.demolish_building button.textButtonV1.green[value='Demolish']").First;
+        if (await button.CountAsync() == 0
+            || !await button.IsVisibleAsync()
+            || !await button.IsEnabledAsync())
+        {
+            return false;
+        }
+
+        try
+        {
+            await button.ClickAsync(new LocatorClickOptions { Timeout = _config.TimeoutMs })
+                .WaitAsync(cancellationToken);
+            return true;
+        }
+        catch (PlaywrightException ex) when (
+            !BrowserFailureClassifier.IsTargetCrash(ex)
+            && IsTransientExecutionContextError(ex))
+        {
+            // The click can destroy its own JavaScript context while Travian submits the form.
+            // Treat only that navigation transition as attempted; the timer read below remains
+            // the authoritative confirmation that the demolition actually started.
+            Notify("[demolish:verbose] submit navigation replaced the click context; verifying the server timer on the returned page.");
+            return true;
+        }
     }
 
     // The active Official demolition row is rendered separately from the form as table#demolish.
