@@ -340,7 +340,7 @@ public sealed partial class TravianClient : ITrainingClient
             }
 
             var outcome = await TryTrainTroopsAtBuildingAsync(status, candidate, fallbackCooldownSeconds, cancellationToken);
-            Notify($"[troops] {candidate.Request.BuildingName} result — success={outcome.Success}, wait={outcome.WaitSeconds?.ToString() ?? "null"}s, msg='{outcome.Message}'");
+            Notify($"[troops] village='{status.ActiveVillage}' {candidate.Request.BuildingName} result — success={outcome.Success}, wait={outcome.WaitSeconds?.ToString() ?? "null"}s, msg='{outcome.Message}'");
             if (outcome.Success)
             {
                 return outcome.Message;
@@ -1216,65 +1216,105 @@ public sealed partial class TravianClient : ITrainingClient
 
     private async Task<bool> SubmitTroopTrainingFromCurrentPageAsync(string inputName, int amount, bool useMaxShortcut, CancellationToken cancellationToken)
     {
-        Notify($"[troops:verbose] submit:locating input '{inputName}'. amount={amount}, useMaxShortcut={useMaxShortcut}.");
-        var input = _page.Locator($"input[name='{inputName}'], input[id='{inputName}']").First;
-        if (await input.CountAsync() <= 0)
+        const int submitAttempts = 3;
+        for (var submitAttempt = 1; submitAttempt <= submitAttempts; submitAttempt++)
         {
-            Notify($"Troop training submit skipped: input '{inputName}' not found.");
-            return false;
-        }
-
-        if (useMaxShortcut)
-        {
-            if (!await ClickTroopTrainingMaxAmountAsync(input, inputName, cancellationToken))
+            if (submitAttempt > 1)
             {
-                Notify($"Troop training submit skipped: maximum amount link for '{inputName}' was not found or did not fill the input.");
-                return false;
+                await WaitForPageReadyAsync(cancellationToken);
             }
 
-            Notify($"[troops:verbose] submit:clicked Travian maximum amount link for '{inputName}'.");
-        }
-        else
-        {
-            var integerAmount = Math.Max(0, amount);
-            if (integerAmount <= 0)
+            try
             {
-                Notify($"[troops:verbose] submit:integer amount for '{inputName}' was <= 0.");
-                return false;
+                Notify($"[troops:verbose] submit:locating input '{inputName}'. amount={amount}, useMaxShortcut={useMaxShortcut}, attempt={submitAttempt}/{submitAttempts}.");
+                var input = _page.Locator($"input[name='{inputName}'], input[id='{inputName}']").First;
+                if (await input.CountAsync() <= 0)
+                {
+                    Notify($"[troops] submit attempt {submitAttempt}/{submitAttempts}: form auto-refreshed and input '{inputName}' was not found.");
+                    continue;
+                }
+
+                if (useMaxShortcut)
+                {
+                    if (!await ClickTroopTrainingMaxAmountAsync(input, inputName, cancellationToken))
+                    {
+                        Notify($"[troops] submit attempt {submitAttempt}/{submitAttempts}: form auto-refreshed or maximum amount link for '{inputName}' did not fill a positive value.");
+                        continue;
+                    }
+
+                    Notify($"[troops:verbose] submit:clicked Travian maximum amount link for '{inputName}'.");
+                }
+                else
+                {
+                    var integerAmount = Math.Max(0, amount);
+                    if (integerAmount <= 0)
+                    {
+                        Notify($"[troops:verbose] submit:integer amount for '{inputName}' was <= 0.");
+                        return false;
+                    }
+
+                    await DelayBeforeClickAsync(cancellationToken); // Action pacing "Click" delay
+                    await TypeHumanlyAsync(input, integerAmount.ToString(), cancellationToken);
+                    Notify($"[troops:verbose] submit:filled '{inputName}' with '{integerAmount}'.");
+                }
+
+                await Task.Delay(150, cancellationToken);
+                input = _page.Locator($"input[name='{inputName}'], input[id='{inputName}']").First;
+                var parsedValueRaw = await input.InputValueAsync();
+                var parsedValue = TroopTrainingCalculator.ParsePositiveTrainingAmount(parsedValueRaw);
+                Notify($"[troops:verbose] submit:input '{inputName}' now has raw='{parsedValueRaw}', parsed={parsedValue?.ToString() ?? "null"}.");
+                if (parsedValue is null)
+                {
+                    Notify($"[troops] submit attempt {submitAttempt}/{submitAttempts}: form auto-refreshed and input '{inputName}' became '{parsedValueRaw}'.");
+                    continue;
+                }
+
+                var form = input.Locator("xpath=ancestor::form[1]").First;
+                Notify($"[troops:verbose] submit:located form for '{inputName}'.");
+                var submitButton = form.Locator("button.startTraining, button.green.startTraining, button[type='submit'].startTraining, button[type='submit'].green").First;
+                Notify($"[troops:verbose] submit:locating Train button for '{inputName}'.");
+                if (await submitButton.CountAsync() <= 0)
+                {
+                    Notify($"[troops] submit attempt {submitAttempt}/{submitAttempts}: form auto-refreshed and Train button was not found for '{inputName}'.");
+                    continue;
+                }
+
+                var submitText = (await submitButton.InnerTextAsync()).Trim();
+                Notify($"[troops:verbose] submit:Train button text='{submitText}' for '{inputName}'.");
+                await DelayBeforeClickAsync(cancellationToken); // Action pacing "Click" delay
+
+                // A fast training queue can reload the page while the human click delay runs.
+                // Re-resolve the live form immediately before the only state-changing click.
+                input = _page.Locator($"input[name='{inputName}'], input[id='{inputName}']").First;
+                var finalValueRaw = await input.InputValueAsync();
+                var finalValue = TroopTrainingCalculator.ParsePositiveTrainingAmount(finalValueRaw);
+                if (finalValue is null)
+                {
+                    Notify($"[troops] submit attempt {submitAttempt}/{submitAttempts}: form auto-refreshed during click delay and input '{inputName}' became '{finalValueRaw}'.");
+                    continue;
+                }
+
+                form = input.Locator("xpath=ancestor::form[1]").First;
+                submitButton = form.Locator("button.startTraining, button.green.startTraining, button[type='submit'].startTraining, button[type='submit'].green").First;
+                if (await submitButton.CountAsync() <= 0)
+                {
+                    Notify($"[troops] submit attempt {submitAttempt}/{submitAttempts}: form auto-refreshed during click delay and Train button disappeared for '{inputName}'.");
+                    continue;
+                }
+
+                await submitButton.ClickAsync();
+                Notify($"[troops:verbose] submit:clicked Train button for '{inputName}' with parsedValue={finalValue.Value} on attempt {submitAttempt}/{submitAttempts}.");
+                return true;
             }
-
-            await DelayBeforeClickAsync(cancellationToken); // Action pacing "Click" delay
-            await TypeHumanlyAsync(input, integerAmount.ToString(), cancellationToken);
-            Notify($"[troops:verbose] submit:filled '{inputName}' with '{integerAmount}'.");
+            catch (Microsoft.Playwright.PlaywrightException ex) when (!BrowserFailureClassifier.IsTargetCrash(ex))
+            {
+                var action = submitAttempt < submitAttempts ? "Retrying before Train." : "No Train click was made.";
+                Notify($"[troops] submit attempt {submitAttempt}/{submitAttempts}: form auto-refreshed during preparation ({ex.Message}). {action}");
+            }
         }
 
-        await Task.Delay(150, cancellationToken);
-        input = _page.Locator($"input[name='{inputName}'], input[id='{inputName}']").First;
-        var parsedValueRaw = await input.InputValueAsync();
-        var parsedDigits = new string(parsedValueRaw.Where(char.IsDigit).ToArray());
-        Notify($"[troops:verbose] submit:input '{inputName}' now has raw='{parsedValueRaw}', digits='{parsedDigits}'.");
-        if (!int.TryParse(parsedDigits, out var parsedValue) || parsedValue <= 0)
-        {
-            Notify($"Troop training submit skipped: input '{inputName}' stayed at '{parsedValueRaw}'.");
-            return false;
-        }
-
-        var form = input.Locator("xpath=ancestor::form[1]").First;
-        Notify($"[troops:verbose] submit:located form for '{inputName}'.");
-        var submitButton = form.Locator("button.startTraining, button.green.startTraining, button[type='submit'].startTraining, button[type='submit'].green").First;
-        Notify($"[troops:verbose] submit:locating Train button for '{inputName}'.");
-        if (await submitButton.CountAsync() <= 0)
-        {
-            Notify($"Troop training submit skipped: Train button not found for '{inputName}'.");
-            return false;
-        }
-
-        var submitText = (await submitButton.InnerTextAsync()).Trim();
-        Notify($"[troops:verbose] submit:Train button text='{submitText}' for '{inputName}'.");
-        await DelayBeforeClickAsync(cancellationToken); // Action pacing "Click" delay
-        await submitButton.ClickAsync();
-        Notify($"[troops:verbose] submit:clicked Train button for '{inputName}' with parsedValue={parsedValue}.");
-        return true;
+        Notify($"Troop training submit skipped: the '{inputName}' form did not remain stable for {submitAttempts} attempts.");
+        return false;
     }
 
     // Resolves the training form's amount-input NAME for a troop.
@@ -1330,8 +1370,8 @@ public sealed partial class TravianClient : ITrainingClient
             }
 
             var linkText = (await link.InnerTextAsync()).Trim();
-            var linkDigits = new string(linkText.Where(char.IsDigit).ToArray());
-            if (!int.TryParse(linkDigits, out var advertisedMaximum) || advertisedMaximum <= 0)
+            var advertisedMaximum = TroopTrainingCalculator.ParsePositiveTrainingAmount(linkText);
+            if (advertisedMaximum is null)
             {
                 continue;
             }
@@ -1342,13 +1382,18 @@ public sealed partial class TravianClient : ITrainingClient
 
             var refreshedInput = _page.Locator($"input[name='{inputName}'], input[id='{inputName}']").First;
             var filledValue = await refreshedInput.InputValueAsync();
-            var filledDigits = new string(filledValue.Where(char.IsDigit).ToArray());
-            if (int.TryParse(filledDigits, out var filledAmount) && filledAmount == advertisedMaximum)
+            var filledAmount = TroopTrainingCalculator.ParsePositiveTrainingAmount(filledValue);
+            if (filledAmount is not null)
             {
+                if (filledAmount.Value != advertisedMaximum.Value)
+                {
+                    Notify($"[troops:verbose] submit:maximum changed from {advertisedMaximum.Value} to {filledAmount.Value} while the fast training page refreshed; using the current positive value.");
+                }
+
                 return true;
             }
 
-            Notify($"[troops:verbose] submit:maximum link showed {advertisedMaximum}, but '{inputName}' contained '{filledValue}'.");
+            Notify($"[troops:verbose] submit:maximum link showed {advertisedMaximum.Value}, but '{inputName}' contained '{filledValue}'.");
         }
 
         return false;

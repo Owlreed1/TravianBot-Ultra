@@ -14,7 +14,7 @@ public sealed partial class TravianClient
             await GotoAsync(Paths.Resources, cancellationToken);
         }
 
-        await EnsureLoggedInAsync();
+        await EnsureLoggedInAsync(cancellationToken: cancellationToken);
         if (allowNavigationToResourcePage)
         {
             await WaitForResourceSnapshotWidgetsAsync(cancellationToken);

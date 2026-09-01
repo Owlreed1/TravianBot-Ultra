@@ -149,6 +149,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
   remains separate. Current-page jitter/UI sync is observation-only and must never navigate while the bot is paused;
   profile verification runs only from an explicit/login flow or active automation path. Remember a verified missing
   coordinate for the browser session so stale cache seeding cannot repeat the same profile navigation.
+- Recurring browser timers (including resource jitter and inbox refresh) run only while continuous or queue
+  automation is active. Login-state detection waits, with cancellation, for stable authenticated shell markers on
+  the current page (including the global Hero control and active-village sidebar), never page-specific Dorf1/Dorf2
+  content, and never navigates to Dorf1 merely to verify a session; an unresolved page is a transient read failure.
+  Explicit user operations such as Login, scans, and refresh buttons remain allowed while automation is idle.
 - The village status cache and queue use canonical coordinate keys. Legacy name-keyed entries are migrated only
   when coordinates can be resolved; active coordinates come from `#villageName[data-x][data-y]`.
 - Per-village runtime caches are shared by the UI and background loop and must be synchronized. A display-name
@@ -360,6 +365,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Optional per-building troop minimum ranges are village-scoped. Randomize one threshold per building/run and
   evaluate it from the current village resource snapshot plus the Official unit-cost catalog before navigating;
   recheck live costs and resources before submit, and alarm/skip on a catalog-to-live cost mismatch.
+- Fast training queues can auto-refresh their building page while an amount is being prepared. Re-resolve and
+  validate the live form after click pacing, retry preparation a bounded number of times, and accept a changed but
+  still-positive Official maximum; never retry after the state-changing Train click because submission is ambiguous.
 - Hero HP regeneration per day is only a scheduling estimate for low-HP adventure defers. A successful current-page
   HP read is authoritative and releases the deferred Hero task immediately once the threshold is met. That release
   is centralized in the shared UI HP-read helper, so login, quick re-login, browser restart, the manual refresh
@@ -646,9 +654,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   defaulting enabled when absent. Before Create, set and verify `#createFarmListForm input[name='onlyLosses']` with
   a direct input click (the wrapping label can be covered by `.onlyLossesSelection`); use a short actionability wait
   with a trusted forced-click fallback. A missing or unverifiable checkbox is logged but must not block list creation.
-- Hero attribute priority is execution-authoritative from the latest saved account settings. A queued
-  `hero_manage` or `spend_hero_attribute_points` payload is only a snapshot and must never overwrite a reorder
-  the user made in the UI while the task was waiting.
+- Hero settings are execution-authoritative from the latest saved account settings. A queued `hero_manage` payload
+  is only a snapshot and must never overwrite changed HP, revive, ointment, attribute, adventure-selection, or
+  continuous-adventure controls while the task was waiting. `spend_hero_attribute_points` likewise always uses the
+  latest attribute priority and maximums.
 - Hero runtime state is published as one structured Worker update (`HeroRuntimeStatus`). The Hero page and the
   Village overview icon must consume that same update so away/dead/reviving state cannot diverge between views.
 - Hero Attributes navigation is required only when the sidebar signals new points or no known attribute snapshot

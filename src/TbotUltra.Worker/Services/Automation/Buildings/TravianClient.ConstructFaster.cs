@@ -356,7 +356,7 @@ public sealed partial class TravianClient
         CancellationToken cancellationToken)
     {
         await GotoAsync(BuildConstructFasterPath(slotId, gid), cancellationToken);
-        if (!await IsLoggedInAsync())
+        if (!await IsLoggedInAsync(cancellationToken))
         {
             throw new InvalidOperationException("isolated bonus-video browser is not logged in");
         }

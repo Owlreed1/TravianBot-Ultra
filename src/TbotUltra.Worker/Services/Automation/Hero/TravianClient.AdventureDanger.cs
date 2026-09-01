@@ -130,7 +130,7 @@ public sealed partial class TravianClient
                 Paths.HeroAdventures,
                 label,
                 async pageLoadCancellationToken =>
-                    await IsLoggedInAsync() && await IsAdventureVideoPageRenderedAsync(pageLoadCancellationToken),
+                    await IsLoggedInAsync(pageLoadCancellationToken) && await IsAdventureVideoPageRenderedAsync(pageLoadCancellationToken),
                 cancellationToken);
             if (!pageReady)
             {

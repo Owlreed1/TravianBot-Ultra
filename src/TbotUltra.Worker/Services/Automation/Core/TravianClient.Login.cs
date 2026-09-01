@@ -28,7 +28,7 @@ public sealed partial class TravianClient : ISessionClient
         Notify($"[login] Account='{_account.Name}' server='{ServerUrl}' — starting");
         if (IsConfiguredGameOrigin(_page.Url))
         {
-            var state = await LoginStateAsync();
+            var state = await LoginStateAsync(cancellationToken);
             ThrowIfAccountAccessBlocked(state);
             if (state == AccountAccessState.LoggedIn)
             {
@@ -40,16 +40,7 @@ public sealed partial class TravianClient : ISessionClient
 
             if (state == AccountAccessState.Unknown)
             {
-                Notify("[login] state unknown on an existing game page; rechecking dorf1 before opening the lobby.");
-                state = await VerifyUnknownAccessStateAsync(cancellationToken);
-                ThrowIfAccountAccessBlocked(state);
-                if (state == AccountAccessState.LoggedIn)
-                {
-                    MarkSessionLoggedIn();
-                    Notify($"[login] already logged in as '{_account.Name}' after dorf1 recheck");
-                    await ConfirmExpectedLanguageIfEnabledAndRefreshAccountSignalsAsync(cancellationToken);
-                    return;
-                }
+                Notify("[login] current game page remained unknown after waiting for its authenticated layout; continuing with the requested lobby login without a Dorf1 verification navigation.");
             }
         }
 
@@ -87,7 +78,7 @@ public sealed partial class TravianClient : ISessionClient
 
                     if (!await WaitUntilLoggedInAsync(cancellationToken))
                     {
-                        ThrowIfAccountAccessBlocked(await LoginStateAsync());
+                        ThrowIfAccountAccessBlocked(await LoginStateAsync(cancellationToken));
                         throw new InvalidOperationException("Lobby login state did not survive the clean browser-context rotation.");
                     }
 
@@ -175,7 +166,7 @@ public sealed partial class TravianClient : ISessionClient
         _session.VillageTribes.Clear();
         _cachedGoldClubEnabled = null;
         await GotoAsync(Paths.Resources, cancellationToken);
-        if (!await IsLoggedInAsync())
+        if (!await IsLoggedInAsync(cancellationToken))
         {
             Notify($"[logout] {_account.Name} was already logged out");
             return;
@@ -307,7 +298,7 @@ public sealed partial class TravianClient : ISessionClient
     {
         Notify("CheckLoggedInAsync started");
         cancellationToken.ThrowIfCancellationRequested();
-        return await IsLoggedInAsync();
+        return await IsLoggedInAsync(cancellationToken);
     }
 
     private async Task EnsureLoggedInAsync(bool force = false, CancellationToken cancellationToken = default)
@@ -320,7 +311,8 @@ public sealed partial class TravianClient : ISessionClient
 
         // Routine "already logged in" is silent — only abnormal states (recovery/relogin/failure) below
         // log, so ensure-logged-in doesn't emit 3 lines on every background tick.
-        var loggedIn = await IsLoggedInAsync();
+        var state = await LoginStateAsync(cancellationToken);
+        var loggedIn = state == AccountAccessState.LoggedIn;
         _lastEnsureLoggedInAt = now;
         _lastEnsureLoggedInSucceeded = loggedIn;
         if (!loggedIn)
@@ -331,14 +323,6 @@ public sealed partial class TravianClient : ISessionClient
             // covers the in-feature drop case (and the keep-alive idle path). Other non-logged-in
             // Unknown/unavailable states remain transient failures; an explicit logged-out state
             // is the only state that starts the normal Official login flow.
-            var state = await LoginStateAsync();
-            if (state == AccountAccessState.Unknown)
-            {
-                Notify("[ensure-logged-in] state unknown; verifying the canonical village page before failing.");
-                state = await VerifyUnknownAccessStateAsync(cancellationToken);
-                Notify($"[ensure-logged-in] retry state={state} url='{_page.Url}' pages={TryGetPageCountForDiagnostics()}");
-            }
-
             ThrowIfAccountAccessBlocked(state);
             if (state == AccountAccessState.LoggedIn)
             {
@@ -365,7 +349,7 @@ public sealed partial class TravianClient : ISessionClient
                     throw new InvalidOperationException($"Auto-relogin failed: {ex.Message}", ex);
                 }
                 _lastEnsureLoggedInAt = DateTimeOffset.UtcNow;
-                _lastEnsureLoggedInSucceeded = await IsLoggedInAsync();
+                _lastEnsureLoggedInSucceeded = await IsLoggedInAsync(cancellationToken);
                 if (!_lastEnsureLoggedInSucceeded)
                 {
                     throw new InvalidOperationException("Auto-relogin completed but session is still not logged in.");
@@ -384,6 +368,12 @@ public sealed partial class TravianClient : ISessionClient
                     $"Travian page is unavailable while checking login state. Url='{_page.Url}'.");
             }
 
+            if (state == AccountAccessState.Unknown)
+            {
+                throw new TransientNavigationException(
+                    $"The current Travian page did not expose a known logged-in or logged-out layout before the timeout. No verification navigation was attempted. Url='{_page.Url}'.");
+            }
+
             throw new InvalidOperationException($"Not logged in. Current page state is '{FormatAccessState(state)}'.");
         }
         if (_suppressEnsureUiSyncDepth <= 0)
@@ -392,55 +382,48 @@ public sealed partial class TravianClient : ISessionClient
         }
     }
 
-    private async Task<bool> IsLoggedInAsync()
+    private async Task<bool> IsLoggedInAsync(CancellationToken cancellationToken = default)
     {
-        return (await LoginStateAsync()) == AccountAccessState.LoggedIn;
+        return (await LoginStateAsync(cancellationToken)) == AccountAccessState.LoggedIn;
     }
 
-    private async Task<AccountAccessState> LoginStateAsync()
+    private async Task<AccountAccessState> LoginStateAsync(CancellationToken cancellationToken = default)
     {
-        try
+        var loginProbeTimeoutMs = Math.Clamp(_config.TimeoutMs, 5_000, 20_000);
+        var loginProbeDeadline = DateTimeOffset.UtcNow.AddMilliseconds(loginProbeTimeoutMs);
+        do
         {
-            // Cheap logged-out check FIRST: on a logout redirect the page is on login.php and is
-            // actively navigating. Running the continue-prompt scan (which reads element text) against
-            // a navigating page can hang on the default action timeout, so confirm sign-out by URL
-            // before touching any element.
-            var currentUrl = _page.Url.ToLowerInvariant();
-            if (currentUrl.StartsWith("chrome-error://", StringComparison.Ordinal)
-                || currentUrl.StartsWith("about:neterror", StringComparison.Ordinal))
+            cancellationToken.ThrowIfCancellationRequested();
+            try
             {
-                Notify($"[ensure-logged-in] browser network error page detected url='{_page.Url}'.");
-                return AccountAccessState.Unavailable;
-            }
+                // Probe only the page the user is already viewing. A slow/manual navigation may replace
+                // its execution context several times, so keep retrying until the authenticated shell or
+                // an explicit logged-out/error state becomes visible.
+                var currentUrl = _page.Url.ToLowerInvariant();
+                if (currentUrl.StartsWith("chrome-error://", StringComparison.Ordinal)
+                    || currentUrl.StartsWith("about:neterror", StringComparison.Ordinal))
+                {
+                    Notify($"[ensure-logged-in] browser network error page detected url='{_page.Url}'.");
+                    return AccountAccessState.Unavailable;
+                }
 
-            if (await _page.Locator("body.neterror, #main-frame-error, .error-code").CountAsync() > 0)
-            {
-                Notify($"[ensure-logged-in] browser network error DOM detected url='{_page.Url}'.");
-                return AccountAccessState.Unavailable;
-            }
+                if (await _page.Locator("body.neterror, #main-frame-error, .error-code").CountAsync() > 0)
+                {
+                    Notify($"[ensure-logged-in] browser network error DOM detected url='{_page.Url}'.");
+                    return AccountAccessState.Unavailable;
+                }
 
-            var explicitState = await ProbeExplicitAccountAccessStateAsync(currentUrl);
-            if (explicitState is not null)
-            {
-                return explicitState.Value;
-            }
+                var explicitState = await ProbeExplicitAccountAccessStateAsync(currentUrl);
+                if (explicitState is not null)
+                {
+                    return explicitState.Value;
+                }
 
-            if (currentUrl.Contains("login.php", StringComparison.Ordinal))
-            {
-                return AccountAccessState.LoggedOut;
-            }
+                if (currentUrl.Contains("login.php", StringComparison.Ordinal))
+                {
+                    return AccountAccessState.LoggedOut;
+                }
 
-            await TryDismissContinuePromptAsync();
-
-            // The page can still be settling right after a navigation/reload (especially the
-            // official React in-game pages). Probing the indicators too early yielded a false
-            // 'unknown' → "Not logged in. Current page state is 'unknown'." task failures even
-            // though we were on an authenticated page (e.g. dorf1.php). Retry the probe a few
-            // times with a short wait before giving up. The happy path (indicator already present)
-            // returns immediately on the first attempt with no delay.
-            const int probeAttempts = 4;
-            for (var attempt = 0; attempt < probeAttempts; attempt++)
-            {
                 foreach (var selector in Selectors.LoggedInIndicators)
                 {
                     if (await _page.Locator(selector).CountAsync() > 0)
@@ -456,22 +439,28 @@ public sealed partial class TravianClient : ISessionClient
                         return AccountAccessState.LoggedOut;
                     }
                 }
-
-                if (attempt < probeAttempts - 1)
-                {
-                    // Give the DOM a moment to render the topbar/village list, then re-probe.
-                    await Task.Delay(Random.Shared.Next(300, 600)); // Random wait
-                }
+            }
+            catch (PlaywrightException ex) when (IsTransientExecutionContextError(ex))
+            {
+                // The user or page navigated while it was being inspected. Stay on that navigation
+                // and retry the new document; never replace it with a recovery URL.
+            }
+            catch (TimeoutException)
+            {
+                // Treat a slow DOM read the same as a still-rendering page and retry in place.
             }
 
-            Notify("Login state is unknown");
-            return AccountAccessState.Unknown;
+            if (DateTimeOffset.UtcNow >= loginProbeDeadline)
+            {
+                break;
+            }
+
+            await Task.Delay(Random.Shared.Next(250, 450), cancellationToken);
         }
-        catch (PlaywrightException ex) when (IsTransientExecutionContextError(ex))
-        {
-            Notify("Page navigated while checking login state. State is unknown.");
-            return AccountAccessState.Unknown;
-        }
+        while (DateTimeOffset.UtcNow < loginProbeDeadline);
+
+        Notify($"Login state is unknown after waiting {loginProbeTimeoutMs} ms on the current page; no navigation was attempted. url='{_page.Url}'.");
+        return AccountAccessState.Unknown;
     }
 
     private async Task<AccountAccessState?> ProbeExplicitAccountAccessStateAsync(string currentUrl)
@@ -544,41 +533,6 @@ public sealed partial class TravianClient : ISessionClient
             && age < EnsureLoggedInMinInterval
             && IsConfiguredGameOrigin(currentUrl, serverUrl)
             && !(currentUrl?.Contains("login", StringComparison.OrdinalIgnoreCase) ?? false);
-    }
-
-    private async Task<AccountAccessState> VerifyUnknownAccessStateAsync(CancellationToken cancellationToken)
-    {
-        AccountAccessState state;
-        try
-        {
-            await GotoAsync(Paths.Resources, cancellationToken);
-            state = await LoginStateAsync();
-        }
-        catch (TransientNavigationException)
-        {
-            _session.ConsecutiveUnknownAccessStates = 0;
-            return AccountAccessState.Unavailable;
-        }
-
-        var circuitState = AccountAccessClassifier.RegisterVerifiedState(
-            _session.ConsecutiveUnknownAccessStates,
-            state);
-        _session.ConsecutiveUnknownAccessStates = circuitState.ConsecutiveUnknown;
-        if (state != AccountAccessState.Unknown)
-        {
-            return state;
-        }
-
-        Notify($"[account-access] canonical page remained unknown ({_session.ConsecutiveUnknownAccessStates}/3).");
-        if (circuitState.Stop)
-        {
-            throw new AccountAccessException(
-                _account.Name,
-                AccountAccessState.Unknown,
-                "The canonical village page remained in an unknown access state after three verified checks.");
-        }
-
-        return state;
     }
 
     private void ThrowIfAccountAccessBlocked(AccountAccessState state)
@@ -949,13 +903,13 @@ public sealed partial class TravianClient : ISessionClient
             {
                 await TryDismissContinuePromptAsync(cancellationToken);
 
-                if (await IsLoggedInAsync())
+                if (await IsLoggedInAsync(cancellationToken))
                 {
                     Notify($"[login:verbose] login confirmed after {pollCount} poll(s)");
                     return true;
                 }
 
-                ThrowIfAccountAccessBlocked(await LoginStateAsync());
+                ThrowIfAccountAccessBlocked(await LoginStateAsync(cancellationToken));
 
                 // Fail fast on an explicit credential/account error instead of waiting the full
                 // login timeout (which can be minutes).

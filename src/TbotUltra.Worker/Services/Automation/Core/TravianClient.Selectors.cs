@@ -179,15 +179,22 @@ public sealed partial class TravianClient
 
         public static readonly string[] LoggedInIndicators =
         {
+            // Stable Official in-game shell markers. These are rendered on authenticated pages beyond
+            // Dorf1/Dorf2 as well, so login detection can stay on the user's current page.
+            "#heroImageButton[href^='/hero']",
+            "img.heroImage[alt='Hero']",
+            "#sidebarBoxActiveVillage",
+            "#villageName[data-x][data-y]",
+            "#sidebarBoxVillageList",
             "a[href*='logout']",
             "img[alt*='Logout' i]",
             "a[href*='dorf1.php']",
             "a[href*='dorf2.php']",
-            "#sidebarBoxVillagelist",
             ".villageList",
             "#villageList",
             "#resourceFieldContainer",
             "#village_map",
+            ContinueAfterUpdateLink,
         };
 
         public static readonly string[] LoggedOutIndicators =

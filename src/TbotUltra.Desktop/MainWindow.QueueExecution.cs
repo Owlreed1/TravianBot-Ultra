@@ -409,14 +409,28 @@ public partial class MainWindow
         if (string.Equals(item.TaskName, "hero_manage", StringComparison.OrdinalIgnoreCase)
             || string.Equals(item.TaskName, "spend_hero_attribute_points", StringComparison.OrdinalIgnoreCase))
         {
-            // A continuous-loop tick may have loaded its options before the user reordered Hero attributes.
-            // Reload the execution-authoritative attribute rules at the last synchronous boundary before running.
+            // A continuous-loop tick may have loaded its options before the user changed Hero settings.
+            // Reload the execution-authoritative controls at the last synchronous boundary before running.
             var currentHeroOptions = LoadBotOptions();
             options = options with
             {
                 HeroStatPriority = currentHeroOptions.HeroStatPriority,
                 HeroStatMaximums = currentHeroOptions.HeroStatMaximums,
             };
+
+            if (string.Equals(item.TaskName, "hero_manage", StringComparison.OrdinalIgnoreCase))
+            {
+                options = options with
+                {
+                    HeroMinHpForAdventure = currentHeroOptions.HeroMinHpForAdventure,
+                    HeroAutoRevive = currentHeroOptions.HeroAutoRevive,
+                    HeroAutoAssignPoints = currentHeroOptions.HeroAutoAssignPoints,
+                    HeroAutoUseOintments = currentHeroOptions.HeroAutoUseOintments,
+                    HeroOintmentTargetHpPercent = currentHeroOptions.HeroOintmentTargetHpPercent,
+                    HeroAdventurePickOrder = currentHeroOptions.HeroAdventurePickOrder,
+                    HeroContinuousAdventures = currentHeroOptions.HeroContinuousAdventures,
+                };
+            }
         }
 
         MarkDueConstructionForPreSleepFill(item);

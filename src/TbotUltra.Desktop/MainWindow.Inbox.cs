@@ -108,7 +108,7 @@ public partial class MainWindow
                 return;
             }
 
-            if (!force && (_uiBusy || _autoQueueRunning || IsContinuousLoopRunning()))
+            if (!force && _uiBusy)
             {
                 return;
             }
@@ -167,12 +167,14 @@ public partial class MainWindow
 
     private async Task HandleInboxRefreshTickAsync()
     {
-        if (IsFreezeActive)
+        if (IsFreezeActive || (!IsContinuousLoopRunning() && !_autoQueueRunning))
         {
             return;
         }
 
-        await RefreshInboxIndicatorsAsync(logErrors: false);
+        await RefreshInboxIndicatorsAsync(
+            logErrors: false,
+            cancellationToken: _loopController.AcquireSessionScopeToken());
     }
 
     // Lightweight read-only check used by the ~20s background tick: only reads the

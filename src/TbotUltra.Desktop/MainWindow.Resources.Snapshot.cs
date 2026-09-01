@@ -615,6 +615,13 @@ public partial class MainWindow
 
     private bool ShouldRunBackgroundResourceSnapshotRefresh()
     {
+        // Start bot is the authority for recurring browser work. While paused, the user owns the
+        // current tab and a timer must not inspect/login-recover/navigate it.
+        if (!IsContinuousLoopRunning() && !_autoQueueRunning)
+        {
+            return false;
+        }
+
         // Session sleep is an offline state: the background tick must never read/navigate the browser
         // while sleeping, or it will auto-relogin and defeat the sleep (see ENGINEERING_NOTES §5).
         if (IsSessionSleeping)

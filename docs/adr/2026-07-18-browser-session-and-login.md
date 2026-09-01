@@ -47,11 +47,10 @@ Active decision, extracted from `ENGINEERING_NOTES.md` on 2026-07-18.
 ## Account access and holds
 
 - Classify access as `LoggedIn`, `LoggedOut`, `Unavailable`, `Restricted`, `Challenge`, or `Unknown`.
-- Verify `Unknown` once on canonical `/dorf1.php`; network failures are `Unavailable` and do not count toward
-  restriction.
-- `Restricted`, `Challenge`, or three consecutive verified `Unknown` results create a persistent,
-  account-specific automation hold. Stop only that account, preserve queue/settings, and require manual
-  re-enable after review.
+- Wait with cancellation for stable authenticated shell markers on the current page. Login-state detection never
+  navigates to canonical `/dorf1.php`; `Unknown` after the bounded wait is a transient read failure.
+- Network failures are `Unavailable`. Explicit `Restricted` or `Challenge` results create a persistent,
+  account-specific automation hold; stop only that account, preserve queue/settings, and require manual re-enable.
 
 ## Consequences
 

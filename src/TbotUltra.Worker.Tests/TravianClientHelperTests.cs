@@ -8,6 +8,16 @@ namespace TbotUltra.Worker.Tests;
 
 public sealed class TravianClientHelperTests
 {
+    [Theory]
+    [InlineData("1677", 1677)]
+    [InlineData("1,677", 1677)]
+    [InlineData("0", null)]
+    [InlineData("", null)]
+    public void ParsePositiveTrainingAmount_RequiresAPositiveValue(string raw, int? expected)
+    {
+        Assert.Equal(expected, TroopTrainingCalculator.ParsePositiveTrainingAmount(raw));
+    }
+
     [Fact]
     public void SelectRandomMinimumTroops_UsesInclusiveConfiguredRange()
     {

@@ -34,6 +34,15 @@ public sealed class QueueExecutor
         try
         {
             var options = QueueExecutionOptionsResolver.Resolve(baseOptions, item);
+            if (QueueExecutionOptionsResolver.IsHeroManageTask(item.TaskName)
+                && item.Payload.TryGetValue(BotOptionPayloadKeys.HeroAutoUseOintments, out var queuedAutoUseOintments)
+                && bool.TryParse(queuedAutoUseOintments, out var queuedAutoUse)
+                && queuedAutoUse != options.HeroAutoUseOintments)
+            {
+                log(
+                    "[queue] refreshed Hero ointment setting from current settings before execution: "
+                    + $"queued={queuedAutoUse} current={options.HeroAutoUseOintments}");
+            }
             if (QueueExecutionOptionsResolver.IsHeroAttributeTask(item.TaskName)
                 && item.Payload.TryGetValue(BotOptionPayloadKeys.HeroStatPriority, out var queuedPriority)
                 && !string.Equals(queuedPriority, options.HeroStatPriority, StringComparison.OrdinalIgnoreCase))

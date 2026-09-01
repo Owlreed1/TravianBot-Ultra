@@ -130,7 +130,7 @@ public partial class MainWindow
 
     private void ActivateDueHeroCropAntiStarveObservations(BotOptions? options = null)
     {
-        if (!_isLoggedIn)
+        if (!_isLoggedIn || (!IsContinuousLoopRunning() && !_autoQueueRunning))
         {
             return;
         }

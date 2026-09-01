@@ -15,6 +15,14 @@ namespace TbotUltra.Worker.Services;
 /// </summary>
 internal static class TroopTrainingCalculator
 {
+    internal static int? ParsePositiveTrainingAmount(string? raw)
+    {
+        var digits = new string((raw ?? string.Empty).Where(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var value) && value > 0
+            ? value
+            : null;
+    }
+
     internal static int SelectRandomMinimumTroops(int configuredMin, int configuredMax, Random? random = null)
     {
         var min = Math.Clamp(configuredMin, 1, 10000);

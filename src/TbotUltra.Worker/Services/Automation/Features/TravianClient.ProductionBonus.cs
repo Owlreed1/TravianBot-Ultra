@@ -328,7 +328,7 @@ public sealed partial class TravianClient
         var pageReady = await LoadIsolatedBonusVideoPageAsync(
             Paths.Resources,
             $"{resource} production bonus",
-            _ => IsLoggedInAsync(),
+            pageLoadCancellationToken => IsLoggedInAsync(pageLoadCancellationToken),
             cancellationToken);
         if (!pageReady)
         {

@@ -57,6 +57,9 @@ Aktivt beslut, 2026-06-20. Detaljerna bakom de korta reglerna i
   `table.under_progress td.dur .timer` (`value`/`data-value` eller text), ankra som absolut `TimerSnapshot`
   pa servertid (`_serverTimeUtc`). `TroopTrainingQueueState.PreserveKnownActiveQueue` behaller en levande ko
   vid tom/partiell lasning; UI tickar ned via `Tick(serverNow)` och posten forsvinner forst nar sluttiden passeras.
+- Pa snabba servrar kan en kort traningsko auto-reloada byggnadssidan medan mangd och Train forbereds. Las om
+  formularet efter klick-delay och gor hogst tre nya forberedelseforsok fore Train. Ett positivt maxvarde ar giltigt
+  aven om resursticken andrade lankens annonserade max; retry far aldrig ske efter ett mojligt Train-klick.
 
 ## Per-by-traning och UI-synk
 
