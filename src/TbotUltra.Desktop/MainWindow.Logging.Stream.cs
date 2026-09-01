@@ -12,18 +12,23 @@ using System.Windows.Threading;
 using TbotUltra.Desktop.Models;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Desktop.Services.Logging;
+using TbotUltra.Worker.Infrastructure;
 
 namespace TbotUltra.Desktop;
 
 public partial class MainWindow
 {
+    private sealed record PendingLogMessage(string Message, AutomationLogMetadata? Context);
+
     private void AppendLog(string message)
     {
         try
         {
             lock (_pendingLogSync)
             {
-                _pendingLogMessages.AddLast(message ?? string.Empty);
+                _pendingLogMessages.AddLast(new PendingLogMessage(
+                    message ?? string.Empty,
+                    CaptureDesktopLogContext()));
                 if (_logFlushQueued)
                 {
                     return;
@@ -38,6 +43,30 @@ public partial class MainWindow
         {
             Debug.WriteLine($"AppendLog dispatch failed: {ex}");
         }
+    }
+
+    private AutomationLogMetadata CaptureDesktopLogContext()
+    {
+        var context = AutomationLogContext.Capture();
+        if (!string.IsNullOrWhiteSpace(context?.Account))
+        {
+            return context;
+        }
+
+        string? account = null;
+        try
+        {
+            account = _accountStore?.ActiveAccountName();
+        }
+        catch (Exception)
+        {
+            // Startup/shutdown logs can arrive before or after account storage is available.
+        }
+
+        return (context ?? new AutomationLogMetadata(null, null, null, null, null)) with
+        {
+            Account = string.IsNullOrWhiteSpace(account) ? null : account,
+        };
     }
 
     private string? _lastSessionLogUiSyncPayload;
@@ -86,7 +115,7 @@ public partial class MainWindow
             var popupTerminalAnchor = logsVisible ? CaptureLogListAnchor(_logsPopupLogList) : null;
             var alarmAnchor = logsVisible ? CaptureLogListAnchor(AlarmListBox) : null;
             var popupAlarmAnchor = logsVisible ? CaptureLogListAnchor(_logsPopupAlarmList) : null;
-            var messages = new List<string>(MaxLogLinesPerFlush);
+            var messages = new List<PendingLogMessage>(MaxLogLinesPerFlush);
             var logLinesForSessionLog = new List<string>(MaxLogLinesPerFlush * 2);
             var alarmLinesForSessionLog = new List<string>(MaxLogLinesPerFlush);
             var hasMore = false;
@@ -131,7 +160,8 @@ public partial class MainWindow
                     break;
                 }
 
-                var message = messages[messageIndex];
+                var pending = messages[messageIndex];
+                var message = pending.Message;
                 lastRawMessage = message;
                 var normalized = message.Replace("\r\n", "\n").Replace('\r', '\n');
                 var parts = normalized
@@ -150,7 +180,8 @@ public partial class MainWindow
                 foreach (var part in parts)
                 {
                     browserStatisticsChanged |= TryRecordBrowserActivityStatistics(part);
-                    var line = $"[{GetServerNow():yyyy-MM-dd HH:mm:ss}] {part}";
+                    var humanPart = AutomationLogContext.FormatForHuman(part, pending.Context);
+                    var line = $"[{GetServerNow():yyyy-MM-dd HH:mm:ss}] {humanPart}";
                     var isAlarm = IsAlarmMessage(part);
                     _terminalEntries.Insert(0, new TerminalEntryRow
                     {
@@ -197,7 +228,7 @@ public partial class MainWindow
                     {
                         var isAcknowledgedAlarm = IsAutoAcknowledgedAlarmMessage(part);
                         var accountKey = _accountStore.ActiveAccountName();
-                        var signature = $"{accountKey}|{part}";
+                        var signature = $"{accountKey}|{humanPart}";
                         alarmEntriesChanged = true;
                         var isNewAlarm = _alarmsViewModel.RecordAlarm(
                             line,
@@ -561,6 +592,13 @@ public partial class MainWindow
 
         if ((value.Contains("[construct-faster]") && value.Contains("video unavailable"))
             || (value.Contains("[production-bonus]") && value.Contains("inspection unavailable")))
+        {
+            return false;
+        }
+
+        // This is a successful authoritative membership read. The generic "verification" alarm
+        // keyword below must remain available for incomplete or failed membership checks.
+        if (value.Contains("[village-membership] profile verification complete:"))
         {
             return false;
         }

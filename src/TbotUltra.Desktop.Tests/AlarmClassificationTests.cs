@@ -55,4 +55,18 @@ public sealed class AlarmClassificationTests
         Assert.True(MainWindow.IsAlarmMessage(
             "Upgrade analysis failed for slot 10: exhausted retries."));
     }
+
+    [Fact]
+    public void CompletedVillageMembershipVerification_IsNotAlarm()
+    {
+        Assert.False(MainWindow.IsAlarmMessage(
+            "[village-membership] profile verification complete: villages=8 removedConfirmed=true."));
+    }
+
+    [Fact]
+    public void EmptyVillageMembershipVerification_RemainsAlarm()
+    {
+        Assert.True(MainWindow.IsAlarmMessage(
+            "[village-membership] profile verification returned no villages; preserving the cached list."));
+    }
 }

@@ -221,6 +221,7 @@ public sealed partial class BotTaskRunner
                     var taskIndex = 0;
                     foreach (var taskName in tasks)
                     {
+                        using var taskLogContext = AutomationLogContext.BeginScope(task: taskName);
                         cancellationToken.ThrowIfCancellationRequested();
                         if (_priorityBrowserWork.HasPendingRequest)
                         {
@@ -427,6 +428,10 @@ public sealed partial class BotTaskRunner
         BrowserStateSaveMode saveStateMode = BrowserStateSaveMode.Always)
     {
         var account = _accountProvider.LoadAccount(accountName);
+        using var logContext = AutomationLogContext.BeginScope(
+            account: account.Name,
+            village: options.TargetVillageName,
+            villageKey: options.TargetVillageKey);
         await _sessionGate.WaitAsync(cancellationToken);
         try
         {

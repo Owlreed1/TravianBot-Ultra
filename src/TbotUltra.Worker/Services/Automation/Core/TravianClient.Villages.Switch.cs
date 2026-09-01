@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Runtime.CompilerServices;
+using TbotUltra.Worker.Infrastructure;
 
 namespace TbotUltra.Worker.Services;
 
@@ -296,6 +297,7 @@ public sealed partial class TravianClient
 
     private void NotifyVerifiedActiveVillage(string? villageName, (int? X, int? Y) coordinates)
     {
+        AutomationLogContext.UpdateVillage(villageName, coordinates.X, coordinates.Y);
         _activeVillageVerified?.Invoke(new VerifiedActiveVillage(
             villageName,
             coordinates.X,

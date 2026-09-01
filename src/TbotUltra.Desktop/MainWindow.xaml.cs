@@ -344,7 +344,7 @@ public partial class MainWindow : Window
     private VillageStatus? _lastBuildingStatus;
     private VillageStatus? _lastResourceStatusForUi;
     private readonly object _pendingLogSync = new();
-    private readonly LinkedList<string> _pendingLogMessages = new();
+    private readonly LinkedList<PendingLogMessage> _pendingLogMessages = new();
     private readonly object _sessionLogWriteSync = new();
     private bool _logFlushQueued;
     private bool _restartContinuousLoopAfterStop;

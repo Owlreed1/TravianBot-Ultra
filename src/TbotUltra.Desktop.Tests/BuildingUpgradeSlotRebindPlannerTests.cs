@@ -177,6 +177,40 @@ public sealed class BuildingUpgradeSlotRebindPlannerTests
     }
 
     [Fact]
+    public void PlanFromLiveStatus_RebindsDuplicateBuildingWhenExactlyOneInstanceStillNeedsTarget()
+    {
+        var upgrade = Item(
+            "upgrade_building_to_level",
+            new BuildingUpgradePayload(35, 20, "Granary").ToDictionary());
+        var status = Status(
+            new Building(24, "Granary", 20, "/build.php?id=24", 11),
+            new Building(35, "Trade Office", 10, "/build.php?id=35", 28),
+            new Building(36, "Granary", 6, "/build.php?id=36", 11));
+
+        var reconciliation = Assert.Single(
+            BuildingUpgradeSlotRebindPlanner.PlanFromLiveStatus(status, [upgrade]));
+
+        Assert.False(reconciliation.TargetSatisfied);
+        Assert.Equal(35, reconciliation.QueuedSlotId);
+        Assert.Equal(36, reconciliation.LiveSlotId);
+        Assert.Equal("36", reconciliation.Payload[BotOptionPayloadKeys.BuildingUpgradeSlotId]);
+    }
+
+    [Fact]
+    public void PlanFromLiveStatus_DoesNotGuessBetweenMultipleDuplicateBuildingsBelowTarget()
+    {
+        var upgrade = Item(
+            "upgrade_building_to_level",
+            new BuildingUpgradePayload(35, 20, "Granary").ToDictionary());
+        var status = Status(
+            new Building(35, "Trade Office", 10, "/build.php?id=35", 28),
+            new Building(36, "Granary", 6, "/build.php?id=36", 11),
+            new Building(37, "Granary", 8, "/build.php?id=37", 11));
+
+        Assert.Empty(BuildingUpgradeSlotRebindPlanner.PlanFromLiveStatus(status, [upgrade]));
+    }
+
+    [Fact]
     public void PlanFromLiveStatus_RebindsWrongSlotAcademyUpgradeWhenTargetNotMet()
     {
         var upgrade = Item(
@@ -335,6 +369,7 @@ public sealed class BuildingUpgradeSlotRebindPlannerTests
             BuildingUpgradeSlotRebindPlanner.PlanConstructSlotConflict(status, construct, [construct]));
 
         Assert.Null(conflict.ReboundSlotId);
+        Assert.Empty(conflict.ConfirmedEmptySlotIds);
         Assert.Empty(conflict.Updates);
     }
 

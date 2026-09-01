@@ -1,5 +1,6 @@
 using TbotUltra.Core.Configuration;
 using TbotUltra.Worker.Domain;
+using TbotUltra.Worker.Infrastructure;
 
 namespace TbotUltra.Worker.Services;
 
@@ -18,6 +19,13 @@ public sealed class QueueExecutor
         Action<string> log,
         CancellationToken cancellationToken = default)
     {
+        item.Payload.TryGetValue(BotOptionPayloadKeys.TargetVillageName, out var villageName);
+        item.Payload.TryGetValue(BotOptionPayloadKeys.TargetVillageKey, out var villageKey);
+        using var logContext = AutomationLogContext.BeginScope(
+            task: item.TaskName,
+            village: villageName,
+            villageKey: villageKey);
+
         if (!TaskCatalog.IsAllowed(item.TaskName))
         {
             log($"[queue] REJECTED item id={item.Id} task='{item.TaskName}' — task is not in the allow-list");
@@ -26,8 +34,7 @@ public sealed class QueueExecutor
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
         // Village tag so queue log lines can be attributed to a village; empty for global tasks.
-        var village = item.Payload.TryGetValue(BotOptionPayloadKeys.TargetVillageName, out var villageName)
-            && !string.IsNullOrWhiteSpace(villageName)
+        var village = !string.IsNullOrWhiteSpace(villageName)
             ? $" village='{villageName.Trim()}'"
             : string.Empty;
         log($"[queue] EXEC id={item.Id} group={item.Group} task='{item.TaskName}'{village} priority={item.Priority} retries={item.Retries}/{item.MaxRetries}");

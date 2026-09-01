@@ -30,6 +30,7 @@ internal sealed record BuildingConstructSlotConflictReconciliation(
     int QueuedSlotId,
     string OccupyingBuildingName,
     int? ReboundSlotId,
+    IReadOnlyList<int> ConfirmedEmptySlotIds,
     IReadOnlyList<QueuePayloadUpdate> Updates);
 
 internal static class BuildingUpgradeSlotRebindPlanner
@@ -44,7 +45,11 @@ internal static class BuildingUpgradeSlotRebindPlanner
                      && (string.Equals(item.TaskName, "upgrade_building_to_level", StringComparison.OrdinalIgnoreCase)
                          || string.Equals(item.TaskName, "upgrade_building_to_max", StringComparison.OrdinalIgnoreCase))))
         {
-            if (PlanUpgradeFromLiveStatus(status, candidate) is { } reconciliation)
+            var hasActiveConstructForQueuedSlot = HasActiveConstructForUpgrade(candidate, sameVillageItems);
+            if (PlanUpgradeFromLiveStatus(
+                    status,
+                    candidate,
+                    allowMultiInstanceFallback: !hasActiveConstructForQueuedSlot) is { } reconciliation)
             {
                 if (reconciliation.TargetSatisfied
                     || reconciliation.LiveSlotId != reconciliation.QueuedSlotId)
@@ -59,7 +64,8 @@ internal static class BuildingUpgradeSlotRebindPlanner
 
     public static BuildingUpgradeLiveReconciliation? PlanUpgradeFromLiveStatus(
         VillageStatus status,
-        QueueItem candidate)
+        QueueItem candidate,
+        bool allowMultiInstanceFallback = true)
     {
         if (!BuildingUpgradePayload.TryFromDictionary(candidate.Payload, out var upgrade)
             || upgrade is null
@@ -68,25 +74,38 @@ internal static class BuildingUpgradeSlotRebindPlanner
             return null;
         }
 
+        var targetLevel = upgrade.TargetLevel;
+        if (string.Equals(candidate.TaskName, "upgrade_building_to_max", StringComparison.OrdinalIgnoreCase))
+        {
+            targetLevel = BuildingCatalogService.MaxLevelFor(gid);
+        }
+
         var liveMatches = FindLiveMatches(status, gid);
         var liveMatch = liveMatches.FirstOrDefault(building => building.SlotId == upgrade.SlotId);
-        if (liveMatch is null
-            && BuildingCatalogService.IsSingleInstance(gid)
-            && liveMatches.Count == 1)
+        if (liveMatch is null && BuildingCatalogService.IsSingleInstance(gid) && liveMatches.Count == 1)
         {
             liveMatch = liveMatches[0];
+        }
+        else if (liveMatch is null
+                 && allowMultiInstanceFallback
+                 && targetLevel is int candidateTarget)
+        {
+            // Multi-instance buildings cannot normally move between slots. A stale queued slot can still
+            // be repaired safely when exactly one live instance remains below this task's target; instances
+            // already at/above target are not candidates. Never guess between multiple unfinished copies.
+            var unfinishedMatches = liveMatches
+                .Where(building => building.Level is int level && level < candidateTarget)
+                .ToList();
+            if (unfinishedMatches.Count == 1)
+            {
+                liveMatch = unfinishedMatches[0];
+            }
         }
 
         if (liveMatch?.SlotId is not int liveSlotId
             || liveMatch.Level is not int liveLevel)
         {
             return null;
-        }
-
-        var targetLevel = upgrade.TargetLevel;
-        if (string.Equals(candidate.TaskName, "upgrade_building_to_max", StringComparison.OrdinalIgnoreCase))
-        {
-            targetLevel = BuildingCatalogService.MaxLevelFor(gid);
         }
 
         var targetSatisfied = targetLevel is int target && liveLevel >= target;
@@ -103,6 +122,27 @@ internal static class BuildingUpgradeSlotRebindPlanner
             targetLevel,
             targetSatisfied,
             payload);
+    }
+
+    private static bool HasActiveConstructForUpgrade(
+        QueueItem upgradeItem,
+        IReadOnlyList<QueueItem> sameVillageItems)
+    {
+        if (!BuildingUpgradePayload.TryFromDictionary(upgradeItem.Payload, out var upgrade)
+            || upgrade is null
+            || BuildingCatalogService.GidForName(upgrade.Name) is not int upgradeGid)
+        {
+            return false;
+        }
+
+        return sameVillageItems.Any(item =>
+            item.Id != upgradeItem.Id
+            && item.Status is QueueStatus.Pending or QueueStatus.Running or QueueStatus.Paused
+            && string.Equals(item.TaskName, "construct_building", StringComparison.OrdinalIgnoreCase)
+            && BuildingConstructPayload.TryFromDictionary(item.Payload, out var construct)
+            && construct is not null
+            && construct.SlotId == upgrade.SlotId
+            && construct.Gid == upgradeGid);
     }
 
     public static BuildingConstructLiveMatch? FindExistingConstruct(
@@ -207,11 +247,13 @@ internal static class BuildingUpgradeSlotRebindPlanner
             reservedSlots.UnionWith(ParseOrdinarySlotIds(excludedSlotsRaw));
         }
 
-        var reboundSlotId = status.Buildings
+        var confirmedEmptySlotIds = status.Buildings
             .Where(IsConfirmedEmptyOrdinarySlot)
             .Select(building => building.SlotId!.Value)
-            .Where(slot => !reservedSlots.Contains(slot))
             .OrderBy(slot => slot)
+            .ToList();
+        var reboundSlotId = confirmedEmptySlotIds
+            .Where(slot => !reservedSlots.Contains(slot))
             .Cast<int?>()
             .FirstOrDefault();
         if (reboundSlotId is null)
@@ -222,6 +264,7 @@ internal static class BuildingUpgradeSlotRebindPlanner
                 construct.SlotId,
                 targetSlot.Name,
                 null,
+                confirmedEmptySlotIds,
                 []);
         }
 
@@ -242,6 +285,7 @@ internal static class BuildingUpgradeSlotRebindPlanner
             construct.SlotId,
             targetSlot.Name,
             reboundSlotId,
+            confirmedEmptySlotIds,
             updates);
     }
 

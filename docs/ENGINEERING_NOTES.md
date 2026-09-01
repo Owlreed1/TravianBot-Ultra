@@ -774,14 +774,23 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - A complete live Dorf2 overview may reconcile a pending ordinary-slot construct whose requested slot was manually
   occupied by another building. Rebind the construct and its dependent upgrades atomically to the lowest confirmed
   empty slot 19-38, without stealing slots reserved by other queued constructs. Incomplete or unknown slot state never
-  authorizes a move; when no safe slot exists, keep and defer the item without clicking or consuming failure retries.
-  That unresolved safety stop is actionable: raise a deduplicated alarm containing village, task, queued/live slot
-  identity, and every unknown ordinary slot. Normal resource and construction-slot waits remain non-alarm status.
+  authorizes a move. If a complete overview confirms that all ordinary slots are occupied, fail the construct into
+  History with one actionable alarm so later queue work can continue; if empty/unknown slots still exist but none is
+  safely assignable, keep and defer the item without clicking or consuming failure retries. A stale upgrade for a
+  multi-instance building may rebind only when exactly one live instance remains below its target and no active
+  construct still owns the queued slot; never guess between multiple unfinished instances. Unresolved safety alarms
+  contain village, task, queued/live slot identity, and every unknown ordinary slot. Normal resource and
+  construction-slot waits remain non-alarm status.
   Official empty slots still contain a clickable `a.emptyBuildingSlot`; that link is explicit empty evidence, not
   occupancy. Treat `emptyBuildingSlot`, `g0`, and `data-gid=0` as empty before applying generic link evidence.
 - An automation run captures Worker's actual `BrowserGeneration`; never mirror or synthesize that generation in
   Desktop. Runtime-item reconciliation identifies village scope with `BotOptionPayloadKeys.TargetVillageKey` and
   must preserve an existing pending item's authoritative `NextAttemptAt` when refreshing payload or priority.
+- Human session-log and alarm lines carry captured account, task, village, and coordinate context. Establish the
+  context at queue/Worker execution seams and update it only from verified active-village identity; missing values
+  are rendered as `-`, never guessed from the selected UI village. Desktop keeps the original raw message separate
+  for status parsers and adds context only to the displayed/file/alarm line. Detailed browser traces retain their
+  existing structured context instead of receiving a duplicate suffix.
 
 ## Target architecture
 

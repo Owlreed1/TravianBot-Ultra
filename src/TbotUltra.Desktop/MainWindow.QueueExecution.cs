@@ -7,6 +7,7 @@ using TbotUltra.Core.Tasks;
 using TbotUltra.Desktop.Services;
 using TbotUltra.Desktop.Services.Orchestration;
 using TbotUltra.Worker.Domain;
+using TbotUltra.Worker.Infrastructure;
 using TbotUltra.Worker.Services;
 
 namespace TbotUltra.Desktop;
@@ -405,6 +406,11 @@ public partial class MainWindow
         QueueExecutionMode mode,
         CancellationToken cancellationToken)
     {
+        using var logContext = AutomationLogContext.BeginScope(
+            account: _accountStore.ActiveAccountName(),
+            task: item.TaskName,
+            village: GetQueueItemVillageName(item),
+            villageKey: GetQueueItemVillageKey(item));
         var tickSw = Stopwatch.StartNew();
         if (string.Equals(item.TaskName, "hero_manage", StringComparison.OrdinalIgnoreCase)
             || string.Equals(item.TaskName, "spend_hero_attribute_points", StringComparison.OrdinalIgnoreCase))
@@ -653,7 +659,6 @@ public partial class MainWindow
 
         if (conflict.ReboundSlotId is not int reboundSlotId)
         {
-            _botService.MarkQueueItemDeferred(item.Id, TimeSpan.FromMinutes(5));
             var unknownSlots = freshStatus.Buildings
                 .Where(building => building.SlotId is >= 19 and <= 38
                     && string.Equals(building.Name, "Unknown", StringComparison.OrdinalIgnoreCase))
@@ -667,6 +672,31 @@ public partial class MainWindow
             var unknownSlotText = unknownSlots.Count == 0
                 ? "none"
                 : string.Join(", ", unknownSlots);
+
+            if (unknownSlots.Count == 0 && conflict.ConfirmedEmptySlotIds.Count == 0)
+            {
+                if (!_botService.MarkQueueItemPermanentlyFailed(item.Id))
+                {
+                    AppendLog(
+                        $"{logPrefix} FAIL {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
+                        "complete live dorf2 confirmed that every ordinary building slot is occupied, " +
+                        "but the task could not be moved to History");
+                    return false;
+                }
+
+                ForgetBuildingQueueCachesForItem(item);
+                AppendLog(
+                    $"ALARM: construction task '{item.TaskName}' in village '{villageName}' failed: " +
+                    $"queued slot {conflict.QueuedSlotId} shows '{conflict.OccupyingBuildingName}' and complete live " +
+                    $"dorf2 confirms no free ordinary slot for {conflict.BuildingName}. No construction click was " +
+                    "attempted; the task was moved to History.");
+                AppendLog(
+                    $"{logPrefix} ABANDONED {timer.Elapsed.TotalSeconds:F1}s task={item.TaskName} | " +
+                    "all ordinary building slots are occupied; moved to History so later queue tasks can continue");
+                return true;
+            }
+
+            _botService.MarkQueueItemDeferred(item.Id, TimeSpan.FromMinutes(5));
             AppendLog(
                 $"ALARM: construction task '{item.TaskName}' in village '{villageName}' could not continue: " +
                 $"queued slot {conflict.QueuedSlotId} shows '{conflict.OccupyingBuildingName}', and no safe free " +

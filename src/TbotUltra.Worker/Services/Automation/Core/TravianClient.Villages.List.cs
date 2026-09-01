@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Runtime.CompilerServices;
+using TbotUltra.Worker.Infrastructure;
 
 namespace TbotUltra.Worker.Services;
 
@@ -952,6 +953,7 @@ public sealed partial class TravianClient
             }
             """);
 
+        AutomationLogContext.UpdateVillageCoordinates(coord?.X, coord?.Y);
         return (coord?.X, coord?.Y);
     }
 
@@ -1011,7 +1013,13 @@ public sealed partial class TravianClient
               return 'Unknown village';
             }
             """);
-        return string.IsNullOrWhiteSpace(value) ? "Unknown village" : value;
+        var activeVillage = string.IsNullOrWhiteSpace(value) ? "Unknown village" : value;
+        if (!string.Equals(activeVillage, "Unknown village", StringComparison.OrdinalIgnoreCase))
+        {
+            AutomationLogContext.UpdateVillageName(activeVillage);
+        }
+
+        return activeVillage;
     }
 
 }
