@@ -23,10 +23,15 @@ public partial class FarmingPanel : UserControl
     internal RadioButton SendAllAtOnceOption => FarmSendAllAtOnceRadioButton;
     internal TextBox DispatchDelayMin => FarmDispatchDelayMinTextBox;
     internal TextBox DispatchDelayMax => FarmDispatchDelayMaxTextBox;
-    internal CheckBox DeactivateLossesOption => DeactivateFarmLossesCheckBox;
+    internal CheckBox DeactivateRedLossesOption => DeactivateRedFarmLossesCheckBox;
+    internal CheckBox DeactivateYellowLossesOption => DeactivateYellowFarmLossesCheckBox;
     internal CheckBox DeactivateOasisLossesOption => DeactivateFarmOasisLossesCheckBox;
-    internal CheckBox MoveLossesOption => MoveFarmLossesCheckBox;
-    internal ComboBox LossDestinationOption => FarmLossDestinationComboBox;
+    internal CheckBox DeactivateRedOasisLossesOption => DeactivateRedFarmOasisLossesCheckBox;
+    internal CheckBox DeactivateYellowOasisLossesOption => DeactivateYellowFarmOasisLossesCheckBox;
+    internal CheckBox MoveRedLossesOption => MoveRedFarmLossesCheckBox;
+    internal CheckBox MoveYellowLossesOption => MoveYellowFarmLossesCheckBox;
+    internal ComboBox RedLossDestinationOption => RedFarmLossDestinationComboBox;
+    internal ComboBox YellowLossDestinationOption => YellowFarmLossDestinationComboBox;
     internal ContentControl TravcoWorkspaceHost => TravcoToolsHost;
 
     public string NextSendDisplay

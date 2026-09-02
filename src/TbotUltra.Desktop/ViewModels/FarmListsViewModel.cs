@@ -27,10 +27,15 @@ public sealed class FarmListsViewModel : BaseViewModel
     private bool _sendAllLists;
     private string _dispatchDelayMinMinutes = "15";
     private string _dispatchDelayMaxMinutes = "30";
-    private bool _deactivateLosses;
+    private bool _deactivateRedLosses;
+    private bool _deactivateYellowLosses;
     private bool _deactivateOasisLosses;
-    private bool _moveLosses;
-    private FarmLossDestinationOption? _selectedLossDestination;
+    private bool _deactivateRedOasisLosses;
+    private bool _deactivateYellowOasisLosses;
+    private bool _moveRedLosses;
+    private bool _moveYellowLosses;
+    private FarmLossDestinationOption? _selectedRedLossDestination;
+    private FarmLossDestinationOption? _selectedYellowLossDestination;
 
     public FarmListsViewModel()
     {
@@ -59,7 +64,8 @@ public sealed class FarmListsViewModel : BaseViewModel
     public event Action? SendAllNowRequested;
     public event Action<FarmListStatusRow>? SendNowRequested;
     public event Action? SettingsChanged;
-    public event Action? MoveLossesEnabledRequested;
+    public event Action? MoveRedLossesEnabledRequested;
+    public event Action? MoveYellowLossesEnabledRequested;
 
     /// <summary>Applies MainWindow's global session/busy gate to panel commands.</summary>
     public void UpdateCommandAvailability(bool canAnalyze, bool canManageLists, bool canCreate, bool canSendAll)
@@ -124,25 +130,44 @@ public sealed class FarmListsViewModel : BaseViewModel
         }
     }
 
-    public bool DeactivateLosses
+    public bool DeactivateRedLosses
     {
-        get => _deactivateLosses;
+        get => _deactivateRedLosses;
         set
         {
-            if (!SetProperty(ref _deactivateLosses, value))
+            if (!SetProperty(ref _deactivateRedLosses, value))
             {
                 return;
             }
 
-            if (!value && MoveLosses)
+            if (!value && MoveRedLosses)
             {
                 using (SuppressSettingsNotifications())
                 {
-                    MoveLosses = false;
+                    MoveRedLosses = false;
                 }
             }
 
-            OnPropertyChanged(nameof(CanMoveLosses));
+            OnPropertyChanged(nameof(CanMoveRedLosses));
+            OnSettingsChanged();
+        }
+    }
+
+    public bool DeactivateYellowLosses
+    {
+        get => _deactivateYellowLosses;
+        set
+        {
+            if (!SetProperty(ref _deactivateYellowLosses, value))
+                return;
+            if (!value && MoveYellowLosses)
+            {
+                using (SuppressSettingsNotifications())
+                {
+                    MoveYellowLosses = false;
+                }
+            }
+            OnPropertyChanged(nameof(CanMoveYellowLosses));
             OnSettingsChanged();
         }
     }
@@ -152,44 +177,96 @@ public sealed class FarmListsViewModel : BaseViewModel
         get => _deactivateOasisLosses;
         set
         {
-            if (SetProperty(ref _deactivateOasisLosses, value))
+            if (!SetProperty(ref _deactivateOasisLosses, value))
+                return;
+            if (value && !_deactivateRedOasisLosses && !_deactivateYellowOasisLosses)
             {
-                OnSettingsChanged();
+                SetProperty(ref _deactivateRedOasisLosses, true, nameof(DeactivateRedOasisLosses));
+                SetProperty(ref _deactivateYellowOasisLosses, true, nameof(DeactivateYellowOasisLosses));
             }
+            else if (!value)
+            {
+                SetProperty(ref _deactivateRedOasisLosses, false, nameof(DeactivateRedOasisLosses));
+                SetProperty(ref _deactivateYellowOasisLosses, false, nameof(DeactivateYellowOasisLosses));
+            }
+            OnSettingsChanged();
         }
     }
 
-    public bool MoveLosses
+    public bool DeactivateRedOasisLosses
     {
-        get => _moveLosses;
+        get => _deactivateRedOasisLosses;
         set
         {
-            if (!SetProperty(ref _moveLosses, value))
-            {
+            if (!SetProperty(ref _deactivateRedOasisLosses, value))
                 return;
-            }
-
+            SyncOasisMasterFromColors();
             OnSettingsChanged();
-            if (value && _settingsNotificationSuppressionCount == 0)
-            {
-                MoveLossesEnabledRequested?.Invoke();
-            }
         }
     }
 
-    public bool CanMoveLosses => DeactivateLosses;
+    public bool DeactivateYellowOasisLosses
+    {
+        get => _deactivateYellowOasisLosses;
+        set
+        {
+            if (!SetProperty(ref _deactivateYellowOasisLosses, value))
+                return;
+            SyncOasisMasterFromColors();
+            OnSettingsChanged();
+        }
+    }
+
+    public bool MoveRedLosses
+    {
+        get => _moveRedLosses;
+        set
+        {
+            if (!SetProperty(ref _moveRedLosses, value))
+                return;
+            OnSettingsChanged();
+            if (value && _settingsNotificationSuppressionCount == 0)
+                MoveRedLossesEnabledRequested?.Invoke();
+        }
+    }
+
+    public bool MoveYellowLosses
+    {
+        get => _moveYellowLosses;
+        set
+        {
+            if (!SetProperty(ref _moveYellowLosses, value))
+                return;
+            OnSettingsChanged();
+            if (value && _settingsNotificationSuppressionCount == 0)
+                MoveYellowLossesEnabledRequested?.Invoke();
+        }
+    }
+
+    public bool CanMoveRedLosses => DeactivateRedLosses;
+    public bool CanMoveYellowLosses => DeactivateYellowLosses;
 
     public ObservableCollection<FarmLossDestinationOption> LossDestinations { get; } = [];
 
-    public FarmLossDestinationOption? SelectedLossDestination
+    public FarmLossDestinationOption? SelectedRedLossDestination
     {
-        get => _selectedLossDestination;
+        get => _selectedRedLossDestination;
         set
         {
-            if (SetProperty(ref _selectedLossDestination, value))
+            if (SetProperty(ref _selectedRedLossDestination, value))
             {
                 OnSettingsChanged();
             }
+        }
+    }
+
+    public FarmLossDestinationOption? SelectedYellowLossDestination
+    {
+        get => _selectedYellowLossDestination;
+        set
+        {
+            if (SetProperty(ref _selectedYellowLossDestination, value))
+                OnSettingsChanged();
         }
     }
 
@@ -199,7 +276,8 @@ public sealed class FarmListsViewModel : BaseViewModel
     /// </summary>
     public void ReplaceLossDestinations(
         IEnumerable<FarmLossDestinationOption> destinations,
-        FarmLossDestinationOption? selectedDestination)
+        FarmLossDestinationOption? selectedRedDestination,
+        FarmLossDestinationOption? selectedYellowDestination)
     {
         using var suppress = SuppressSettingsNotifications();
         LossDestinations.Clear();
@@ -208,24 +286,39 @@ public sealed class FarmListsViewModel : BaseViewModel
             LossDestinations.Add(destination);
         }
 
-        SelectedLossDestination = selectedDestination;
+        SelectedRedLossDestination = selectedRedDestination;
+        SelectedYellowLossDestination = selectedYellowDestination;
     }
 
     public void LoadSettings(
         bool sendAllLists,
         int dispatchDelayMinMinutes,
         int dispatchDelayMaxMinutes,
-        bool deactivateLosses,
-        bool deactivateOasisLosses,
-        bool moveLosses)
+        bool deactivateRedLosses,
+        bool deactivateYellowLosses,
+        bool deactivateRedOasisLosses,
+        bool deactivateYellowOasisLosses,
+        bool moveRedLosses,
+        bool moveYellowLosses)
     {
         using var suppress = SuppressSettingsNotifications();
         SendAllLists = sendAllLists;
         DispatchDelayMinMinutes = dispatchDelayMinMinutes.ToString();
         DispatchDelayMaxMinutes = dispatchDelayMaxMinutes.ToString();
-        DeactivateLosses = deactivateLosses;
-        DeactivateOasisLosses = deactivateOasisLosses;
-        MoveLosses = deactivateLosses && moveLosses;
+        DeactivateRedLosses = deactivateRedLosses;
+        DeactivateYellowLosses = deactivateYellowLosses;
+        DeactivateRedOasisLosses = deactivateRedOasisLosses;
+        DeactivateYellowOasisLosses = deactivateYellowOasisLosses;
+        MoveRedLosses = deactivateRedLosses && moveRedLosses;
+        MoveYellowLosses = deactivateYellowLosses && moveYellowLosses;
+    }
+
+    private void SyncOasisMasterFromColors()
+    {
+        SetProperty(
+            ref _deactivateOasisLosses,
+            _deactivateRedOasisLosses || _deactivateYellowOasisLosses,
+            nameof(DeactivateOasisLosses));
     }
 
     private IDisposable SuppressSettingsNotifications()

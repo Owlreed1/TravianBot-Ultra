@@ -67,10 +67,10 @@ public sealed class BotOptionsFromConfigurationCoverageTests
     [Fact]
     public void LossMoveSettings_AreAccountScoped()
     {
-        Assert.Contains(BotOptionPayloadKeys.ContinuousFarmMoveLosses, BotConfigStore.AccountScopedKeyValues);
-        Assert.Contains(BotOptionPayloadKeys.ContinuousFarmLossDestinationListId, BotConfigStore.AccountScopedKeyValues);
-        Assert.Contains(BotOptionPayloadKeys.ContinuousFarmLossDestinationListName, BotConfigStore.AccountScopedKeyValues);
-        Assert.Contains(BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName, BotConfigStore.AccountScopedKeyValues);
+        Assert.Contains(BotOptionPayloadKeys.ContinuousFarmMoveRedLosses, BotConfigStore.AccountScopedKeyValues);
+        Assert.Contains(BotOptionPayloadKeys.ContinuousFarmMoveYellowLosses, BotConfigStore.AccountScopedKeyValues);
+        Assert.Contains(BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListId, BotConfigStore.AccountScopedKeyValues);
+        Assert.Contains(BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListId, BotConfigStore.AccountScopedKeyValues);
     }
 
     [Fact]

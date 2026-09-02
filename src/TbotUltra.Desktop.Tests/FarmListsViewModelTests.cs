@@ -160,9 +160,12 @@ public sealed class FarmListsViewModelTests
             sendAllLists: true,
             dispatchDelayMinMinutes: 10,
             dispatchDelayMaxMinutes: 20,
-            deactivateLosses: true,
-            deactivateOasisLosses: false,
-            moveLosses: false);
+            deactivateRedLosses: true,
+            deactivateYellowLosses: true,
+            deactivateRedOasisLosses: false,
+            deactivateYellowOasisLosses: false,
+            moveRedLosses: false,
+            moveYellowLosses: false);
         vm.DeactivateOasisLosses = true;
 
         Assert.Equal(1, changes);
@@ -171,24 +174,27 @@ public sealed class FarmListsViewModelTests
     }
 
     [Fact]
-    public void MoveLosses_UserEnableRequestsDestinationSetup_InitialLoadDoesNot()
+    public void MoveLosses_UserEnableRequestsMatchingDestinationSetup_InitialLoadDoesNot()
     {
         var vm = new FarmListsViewModel();
         var requests = 0;
-        vm.MoveLossesEnabledRequested += () => requests++;
+        vm.MoveRedLossesEnabledRequested += () => requests++;
 
         vm.LoadSettings(
             sendAllLists: false,
             dispatchDelayMinMinutes: 15,
             dispatchDelayMaxMinutes: 30,
-            deactivateLosses: true,
-            deactivateOasisLosses: false,
-            moveLosses: true);
+            deactivateRedLosses: true,
+            deactivateYellowLosses: true,
+            deactivateRedOasisLosses: false,
+            deactivateYellowOasisLosses: false,
+            moveRedLosses: true,
+            moveYellowLosses: false);
 
         Assert.Equal(0, requests);
 
-        vm.MoveLosses = false;
-        vm.MoveLosses = true;
+        vm.MoveRedLosses = false;
+        vm.MoveRedLosses = true;
 
         Assert.Equal(1, requests);
     }
@@ -207,11 +213,46 @@ public sealed class FarmListsViewModelTests
                 new FarmLossDestinationOption("41", "raiders", "Capital", 10, 100),
                 selected,
             ],
-            selected);
+            selected,
+            null);
 
         Assert.Same(collection, vm.LossDestinations);
         Assert.Equal(2, vm.LossDestinations.Count);
-        Assert.Same(selected, vm.SelectedLossDestination);
+        Assert.Same(selected, vm.SelectedRedLossDestination);
+        Assert.Null(vm.SelectedYellowLossDestination);
         Assert.Equal(0, changes);
+    }
+
+    [Fact]
+    public void OasisColors_SynchronizeMasterSelection()
+    {
+        var vm = new FarmListsViewModel();
+
+        vm.DeactivateOasisLosses = true;
+        Assert.True(vm.DeactivateRedOasisLosses);
+        Assert.True(vm.DeactivateYellowOasisLosses);
+
+        vm.DeactivateRedOasisLosses = false;
+        Assert.True(vm.DeactivateOasisLosses);
+        vm.DeactivateYellowOasisLosses = false;
+        Assert.False(vm.DeactivateOasisLosses);
+
+        vm.DeactivateRedOasisLosses = true;
+        Assert.True(vm.DeactivateOasisLosses);
+    }
+
+    [Fact]
+    public void DisablingLossColor_DisablesOnlyMatchingMoveAndKeepsDestination()
+    {
+        var vm = new FarmListsViewModel();
+        var destination = new FarmLossDestinationOption("42", "Red farms", "Capital", 3, 100);
+        vm.ReplaceLossDestinations([destination], destination, null);
+        vm.DeactivateRedLosses = true;
+        vm.MoveRedLosses = true;
+
+        vm.DeactivateRedLosses = false;
+
+        Assert.False(vm.MoveRedLosses);
+        Assert.Same(destination, vm.SelectedRedLossDestination);
     }
 }

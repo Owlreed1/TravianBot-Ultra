@@ -417,7 +417,17 @@ public sealed record FarmListLossDeactivationResult(
     int MoveFailures = 0,
     string? DestinationListId = null,
     string? DestinationListName = null,
-    bool DestinationChanged = false);
+    bool DestinationChanged = false,
+    FarmListLossColors LossColors = FarmListLossColors.Both);
+
+[Flags]
+public enum FarmListLossColors
+{
+    None = 0,
+    Red = 1,
+    Yellow = 2,
+    Both = Red | Yellow,
+}
 
 public sealed record FarmListLossHandlingRequest(
     bool IncludeUnoccupiedOasis,
@@ -427,14 +437,16 @@ public sealed record FarmListLossHandlingRequest(
     string DestinationBaseName,
     FarmListCreateRequest? CreateTemplate = null,
     int? MaxTargets = null,
-    bool YellowLossesOnly = false);
+    FarmListLossColors LossColors = FarmListLossColors.Both,
+    bool IncludeNonOasisLosses = true);
 
 public sealed record FarmLossDestinationChange(
     string AccountName,
     string ListId,
     string ListName,
     string BaseName,
-    string VillageName);
+    string VillageName,
+    FarmListLossColors LossColors = FarmListLossColors.Both);
 
 public sealed record FarmCoordinate(int X, int Y, bool RequireUnoccupiedOasis = false);
 

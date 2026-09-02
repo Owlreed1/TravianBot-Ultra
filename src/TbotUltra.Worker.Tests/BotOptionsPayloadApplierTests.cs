@@ -142,6 +142,35 @@ public sealed class BotOptionsPayloadApplierTests
         var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
 
         Assert.True(BotOptionsFactory.FromConfiguration(configuration).ContinuousFarmDeactivateLosses);
+        Assert.True(BotOptionsFactory.FromConfiguration(configuration).ContinuousFarmDeactivateRedLosses);
+        Assert.True(BotOptionsFactory.FromConfiguration(configuration).ContinuousFarmDeactivateYellowLosses);
+    }
+
+    [Fact]
+    public void FromConfiguration_LegacyLossSettingsSeedBothColorsAndDestinations()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [BotOptionPayloadKeys.ContinuousFarmDeactivateLosses] = "true",
+                [BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses] = "true",
+                [BotOptionPayloadKeys.ContinuousFarmMoveLosses] = "true",
+                [BotOptionPayloadKeys.ContinuousFarmLossDestinationListId] = "old-id",
+                [BotOptionPayloadKeys.ContinuousFarmLossDestinationListName] = "Old losses",
+                [BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] = "Old base",
+            })
+            .Build();
+
+        var options = BotOptionsFactory.FromConfiguration(configuration);
+
+        Assert.True(options.ContinuousFarmMoveRedLosses);
+        Assert.True(options.ContinuousFarmMoveYellowLosses);
+        Assert.True(options.ContinuousFarmDeactivateRedOasisLosses);
+        Assert.True(options.ContinuousFarmDeactivateYellowOasisLosses);
+        Assert.Equal("old-id", options.ContinuousFarmRedLossDestinationListId);
+        Assert.Equal("old-id", options.ContinuousFarmYellowLossDestinationListId);
+        Assert.Equal("Old base", options.ContinuousFarmRedLossDestinationBaseName);
+        Assert.Equal("Old base", options.ContinuousFarmYellowLossDestinationBaseName);
     }
 
     [Fact]

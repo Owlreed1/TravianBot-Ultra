@@ -196,25 +196,38 @@ public sealed class PanelServiceContractTests : IDisposable
             SendAllLists: false,
             DispatchDelayMinMinutes: 4,
             DispatchDelayMaxMinutes: 9,
-            DeactivateLosses: true,
-            DeactivateOasisLosses: true,
-            MoveLosses: true,
-            SelectedDestination: new FarmLossDestinationOption("new-id", "Losses", "Capital", 3, 12)));
-        service.SaveDestinationBaseName("Pinned base");
+            DeactivateRedLosses: true,
+            DeactivateYellowLosses: true,
+            DeactivateRedOasisLosses: true,
+            DeactivateYellowOasisLosses: false,
+            MoveRedLosses: true,
+            MoveYellowLosses: true,
+            SelectedRedDestination: new FarmLossDestinationOption("red-id", "Red farms", "Capital", 3, 12),
+            SelectedYellowDestination: new FarmLossDestinationOption("yellow-id", "Yellow farms", "Capital", 4, 12)));
+        service.SaveDestinationBaseName(true, "Pinned red base");
         var persisted = store.Load();
 
         Assert.Equal(FarmingDefaults.SendModeListPerList, result.SendMode);
-        Assert.True(result.MoveLossesEnabled);
-        Assert.Equal("new-id", persisted[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId]!.GetValue<string>());
-        Assert.Equal("Losses", persisted[BotOptionPayloadKeys.ContinuousFarmLossDestinationListName]!.GetValue<string>());
-        Assert.Equal("Pinned base", persisted[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName]!.GetValue<string>());
+        Assert.True(result.MoveRedLossesEnabled);
+        Assert.True(result.MoveYellowLossesEnabled);
+        Assert.Equal("red-id", persisted[BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListId]!.GetValue<string>());
+        Assert.Equal("Red farms", persisted[BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListName]!.GetValue<string>());
+        Assert.Equal("Pinned red base", persisted[BotOptionPayloadKeys.ContinuousFarmRedLossDestinationBaseName]!.GetValue<string>());
+        Assert.Equal("yellow-id", persisted[BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListId]!.GetValue<string>());
         Assert.Equal(4, persisted[BotOptionPayloadKeys.ContinuousFarmDispatchDelayMinMinutes]!.GetValue<int>());
         Assert.Equal(9, persisted[BotOptionPayloadKeys.ContinuousFarmDispatchDelayMaxMinutes]!.GetValue<int>());
         Assert.True(persisted[BotOptionPayloadKeys.ContinuousFarmMoveLosses]!.GetValue<bool>());
         Assert.Equal("keep", persisted["unrelated"]!.GetValue<string>());
 
-        var disabled = service.SaveSettings(new FarmingPanelSettings(true, 1, 2, false, false, true, new FarmLossDestinationOption("id", "Name", "Capital", 1, 2)));
-        Assert.False(disabled.MoveLossesEnabled);
+        var disabled = service.SaveSettings(new FarmingPanelSettings(
+            true, 1, 2,
+            false, false,
+            false, false,
+            true, true,
+            new FarmLossDestinationOption("red", "Red", "Capital", 1, 2),
+            new FarmLossDestinationOption("yellow", "Yellow", "Capital", 1, 2)));
+        Assert.False(disabled.MoveRedLossesEnabled);
+        Assert.False(disabled.MoveYellowLossesEnabled);
         Assert.False(store.Load()[BotOptionPayloadKeys.ContinuousFarmMoveLosses]!.GetValue<bool>());
     }
 

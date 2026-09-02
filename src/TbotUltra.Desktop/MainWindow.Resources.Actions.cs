@@ -804,9 +804,13 @@ public partial class MainWindow
         }
 
         var options = ApplySelectedVillageToOptions(LoadBotOptions());
-        if (!options.ContinuousFarmDeactivateLosses
-            || !options.ContinuousFarmMoveLosses
-            || string.IsNullOrWhiteSpace(options.ContinuousFarmLossDestinationListName))
+        var redReady = options.ContinuousFarmDeactivateRedLosses
+            && options.ContinuousFarmMoveRedLosses
+            && !string.IsNullOrWhiteSpace(options.ContinuousFarmRedLossDestinationListName);
+        var yellowReady = options.ContinuousFarmDeactivateYellowLosses
+            && options.ContinuousFarmMoveYellowLosses
+            && !string.IsNullOrWhiteSpace(options.ContinuousFarmYellowLossDestinationListName);
+        if (!redReady && !yellowReady)
         {
             const string message = "Enable both loss checkboxes and select a destination list on the Farming page first.";
             AppendLog($"[farm-list:debug] canceled: {message}");
@@ -821,7 +825,7 @@ public partial class MainWindow
             async (operationId, operationToken) =>
             {
                 await EnsureChromiumInstalledAsync();
-                AppendLog($"[{operationId}] moving and deactivating all red/yellow farms to '{options.ContinuousFarmLossDestinationListName}'.");
+                AppendLog($"[{operationId}] moving and deactivating selected red/yellow farm losses.");
                 var result = await _botService.RunFarmLossMoveDebugAsync(options, AppendLog, operationToken);
                 var summary = result.RowsMoved > 0
                     ? $"Moved and deactivated {result.RowsMoved} red/yellow farm(s)."

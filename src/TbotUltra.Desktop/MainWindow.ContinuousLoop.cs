@@ -1466,10 +1466,14 @@ public partial class MainWindow
                     var farmingPayload = new FarmingPayload(
                         selectedFarmLists,
                         selectedSnapshot.Ids,
-                        options.ContinuousFarmMoveLosses,
-                        options.ContinuousFarmLossDestinationListId,
-                        options.ContinuousFarmLossDestinationListName,
-                        options.ContinuousFarmLossDestinationBaseName).ToDictionary();
+                        MoveRedLosses: options.ContinuousFarmMoveRedLosses,
+                        RedLossDestinationListId: options.ContinuousFarmRedLossDestinationListId,
+                        RedLossDestinationListName: options.ContinuousFarmRedLossDestinationListName,
+                        RedLossDestinationBaseName: options.ContinuousFarmRedLossDestinationBaseName,
+                        MoveYellowLosses: options.ContinuousFarmMoveYellowLosses,
+                        YellowLossDestinationListId: options.ContinuousFarmYellowLossDestinationListId,
+                        YellowLossDestinationListName: options.ContinuousFarmYellowLossDestinationListName,
+                        YellowLossDestinationBaseName: options.ContinuousFarmYellowLossDestinationBaseName).ToDictionary();
                     foreach (var farmingVillage in automationVillages)
                     {
                         if (!IsGroupEnabledForVillage(GetVillageKey(farmingVillage), QueueGroup.Farming)

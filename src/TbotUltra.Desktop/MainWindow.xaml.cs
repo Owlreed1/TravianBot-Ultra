@@ -668,7 +668,8 @@ public partial class MainWindow : Window
         _farmListsViewModel.SendAllNowRequested += () => _ = GuardUiAsync(FarmListSendAllNowButtonClickAsync);
         _farmListsViewModel.SendNowRequested += list => _ = GuardUiAsync(() => FarmListSendNowButtonClickAsync(list));
         _farmListsViewModel.SettingsChanged += PersistFarmingSettings;
-        _farmListsViewModel.MoveLossesEnabledRequested += () => _ = GuardUiAsync(EnsureFarmLossDestinationSelectedAsync);
+        _farmListsViewModel.MoveRedLossesEnabledRequested += () => _ = GuardUiAsync(() => EnsureFarmLossDestinationSelectedAsync(FarmListLossColors.Red));
+        _farmListsViewModel.MoveYellowLossesEnabledRequested += () => _ = GuardUiAsync(() => EnsureFarmLossDestinationSelectedAsync(FarmListLossColors.Yellow));
         InitializeTravcoTools();
         _troopTrainingViewModel.Initialize();
         _troopTrainingViewModel.UpdateTroopOptions(ResolveStoredTroopTrainingTribe());

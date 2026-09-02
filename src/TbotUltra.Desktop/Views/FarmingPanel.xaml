@@ -303,84 +303,223 @@
                                             <TextBlock Text="Farm settings"
                                                        FontSize="22"
                                                        FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                                       Margin="0,0,0,8" />
-                                            <StackPanel Margin="0,0,0,10">
-                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                                    <RadioButton x:Name="FarmSendListPerListRadioButton"
-                                                                 Content="Send toggled lists"
-                                                                 GroupName="FarmSendMode"
-                                                                 Margin="0,0,16,0"
-                                                                 IsChecked="{Binding SendToggledLists, Mode=TwoWay}" />
-                                                    <RadioButton x:Name="FarmSendAllAtOnceRadioButton"
-                                                                 Content="Send all lists"
-                                                                 GroupName="FarmSendMode"
-                                                                 Margin="0,0,8,0"
-                                                                 IsChecked="{Binding SendAllLists, Mode=TwoWay}" />
-                                                    <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                                    VerticalAlignment="Center"
-                                                                    ToolTip="Send toggled lists: each round sends every farm list toggled on above, one at a time. Send all lists: sends every farm list on the account. Either way the lists go out one at a time (paced by 'Send farmlists'); 'Delay between farm sends' is the wait between whole rounds." />
+                                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Control how lists are sent and how failed targets are handled."
+                                                       Foreground="{DynamicResource TextSubtleBrush}"
+                                                       Margin="0,3,0,14" />
+
+                                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                    BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="8"
+                                                    Padding="12"
+                                                    Margin="0,0,0,10">
+                                                <StackPanel>
+                                                    <TextBlock Text="DISPATCH"
+                                                               FontSize="11"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource TextSubtleBrush}"
+                                                               Margin="0,0,0,9" />
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                                        <RadioButton x:Name="FarmSendListPerListRadioButton"
+                                                                     Content="Send toggled lists"
+                                                                     GroupName="FarmSendMode"
+                                                                     Margin="0,0,18,0"
+                                                                     IsChecked="{Binding SendToggledLists, Mode=TwoWay}" />
+                                                        <RadioButton x:Name="FarmSendAllAtOnceRadioButton"
+                                                                     Content="Send all lists"
+                                                                     GroupName="FarmSendMode"
+                                                                     Margin="0,0,8,0"
+                                                                     IsChecked="{Binding SendAllLists, Mode=TwoWay}" />
+                                                        <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                                        VerticalAlignment="Center"
+                                                                        ToolTip="Send toggled lists: each round sends every farm list toggled on above, one at a time. Send all lists: sends every farm list on the account. Either way the lists go out one at a time (paced by 'Send farmlists'); the delay is the wait between whole rounds." />
+                                                    </StackPanel>
+                                                    <Border BorderBrush="{DynamicResource BorderMutedBrush}"
+                                                            BorderThickness="0,1,0,0"
+                                                            Padding="0,11,0,0">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                                <TextBlock Text="Delay between sends"
+                                                                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                                <TextBlock Text="A random delay is selected for each round."
+                                                                           FontSize="11"
+                                                                           Foreground="{DynamicResource TextSubtleBrush}" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <TextBlock Text="Min" VerticalAlignment="Center" Margin="0,0,5,0"
+                                                                           Foreground="{DynamicResource TextSubtleBrush}" />
+                                                                <TextBox x:Name="FarmDispatchDelayMinTextBox"
+                                                                         Width="52"
+                                                                         Height="28"
+                                                                         VerticalContentAlignment="Center"
+                                                                         Text="{Binding DispatchDelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                                                                <TextBlock Text="Max" VerticalAlignment="Center" Margin="12,0,5,0"
+                                                                           Foreground="{DynamicResource TextSubtleBrush}" />
+                                                                <TextBox x:Name="FarmDispatchDelayMaxTextBox"
+                                                                         Width="52"
+                                                                         Height="28"
+                                                                         VerticalContentAlignment="Center"
+                                                                         Text="{Binding DispatchDelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                                                                <TextBlock Text="min" VerticalAlignment="Center" Margin="6,0,0,0"
+                                                                           Foreground="{DynamicResource TextSubtleBrush}" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Border>
                                                 </StackPanel>
-                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                                    <TextBlock Text="Delay between farm sends"
-                                                               VerticalAlignment="Center"
-                                                               Foreground="{DynamicResource TextPrimaryBrush}"
-                                                               Margin="0,0,8,0" />
-                                                    <TextBlock Text="Min" VerticalAlignment="Center" Margin="0,0,4,0"
-                                                               Foreground="{DynamicResource TextSubtleBrush}" />
-                                                    <TextBox x:Name="FarmDispatchDelayMinTextBox"
-                                                             Width="52"
-                                                             Height="26"
-                                                             VerticalContentAlignment="Center"
-                                                             Text="{Binding DispatchDelayMinMinutes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
-                                                    <TextBlock Text="Max" VerticalAlignment="Center" Margin="8,0,4,0"
-                                                               Foreground="{DynamicResource TextSubtleBrush}" />
-                                                    <TextBox x:Name="FarmDispatchDelayMaxTextBox"
-                                                             Width="52"
-                                                             Height="26"
-                                                             Margin="0,0,8,0"
-                                                             VerticalContentAlignment="Center"
-                                                             Text="{Binding DispatchDelayMaxMinutes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
-                                                    <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                                    VerticalAlignment="Center"
-                                                                    ToolTip="Delay between farm sends: a random wait between Min and Max minutes is picked for every send." />
+                                            </Border>
+
+                                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                    BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="8"
+                                                    Padding="12"
+                                                    Margin="0,0,0,10">
+                                                <StackPanel>
+                                                    <StackPanel Margin="0,0,0,9">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="FAILED ATTACKS"
+                                                                       FontSize="11"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource TextSubtleBrush}"
+                                                                       VerticalAlignment="Center" />
+                                                            <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                                            Margin="7,0,0,0"
+                                                                            VerticalAlignment="Center"
+                                                                            ToolTip="Deactivate targets whose latest result matches the selected color. Moving uses the same Edit action and requires deactivation for that color." />
+                                                        </StackPanel>
+                                                        <TextBlock Text="Handle red and yellow results independently."
+                                                                   FontSize="11"
+                                                                   Foreground="{DynamicResource TextSubtleBrush}"
+                                                                   Margin="0,2,0,0" />
+                                                    </StackPanel>
+
+                                                    <Border Background="{DynamicResource ControlBackgroundBrush}"
+                                                            BorderBrush="{DynamicResource BorderMutedBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="6"
+                                                            Margin="0,0,0,8">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="4" />
+                                                                <ColumnDefinition Width="106" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Border Grid.Column="0" Background="{DynamicResource DangerBrush}" CornerRadius="5,0,0,5" />
+                                                            <CheckBox x:Name="DeactivateRedFarmLossesCheckBox"
+                                                                      Grid.Column="1"
+                                                                      Content="Red attacks"
+                                                                      Margin="12,11,8,11"
+                                                                      Foreground="{DynamicResource DangerTextBrush}"
+                                                                      FontWeight="SemiBold"
+                                                                      IsChecked="{Binding DeactivateRedLosses, Mode=TwoWay}" />
+                                                            <CheckBox x:Name="MoveRedFarmLossesCheckBox"
+                                                                      Grid.Column="2"
+                                                                      Content="Move to list"
+                                                                      Margin="0,11,12,11"
+                                                                      IsEnabled="{Binding CanMoveRedLosses}"
+                                                                      IsChecked="{Binding MoveRedLosses, Mode=TwoWay}" />
+                                                            <ComboBox x:Name="RedFarmLossDestinationComboBox"
+                                                                      Grid.Column="3"
+                                                                      Width="145"
+                                                                      Height="28"
+                                                                      Margin="0,6,8,6"
+                                                                      HorizontalAlignment="Right"
+                                                                      DisplayMemberPath="DisplayText"
+                                                                      IsEnabled="{Binding MoveRedLosses}"
+                                                                      ItemsSource="{Binding LossDestinations}"
+                                                                      SelectedItem="{Binding SelectedRedLossDestination, Mode=TwoWay}" />
+                                                        </Grid>
+                                                    </Border>
+
+                                                    <Border Background="{DynamicResource ControlBackgroundBrush}"
+                                                            BorderBrush="{DynamicResource BorderMutedBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="6">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="4" />
+                                                                <ColumnDefinition Width="106" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Border Grid.Column="0" Background="{DynamicResource WarningBrush}" CornerRadius="5,0,0,5" />
+                                                            <CheckBox x:Name="DeactivateYellowFarmLossesCheckBox"
+                                                                      Grid.Column="1"
+                                                                      Content="Yellow attacks"
+                                                                      Margin="12,11,8,11"
+                                                                      Foreground="{DynamicResource WarningTextBrush}"
+                                                                      FontWeight="SemiBold"
+                                                                      IsChecked="{Binding DeactivateYellowLosses, Mode=TwoWay}" />
+                                                            <CheckBox x:Name="MoveYellowFarmLossesCheckBox"
+                                                                      Grid.Column="2"
+                                                                      Content="Move to list"
+                                                                      Margin="0,11,12,11"
+                                                                      IsEnabled="{Binding CanMoveYellowLosses}"
+                                                                      IsChecked="{Binding MoveYellowLosses, Mode=TwoWay}" />
+                                                            <ComboBox x:Name="YellowFarmLossDestinationComboBox"
+                                                                      Grid.Column="3"
+                                                                      Width="145"
+                                                                      Height="28"
+                                                                      Margin="0,6,8,6"
+                                                                      HorizontalAlignment="Right"
+                                                                      DisplayMemberPath="DisplayText"
+                                                                      IsEnabled="{Binding MoveYellowLosses}"
+                                                                      ItemsSource="{Binding LossDestinations}"
+                                                                      SelectedItem="{Binding SelectedYellowLossDestination, Mode=TwoWay}" />
+                                                        </Grid>
+                                                    </Border>
                                                 </StackPanel>
-                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                                    <CheckBox x:Name="DeactivateFarmLossesCheckBox"
-                                                              Content="Deactivate red/yellow attacks"
-                                                              Margin="0,0,8,0"
-                                                              IsChecked="{Binding DeactivateLosses, Mode=TwoWay}" />
-                                                    <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                                    VerticalAlignment="Center"
-                                                                    ToolTip="Before sending farmlists, disable targets whose last raid shows red or yellow losses." />
-                                                </StackPanel>
-                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                                    <CheckBox x:Name="MoveFarmLossesCheckBox"
-                                                              Content="Move red/yellow farms to list"
-                                                              Margin="0,0,6,0"
-                                                              IsEnabled="{Binding CanMoveLosses}"
-                                                              IsChecked="{Binding MoveLosses, Mode=TwoWay}" />
-                                                    <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                                    Margin="0,0,8,0"
-                                                                    VerticalAlignment="Center"
-                                                                    ToolTip="Moves red/yellow non-oasis targets to the selected list and deactivates them in the same Edit action." />
-                                                    <ComboBox x:Name="FarmLossDestinationComboBox"
-                                                              Width="260"
-                                                              DisplayMemberPath="DisplayText"
-                                                              IsEnabled="{Binding CanMoveLosses}"
-                                                              ItemsSource="{Binding LossDestinations}"
-                                                              SelectedItem="{Binding SelectedLossDestination, Mode=TwoWay}" />
-                                                </StackPanel>
-                                                <StackPanel Orientation="Horizontal">
-                                                    <CheckBox x:Name="DeactivateFarmOasisLossesCheckBox"
-                                                              Content="Deactivate oasis with losses"
-                                                              Margin="0,0,8,0"
-                                                              IsChecked="{Binding DeactivateOasisLosses, Mode=TwoWay}" />
-                                                    <ContentControl Style="{StaticResource SettingInfoIconStyle}"
-                                                                    VerticalAlignment="Center"
-                                                                    ToolTip="When loss deactivation is enabled, also disable oasis targets that show losses." />
-                                                </StackPanel>
-                                            </StackPanel>
+                                            </Border>
+
+                                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                    BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="8"
+                                                    Padding="12">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Text="OASIS LOSSES"
+                                                                   FontSize="11"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource TextSubtleBrush}" />
+                                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                            <CheckBox x:Name="DeactivateFarmOasisLossesCheckBox"
+                                                                      Content="Deactivate oasis targets"
+                                                                      IsChecked="{Binding DeactivateOasisLosses, Mode=TwoWay}" />
+                                                            <ContentControl Style="{StaticResource SettingInfoIconStyle}"
+                                                                            Margin="7,0,0,0"
+                                                                            VerticalAlignment="Center"
+                                                                            ToolTip="Disable oasis targets whose latest result matches the selected color. Oasis targets are never moved." />
+                                                        </StackPanel>
+                                                        <TextBlock Text="Oases are deactivated only — never moved."
+                                                                   FontSize="11"
+                                                                   Foreground="{DynamicResource TextSubtleBrush}"
+                                                                   Margin="0,4,0,0" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <CheckBox x:Name="DeactivateRedFarmOasisLossesCheckBox"
+                                                                  Content="Red"
+                                                                  Foreground="{DynamicResource DangerTextBrush}"
+                                                                  Margin="0,0,12,0"
+                                                                  IsChecked="{Binding DeactivateRedOasisLosses, Mode=TwoWay}" />
+                                                        <CheckBox x:Name="DeactivateYellowFarmOasisLossesCheckBox"
+                                                                  Content="Yellow"
+                                                                  Foreground="{DynamicResource WarningTextBrush}"
+                                                                  Margin="0"
+                                                                  IsChecked="{Binding DeactivateYellowOasisLosses, Mode=TwoWay}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
                                          </StackPanel>
                                      </Border>
                                  </Grid>

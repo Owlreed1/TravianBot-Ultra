@@ -86,6 +86,31 @@ public sealed class ContinuousFarmingOperationTests
         Assert.Equal("Continuous farming cooldown active.", result.WaitMessage);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_HandlesRedAndYellowWithSeparateRequestsBeforeSending()
+    {
+        var client = new FakeFarmingClient([new FarmListOverview("Mercs", 3, 3, 0, "42")]);
+        var operation = new ContinuousFarmingOperation(client);
+        var red = new FarmListLossHandlingRequest(false, true, "red", "Red farms", "Red farms", LossColors: FarmListLossColors.Red);
+        var yellow = new FarmListLossHandlingRequest(false, true, "yellow", "Yellow farms", "Yellow farms", LossColors: FarmListLossColors.Yellow);
+
+        var result = await operation.ExecuteAsync(
+            new ContinuousFarmingDispatchRequest(
+                FarmingDefaults.SendModeAllAtOnce,
+                [],
+                [],
+                600,
+                true,
+                null,
+                [red, yellow]),
+            _ => { },
+            CancellationToken.None);
+
+        Assert.Equal(["loss", "loss", "start-all", "read"], client.Calls);
+        Assert.Equal([FarmListLossColors.Red, FarmListLossColors.Yellow], client.LossRequests.Select(request => request.LossColors));
+        Assert.Equal(2, result.LossHandlingResults!.Count);
+    }
+
     private sealed class FakeFarmingClient(
         IReadOnlyList<FarmListOverview> initialOverview,
         IReadOnlyList<FarmListOverview>? refreshedOverview = null) : IFarmingClient
@@ -93,6 +118,7 @@ public sealed class ContinuousFarmingOperationTests
         private readonly Queue<IReadOnlyList<FarmListOverview>> _overviews = new([initialOverview, refreshedOverview ?? initialOverview]);
 
         public List<string> Calls { get; } = [];
+        public List<FarmListLossHandlingRequest> LossRequests { get; } = [];
 
         public Task<IReadOnlyList<FarmListOverview>> ReadFarmListsOverviewAsync(CancellationToken cancellationToken = default)
         {
@@ -126,7 +152,8 @@ public sealed class ContinuousFarmingOperationTests
         public Task<FarmListLossDeactivationResult> HandleFarmListLossTargetsAsync(FarmListLossHandlingRequest request, CancellationToken cancellationToken = default)
         {
             Calls.Add("loss");
-            return Task.FromResult(new FarmListLossDeactivationResult(2, 1, 0));
+            LossRequests.Add(request);
+            return Task.FromResult(new FarmListLossDeactivationResult(2, 1, 0, LossColors: request.LossColors));
         }
 
         public Task<FarmListCreateBatchResult> CreateFarmListsAsync(FarmListCreateRequest request, IProgress<FarmListCreateProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();

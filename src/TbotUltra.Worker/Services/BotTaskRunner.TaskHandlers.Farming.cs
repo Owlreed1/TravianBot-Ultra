@@ -40,7 +40,8 @@ public sealed partial class BotTaskRunner
         var minDelaySeconds = FarmingDefaults.NormalizeDispatchDelayMinMinutes(context.Options.ContinuousFarmDispatchDelayMinMinutes) * 60;
         var maxDelaySeconds = Math.Max(minDelaySeconds, FarmingDefaults.NormalizeDispatchDelayMaxMinutes(context.Options.ContinuousFarmDispatchDelayMaxMinutes) * 60);
         var dispatchDelaySeconds = FarmingDefaults.CalculateDispatchDelaySeconds(context.Options.ContinuousFarmDispatchDelayMinMinutes, context.Options.ContinuousFarmDispatchDelayMaxMinutes);
-        context.Log($"Continuous farming mode={mode}; delayRange={minDelaySeconds}-{maxDelaySeconds}s; selectedDelay={dispatchDelaySeconds}s; targetVillage='{(string.IsNullOrWhiteSpace(context.Options.TargetVillageName) ? "(default)" : context.Options.TargetVillageName)}'; deactivateLosses={context.Options.ContinuousFarmDeactivateLosses}; deactivateOasis={context.Options.ContinuousFarmDeactivateOasisLosses}.");
+        var lossRequests = CreateFarmListLossHandlingRequests(context.Options);
+        context.Log($"Continuous farming mode={mode}; delayRange={minDelaySeconds}-{maxDelaySeconds}s; selectedDelay={dispatchDelaySeconds}s; targetVillage='{(string.IsNullOrWhiteSpace(context.Options.TargetVillageName) ? "(default)" : context.Options.TargetVillageName)}'; redLosses={context.Options.ContinuousFarmDeactivateRedLosses}; yellowLosses={context.Options.ContinuousFarmDeactivateYellowLosses}; redOasis={context.Options.ContinuousFarmDeactivateRedOasisLosses}; yellowOasis={context.Options.ContinuousFarmDeactivateYellowOasisLosses}.");
 
         var operation = new ContinuousFarmingOperation(context.Client);
         var result = await operation.ExecuteAsync(
@@ -49,16 +50,15 @@ public sealed partial class BotTaskRunner
                 context.Options.ContinuousFarmListNames,
                 context.Options.ContinuousFarmListIds,
                 dispatchDelaySeconds,
-                context.Options.ContinuousFarmDeactivateLosses,
-                context.Options.ContinuousFarmDeactivateLosses
-                    ? CreateFarmListLossHandlingRequest(context.Options)
-                    : null),
+                lossRequests.Count > 0,
+                null,
+                lossRequests),
             context.Log,
             context.CancellationToken);
 
-        if (result.LossHandlingResult is not null)
+        foreach (var lossResult in result.LossHandlingResults ?? [])
         {
-            context.Runner.PublishFarmLossDestinationChange(context.Options, result.LossHandlingResult);
+            context.Runner.PublishFarmLossDestinationChange(context.Options, lossResult);
         }
 
         if (result.Snapshot is not null)

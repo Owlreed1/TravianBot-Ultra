@@ -55,12 +55,29 @@ public sealed partial class BotTaskRunner
 
     private static FarmListLossHandlingRequest CreateFarmListLossHandlingRequest(
         BotOptions options,
-        int? maxTargets = null,
-        bool yellowLossesOnly = false)
+        FarmListLossColors lossColor,
+        int? maxTargets = null)
     {
-        var moveEnabled = options.ContinuousFarmDeactivateLosses
-            && options.ContinuousFarmMoveLosses
-            && !string.IsNullOrWhiteSpace(options.ContinuousFarmLossDestinationListName);
+        var isRed = lossColor == FarmListLossColors.Red;
+        var deactivateLosses = isRed
+            ? options.ContinuousFarmDeactivateRedLosses
+            : options.ContinuousFarmDeactivateYellowLosses;
+        var includeOasis = isRed
+            ? options.ContinuousFarmDeactivateRedOasisLosses
+            : options.ContinuousFarmDeactivateYellowOasisLosses;
+        var configuredMove = isRed
+            ? options.ContinuousFarmMoveRedLosses
+            : options.ContinuousFarmMoveYellowLosses;
+        var destinationListId = isRed
+            ? options.ContinuousFarmRedLossDestinationListId
+            : options.ContinuousFarmYellowLossDestinationListId;
+        var destinationListName = isRed
+            ? options.ContinuousFarmRedLossDestinationListName
+            : options.ContinuousFarmYellowLossDestinationListName;
+        var destinationBaseName = isRed
+            ? options.ContinuousFarmRedLossDestinationBaseName
+            : options.ContinuousFarmYellowLossDestinationBaseName;
+        var moveEnabled = deactivateLosses && configuredMove && !string.IsNullOrWhiteSpace(destinationListName);
         var villageIdMatch = Regex.Match(
             options.TargetVillageUrl ?? string.Empty,
             @"[?&]newdid=(\d+)",
@@ -68,7 +85,7 @@ public sealed partial class BotTaskRunner
         var createTemplate = string.IsNullOrWhiteSpace(options.TargetVillageName)
             ? null
             : new FarmListCreateRequest(
-                [options.ContinuousFarmLossDestinationListName],
+                [destinationListName],
                 options.TargetVillageName,
                 villageIdMatch.Success ? villageIdMatch.Groups[1].Value : null,
                 "First available troop",
@@ -77,33 +94,44 @@ public sealed partial class BotTaskRunner
                 OnlyCreateReportsWithLosses: options.FarmListOnlyCreateReportsWithLosses);
 
         return new FarmListLossHandlingRequest(
-            options.ContinuousFarmDeactivateOasisLosses,
+            includeOasis,
             moveEnabled,
-            options.ContinuousFarmLossDestinationListId,
-            options.ContinuousFarmLossDestinationListName,
-            string.IsNullOrWhiteSpace(options.ContinuousFarmLossDestinationBaseName)
-                ? options.ContinuousFarmLossDestinationListName
-                : options.ContinuousFarmLossDestinationBaseName,
+            destinationListId,
+            destinationListName,
+            string.IsNullOrWhiteSpace(destinationBaseName) ? destinationListName : destinationBaseName,
             createTemplate,
             maxTargets,
-            yellowLossesOnly);
+            LossColors: lossColor,
+            IncludeNonOasisLosses: deactivateLosses);
+    }
+
+    private static IReadOnlyList<FarmListLossHandlingRequest> CreateFarmListLossHandlingRequests(BotOptions options)
+    {
+        var requests = new List<FarmListLossHandlingRequest>(2);
+        if (options.ContinuousFarmDeactivateRedLosses || options.ContinuousFarmDeactivateRedOasisLosses)
+            requests.Add(CreateFarmListLossHandlingRequest(options, FarmListLossColors.Red));
+        if (options.ContinuousFarmDeactivateYellowLosses || options.ContinuousFarmDeactivateYellowOasisLosses)
+            requests.Add(CreateFarmListLossHandlingRequest(options, FarmListLossColors.Yellow));
+        return requests;
     }
 
     // Manual farming actions still use this path. The queued continuous-farming
     // task owns the same decision through ContinuousFarmingOperation.
     private static async Task RunFarmListLossDeactivationIfEnabledAsync(TaskExecutionContext context)
     {
-        if (!context.Options.ContinuousFarmDeactivateLosses)
+        var requests = CreateFarmListLossHandlingRequests(context.Options);
+        if (requests.Count == 0)
         {
             context.Log("Continuous farming loss deactivation disabled.");
             return;
         }
 
-        var result = await new ManualFarmingOperation(context.Client).HandleLossTargetsAsync(
-            CreateFarmListLossHandlingRequest(context.Options),
-            context.CancellationToken);
-        context.Log($"Continuous farming loss handling result: found={result.RowsFound}, deactivated={result.RowsDeactivated}, moved={result.RowsMoved}, moveFailures={result.MoveFailures}, skippedOasis={result.SkippedOasisRows}.");
-        context.Runner.PublishFarmLossDestinationChange(context.Options, result);
+        foreach (var request in requests)
+        {
+            var result = await new ManualFarmingOperation(context.Client).HandleLossTargetsAsync(request, context.CancellationToken);
+            context.Log($"Continuous farming {request.LossColors.ToString().ToLowerInvariant()} loss handling result: found={result.RowsFound}, deactivated={result.RowsDeactivated}, moved={result.RowsMoved}, moveFailures={result.MoveFailures}, skippedOasis={result.SkippedOasisRows}.");
+            context.Runner.PublishFarmLossDestinationChange(context.Options, result);
+        }
     }
 
     private void PublishFarmLossDestinationChange(BotOptions options, FarmListLossDeactivationResult result)
@@ -115,14 +143,20 @@ public sealed partial class BotTaskRunner
             return;
         }
 
+        var isRed = result.LossColors == FarmListLossColors.Red;
+        var baseName = isRed
+            ? options.ContinuousFarmRedLossDestinationBaseName
+            : options.ContinuousFarmYellowLossDestinationBaseName;
+        var configuredName = isRed
+            ? options.ContinuousFarmRedLossDestinationListName
+            : options.ContinuousFarmYellowLossDestinationListName;
         RaiseFarmLossDestinationChanged(new FarmLossDestinationChange(
             _accountProvider.LoadAccount().Name,
             result.DestinationListId,
             result.DestinationListName,
-            string.IsNullOrWhiteSpace(options.ContinuousFarmLossDestinationBaseName)
-                ? options.ContinuousFarmLossDestinationListName
-                : options.ContinuousFarmLossDestinationBaseName,
-            options.TargetVillageName));
+            string.IsNullOrWhiteSpace(baseName) ? configuredName : baseName,
+            options.TargetVillageName,
+            result.LossColors));
     }
 
     public async Task<FarmListLossDeactivationResult> RunFarmLossMoveDebugAsync(
@@ -131,15 +165,17 @@ public sealed partial class BotTaskRunner
         string? accountName = null,
         CancellationToken cancellationToken = default)
     {
-        if (!options.ContinuousFarmDeactivateLosses
-            || !options.ContinuousFarmMoveLosses
-            || string.IsNullOrWhiteSpace(options.ContinuousFarmLossDestinationListName))
+        var requests = CreateFarmListLossHandlingRequests(options)
+            .Where(request => request.MoveLosses)
+            .Select(request => request with { IncludeUnoccupiedOasis = false })
+            .ToList();
+        if (requests.Count == 0)
         {
             throw new InvalidOperationException(
-                "Enable 'Deactivate red/yellow attacks' and 'Move red/yellow farms to list', then select a destination list first.");
+                "Enable red or yellow loss deactivation and its matching move option, then select a destination list first.");
         }
 
-        FarmListLossDeactivationResult? result = null;
+        var results = new List<FarmListLossDeactivationResult>();
         await ExecuteWithClientAsync(
             options,
             log,
@@ -150,15 +186,23 @@ public sealed partial class BotTaskRunner
             {
                 await client.LoginAsync(cancellationToken);
                 await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken);
-                var request = CreateFarmListLossHandlingRequest(options)
-                    with { IncludeUnoccupiedOasis = false };
-                log($"[farm-list:debug] running red/yellow farm move/deactivate to '{request.DestinationListName}'.");
-                result = await new ManualFarmingOperation(client).HandleLossTargetsAsync(request, cancellationToken);
+                foreach (var request in requests)
+                {
+                    log($"[farm-list:debug] running {request.LossColors.ToString().ToLowerInvariant()} farm move/deactivate to '{request.DestinationListName}'.");
+                    results.Add(await new ManualFarmingOperation(client).HandleLossTargetsAsync(request, cancellationToken));
+                }
             });
 
-        var completed = result ?? throw new InvalidOperationException("The red/yellow farm move returned no result.");
-        PublishFarmLossDestinationChange(options, completed);
-        return completed;
+        if (results.Count == 0)
+            throw new InvalidOperationException("The selected farm-loss move returned no result.");
+        foreach (var result in results)
+            PublishFarmLossDestinationChange(options, result);
+        return new FarmListLossDeactivationResult(
+            results.Sum(result => result.RowsFound),
+            results.Sum(result => result.RowsDeactivated),
+            results.Sum(result => result.SkippedOasisRows),
+            results.Sum(result => result.RowsMoved),
+            results.Sum(result => result.MoveFailures));
     }
 
     public async Task<IReadOnlyList<FarmListOverview>> ReadFarmListsOverviewAsync(

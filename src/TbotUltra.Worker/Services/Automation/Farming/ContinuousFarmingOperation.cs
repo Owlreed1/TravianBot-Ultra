@@ -17,7 +17,7 @@ internal sealed class ContinuousFarmingOperation(IFarmingClient client)
     {
         if (string.Equals(request.SendMode, FarmingDefaults.SendModeAllAtOnce, StringComparison.Ordinal))
         {
-            var lossResult = await HandleLossesIfEnabledAsync(request, log, cancellationToken);
+            var lossResults = await HandleLossesIfEnabledAsync(request, log, cancellationToken);
             log("Continuous farming send-all started.");
             var listCount = await client.SendAllFarmListsViaStartAllButtonAsync(cancellationToken);
             log($"Continuous farming send-all completed. Lists considered={listCount}.");
@@ -25,7 +25,7 @@ internal sealed class ContinuousFarmingOperation(IFarmingClient client)
             return ContinuousFarmingDispatchResult.ForCompletedRound(
                 snapshot,
                 request.DispatchDelaySeconds,
-                lossResult);
+                lossResults);
         }
 
         var selectedNames = (request.SelectedNames ?? [])
@@ -67,7 +67,7 @@ internal sealed class ContinuousFarmingOperation(IFarmingClient client)
             return ContinuousFarmingDispatchResult.ForDefer("No toggled farm list is ready.", waitSeconds);
         }
 
-        var lossHandlingResult = await HandleLossesIfEnabledAsync(request, log, cancellationToken);
+        var lossHandlingResults = await HandleLossesIfEnabledAsync(request, log, cancellationToken);
         log($"Continuous farming (toggled lists): sending {readyLists.Count}/{matchingLists.Count} ready list(s) this round; delay between rounds={request.DispatchDelaySeconds}s.");
         var sent = await client.SendSelectedFarmListsNowAsync(selectedNames, selectedIds, cancellationToken);
         log($"Continuous farming (toggled lists): {sent} list(s) dispatched this round.");
@@ -75,10 +75,10 @@ internal sealed class ContinuousFarmingOperation(IFarmingClient client)
         return ContinuousFarmingDispatchResult.ForCompletedRound(
             refreshedOverview,
             request.DispatchDelaySeconds,
-            lossHandlingResult);
+            lossHandlingResults);
     }
 
-    private async Task<FarmListLossDeactivationResult?> HandleLossesIfEnabledAsync(
+    private async Task<IReadOnlyList<FarmListLossDeactivationResult>?> HandleLossesIfEnabledAsync(
         ContinuousFarmingDispatchRequest request,
         Action<string> log,
         CancellationToken cancellationToken)
@@ -89,11 +89,19 @@ internal sealed class ContinuousFarmingOperation(IFarmingClient client)
             return null;
         }
 
-        var result = await client.HandleFarmListLossTargetsAsync(
-            request.LossHandlingRequest ?? throw new InvalidOperationException("Farm loss handling request is required when loss deactivation is enabled."),
-            cancellationToken);
-        log($"Continuous farming loss handling result: found={result.RowsFound}, deactivated={result.RowsDeactivated}, moved={result.RowsMoved}, moveFailures={result.MoveFailures}, skippedOasis={result.SkippedOasisRows}.");
-        return result;
+        var requests = request.LossHandlingRequests
+            ?? (request.LossHandlingRequest is null ? null : [request.LossHandlingRequest]);
+        if (requests is null || requests.Count == 0)
+            throw new InvalidOperationException("Farm loss handling requests are required when loss deactivation is enabled.");
+
+        var results = new List<FarmListLossDeactivationResult>(requests.Count);
+        foreach (var lossRequest in requests)
+        {
+            var result = await client.HandleFarmListLossTargetsAsync(lossRequest, cancellationToken);
+            results.Add(result);
+            log($"Continuous farming {lossRequest.LossColors.ToString().ToLowerInvariant()} loss handling result: found={result.RowsFound}, deactivated={result.RowsDeactivated}, moved={result.RowsMoved}, moveFailures={result.MoveFailures}, skippedOasis={result.SkippedOasisRows}.");
+        }
+        return results;
     }
 }
 
@@ -103,7 +111,8 @@ internal sealed record ContinuousFarmingDispatchRequest(
     IReadOnlyCollection<string>? SelectedIds,
     int DispatchDelaySeconds,
     bool DeactivateLosses,
-    FarmListLossHandlingRequest? LossHandlingRequest);
+    FarmListLossHandlingRequest? LossHandlingRequest,
+    IReadOnlyList<FarmListLossHandlingRequest>? LossHandlingRequests = null);
 
 internal sealed record ContinuousFarmingDispatchResult(
     string WaitMessage,
@@ -111,7 +120,8 @@ internal sealed record ContinuousFarmingDispatchResult(
     string? WaitReasonCode,
     IReadOnlyList<FarmListOverview>? Snapshot,
     FarmListLossDeactivationResult? LossHandlingResult,
-    bool ScheduleNextRound)
+    bool ScheduleNextRound,
+    IReadOnlyList<FarmListLossDeactivationResult>? LossHandlingResults = null)
 {
     public static ContinuousFarmingDispatchResult ForDefer(string message, int waitSeconds) =>
         new(message, Math.Max(1, waitSeconds), null, null, null, false);
@@ -119,7 +129,21 @@ internal sealed record ContinuousFarmingDispatchResult(
     public static ContinuousFarmingDispatchResult ForCompletedRound(
         IReadOnlyList<FarmListOverview> snapshot,
         int waitSeconds,
-        FarmListLossDeactivationResult? lossHandlingResult) =>
+        IReadOnlyList<FarmListLossDeactivationResult>? lossHandlingResults) =>
         new("Continuous farming cooldown active.", Math.Max(1, waitSeconds), TaskWaitReasons.WorkQueued,
-            snapshot, lossHandlingResult, true);
+            snapshot, CombineLossResults(lossHandlingResults), true, lossHandlingResults);
+
+    private static FarmListLossDeactivationResult? CombineLossResults(IReadOnlyList<FarmListLossDeactivationResult>? results)
+    {
+        if (results is null || results.Count == 0)
+            return null;
+        if (results.Count == 1)
+            return results[0];
+        return new FarmListLossDeactivationResult(
+            results.Sum(result => result.RowsFound),
+            results.Sum(result => result.RowsDeactivated),
+            results.Sum(result => result.SkippedOasisRows),
+            results.Sum(result => result.RowsMoved),
+            results.Sum(result => result.MoveFailures));
+    }
 }

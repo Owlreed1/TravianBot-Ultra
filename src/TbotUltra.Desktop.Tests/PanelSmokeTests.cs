@@ -84,8 +84,14 @@ public sealed class PanelSmokeTests
         {
             var panel = new FarmingPanel();
 
-            Assert.Equal("Move red/yellow farms to list", panel.MoveLossesOption.Content);
-            Assert.Equal("DisplayText", panel.LossDestinationOption.DisplayMemberPath);
+            Assert.Equal("Red attacks", panel.DeactivateRedLossesOption.Content);
+            Assert.Equal("Yellow attacks", panel.DeactivateYellowLossesOption.Content);
+            Assert.Equal("Move to list", panel.MoveRedLossesOption.Content);
+            Assert.Equal("Move to list", panel.MoveYellowLossesOption.Content);
+            Assert.Equal("Red", panel.DeactivateRedOasisLossesOption.Content);
+            Assert.Equal("Yellow", panel.DeactivateYellowOasisLossesOption.Content);
+            Assert.Equal("DisplayText", panel.RedLossDestinationOption.DisplayMemberPath);
+            Assert.Equal("DisplayText", panel.YellowLossDestinationOption.DisplayMemberPath);
         });
     }
 

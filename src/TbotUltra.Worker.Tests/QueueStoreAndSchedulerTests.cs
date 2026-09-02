@@ -738,6 +738,32 @@ public sealed class QueueStoreAndSchedulerTests : IDisposable
         Assert.Equal("4711", parsed.LossDestinationListId);
         Assert.Equal("Yellow farms1", parsed.LossDestinationListName);
         Assert.Equal("Yellow farms", parsed.LossDestinationBaseName);
+        Assert.True(parsed.MoveRedLosses);
+        Assert.True(parsed.MoveYellowLosses);
+        Assert.Equal("4711", parsed.RedLossDestinationListId);
+        Assert.Equal("4711", parsed.YellowLossDestinationListId);
+    }
+
+    [Fact]
+    public void FarmingPayload_RoundTripsSeparateLossDestinations()
+    {
+        var payload = new FarmingPayload(
+            ["Raiders"],
+            ["39"],
+            MoveRedLosses: true,
+            RedLossDestinationListId: "red-id",
+            RedLossDestinationListName: "Red farms",
+            RedLossDestinationBaseName: "Red farms",
+            MoveYellowLosses: true,
+            YellowLossDestinationListId: "yellow-id",
+            YellowLossDestinationListName: "Yellow farms",
+            YellowLossDestinationBaseName: "Yellow farms");
+
+        Assert.True(FarmingPayload.TryFromDictionary(payload.ToDictionary(), out var parsed));
+        Assert.True(parsed!.MoveRedLosses);
+        Assert.True(parsed.MoveYellowLosses);
+        Assert.Equal("red-id", parsed.RedLossDestinationListId);
+        Assert.Equal("yellow-id", parsed.YellowLossDestinationListId);
     }
 
     [Fact]

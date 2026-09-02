@@ -388,6 +388,15 @@ public sealed partial class TravianClient : IFarmingClient
         bool includeUnoccupiedOasis,
         CancellationToken cancellationToken = default)
     {
+        return await DeactivateRequestedFarmListLossTargetsAsync(
+            new FarmListLossHandlingRequest(includeUnoccupiedOasis, false, string.Empty, string.Empty, string.Empty),
+            cancellationToken);
+    }
+
+    private async Task<FarmListLossDeactivationResult> DeactivateRequestedFarmListLossTargetsAsync(
+        FarmListLossHandlingRequest request,
+        CancellationToken cancellationToken)
+    {
         LogFunctionStarted();
         await EnsureLoggedInAsync(cancellationToken: cancellationToken);
         if (!await ReadGoldClubEnabledAsync(cancellationToken))
@@ -402,9 +411,9 @@ public sealed partial class TravianClient : IFarmingClient
         await EnsureOfficialFarmListsExpandedAsync(cancellationToken);
 
         var initialRows = await ReadFarmListLossRowsFromCurrentPageAsync(cancellationToken);
-        var lossRows = initialRows.Where(IsFarmListLossRow).ToList();
+        var lossRows = initialRows.Where(row => MatchesRequestedFarmListLossColor(row, request)).ToList();
         var skippedOasisRows = lossRows.Count(row =>
-            !includeUnoccupiedOasis && FarmListLossStateClassifier.IsUnoccupiedOasis(row.TargetName));
+            !request.IncludeUnoccupiedOasis && FarmListLossStateClassifier.IsUnoccupiedOasis(row.TargetName));
         var unknownRaidClasses = initialRows
             .Where(row => !string.IsNullOrWhiteSpace(row.RaidClass))
             .Where(row => row.RaidClass!.Contains("attack_", StringComparison.OrdinalIgnoreCase))
@@ -418,7 +427,7 @@ public sealed partial class TravianClient : IFarmingClient
             Notify($"[farm-list] red/yellow scan saw unknown raid state class(es): {string.Join(", ", unknownRaidClasses)}");
         }
 
-        Notify($"[farm-list] red/yellow loss scan found {lossRows.Count} active row(s); skipped oasis={skippedOasisRows}; includeOasis={includeUnoccupiedOasis}.");
+        Notify($"[farm-list] {DescribeLossColors(request.LossColors)} loss scan found {lossRows.Count} active row(s); skipped oasis={skippedOasisRows}; includeOasis={request.IncludeUnoccupiedOasis}.");
 
         var deactivated = 0;
         for (var attempt = 1; attempt <= MaxFarmsPerFarmList * 2; attempt++)
@@ -427,7 +436,7 @@ public sealed partial class TravianClient : IFarmingClient
             var rows = attempt == 1
                 ? initialRows
                 : await ReadFarmListLossRowsFromCurrentPageAsync(cancellationToken);
-            var candidate = rows.FirstOrDefault(row => IsFarmListLossDeactivationCandidate(row, includeUnoccupiedOasis));
+            var candidate = rows.FirstOrDefault(row => IsRequestedFarmListLossRow(row, request));
             if (candidate is null)
             {
                 break;
@@ -445,8 +454,8 @@ public sealed partial class TravianClient : IFarmingClient
             await Task.Delay(Random.Shared.Next(150, 350), cancellationToken); // Random wait
         }
 
-        Notify($"[farm-list] red/yellow loss deactivation done: found={lossRows.Count}, deactivated={deactivated}, skippedOasis={skippedOasisRows}.");
-        return new FarmListLossDeactivationResult(lossRows.Count, deactivated, skippedOasisRows);
+        Notify($"[farm-list] {DescribeLossColors(request.LossColors)} loss deactivation done: found={lossRows.Count}, deactivated={deactivated}, skippedOasis={skippedOasisRows}.");
+        return new FarmListLossDeactivationResult(lossRows.Count, deactivated, skippedOasisRows, LossColors: request.LossColors);
     }
 
     public async Task<FarmListLossDeactivationResult> HandleFarmListLossTargetsAsync(
@@ -456,7 +465,7 @@ public sealed partial class TravianClient : IFarmingClient
         ArgumentNullException.ThrowIfNull(request);
         if (!request.MoveLosses)
         {
-            return await DeactivateFarmListLossTargetsAsync(request.IncludeUnoccupiedOasis, cancellationToken);
+            return await DeactivateRequestedFarmListLossTargetsAsync(request, cancellationToken);
         }
 
         LogFunctionStarted();
@@ -480,26 +489,12 @@ public sealed partial class TravianClient : IFarmingClient
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Notify($"ALARM: [farm-list] loss destination could not be prepared: {ex.Message}. Falling back to deactivation only.");
-            if (request.YellowLossesOnly || request.MaxTargets is > 0)
-            {
-                var constrainedRows = await ReadFarmListLossRowsFromCurrentPageAsync(cancellationToken);
-                var constrainedFound = constrainedRows.Count(row =>
-                    IsRequestedFarmListLossRow(row, request)
-                    && !FarmListLossStateClassifier.IsUnoccupiedOasis(row.TargetName));
-                Notify("ALARM: [farm-list:debug] destination preparation failed; constrained test will not run broad deactivation fallback.");
-                return new FarmListLossDeactivationResult(
-                    constrainedFound,
-                    0,
-                    0,
-                    MoveFailures: constrainedFound > 0 ? 1 : 0);
-            }
-
-            var fallback = await DeactivateFarmListLossTargetsAsync(request.IncludeUnoccupiedOasis, cancellationToken);
+            var fallback = await DeactivateRequestedFarmListLossTargetsAsync(request with { MoveLosses = false }, cancellationToken);
             return fallback with { MoveFailures = fallback.RowsDeactivated };
         }
 
         var initialRows = await ReadFarmListLossRowsFromCurrentPageAsync(cancellationToken);
-        var lossRows = initialRows.Where(row => IsRequestedFarmListLossRow(row, request)).ToList();
+        var lossRows = initialRows.Where(row => MatchesRequestedFarmListLossColor(row, request)).ToList();
         var skippedOasisRows = lossRows.Count(row =>
             !request.IncludeUnoccupiedOasis && FarmListLossStateClassifier.IsUnoccupiedOasis(row.TargetName));
         var deactivated = 0;
@@ -637,7 +632,8 @@ public sealed partial class TravianClient : IFarmingClient
             moveFailures,
             destination.Id,
             destination.Name,
-            destination.Changed);
+            destination.Changed,
+            request.LossColors);
     }
 
     private async Task<LossDestinationResolution> ResolveLossDestinationAsync(
@@ -1696,18 +1692,37 @@ public sealed partial class TravianClient : IFarmingClient
 
     private static bool IsRequestedFarmListLossRow(FarmListLossRowJs row, FarmListLossHandlingRequest request)
     {
-        return IsFarmListLossRow(row)
-            && (!request.YellowLossesOnly || FarmListLossStateClassifier.IsYellowLoss(row.RaidClass));
+        if (!MatchesRequestedFarmListLossColor(row, request))
+        {
+            return false;
+        }
+
+        return FarmListLossStateClassifier.IsUnoccupiedOasis(row.TargetName)
+            ? request.IncludeUnoccupiedOasis
+            : request.IncludeNonOasisLosses;
+    }
+
+    private static bool MatchesRequestedFarmListLossColor(FarmListLossRowJs row, FarmListLossHandlingRequest request)
+    {
+        if (!IsFarmListLossRow(row))
+        {
+            return false;
+        }
+
+        var colors = request.LossColors;
+        return (colors.HasFlag(FarmListLossColors.Red) && FarmListLossStateClassifier.IsRedLoss(row.RaidClass))
+            || (colors.HasFlag(FarmListLossColors.Yellow) && FarmListLossStateClassifier.IsYellowLoss(row.RaidClass));
     }
 
     private static string FarmListLossRowKey(FarmListLossRowJs row)
         => string.IsNullOrWhiteSpace(row.SlotId) ? $"row:{row.RowIndex}" : row.SlotId;
 
-    private static bool IsFarmListLossDeactivationCandidate(FarmListLossRowJs row, bool includeUnoccupiedOasis)
+    private static string DescribeLossColors(FarmListLossColors colors) => colors switch
     {
-        return IsFarmListLossRow(row)
-            && (includeUnoccupiedOasis || !FarmListLossStateClassifier.IsUnoccupiedOasis(row.TargetName));
-    }
+        FarmListLossColors.Red => "red",
+        FarmListLossColors.Yellow => "yellow",
+        _ => "red/yellow",
+    };
 
     private async Task<bool> TryDeactivateFarmListLossRowAsync(FarmListLossRowJs row, CancellationToken cancellationToken)
     {

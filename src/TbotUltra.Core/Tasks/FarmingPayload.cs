@@ -15,19 +15,39 @@ public sealed record FarmingPayload(
     bool MoveLosses = false,
     string? LossDestinationListId = null,
     string? LossDestinationListName = null,
-    string? LossDestinationBaseName = null)
+    string? LossDestinationBaseName = null,
+    bool MoveRedLosses = false,
+    string? RedLossDestinationListId = null,
+    string? RedLossDestinationListName = null,
+    string? RedLossDestinationBaseName = null,
+    bool MoveYellowLosses = false,
+    string? YellowLossDestinationListId = null,
+    string? YellowLossDestinationListName = null,
+    string? YellowLossDestinationBaseName = null)
 {
     public static bool TryFromDictionary(IReadOnlyDictionary<string, string> payload, out FarmingPayload? result)
     {
         var names = ParseList(ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmListNames));
         var ids = ParseList(ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmListIds));
+        var legacyMove = ReadBool(payload, BotOptionPayloadKeys.ContinuousFarmMoveLosses);
+        var legacyListId = ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmLossDestinationListId);
+        var legacyListName = ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmLossDestinationListName);
+        var legacyBaseName = ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName);
         result = new FarmingPayload(
             names,
             ids,
-            ReadBool(payload, BotOptionPayloadKeys.ContinuousFarmMoveLosses),
-            ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmLossDestinationListId),
-            ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmLossDestinationListName),
-            ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName));
+            legacyMove,
+            legacyListId,
+            legacyListName,
+            legacyBaseName,
+            ReadBool(payload, BotOptionPayloadKeys.ContinuousFarmMoveRedLosses, legacyMove),
+            ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListId) ?? legacyListId,
+            ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListName) ?? legacyListName,
+            ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmRedLossDestinationBaseName) ?? legacyBaseName,
+            ReadBool(payload, BotOptionPayloadKeys.ContinuousFarmMoveYellowLosses, legacyMove),
+            ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListId) ?? legacyListId,
+            ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListName) ?? legacyListName,
+            ReadTrimmed(payload, BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationBaseName) ?? legacyBaseName);
         return true;
     }
 
@@ -51,6 +71,16 @@ public sealed record FarmingPayload(
         AddIfPresent(dictionary, BotOptionPayloadKeys.ContinuousFarmLossDestinationListId, LossDestinationListId);
         AddIfPresent(dictionary, BotOptionPayloadKeys.ContinuousFarmLossDestinationListName, LossDestinationListName);
         AddIfPresent(dictionary, BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName, LossDestinationBaseName);
+        if (MoveRedLosses || RedLossDestinationListId is not null || RedLossDestinationListName is not null || RedLossDestinationBaseName is not null)
+            dictionary[BotOptionPayloadKeys.ContinuousFarmMoveRedLosses] = MoveRedLosses.ToString();
+        if (MoveYellowLosses || YellowLossDestinationListId is not null || YellowLossDestinationListName is not null || YellowLossDestinationBaseName is not null)
+            dictionary[BotOptionPayloadKeys.ContinuousFarmMoveYellowLosses] = MoveYellowLosses.ToString();
+        AddIfPresent(dictionary, BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListId, RedLossDestinationListId);
+        AddIfPresent(dictionary, BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListName, RedLossDestinationListName);
+        AddIfPresent(dictionary, BotOptionPayloadKeys.ContinuousFarmRedLossDestinationBaseName, RedLossDestinationBaseName);
+        AddIfPresent(dictionary, BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListId, YellowLossDestinationListId);
+        AddIfPresent(dictionary, BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListName, YellowLossDestinationListName);
+        AddIfPresent(dictionary, BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationBaseName, YellowLossDestinationBaseName);
 
         return dictionary;
     }
@@ -89,6 +119,9 @@ public sealed record FarmingPayload(
 
     private static bool ReadBool(IReadOnlyDictionary<string, string> payload, string key)
         => payload.TryGetValue(key, out var value) && bool.TryParse(value, out var parsed) && parsed;
+
+    private static bool ReadBool(IReadOnlyDictionary<string, string> payload, string key, bool fallback)
+        => payload.TryGetValue(key, out var value) && bool.TryParse(value, out var parsed) ? parsed : fallback;
 
     private static string JoinDistinct(IReadOnlyList<string> values)
     {

@@ -640,6 +640,12 @@ Published artifacts belong under `artifacts/`, never beside source files.
   treat both Playwright and system timeouts as a row-level retry. Confirm a duplicate override at most once;
   if the saved state remains ambiguous, refresh once and verify slot id, destination list id, and disabled state
   before allowing another mutation attempt.
+- Farm-list loss handling is configured independently for red (`attack_lost`) and yellow
+  (`attack_won_withLosses`) results. Each color has its own move toggle, destination identity, and rollover base
+  name; moving requires that color's non-oasis deactivation toggle. Oasis deactivation has independent red/yellow
+  selections and never moves oasis targets. Enabling a move toggle may start destination setup only while the user
+  is already logged in; logged-out attempts are reverted with a login-required dialog and must never start login or
+  browser work. Legacy combined settings seed both colors and both destinations.
 - Analyzed farm lists persist per account (`FarmListsSnapshotPath`) and are restored into the panel at
   startup / account switch so it is never blank; restored timers are re-based on the capture time and
   `_lastFarmListsAnalysisAt` stays `MinValue` so a real re-analyze still fires when due.

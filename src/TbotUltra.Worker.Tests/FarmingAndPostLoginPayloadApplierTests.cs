@@ -47,6 +47,14 @@ public sealed class FarmingAndPostLoginPayloadApplierTests
         Assert.Equal("4711", result.ContinuousFarmLossDestinationListId);
         Assert.Equal("Yellow farms", result.ContinuousFarmLossDestinationListName);
         Assert.Equal("Yellow farms", result.ContinuousFarmLossDestinationBaseName);
+        Assert.True(result.ContinuousFarmDeactivateRedLosses);
+        Assert.True(result.ContinuousFarmDeactivateYellowLosses);
+        Assert.True(result.ContinuousFarmDeactivateRedOasisLosses);
+        Assert.True(result.ContinuousFarmDeactivateYellowOasisLosses);
+        Assert.True(result.ContinuousFarmMoveRedLosses);
+        Assert.True(result.ContinuousFarmMoveYellowLosses);
+        Assert.Equal("4711", result.ContinuousFarmRedLossDestinationListId);
+        Assert.Equal("4711", result.ContinuousFarmYellowLossDestinationListId);
         Assert.Equal(0, result.ContinuousFarmNextListIndex);
         Assert.False(result.PostLoginAnalyzeFarmlists);
         Assert.False(result.PostLoginAnalyzeHero);
@@ -68,5 +76,28 @@ public sealed class FarmingAndPostLoginPayloadApplierTests
         });
 
         Assert.False(result.ContinuousFarmMoveLosses);
+        Assert.False(result.ContinuousFarmMoveRedLosses);
+        Assert.False(result.ContinuousFarmMoveYellowLosses);
+    }
+
+    [Fact]
+    public void Apply_MapsIndependentLossColorsAndDestinations()
+    {
+        var result = BotOptionsPayloadApplier.Apply(new BotOptions(), new Dictionary<string, string>
+        {
+            [BotOptionPayloadKeys.ContinuousFarmDeactivateRedLosses] = "false",
+            [BotOptionPayloadKeys.ContinuousFarmDeactivateYellowLosses] = "true",
+            [BotOptionPayloadKeys.ContinuousFarmMoveRedLosses] = "true",
+            [BotOptionPayloadKeys.ContinuousFarmMoveYellowLosses] = "true",
+            [BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListName] = "Red farms",
+            [BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListName] = "Yellow farms",
+        });
+
+        Assert.False(result.ContinuousFarmDeactivateRedLosses);
+        Assert.True(result.ContinuousFarmDeactivateYellowLosses);
+        Assert.False(result.ContinuousFarmMoveRedLosses);
+        Assert.True(result.ContinuousFarmMoveYellowLosses);
+        Assert.Equal("Red farms", result.ContinuousFarmRedLossDestinationListName);
+        Assert.Equal("Yellow farms", result.ContinuousFarmYellowLossDestinationListName);
     }
 }

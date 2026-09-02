@@ -30,4 +30,13 @@ public sealed class FarmListLossStateClassifierTests
     {
         Assert.Equal(expected, FarmListLossStateClassifier.IsYellowLoss(classNames));
     }
+
+    [Theory]
+    [InlineData("lastRaidState attack_lost_small", true)]
+    [InlineData("lastRaidState attack_won_withLosses_small", false)]
+    [InlineData("lastRaidState attack_won_withoutLosses_small", false)]
+    public void IsRedLoss_OnlyMatchesLost(string classNames, bool expected)
+    {
+        Assert.Equal(expected, FarmListLossStateClassifier.IsRedLoss(classNames));
+    }
 }

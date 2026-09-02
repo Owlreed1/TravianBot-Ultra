@@ -39,41 +39,68 @@ public sealed class FarmingPanelService(IFarmingPanelClient client, BotConfigSto
     public FarmingSettingsSaveResult SaveSettings(FarmingPanelSettings settings)
     {
         var config = configStore.Load();
-        var existingDestinationId = config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId]?.GetValue<string>() ?? string.Empty;
-        var priorBaseName = config[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName]?.GetValue<string>();
-        var destination = settings.SelectedDestination;
-        var moveEnabled = settings.DeactivateLosses && settings.MoveLosses && destination is not null;
-        var destinationChangedByUser = destination is not null
-            && !string.Equals(existingDestinationId, destination.ListId, StringComparison.OrdinalIgnoreCase);
+        var redDestination = settings.SelectedRedDestination;
+        var yellowDestination = settings.SelectedYellowDestination;
+        var redMoveEnabled = settings.DeactivateRedLosses && settings.MoveRedLosses && redDestination is not null;
+        var yellowMoveEnabled = settings.DeactivateYellowLosses && settings.MoveYellowLosses && yellowDestination is not null;
 
         config[BotOptionPayloadKeys.ContinuousFarmSendMode] = settings.SendAllLists
             ? FarmingDefaults.SendModeAllAtOnce
             : FarmingDefaults.SendModeListPerList;
         config[BotOptionPayloadKeys.ContinuousFarmDispatchDelayMinMinutes] = settings.DispatchDelayMinMinutes;
         config[BotOptionPayloadKeys.ContinuousFarmDispatchDelayMaxMinutes] = settings.DispatchDelayMaxMinutes;
-        config[BotOptionPayloadKeys.ContinuousFarmDeactivateLosses] = settings.DeactivateLosses;
-        config[BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses] = settings.DeactivateOasisLosses;
-        config[BotOptionPayloadKeys.ContinuousFarmMoveLosses] = moveEnabled;
-        config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId] = destination?.ListId ?? string.Empty;
-        config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListName] = destination?.Name ?? string.Empty;
-        config[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] = destinationChangedByUser || string.IsNullOrWhiteSpace(priorBaseName)
-            ? destination?.Name ?? string.Empty
-            : priorBaseName;
+        config[BotOptionPayloadKeys.ContinuousFarmDeactivateRedLosses] = settings.DeactivateRedLosses;
+        config[BotOptionPayloadKeys.ContinuousFarmDeactivateYellowLosses] = settings.DeactivateYellowLosses;
+        config[BotOptionPayloadKeys.ContinuousFarmDeactivateRedOasisLosses] = settings.DeactivateRedOasisLosses;
+        config[BotOptionPayloadKeys.ContinuousFarmDeactivateYellowOasisLosses] = settings.DeactivateYellowOasisLosses;
+        config[BotOptionPayloadKeys.ContinuousFarmMoveRedLosses] = redMoveEnabled;
+        config[BotOptionPayloadKeys.ContinuousFarmMoveYellowLosses] = yellowMoveEnabled;
+        SaveDestination(config, true, redDestination);
+        SaveDestination(config, false, yellowDestination);
+
+        // Keep legacy aggregate keys coherent for older queued payloads while all new behavior reads the split keys.
+        config[BotOptionPayloadKeys.ContinuousFarmDeactivateLosses] = settings.DeactivateRedLosses || settings.DeactivateYellowLosses;
+        config[BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses] = settings.DeactivateRedOasisLosses || settings.DeactivateYellowOasisLosses;
+        config[BotOptionPayloadKeys.ContinuousFarmMoveLosses] = redMoveEnabled || yellowMoveEnabled;
         configStore.Save(config);
 
         return new FarmingSettingsSaveResult(
             settings.SendAllLists ? FarmingDefaults.SendModeAllAtOnce : FarmingDefaults.SendModeListPerList,
             settings.DispatchDelayMinMinutes,
             settings.DispatchDelayMaxMinutes,
-            moveEnabled,
-            destination?.Name);
+            redMoveEnabled,
+            yellowMoveEnabled,
+            redDestination?.Name,
+            yellowDestination?.Name);
     }
 
-    public void SaveDestinationBaseName(string name)
+    public void SaveDestinationBaseName(bool isRed, string name)
     {
         var config = configStore.Load();
-        config[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] = name;
+        config[isRed
+            ? BotOptionPayloadKeys.ContinuousFarmRedLossDestinationBaseName
+            : BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationBaseName] = name;
         configStore.Save(config);
+    }
+
+    private static void SaveDestination(System.Text.Json.Nodes.JsonObject config, bool isRed, FarmLossDestinationOption? destination)
+    {
+        var idKey = isRed ? BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListId : BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListId;
+        var nameKey = isRed ? BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListName : BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListName;
+        var baseNameKey = isRed ? BotOptionPayloadKeys.ContinuousFarmRedLossDestinationBaseName : BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationBaseName;
+        var existingId = config[idKey]?.GetValue<string>()
+            ?? config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId]?.GetValue<string>()
+            ?? string.Empty;
+        var priorBaseName = config[baseNameKey]?.GetValue<string>()
+            ?? config[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName]?.GetValue<string>();
+        var changedByUser = destination is not null
+            && !string.Equals(existingId, destination.ListId, StringComparison.OrdinalIgnoreCase);
+
+        config[idKey] = destination?.ListId ?? string.Empty;
+        config[nameKey] = destination?.Name ?? string.Empty;
+        config[baseNameKey] = changedByUser || string.IsNullOrWhiteSpace(priorBaseName)
+            ? destination?.Name ?? string.Empty
+            : priorBaseName;
     }
 }
 
@@ -81,14 +108,20 @@ public sealed record FarmingPanelSettings(
     bool SendAllLists,
     int DispatchDelayMinMinutes,
     int DispatchDelayMaxMinutes,
-    bool DeactivateLosses,
-    bool DeactivateOasisLosses,
-    bool MoveLosses,
-    FarmLossDestinationOption? SelectedDestination);
+    bool DeactivateRedLosses,
+    bool DeactivateYellowLosses,
+    bool DeactivateRedOasisLosses,
+    bool DeactivateYellowOasisLosses,
+    bool MoveRedLosses,
+    bool MoveYellowLosses,
+    FarmLossDestinationOption? SelectedRedDestination,
+    FarmLossDestinationOption? SelectedYellowDestination);
 
 public sealed record FarmingSettingsSaveResult(
     string SendMode,
     int DelayMinMinutes,
     int DelayMaxMinutes,
-    bool MoveLossesEnabled,
-    string? DestinationName);
+    bool MoveRedLossesEnabled,
+    bool MoveYellowLossesEnabled,
+    string? RedDestinationName,
+    string? YellowDestinationName);

@@ -7,12 +7,18 @@ internal sealed record FarmingPayloadValues(
     int DispatchDelayMaxMinutes,
     string SendMode,
     string TownHallCelebrationMode,
-    bool DeactivateLosses,
-    bool DeactivateOasisLosses,
-    bool MoveLosses,
-    string LossDestinationListId,
-    string LossDestinationListName,
-    string LossDestinationBaseName,
+    bool DeactivateRedLosses,
+    bool DeactivateYellowLosses,
+    bool DeactivateRedOasisLosses,
+    bool DeactivateYellowOasisLosses,
+    bool MoveRedLosses,
+    bool MoveYellowLosses,
+    string RedLossDestinationListId,
+    string RedLossDestinationListName,
+    string RedLossDestinationBaseName,
+    string YellowLossDestinationListId,
+    string YellowLossDestinationListName,
+    string YellowLossDestinationBaseName,
     int NextListIndex);
 
 internal static class FarmingPayloadApplier
@@ -26,16 +32,24 @@ internal static class FarmingPayloadApplier
             source.ContinuousFarmDispatchDelayMaxMinutes,
             source.ContinuousFarmSendMode,
             source.TownHallCelebrationMode,
-            source.ContinuousFarmDeactivateLosses,
-            source.ContinuousFarmDeactivateOasisLosses,
-            source.ContinuousFarmMoveLosses,
-            source.ContinuousFarmLossDestinationListId,
-            source.ContinuousFarmLossDestinationListName,
-            source.ContinuousFarmLossDestinationBaseName,
+            source.ContinuousFarmDeactivateRedLosses,
+            source.ContinuousFarmDeactivateYellowLosses,
+            source.ContinuousFarmDeactivateRedOasisLosses,
+            source.ContinuousFarmDeactivateYellowOasisLosses,
+            source.ContinuousFarmMoveRedLosses,
+            source.ContinuousFarmMoveYellowLosses,
+            source.ContinuousFarmRedLossDestinationListId,
+            source.ContinuousFarmRedLossDestinationListName,
+            source.ContinuousFarmRedLossDestinationBaseName,
+            source.ContinuousFarmYellowLossDestinationListId,
+            source.ContinuousFarmYellowLossDestinationListName,
+            source.ContinuousFarmYellowLossDestinationBaseName,
             source.ContinuousFarmNextListIndex);
 
         if (payload is null)
             return result;
+
+        ApplyLegacyFallbacks(payload, ref result);
 
         foreach (var pair in payload)
         {
@@ -56,23 +70,94 @@ internal static class FarmingPayloadApplier
                 result = result with { SendMode = FarmingDefaults.NormalizeSendMode(value) };
             else if (key.Equals(BotOptionPayloadKeys.TownHallCelebrationMode, StringComparison.OrdinalIgnoreCase))
                 result = result with { TownHallCelebrationMode = TownHallCelebrationDefaults.NormalizeMode(value) };
-            else if (TryReadBool(key, value, BotOptionPayloadKeys.ContinuousFarmDeactivateLosses, out var losses))
-                result = result with { DeactivateLosses = losses };
-            else if (TryReadBool(key, value, BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses, out var oasisLosses))
-                result = result with { DeactivateOasisLosses = oasisLosses };
-            else if (TryReadBool(key, value, BotOptionPayloadKeys.ContinuousFarmMoveLosses, out var moveLosses))
-                result = result with { MoveLosses = moveLosses };
-            else if (key.Equals(BotOptionPayloadKeys.ContinuousFarmLossDestinationListId, StringComparison.OrdinalIgnoreCase))
-                result = result with { LossDestinationListId = value };
-            else if (key.Equals(BotOptionPayloadKeys.ContinuousFarmLossDestinationListName, StringComparison.OrdinalIgnoreCase))
-                result = result with { LossDestinationListName = value };
-            else if (key.Equals(BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName, StringComparison.OrdinalIgnoreCase))
-                result = result with { LossDestinationBaseName = value };
+            else if (TryReadBool(key, value, BotOptionPayloadKeys.ContinuousFarmDeactivateRedLosses, out var deactivateRed))
+                result = result with { DeactivateRedLosses = deactivateRed };
+            else if (TryReadBool(key, value, BotOptionPayloadKeys.ContinuousFarmDeactivateYellowLosses, out var deactivateYellow))
+                result = result with { DeactivateYellowLosses = deactivateYellow };
+            else if (TryReadBool(key, value, BotOptionPayloadKeys.ContinuousFarmDeactivateRedOasisLosses, out var deactivateRedOasis))
+                result = result with { DeactivateRedOasisLosses = deactivateRedOasis };
+            else if (TryReadBool(key, value, BotOptionPayloadKeys.ContinuousFarmDeactivateYellowOasisLosses, out var deactivateYellowOasis))
+                result = result with { DeactivateYellowOasisLosses = deactivateYellowOasis };
+            else if (TryReadBool(key, value, BotOptionPayloadKeys.ContinuousFarmMoveRedLosses, out var moveRed))
+                result = result with { MoveRedLosses = moveRed };
+            else if (TryReadBool(key, value, BotOptionPayloadKeys.ContinuousFarmMoveYellowLosses, out var moveYellow))
+                result = result with { MoveYellowLosses = moveYellow };
+            else if (key.Equals(BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListId, StringComparison.OrdinalIgnoreCase))
+                result = result with { RedLossDestinationListId = value };
+            else if (key.Equals(BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListName, StringComparison.OrdinalIgnoreCase))
+                result = result with { RedLossDestinationListName = value };
+            else if (key.Equals(BotOptionPayloadKeys.ContinuousFarmRedLossDestinationBaseName, StringComparison.OrdinalIgnoreCase))
+                result = result with { RedLossDestinationBaseName = value };
+            else if (key.Equals(BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListId, StringComparison.OrdinalIgnoreCase))
+                result = result with { YellowLossDestinationListId = value };
+            else if (key.Equals(BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListName, StringComparison.OrdinalIgnoreCase))
+                result = result with { YellowLossDestinationListName = value };
+            else if (key.Equals(BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationBaseName, StringComparison.OrdinalIgnoreCase))
+                result = result with { YellowLossDestinationBaseName = value };
             else if (TryReadInt(key, value, BotOptionPayloadKeys.ContinuousFarmNextListIndex, out var nextIndex))
                 result = result with { NextListIndex = Math.Max(0, nextIndex) };
         }
 
-        return result;
+        return result with
+        {
+            MoveRedLosses = result.DeactivateRedLosses && result.MoveRedLosses,
+            MoveYellowLosses = result.DeactivateYellowLosses && result.MoveYellowLosses,
+        };
+    }
+
+    private static void ApplyLegacyFallbacks(IReadOnlyDictionary<string, string> payload, ref FarmingPayloadValues result)
+    {
+        if (TryGetBool(payload, BotOptionPayloadKeys.ContinuousFarmDeactivateLosses, out var deactivateLosses))
+        {
+            if (!ContainsKey(payload, BotOptionPayloadKeys.ContinuousFarmDeactivateRedLosses))
+                result = result with { DeactivateRedLosses = deactivateLosses };
+            if (!ContainsKey(payload, BotOptionPayloadKeys.ContinuousFarmDeactivateYellowLosses))
+                result = result with { DeactivateYellowLosses = deactivateLosses };
+        }
+
+        if (TryGetBool(payload, BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses, out var deactivateOasisLosses))
+        {
+            if (!ContainsKey(payload, BotOptionPayloadKeys.ContinuousFarmDeactivateRedOasisLosses))
+                result = result with { DeactivateRedOasisLosses = deactivateOasisLosses };
+            if (!ContainsKey(payload, BotOptionPayloadKeys.ContinuousFarmDeactivateYellowOasisLosses))
+                result = result with { DeactivateYellowOasisLosses = deactivateOasisLosses };
+        }
+
+        if (TryGetBool(payload, BotOptionPayloadKeys.ContinuousFarmMoveLosses, out var moveLosses))
+        {
+            if (!ContainsKey(payload, BotOptionPayloadKeys.ContinuousFarmMoveRedLosses))
+                result = result with { MoveRedLosses = moveLosses };
+            if (!ContainsKey(payload, BotOptionPayloadKeys.ContinuousFarmMoveYellowLosses))
+                result = result with { MoveYellowLosses = moveLosses };
+        }
+
+        var legacyListId = ReadLegacyString(payload, BotOptionPayloadKeys.ContinuousFarmLossDestinationListId);
+        var legacyListName = ReadLegacyString(payload, BotOptionPayloadKeys.ContinuousFarmLossDestinationListName);
+        var legacyBaseName = ReadLegacyString(payload, BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName);
+        result = result with
+        {
+            RedLossDestinationListId = ContainsKey(payload, BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListId) || legacyListId is null ? result.RedLossDestinationListId : legacyListId,
+            YellowLossDestinationListId = ContainsKey(payload, BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListId) || legacyListId is null ? result.YellowLossDestinationListId : legacyListId,
+            RedLossDestinationListName = ContainsKey(payload, BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListName) || legacyListName is null ? result.RedLossDestinationListName : legacyListName,
+            YellowLossDestinationListName = ContainsKey(payload, BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListName) || legacyListName is null ? result.YellowLossDestinationListName : legacyListName,
+            RedLossDestinationBaseName = ContainsKey(payload, BotOptionPayloadKeys.ContinuousFarmRedLossDestinationBaseName) || legacyBaseName is null ? result.RedLossDestinationBaseName : legacyBaseName,
+            YellowLossDestinationBaseName = ContainsKey(payload, BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationBaseName) || legacyBaseName is null ? result.YellowLossDestinationBaseName : legacyBaseName,
+        };
+    }
+
+    private static string? ReadLegacyString(IReadOnlyDictionary<string, string> payload, string key)
+    {
+        var value = payload.FirstOrDefault(pair => pair.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value?.Trim();
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private static bool ContainsKey(IReadOnlyDictionary<string, string> payload, string key)
+        => payload.Keys.Any(candidate => candidate.Equals(key, StringComparison.OrdinalIgnoreCase));
+
+    private static bool TryGetBool(IReadOnlyDictionary<string, string> payload, string key, out bool parsed)
+    {
+        var value = payload.FirstOrDefault(pair => pair.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value;
+        return bool.TryParse(value, out parsed);
     }
 
     private static List<string> ParseList(string value)

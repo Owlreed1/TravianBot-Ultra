@@ -1338,9 +1338,12 @@ public partial class MainWindow
                 string.Equals(mode, FarmingDefaults.SendModeAllAtOnce, StringComparison.Ordinal),
                 options.ContinuousFarmDispatchDelayMinMinutes,
                 options.ContinuousFarmDispatchDelayMaxMinutes,
-                options.ContinuousFarmDeactivateLosses,
-                options.ContinuousFarmDeactivateOasisLosses,
-                options.ContinuousFarmMoveLosses);
+                options.ContinuousFarmDeactivateRedLosses,
+                options.ContinuousFarmDeactivateYellowLosses,
+                options.ContinuousFarmDeactivateRedOasisLosses,
+                options.ContinuousFarmDeactivateYellowOasisLosses,
+                options.ContinuousFarmMoveRedLosses,
+                options.ContinuousFarmMoveYellowLosses);
             RefreshFarmLossDestinationOptions(options);
         }
         finally
@@ -1368,11 +1371,15 @@ public partial class MainWindow
                 _farmListsViewModel.SendAllLists,
                 delayMinMinutes,
                 delayMaxMinutes,
-                _farmListsViewModel.DeactivateLosses,
-                _farmListsViewModel.DeactivateOasisLosses,
-                _farmListsViewModel.MoveLosses,
-                _farmListsViewModel.SelectedLossDestination));
-            AppendLog($"[farm-settings] mode={saved.SendMode}; delay={saved.DelayMinMinutes}-{saved.DelayMaxMinutes}m; deactivateLosses={_farmListsViewModel.DeactivateLosses}; deactivateOasis={_farmListsViewModel.DeactivateOasisLosses}; moveLosses={saved.MoveLossesEnabled}; destination='{saved.DestinationName ?? "-"}'");
+                _farmListsViewModel.DeactivateRedLosses,
+                _farmListsViewModel.DeactivateYellowLosses,
+                _farmListsViewModel.DeactivateRedOasisLosses,
+                _farmListsViewModel.DeactivateYellowOasisLosses,
+                _farmListsViewModel.MoveRedLosses,
+                _farmListsViewModel.MoveYellowLosses,
+                _farmListsViewModel.SelectedRedLossDestination,
+                _farmListsViewModel.SelectedYellowLossDestination));
+            AppendLog($"[farm-settings] mode={saved.SendMode}; delay={saved.DelayMinMinutes}-{saved.DelayMaxMinutes}m; deactivateRed={_farmListsViewModel.DeactivateRedLosses}; deactivateYellow={_farmListsViewModel.DeactivateYellowLosses}; oasisRed={_farmListsViewModel.DeactivateRedOasisLosses}; oasisYellow={_farmListsViewModel.DeactivateYellowOasisLosses}; moveRed={saved.MoveRedLossesEnabled}; redDestination='{saved.RedDestinationName ?? "-"}'; moveYellow={saved.MoveYellowLossesEnabled}; yellowDestination='{saved.YellowDestinationName ?? "-"}'");
             UpdateAutomationLoopRunningIndicators();
             RefreshQueuedFarmLossDestinationSettings();
         }
@@ -1444,14 +1451,15 @@ public partial class MainWindow
             try
             {
                 var config = _botConfigStore.Load();
-                config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId] = change.ListId;
-                config[BotOptionPayloadKeys.ContinuousFarmLossDestinationListName] = change.ListName;
-                config[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] = change.BaseName;
-                config[BotOptionPayloadKeys.ContinuousFarmMoveLosses] = true;
+                var isRed = change.LossColors == FarmListLossColors.Red;
+                config[isRed ? BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListId : BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListId] = change.ListId;
+                config[isRed ? BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListName : BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListName] = change.ListName;
+                config[isRed ? BotOptionPayloadKeys.ContinuousFarmRedLossDestinationBaseName : BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationBaseName] = change.BaseName;
+                config[isRed ? BotOptionPayloadKeys.ContinuousFarmMoveRedLosses : BotOptionPayloadKeys.ContinuousFarmMoveYellowLosses] = true;
                 _botConfigStore.Save(config);
                 SelectChangedFarmLossDestination(change);
                 RefreshQueuedFarmLossDestinationSettings();
-                AppendLog($"[farm-list] loss destination changed to '{change.ListName}' ({change.ListId}).");
+                AppendLog($"[farm-list] {change.LossColors.ToString().ToLowerInvariant()} loss destination changed to '{change.ListName}' ({change.ListId}).");
             }
             catch (Exception ex)
             {
@@ -1471,8 +1479,14 @@ public partial class MainWindow
         _suppressFarmingSettingsConfigWrite = true;
         try
         {
-            _farmListsViewModel.ReplaceLossDestinations(options, selected);
-            _farmListsViewModel.MoveLosses = true;
+            _farmListsViewModel.ReplaceLossDestinations(
+                options,
+                change.LossColors == FarmListLossColors.Red ? selected : _farmListsViewModel.SelectedRedLossDestination,
+                change.LossColors == FarmListLossColors.Yellow ? selected : _farmListsViewModel.SelectedYellowLossDestination);
+            if (change.LossColors == FarmListLossColors.Red)
+                _farmListsViewModel.MoveRedLosses = true;
+            else
+                _farmListsViewModel.MoveYellowLosses = true;
         }
         finally
         {
@@ -1485,10 +1499,18 @@ public partial class MainWindow
         var options = LoadBotOptions();
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            [BotOptionPayloadKeys.ContinuousFarmMoveLosses] = options.ContinuousFarmMoveLosses.ToString(),
-            [BotOptionPayloadKeys.ContinuousFarmLossDestinationListId] = options.ContinuousFarmLossDestinationListId,
-            [BotOptionPayloadKeys.ContinuousFarmLossDestinationListName] = options.ContinuousFarmLossDestinationListName,
-            [BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] = options.ContinuousFarmLossDestinationBaseName,
+            [BotOptionPayloadKeys.ContinuousFarmDeactivateRedLosses] = options.ContinuousFarmDeactivateRedLosses.ToString(),
+            [BotOptionPayloadKeys.ContinuousFarmDeactivateYellowLosses] = options.ContinuousFarmDeactivateYellowLosses.ToString(),
+            [BotOptionPayloadKeys.ContinuousFarmDeactivateRedOasisLosses] = options.ContinuousFarmDeactivateRedOasisLosses.ToString(),
+            [BotOptionPayloadKeys.ContinuousFarmDeactivateYellowOasisLosses] = options.ContinuousFarmDeactivateYellowOasisLosses.ToString(),
+            [BotOptionPayloadKeys.ContinuousFarmMoveRedLosses] = options.ContinuousFarmMoveRedLosses.ToString(),
+            [BotOptionPayloadKeys.ContinuousFarmMoveYellowLosses] = options.ContinuousFarmMoveYellowLosses.ToString(),
+            [BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListId] = options.ContinuousFarmRedLossDestinationListId,
+            [BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListName] = options.ContinuousFarmRedLossDestinationListName,
+            [BotOptionPayloadKeys.ContinuousFarmRedLossDestinationBaseName] = options.ContinuousFarmRedLossDestinationBaseName,
+            [BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListId] = options.ContinuousFarmYellowLossDestinationListId,
+            [BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListName] = options.ContinuousFarmYellowLossDestinationListName,
+            [BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationBaseName] = options.ContinuousFarmYellowLossDestinationBaseName,
         };
 
         foreach (var item in _botService.GetQueueItemsForDisplay())
@@ -1522,52 +1544,66 @@ public partial class MainWindow
                 row.Capacity is > 0 ? row.Capacity.Value : 100))
             .ToList();
 
-        var selected = options.FirstOrDefault(option =>
-                !string.IsNullOrWhiteSpace(loadedOptions.ContinuousFarmLossDestinationListId)
-                && string.Equals(option.ListId, loadedOptions.ContinuousFarmLossDestinationListId, StringComparison.OrdinalIgnoreCase))
-            ?? options.FirstOrDefault(option =>
-                !string.IsNullOrWhiteSpace(loadedOptions.ContinuousFarmLossDestinationListName)
-                && string.Equals(option.Name, loadedOptions.ContinuousFarmLossDestinationListName, StringComparison.OrdinalIgnoreCase));
-
-        if (selected is null && !string.IsNullOrWhiteSpace(loadedOptions.ContinuousFarmLossDestinationListName))
+        FarmLossDestinationOption? ResolveSelected(string listId, string listName)
         {
-            selected = new FarmLossDestinationOption(
-                loadedOptions.ContinuousFarmLossDestinationListId,
-                loadedOptions.ContinuousFarmLossDestinationListName,
-                "Missing",
-                0,
-                100);
+            var selected = options.FirstOrDefault(option =>
+                    !string.IsNullOrWhiteSpace(listId)
+                    && string.Equals(option.ListId, listId, StringComparison.OrdinalIgnoreCase))
+                ?? options.FirstOrDefault(option =>
+                    !string.IsNullOrWhiteSpace(listName)
+                    && string.Equals(option.Name, listName, StringComparison.OrdinalIgnoreCase));
+            if (selected is not null || string.IsNullOrWhiteSpace(listName))
+                return selected;
+
+            selected = new FarmLossDestinationOption(listId, listName, "Missing", 0, 100);
             options.Add(selected);
+            return selected;
         }
 
-        _farmListsViewModel.ReplaceLossDestinations(options, selected);
+        var selectedRed = ResolveSelected(loadedOptions.ContinuousFarmRedLossDestinationListId, loadedOptions.ContinuousFarmRedLossDestinationListName);
+        var selectedYellow = ResolveSelected(loadedOptions.ContinuousFarmYellowLossDestinationListId, loadedOptions.ContinuousFarmYellowLossDestinationListName);
+        _farmListsViewModel.ReplaceLossDestinations(options, selectedRed, selectedYellow);
     }
 
-    private async Task EnsureFarmLossDestinationSelectedAsync()
+    private async Task EnsureFarmLossDestinationSelectedAsync(FarmListLossColors lossColor)
     {
+        var isRed = lossColor == FarmListLossColors.Red;
         if (_suppressFarmingSettingsConfigWrite
-            || !_farmListsViewModel.MoveLosses
+            || !(isRed ? _farmListsViewModel.MoveRedLosses : _farmListsViewModel.MoveYellowLosses)
             || _farmLossDestinationSelectionInProgress)
         {
             return;
         }
 
-        if (!_farmListsViewModel.DeactivateLosses)
+        if (!(isRed ? _farmListsViewModel.DeactivateRedLosses : _farmListsViewModel.DeactivateYellowLosses))
         {
-            _farmListsViewModel.MoveLosses = false;
+            SetMoveLosses(isRed, false);
+            return;
+        }
+
+        if (!_isLoggedIn)
+        {
+            SetMoveLosses(isRed, false);
+            AppendLog("[farm-list] loss destination setup blocked because the user is logged out.");
+            AppDialog.Show(
+                this,
+                "You must log in first.",
+                "Login required",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
         // A configured destination remains usable even when it is represented by the "Missing" placeholder.
         // The Worker owns the overnight self-heal and recreates that list by its persisted base name.
-        if (_farmListsViewModel.SelectedLossDestination is not null)
+        if ((isRed ? _farmListsViewModel.SelectedRedLossDestination : _farmListsViewModel.SelectedYellowLossDestination) is not null)
         {
             return;
         }
 
         if (BlockIfSessionSleeping("Choose loss farmlist"))
         {
-            _farmListsViewModel.MoveLosses = false;
+            SetMoveLosses(isRed, false);
             return;
         }
 
@@ -1596,35 +1632,36 @@ public partial class MainWindow
             HideBusyOverlay();
 
             var existingNames = _farmLists.Where(IsRealFarmListRow).Select(row => row.Name).ToList();
-            var suggestedName = FarmLossListNaming.NextAvailable("Yellow farms", existingNames);
+            var suggestedName = FarmLossListNaming.NextAvailable(isRed ? "Red farms" : "Yellow farms", existingNames);
             var existingDestinations = _farmListsViewModel.LossDestinations.ToList();
             var dialog = new CreateLossFarmListWindow(suggestedName, existingDestinations) { Owner = this };
             if (dialog.ShowDialog() != true)
             {
-                _farmListsViewModel.MoveLosses = false;
+                SetMoveLosses(isRed, false);
                 AppendLog("[farm-list] loss destination selection canceled.");
                 return;
             }
 
             if (dialog.SelectedExistingDestination is { } selectedDestination)
             {
-                _farmListsViewModel.SelectedLossDestination = existingDestinations.FirstOrDefault(option =>
+                var selected = existingDestinations.FirstOrDefault(option =>
                     string.Equals(option.ListId, selectedDestination.ListId, StringComparison.OrdinalIgnoreCase))
                     ?? selectedDestination;
-                AppendLog($"[farm-list] selected '{selectedDestination.Name}' as the loss destination.");
+                SetSelectedLossDestination(isRed, selected);
+                AppendLog($"[farm-list] selected '{selectedDestination.Name}' as the {lossColor.ToString().ToLowerInvariant()} loss destination.");
                 return;
             }
 
-            await CreateAndSelectFarmLossDestinationAsync(options, dialog.ListName, operationToken);
+            await CreateAndSelectFarmLossDestinationAsync(options, lossColor, dialog.ListName, operationToken);
         }
         catch (OperationCanceledException)
         {
-            _farmListsViewModel.MoveLosses = false;
+            SetMoveLosses(isRed, false);
             AppendLog("[farm-list] loss destination setup canceled.");
         }
         catch (Exception ex)
         {
-            _farmListsViewModel.MoveLosses = false;
+            SetMoveLosses(isRed, false);
             HideBusyOverlay();
             AppendLog($"ALARM: Could not configure the loss farmlist: {ex.Message}");
             AppDialog.Show(this, ex.Message, "Choose loss farmlist", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -1698,6 +1735,7 @@ public partial class MainWindow
 
     private async Task CreateAndSelectFarmLossDestinationAsync(
         BotOptions options,
+        FarmListLossColors lossColor,
         string listName,
         CancellationToken cancellationToken)
     {
@@ -1770,9 +1808,26 @@ public partial class MainWindow
             _farmListsViewModel.LossDestinations.Add(created);
         }
 
-        _farmingPanelService.SaveDestinationBaseName(listName);
-        _farmListsViewModel.SelectedLossDestination = created;
-        AppendLog($"[farm-list] created and selected '{created.Name}' as the loss destination.");
+        var isRed = lossColor == FarmListLossColors.Red;
+        _farmingPanelService.SaveDestinationBaseName(isRed, listName);
+        SetSelectedLossDestination(isRed, created);
+        AppendLog($"[farm-list] created and selected '{created.Name}' as the {lossColor.ToString().ToLowerInvariant()} loss destination.");
+    }
+
+    private void SetMoveLosses(bool isRed, bool value)
+    {
+        if (isRed)
+            _farmListsViewModel.MoveRedLosses = value;
+        else
+            _farmListsViewModel.MoveYellowLosses = value;
+    }
+
+    private void SetSelectedLossDestination(bool isRed, FarmLossDestinationOption destination)
+    {
+        if (isRed)
+            _farmListsViewModel.SelectedRedLossDestination = destination;
+        else
+            _farmListsViewModel.SelectedYellowLossDestination = destination;
     }
 
     private void SelectFarmDispatchDelayMinMinutes(int minutes)

@@ -35,6 +35,18 @@ public static class BotOptionsFactory
         var continuousFarmDeactivateLosses = configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmDeactivateLosses, true);
         var configuredContinuousFarmMoveLosses = configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmMoveLosses, false);
         var continuousFarmMoveLosses = continuousFarmDeactivateLosses && configuredContinuousFarmMoveLosses;
+        var continuousFarmDeactivateOasisLosses = configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses, false);
+        var continuousFarmDeactivateRedLosses = GetValueOrDefault(configuration, BotOptionPayloadKeys.ContinuousFarmDeactivateRedLosses, continuousFarmDeactivateLosses);
+        var continuousFarmDeactivateYellowLosses = GetValueOrDefault(configuration, BotOptionPayloadKeys.ContinuousFarmDeactivateYellowLosses, continuousFarmDeactivateLosses);
+        var continuousFarmDeactivateRedOasisLosses = GetValueOrDefault(configuration, BotOptionPayloadKeys.ContinuousFarmDeactivateRedOasisLosses, continuousFarmDeactivateOasisLosses);
+        var continuousFarmDeactivateYellowOasisLosses = GetValueOrDefault(configuration, BotOptionPayloadKeys.ContinuousFarmDeactivateYellowOasisLosses, continuousFarmDeactivateOasisLosses);
+        var continuousFarmMoveRedLosses = continuousFarmDeactivateRedLosses
+            && GetValueOrDefault(configuration, BotOptionPayloadKeys.ContinuousFarmMoveRedLosses, continuousFarmMoveLosses);
+        var continuousFarmMoveYellowLosses = continuousFarmDeactivateYellowLosses
+            && GetValueOrDefault(configuration, BotOptionPayloadKeys.ContinuousFarmMoveYellowLosses, continuousFarmMoveLosses);
+        var legacyLossDestinationListId = configuration[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId] ?? string.Empty;
+        var legacyLossDestinationListName = configuration[BotOptionPayloadKeys.ContinuousFarmLossDestinationListName] ?? string.Empty;
+        var legacyLossDestinationBaseName = configuration[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] ?? string.Empty;
         var townHallCelebrationMode = TownHallCelebrationDefaults.NormalizeMode(configuration[BotOptionPayloadKeys.TownHallCelebrationMode]);
         var townHallCelebrationCount = TownHallCelebrationDefaults.NormalizeCount(
             configuration.GetValue(BotOptionPayloadKeys.TownHallCelebrationCount, TownHallCelebrationDefaults.DefaultCount));
@@ -93,11 +105,23 @@ public static class BotOptionsFactory
             SmithyUpgradeRestartDelayMinMinutes = configuration.GetValue(BotOptionPayloadKeys.SmithyUpgradeRestartDelayMinMinutes, SmithyUpgradeRestartDelayDefaults.MinMinutes),
             SmithyUpgradeRestartDelayMaxMinutes = configuration.GetValue(BotOptionPayloadKeys.SmithyUpgradeRestartDelayMaxMinutes, SmithyUpgradeRestartDelayDefaults.MaxMinutes),
             ContinuousFarmDeactivateLosses = continuousFarmDeactivateLosses,
-            ContinuousFarmDeactivateOasisLosses = configuration.GetValue(BotOptionPayloadKeys.ContinuousFarmDeactivateOasisLosses, false),
+            ContinuousFarmDeactivateOasisLosses = continuousFarmDeactivateOasisLosses,
             ContinuousFarmMoveLosses = continuousFarmMoveLosses,
-            ContinuousFarmLossDestinationListId = configuration[BotOptionPayloadKeys.ContinuousFarmLossDestinationListId] ?? string.Empty,
-            ContinuousFarmLossDestinationListName = configuration[BotOptionPayloadKeys.ContinuousFarmLossDestinationListName] ?? string.Empty,
-            ContinuousFarmLossDestinationBaseName = configuration[BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName] ?? string.Empty,
+            ContinuousFarmLossDestinationListId = legacyLossDestinationListId,
+            ContinuousFarmLossDestinationListName = legacyLossDestinationListName,
+            ContinuousFarmLossDestinationBaseName = legacyLossDestinationBaseName,
+            ContinuousFarmDeactivateRedLosses = continuousFarmDeactivateRedLosses,
+            ContinuousFarmDeactivateYellowLosses = continuousFarmDeactivateYellowLosses,
+            ContinuousFarmDeactivateRedOasisLosses = continuousFarmDeactivateRedOasisLosses,
+            ContinuousFarmDeactivateYellowOasisLosses = continuousFarmDeactivateYellowOasisLosses,
+            ContinuousFarmMoveRedLosses = continuousFarmMoveRedLosses,
+            ContinuousFarmMoveYellowLosses = continuousFarmMoveYellowLosses,
+            ContinuousFarmRedLossDestinationListId = configuration[BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListId] ?? legacyLossDestinationListId,
+            ContinuousFarmRedLossDestinationListName = configuration[BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListName] ?? legacyLossDestinationListName,
+            ContinuousFarmRedLossDestinationBaseName = configuration[BotOptionPayloadKeys.ContinuousFarmRedLossDestinationBaseName] ?? legacyLossDestinationBaseName,
+            ContinuousFarmYellowLossDestinationListId = configuration[BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListId] ?? legacyLossDestinationListId,
+            ContinuousFarmYellowLossDestinationListName = configuration[BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListName] ?? legacyLossDestinationListName,
+            ContinuousFarmYellowLossDestinationBaseName = configuration[BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationBaseName] ?? legacyLossDestinationBaseName,
             PostLoginAnalyzeFarmlists = configuration.GetValue(BotOptionPayloadKeys.PostLoginAnalyzeFarmlists, false),
             PostLoginAnalyzeHero = configuration.GetValue(BotOptionPayloadKeys.PostLoginAnalyzeHero, false),
             PostLoginAnalyzeHeroInventory = configuration.GetValue(BotOptionPayloadKeys.PostLoginAnalyzeHeroInventory, false),

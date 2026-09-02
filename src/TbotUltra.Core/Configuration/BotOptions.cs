@@ -118,6 +118,42 @@ public sealed record BotOptions
     [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmLossDestinationBaseName)]
     public string ContinuousFarmLossDestinationBaseName { get; init; } = string.Empty;
 
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmDeactivateRedLosses)]
+    public bool ContinuousFarmDeactivateRedLosses { get; init; } = true;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmDeactivateYellowLosses)]
+    public bool ContinuousFarmDeactivateYellowLosses { get; init; } = true;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmDeactivateRedOasisLosses)]
+    public bool ContinuousFarmDeactivateRedOasisLosses { get; init; }
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmDeactivateYellowOasisLosses)]
+    public bool ContinuousFarmDeactivateYellowOasisLosses { get; init; }
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmMoveRedLosses)]
+    public bool ContinuousFarmMoveRedLosses { get; init; }
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmMoveYellowLosses)]
+    public bool ContinuousFarmMoveYellowLosses { get; init; }
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListId)]
+    public string ContinuousFarmRedLossDestinationListId { get; init; } = string.Empty;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmRedLossDestinationListName)]
+    public string ContinuousFarmRedLossDestinationListName { get; init; } = string.Empty;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmRedLossDestinationBaseName)]
+    public string ContinuousFarmRedLossDestinationBaseName { get; init; } = string.Empty;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListId)]
+    public string ContinuousFarmYellowLossDestinationListId { get; init; } = string.Empty;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationListName)]
+    public string ContinuousFarmYellowLossDestinationListName { get; init; } = string.Empty;
+
+    [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmYellowLossDestinationBaseName)]
+    public string ContinuousFarmYellowLossDestinationBaseName { get; init; } = string.Empty;
+
     [ConfigurationKeyName(BotOptionPayloadKeys.ContinuousFarmNextListIndex)]
     public int ContinuousFarmNextListIndex { get; init; }
 
