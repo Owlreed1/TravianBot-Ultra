@@ -88,6 +88,9 @@ public sealed partial class BotTaskRunner
     // Proxy settings the shared browser was LAUNCHED with. Playwright proxy is a launch option and
     // cannot change on a running browser, so a proxy toggle must force a new session.
     private string? _sharedVisibleProxyFingerprint;
+    // Manual-login mode also controls Chromium's launch-time popup blocker and cannot be changed on
+    // a running browser. Keep the launch value so an account edit forces a correctly configured session.
+    private bool? _sharedVisibleManualLogin;
     // Session-scoped cache shared by every TravianClient created for the shared visible browser, so
     // feature signals (Plus/GoldClub/tribe) and the logged-in throttle survive across operations.
     private TravianSessionCache _sharedVisibleSessionCache = new();
@@ -385,6 +388,7 @@ public sealed partial class BotTaskRunner
                     _sharedVisibleAccountName = null;
                     _sharedVisibleBaseUrl = null;
                     _sharedVisibleProxyFingerprint = null;
+                    _sharedVisibleManualLogin = null;
                     _sharedVisibleSessionCache = new TravianSessionCache();
                 }
             }
@@ -539,13 +543,20 @@ public sealed partial class BotTaskRunner
             replaceReasons.Add($"proxy='{MaskProxyFingerprint(_sharedVisibleProxyFingerprint)}'->'{MaskProxyFingerprint(desiredProxyFingerprint)}'");
         }
 
+        if (_sharedVisibleSession is not null
+            && _sharedVisibleManualLogin != account.ManualLogin)
+        {
+            replaceReasons.Add($"manualLogin='{_sharedVisibleManualLogin?.ToString() ?? "-"}'->'{account.ManualLogin}'");
+        }
+
         var mustReplaceSession =
             _sharedVisibleSession is null ||
             _sharedVisiblePage is null ||
             _sharedVisiblePage.IsClosed ||
             !string.Equals(_sharedVisibleAccountName, account.Name, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(_sharedVisibleBaseUrl, desiredBaseUrl, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(_sharedVisibleProxyFingerprint, desiredProxyFingerprint, StringComparison.OrdinalIgnoreCase);
+            !string.Equals(_sharedVisibleProxyFingerprint, desiredProxyFingerprint, StringComparison.OrdinalIgnoreCase) ||
+            _sharedVisibleManualLogin != account.ManualLogin;
 
         if (mustReplaceSession)
         {
@@ -597,6 +608,7 @@ public sealed partial class BotTaskRunner
             _sharedVisibleAccountName = account.Name;
             _sharedVisibleBaseUrl = desiredBaseUrl;
             _sharedVisibleProxyFingerprint = desiredProxyFingerprint;
+            _sharedVisibleManualLogin = account.ManualLogin;
             // Fresh browser/account => start a clean session cache so no stale signals carry over.
             _sharedVisibleSessionCache = CreateSeededSessionCache(account, options, log);
             log("Opened shared browser window.");
@@ -850,6 +862,7 @@ public sealed partial class BotTaskRunner
                 _sharedVisibleAccountName = null;
                 _sharedVisibleBaseUrl = null;
                 _sharedVisibleProxyFingerprint = null;
+                _sharedVisibleManualLogin = null;
                 _travcoPage = null;
                 _sharedVisibleSessionCache = new TravianSessionCache();
             }

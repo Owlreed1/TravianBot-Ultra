@@ -115,8 +115,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   login. `www.travian.com` is the visible lobby login source and must be allowed to call `window.open` for external
   authentication, while game-world hosts remain blocked outside the manual wait. Manual-login browsers launch without
   Chromium's native popup blocker because identity providers may open asynchronously after a trusted click; ordinary
-  accounts retain it. This is safe only while the independent route policy keeps CMP/ad domains blocked throughout
-  manual login. Source-level
+  accounts retain it. Changing an account's manual-login setting must replace any existing browser session because
+  that popup-blocker policy is fixed at browser launch. This is safe only while the independent route policy keeps
+  CMP/ad domains blocked throughout manual login. Source-level
   popup permission must be derived from the active confirmation wait, never permanently from the account setting. The clean post-login
   game context restores request, script, and page-handler blocking before it renders Travian, then preloads Dorf1
   before the lobby context closes. Never expose an `about:blank` replacement between those contexts; it looks like
