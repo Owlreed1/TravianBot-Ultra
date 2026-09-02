@@ -39,10 +39,10 @@
                             </Border>
                         </StackPanel>
                         <WrapPanel>
-                            <CheckBox Content="Wood" IsChecked="{Binding UpgradeWood}" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,20,0" />
-                            <CheckBox Content="Clay" IsChecked="{Binding UpgradeClay}" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,20,0" />
-                            <CheckBox Content="Iron" IsChecked="{Binding UpgradeIron}" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,20,0" />
-                            <CheckBox Content="Crop" IsChecked="{Binding UpgradeCrop}" IsEnabled="{Binding ActionsEnabled}" />
+                            <CheckBox x:Name="UpgradeWoodCheckBox" Content="Wood" IsChecked="{Binding UpgradeWood, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,20,0" />
+                            <CheckBox x:Name="UpgradeClayCheckBox" Content="Clay" IsChecked="{Binding UpgradeClay, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,20,0" />
+                            <CheckBox x:Name="UpgradeIronCheckBox" Content="Iron" IsChecked="{Binding UpgradeIron, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding ActionsEnabled}" Margin="0,0,20,0" />
+                            <CheckBox x:Name="UpgradeCropCheckBox" Content="Crop" IsChecked="{Binding UpgradeCrop, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding ActionsEnabled}" />
                         </WrapPanel>
                     </StackPanel>
                 </Border>

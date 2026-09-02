@@ -48,8 +48,12 @@ public sealed partial class BrowserSession
             await ClearTransientExternalStorageOriginsAsync(force: true).WaitAsync(phaseTimeout.Token);
             var stateJson = FilterForeignSubdomainState(await _context.StorageStateAsync().WaitAsync(phaseTimeout.Token));
 
-            videoBrowser = await _playwright.Chromium
-                .LaunchAsync(CreateChromiumLaunchOptions(keepNativePopupBlocker: false))
+            var launchOptions = CreateChromiumLaunchOptions(keepNativePopupBlocker: true);
+            videoBrowser = await LaunchedBrowserRegistry.TrackAsync(
+                    _projectRoot,
+                    launchOptions.Channel,
+                    () => _playwright.Chromium.LaunchAsync(launchOptions),
+                    _log)
                 .WaitAsync(phaseTimeout.Token);
             videoContext = await videoBrowser.NewContextAsync(new BrowserNewContextOptions
             {
@@ -57,6 +61,9 @@ public sealed partial class BrowserSession
                 ViewportSize = ViewportSize.NoViewport,
                 StorageState = stateJson,
             }).WaitAsync(phaseTimeout.Token);
+            await videoContext
+                .AddInitScriptAsync(IsolatedBonusVideoPopupSuppressionScript)
+                .WaitAsync(phaseTimeout.Token);
             _browserTrace.Event("PAGE_CONTEXT", "bonus-video-context-opened", detail: "isolatedBrowser=true");
             videoContext.SetDefaultTimeout(_config.TimeoutMs);
             networkDiagnostics = new BonusVideoNetworkDiagnostics(_log);

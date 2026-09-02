@@ -257,7 +257,8 @@ public partial class MainWindow
             }
             catch (Exception ex)
             {
-                AppendLog($"[pacing] session browser close failed: {ex.Message}");
+                AppendLog($"[pacing] session browser close failed; sleep was not started: {ex.Message}");
+                return;
             }
             finally
             {
@@ -490,6 +491,11 @@ public partial class MainWindow
 
         _sleepSnapshot = new SleepSnapshot(true, false, false);
 
+        // A planned sleep can be entered while a prior page remains open (for example after a
+        // bonus-video cleanup left it on about:blank). Sleep owns no browser process, so do not
+        // publish Sleeping until shutdown has completed and verified all tracked process identities.
+        await CloseBrowserForSleepAsync("Planned sleep");
+
         if (!_sessionPacer.BeginScheduledSleepNow())
         {
             return false;
@@ -497,16 +503,6 @@ public partial class MainWindow
 
         AppendLog("[login] planned sleep window is active — entering sleep instead of logging in. "
             + "Press the session pacing Run-now button to log in anyway.");
-        try
-        {
-            // A planned sleep can be entered while a prior page remains open (for example after a
-            // bonus-video cleanup left it on about:blank). Sleep owns no browser process.
-            await CloseBrowserForSleepAsync("Planned sleep");
-        }
-        catch (Exception ex)
-        {
-            AppendLog($"[pacing] planned sleep browser close failed: {ex.Message}");
-        }
         UpdateSessionPacingUi();
         return true;
     }

@@ -15,4 +15,12 @@ public partial class ResourcesPanel : UserControl
     internal StackPanel CroplandColumn => CroplandColumnPanel;
     internal ItemsControl CroplandItems => CroplandItemsControl;
 
+    internal void CommitUpgradeTypeSelection()
+    {
+        UpgradeWoodCheckBox.GetBindingExpression(CheckBox.IsCheckedProperty)?.UpdateSource();
+        UpgradeClayCheckBox.GetBindingExpression(CheckBox.IsCheckedProperty)?.UpdateSource();
+        UpgradeIronCheckBox.GetBindingExpression(CheckBox.IsCheckedProperty)?.UpdateSource();
+        UpgradeCropCheckBox.GetBindingExpression(CheckBox.IsCheckedProperty)?.UpdateSource();
+    }
+
 }

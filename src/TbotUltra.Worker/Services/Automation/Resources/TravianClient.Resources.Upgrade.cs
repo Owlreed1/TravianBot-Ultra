@@ -506,7 +506,7 @@ public sealed partial class TravianClient
                     if (level >= preliminaryTarget)
                     {
                         // Already at target — the per-slot skip line was pure per-tick noise; the final
-                        // "All resource fields are at or above target" return already summarizes this.
+                        // The final selected-resource-fields return already summarizes this.
                         continue;
                     }
 
@@ -771,7 +771,7 @@ public sealed partial class TravianClient
                     if (blockReasons.Count == 0)
                     {
                         return WithQueuedLevelProjections(
-                            $"All resource fields are at or above target level {targetLevel}. Upgrades made: {upgrades}.");
+                            $"All selected resource fields are at or above target level {targetLevel}. Upgrades made: {upgrades}.");
                     }
 
                     if (earliestResourceWait is not null)

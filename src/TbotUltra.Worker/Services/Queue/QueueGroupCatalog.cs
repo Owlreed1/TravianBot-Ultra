@@ -31,15 +31,54 @@ public static class QueueGroupCatalog
             return QueueGroup.Construction;
         }
 
-        if (taskName.StartsWith("desktop_runtime_manual:farm", StringComparison.OrdinalIgnoreCase)
-            || taskName.StartsWith("desktop_runtime_manual:analyze_farmlists", StringComparison.OrdinalIgnoreCase))
+        const string runtimeManualPrefix = "desktop_runtime_manual:";
+        if (taskName.StartsWith(runtimeManualPrefix, StringComparison.OrdinalIgnoreCase))
         {
-            return QueueGroup.Farming;
-        }
+            var runtimeTask = taskName[runtimeManualPrefix.Length..];
+            if (runtimeTask.StartsWith("upgradeallresources", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueueGroup.Construction;
+            }
 
-        if (taskName.StartsWith("desktop_runtime_manual:hero", StringComparison.OrdinalIgnoreCase))
-        {
-            return QueueGroup.Hero;
+            if (runtimeTask.StartsWith("farm", StringComparison.OrdinalIgnoreCase)
+                || runtimeTask.StartsWith("add_farms", StringComparison.OrdinalIgnoreCase)
+                || runtimeTask.StartsWith("analyze_farmlists", StringComparison.OrdinalIgnoreCase)
+                || runtimeTask.StartsWith("create_farmlists", StringComparison.OrdinalIgnoreCase)
+                || runtimeTask.StartsWith("catapult_waves", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueueGroup.Farming;
+            }
+
+            if (runtimeTask.StartsWith("hero", StringComparison.OrdinalIgnoreCase)
+                || runtimeTask.StartsWith("refresh_hero", StringComparison.OrdinalIgnoreCase)
+                || runtimeTask.StartsWith("refresh_adventures", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueueGroup.Hero;
+            }
+
+            if (runtimeTask.StartsWith("refresh_reinforcement", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueueGroup.Reinforcements;
+            }
+
+            if (runtimeTask.StartsWith("refresh_troop_queues", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueueGroup.TroopTraining;
+            }
+
+            if (runtimeTask.StartsWith("check_celebration", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueueGroup.BreweryCelebration;
+            }
+
+            if (runtimeTask.StartsWith("scan_resource_villages", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueueGroup.ResourceTransfer;
+            }
+
+            // Manual runtime rows are account-level history unless their domain is explicitly known above.
+            // This prevents new read-only/manual operations from silently appearing as Construction work.
+            return QueueGroup.Account;
         }
 
         if (TbotUltra.Core.Tasks.TaskCatalog.TryGetDescriptor(taskName, out var descriptor))

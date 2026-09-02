@@ -477,9 +477,34 @@ public partial class MainWindow
             AppendLog($"[pacing] browser state save before sleep failed; closing with the last saved state: {ex.Message}");
         }
 
+        Exception? shutdownFailure = null;
         try
         {
-            await _botService.ShutdownAsync(AppendLog);
+            for (var attempt = 1; attempt <= 3; attempt++)
+            {
+                try
+                {
+                    await _botService.ShutdownAsync(AppendLog);
+                    shutdownFailure = null;
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    shutdownFailure = ex;
+                    AppendLog($"[pacing] browser shutdown attempt {attempt}/3 failed: {ex.Message}");
+                    if (attempt < 3)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                    }
+                }
+            }
+
+            if (shutdownFailure is not null)
+            {
+                throw new InvalidOperationException(
+                    "Sleep was not started because the program-owned browser could not be closed.",
+                    shutdownFailure);
+            }
         }
         finally
         {

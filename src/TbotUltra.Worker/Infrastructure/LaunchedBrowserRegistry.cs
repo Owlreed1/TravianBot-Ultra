@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -18,6 +19,41 @@ namespace TbotUltra.Worker.Infrastructure;
 /// </summary>
 public static class LaunchedBrowserRegistry
 {
+    internal readonly record struct CleanupResult(
+        int RecordedCount,
+        int ClosedCount,
+        int RemainingCount,
+        bool Skipped)
+    {
+        public bool Completed => !Skipped && RemainingCount == 0;
+    }
+
+    private enum CleanupEntryResult
+    {
+        Resolved,
+        Closed,
+        Retry
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ProcessBasicInformation
+    {
+        public IntPtr Reserved1;
+        public IntPtr PebBaseAddress;
+        public IntPtr Reserved2_0;
+        public IntPtr Reserved2_1;
+        public IntPtr UniqueProcessId;
+        public IntPtr InheritedFromUniqueProcessId;
+    }
+
+    [DllImport("ntdll.dll")]
+    private static extern int NtQueryInformationProcess(
+        IntPtr processHandle,
+        int processInformationClass,
+        ref ProcessBasicInformation processInformation,
+        int processInformationLength,
+        out int returnLength);
+
     private sealed record LaunchedBrowser(
         [property: JsonPropertyName("pid")] int Pid,
         [property: JsonPropertyName("startedAtUtcTicks")] long StartedAtUtcTicks,
@@ -90,32 +126,47 @@ public static class LaunchedBrowserRegistry
     /// live session. Returns how many processes were terminated.
     /// </summary>
     public static int KillOrphanedBrowsers(string projectRoot, Action<string>? log = null)
+        => CleanupTrackedBrowsers(projectRoot, log).ClosedCount;
+
+    internal static CleanupResult CleanupTrackedBrowsers(string projectRoot, Action<string>? log = null)
     {
-        if (string.IsNullOrWhiteSpace(projectRoot) || IsAnotherAppInstanceRunning())
+        if (string.IsNullOrWhiteSpace(projectRoot))
         {
-            return 0;
+            return new CleanupResult(0, 0, 0, Skipped: false);
+        }
+
+        if (IsAnotherAppInstanceRunning())
+        {
+            log?.Invoke("[browser] tracked-process cleanup skipped while another Tbot instance is running.");
+            return new CleanupResult(0, 0, 0, Skipped: true);
         }
 
         var recorded = Read(projectRoot, log);
         if (recorded.Count == 0)
         {
-            return 0;
+            return new CleanupResult(0, 0, 0, Skipped: false);
         }
 
-        var killed = 0;
+        var closed = 0;
+        var remaining = new List<LaunchedBrowser>();
         foreach (var entry in recorded)
         {
-            if (TryKillRecordedProcess(entry, log))
+            switch (TryCloseRecordedProcess(entry, log))
             {
-                killed++;
+                case CleanupEntryResult.Closed:
+                    closed++;
+                    break;
+                case CleanupEntryResult.Retry:
+                    remaining.Add(entry);
+                    break;
             }
         }
 
-        Forget(projectRoot, log);
-        return killed;
+        WriteRemaining(projectRoot, remaining, log);
+        return new CleanupResult(recorded.Count, closed, remaining.Count, Skipped: false);
     }
 
-    private static bool TryKillRecordedProcess(LaunchedBrowser entry, Action<string>? log)
+    private static CleanupEntryResult TryCloseRecordedProcess(LaunchedBrowser entry, Action<string>? log)
     {
         Process? process = null;
         try
@@ -124,27 +175,33 @@ public static class LaunchedBrowserRegistry
             if (process.StartTime.ToUniversalTime().Ticks != entry.StartedAtUtcTicks)
             {
                 // The PID was reused by an unrelated process. Leaving it alone is the whole point.
-                return false;
+                return CleanupEntryResult.Resolved;
             }
 
             if (!string.Equals(TryGetExecutablePath(process), entry.ExecutablePath, StringComparison.OrdinalIgnoreCase))
             {
-                return false;
+                return CleanupEntryResult.Resolved;
             }
 
             process.Kill(entireProcessTree: true);
+            if (!process.WaitForExit(milliseconds: 5000))
+            {
+                log?.Invoke($"[browser] owned browser process {entry.Pid} did not exit after termination; cleanup will retry.");
+                return CleanupEntryResult.Retry;
+            }
+
             log?.Invoke($"[browser] closed leftover browser process {entry.Pid} from a previous run.");
-            return true;
+            return CleanupEntryResult.Closed;
         }
         catch (ArgumentException)
         {
             // Already exited — the normal case.
-            return false;
+            return CleanupEntryResult.Resolved;
         }
         catch (Exception ex)
         {
             log?.Invoke($"[browser] could not close leftover browser process {entry.Pid}: {ex.Message}");
-            return false;
+            return CleanupEntryResult.Retry;
         }
         finally
         {
@@ -174,6 +231,14 @@ public static class LaunchedBrowserRegistry
                     continue;
                 }
 
+                // Chrome.exe is also the user's normal browser. Only its root process is owned by Tbot:
+                // Playwright's configured node.exe must be the direct parent. Child renderers are covered by
+                // Kill(entireProcessTree: true), and a concurrently user-launched Chrome can never pass this gate.
+                if (!HasConfiguredPlaywrightDriverParent(process))
+                {
+                    continue;
+                }
+
                 var executablePath = TryGetExecutablePath(process);
                 if (string.IsNullOrEmpty(executablePath))
                 {
@@ -193,6 +258,97 @@ public static class LaunchedBrowserRegistry
         }
 
         return appeared;
+    }
+
+    private static bool HasConfiguredPlaywrightDriverParent(Process process)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return false;
+        }
+
+        var driverRoot = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_PATH");
+        if (string.IsNullOrWhiteSpace(driverRoot))
+        {
+            return false;
+        }
+
+        Process? parent = null;
+        try
+        {
+            var information = new ProcessBasicInformation();
+            var status = NtQueryInformationProcess(
+                process.Handle,
+                processInformationClass: 0,
+                ref information,
+                Marshal.SizeOf<ProcessBasicInformation>(),
+                out _);
+            var parentId = information.InheritedFromUniqueProcessId.ToInt64();
+            if (status != 0 || parentId <= 0 || parentId > int.MaxValue)
+            {
+                return false;
+            }
+
+            parent = Process.GetProcessById((int)parentId);
+            return IsConfiguredPlaywrightDriverExecutable(TryGetExecutablePath(parent), driverRoot);
+        }
+        catch
+        {
+            // Ownership must be proven. Access denied or a vanished parent means leave the process alone.
+            return false;
+        }
+        finally
+        {
+            parent?.Dispose();
+        }
+    }
+
+    private static void WriteRemaining(
+        string projectRoot,
+        IReadOnlyCollection<LaunchedBrowser> remaining,
+        Action<string>? log)
+    {
+        try
+        {
+            lock (FileGate)
+            {
+                var path = RegistryPath(projectRoot);
+                if (remaining.Count == 0)
+                {
+                    if (File.Exists(path))
+                    {
+                        File.Delete(path);
+                    }
+
+                    return;
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllText(path, JsonSerializer.Serialize(remaining, SerializerOptions));
+            }
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke($"[browser] could not update the launched-browser registry: {ex.Message}");
+        }
+    }
+
+    internal static bool IsConfiguredPlaywrightDriverExecutable(string? executablePath, string? driverRoot)
+    {
+        if (string.IsNullOrWhiteSpace(executablePath) || string.IsNullOrWhiteSpace(driverRoot))
+        {
+            return false;
+        }
+
+        try
+        {
+            var expected = Path.GetFullPath(Path.Combine(driverRoot, "node", "win32_x64", "node.exe"));
+            return string.Equals(Path.GetFullPath(executablePath), expected, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static HashSet<int> SnapshotProcessIds(string processName)

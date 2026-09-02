@@ -13,6 +13,11 @@ Active decision, extracted from `ENGINEERING_NOTES.md` on 2026-07-18.
   Real desktop-process startup and user-triggered application exit delete every account's saved Playwright
   authentication state. Startup cleanup covers crashes where exit cleanup could not run.
 - Browser shutdown, popup handling, and session replacement must account for isolated browser contexts.
+- Session pacing enters `Sleeping` only after shutdown has verified that no tracked Tbot-owned browser process
+  remains. Failed exact-identity cleanup is retained for retry and propagated to Desktop; it must never be
+  replaced with process-name or executable-path cleanup because that could close the user's normal Chrome.
+- Isolated bonus-video browsers retain native popup blocking, install popup-escape suppression before their first
+  page, and participate in the same exact process-identity tracking as the main browser.
 - Detect browser crash/closed-page errors and surface a specific diagnostic message.
 - Portable builds resolve Playwright from the bundled `.playwright` directory.
 - The anti-detection setup is intentional: keep `--disable-blink-features=AutomationControlled`, clear

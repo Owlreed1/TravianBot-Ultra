@@ -103,6 +103,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   Saving also runs the full template and storage preflight. Accepted storage repairs are inserted before their
   dependent rows but are not persisted until the user reviews the repaired template and clicks Save again.
 - New settings require the complete pipeline: model, defaults, load/save, ViewModel, UI, and tests.
+- Resource bulk-upgrade payloads must capture the four checkbox values currently visible for the selected village;
+  explicitly commit their two-way WPF bindings before reading `SelectedUpgradeTypes` at the queue boundary.
+- Synthetic `desktop_runtime_manual:*` history rows are classified by their domain. Unknown manual runtime names
+  default to Account, never Construction; only explicit resource/building operations may use Construction.
 - Account `Manual login` is account-scoped and permits an empty password. It opens the Official lobby
   without submitting credentials, blocks the desktop behind a `Login done`/`Cancel` confirmation, verifies
   the live lobby before continuing, and temporarily permits browser popups, user-opened tabs, and authentication
@@ -193,6 +197,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - Pass the active cancellation token through every cancellable operation. Never replace it with
   `CancellationToken.None`; cancellation is expected control flow, not an alarm.
 - Sleeping/paused state must preserve work and must not start a competing loop.
+- Session pacing may publish `Sleeping` only after browser shutdown succeeds and exact tracked Tbot browser
+  process identities have been cleared. Shutdown failures keep the session out of `Sleeping`, retry cleanup,
+  and must never fall back to killing Chrome by process name or executable path.
 - Entering sleep closes the active browser session, including planned sleep entered before login.
 - Continuous-loop wake requests from saved settings or newly enabled automation must also end an active idle break;
   humanized idle pacing must not delay newly requested work.
@@ -691,6 +698,9 @@ Published artifacts belong under `artifacts/`, never beside source files.
   The provider may autoplay without rendering a play button. Verified active HTML-media playback is a trusted start
   signal: poll for autoplay or a safe play control for at least 20 seconds after the player appears, then begin the
   normal protected completion wait and attempt optional muting instead of closing the isolated browser.
+  Isolated video browsers keep Chrome's native popup blocker and suppress `window.open`, `_blank`, and external-protocol
+  escapes before their first page. Include every isolated launch in PID+start-time ownership tracking; cleanup may
+  terminate only recorded identities and must never kill Chrome by name or executable path alone.
 - One `activate_production_bonus` run is a contiguous four-resource batch: after its initial cooldown gate,
   attempt every resource found activatable before returning control to other automation. A failure or newly
   created internal video cooldown for one resource must not stop the remaining resources in that same batch.

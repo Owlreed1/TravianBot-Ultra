@@ -348,6 +348,7 @@ public sealed partial class BotTaskRunner
             log?.Invoke("[browser-session] shutdown: session gate still held after 15s — force-closing the browser to unblock the running operation.");
         }
 
+        Exception? shutdownFailure = null;
         try
         {
             if (_travcoPage is not null)
@@ -366,27 +367,48 @@ public sealed partial class BotTaskRunner
                 }
             }
 
-            if (_sharedVisibleSession is null)
+            if (_sharedVisibleSession is not null)
             {
-                return;
+                try
+                {
+                    await _sharedVisibleSession.DisposeAsync();
+                }
+                catch (Exception ex)
+                {
+                    shutdownFailure = ex;
+                    log?.Invoke($"Error while closing shared browser: {ex.Message}");
+                }
+                finally
+                {
+                    _sharedVisibleSession = null;
+                    _sharedVisiblePage = null;
+                    _sharedVisibleAccountName = null;
+                    _sharedVisibleBaseUrl = null;
+                    _sharedVisibleProxyFingerprint = null;
+                    _sharedVisibleSessionCache = new TravianSessionCache();
+                }
             }
 
-            try
+            // A failed launch can leave a tracked browser without ever assigning _sharedVisibleSession.
+            // Verify that case too; cleanup targets only exact PID/start-time/path identities recorded at launch.
+            var processCleanup = LaunchedBrowserRegistry.CleanupTrackedBrowsers(_projectContext.RootPath, log);
+            if (processCleanup.RemainingCount > 0)
             {
-                await _sharedVisibleSession.DisposeAsync();
+                shutdownFailure = new InvalidOperationException(
+                    $"Browser shutdown left {processCleanup.RemainingCount} owned process(es) running.",
+                    shutdownFailure);
             }
-            catch (Exception ex)
+            else if (shutdownFailure is not null
+                && processCleanup.RecordedCount > 0
+                && processCleanup.Completed)
             {
-                log?.Invoke($"Error while closing shared browser: {ex.Message}");
+                log?.Invoke("[browser-session] browser shutdown recovered by exact-identity process cleanup.");
+                shutdownFailure = null;
             }
-            finally
+
+            if (shutdownFailure is not null)
             {
-                _sharedVisibleSession = null;
-                _sharedVisiblePage = null;
-                _sharedVisibleAccountName = null;
-                _sharedVisibleBaseUrl = null;
-                _sharedVisibleProxyFingerprint = null;
-                _sharedVisibleSessionCache = new TravianSessionCache();
+                throw new InvalidOperationException("Browser shutdown could not be verified.", shutdownFailure);
             }
         }
         finally

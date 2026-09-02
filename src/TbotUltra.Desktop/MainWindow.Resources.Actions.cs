@@ -982,6 +982,9 @@ public partial class MainWindow
 
     private void QueueUpgradeAllResources(string operationId, int targetLevel)
     {
+        // Commit the exact checkbox state visible to the user before capturing the queue payload.
+        // This also closes the WPF binding timing gap when the action follows a checkbox click immediately.
+        ResourcesPanelControl.CommitUpgradeTypeSelection();
         var selectedTypes = _resourcesViewModel.SelectedUpgradeTypes;
         if (selectedTypes.Count == 0)
         {

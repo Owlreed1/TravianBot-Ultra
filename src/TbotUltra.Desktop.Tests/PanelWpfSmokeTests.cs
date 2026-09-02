@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using TbotUltra.Desktop.ViewModels;
 using TbotUltra.Desktop.Views;
@@ -51,6 +52,37 @@ public sealed class PanelWpfSmokeTests
             Assert.Same(buildings, buildingsPanel.DataContext);
             Assert.Contains(FindButtons(buildingsPanel), button => ReferenceEquals(button.Command, buildings.LoadCommand));
             Assert.Contains(FindButtons(buildingsPanel), button => ReferenceEquals(button.Command, buildings.UpgradeAllToMaxCommand));
+        });
+    }
+
+    [Fact]
+    public void ResourcesPanel_CheckboxesCommitTheVisibleSelectionToTheViewModel()
+    {
+        _wpf.Run(() =>
+        {
+            var viewModel = new ResourcesViewModel();
+            viewModel.LoadResourceUpgradeTypes(["crop"]);
+            var panel = new ResourcesPanel { DataContext = viewModel };
+            Layout(panel);
+
+            var checkBoxes = new[]
+            {
+                Assert.IsType<CheckBox>(panel.FindName("UpgradeWoodCheckBox")),
+                Assert.IsType<CheckBox>(panel.FindName("UpgradeClayCheckBox")),
+                Assert.IsType<CheckBox>(panel.FindName("UpgradeIronCheckBox")),
+                Assert.IsType<CheckBox>(panel.FindName("UpgradeCropCheckBox")),
+            };
+            foreach (var checkBox in checkBoxes)
+            {
+                var binding = Assert.IsType<BindingExpression>(checkBox.GetBindingExpression(CheckBox.IsCheckedProperty));
+                Assert.Equal(BindingMode.TwoWay, binding.ParentBinding.Mode);
+                Assert.Equal(UpdateSourceTrigger.PropertyChanged, binding.ParentBinding.UpdateSourceTrigger);
+                checkBox.IsChecked = true;
+            }
+
+            panel.CommitUpgradeTypeSelection();
+
+            Assert.Equal(["wood", "clay", "iron", "crop"], viewModel.SelectedUpgradeTypes);
         });
     }
 

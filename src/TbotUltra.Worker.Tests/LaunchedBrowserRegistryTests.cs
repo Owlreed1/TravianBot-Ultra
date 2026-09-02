@@ -64,6 +64,19 @@ public sealed class LaunchedBrowserRegistryTests : IDisposable
     }
 
     [Fact]
+    public void CleanupConfirmsThatAnExitedRecordedBrowserNoLongerRemains()
+    {
+        WriteRegistry(pid: 999999, startedAtUtcTicks: DateTime.UtcNow.Ticks, executablePath: @"C:\gone\chrome.exe");
+
+        var result = LaunchedBrowserRegistry.CleanupTrackedBrowsers(_root);
+
+        Assert.Equal(1, result.RecordedCount);
+        Assert.Equal(0, result.RemainingCount);
+        Assert.True(result.Completed);
+        Assert.False(File.Exists(RegistryPath));
+    }
+
+    [Fact]
     public void ForgetRemovesTheRegistryAndToleratesAMissingFile()
     {
         WriteRegistry(pid: 999999, startedAtUtcTicks: DateTime.UtcNow.Ticks, executablePath: @"C:\gone\chrome.exe");
@@ -98,6 +111,21 @@ public sealed class LaunchedBrowserRegistryTests : IDisposable
 
         Assert.Equal("launched", result);
         Assert.False(File.Exists(RegistryPath));
+    }
+
+    [Theory]
+    [InlineData(@"C:\Tbot\.playwright\node\win32_x64\node.exe", @"C:\Tbot\.playwright", true)]
+    [InlineData(@"C:\Program Files\Google\Chrome\Application\chrome.exe", @"C:\Tbot\.playwright", false)]
+    [InlineData(@"C:\Other\.playwright\node\win32_x64\node.exe", @"C:\Tbot\.playwright", false)]
+    [InlineData("", @"C:\Tbot\.playwright", false)]
+    public void OwnershipRequiresTheExactConfiguredPlaywrightDriver(
+        string executablePath,
+        string driverRoot,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            LaunchedBrowserRegistry.IsConfiguredPlaywrightDriverExecutable(executablePath, driverRoot));
     }
 
     private void WriteRegistry(int pid, long startedAtUtcTicks, string executablePath)

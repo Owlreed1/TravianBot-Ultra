@@ -9,6 +9,40 @@ namespace TbotUltra.Worker.Infrastructure;
 
 public sealed partial class BrowserSession : IAsyncDisposable
 {
+    internal const string IsolatedBonusVideoPopupSuppressionScript =
+        """
+        (() => {
+          if (window.__tbotBonusVideoPopupSuppressionInstalled) return;
+          window.__tbotBonusVideoPopupSuppressionInstalled = true;
+
+          const blockedOpen = () => null;
+          try {
+            Object.defineProperty(window, 'open', {
+              configurable: false,
+              enumerable: true,
+              writable: false,
+              value: blockedOpen
+            });
+          } catch {
+            window.open = blockedOpen;
+          }
+
+          document.addEventListener('click', (event) => {
+            const target = event.target instanceof Element ? event.target.closest('a[href]') : null;
+            if (!target) return;
+
+            const href = target.getAttribute('href') || '';
+            const opensAnotherWindow = (target.getAttribute('target') || '').toLowerCase() === '_blank';
+            const usesExternalProtocol = /^[a-z][a-z0-9+.-]*:/i.test(href)
+              && !/^(?:https?|about|javascript):/i.test(href);
+            if (!opensAnotherWindow && !usesExternalProtocol) return;
+
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }, true);
+        })();
+        """;
+
     internal const string MainContextConsentUiSuppressionScript =
         """
         (() => {
@@ -814,6 +848,7 @@ public sealed partial class BrowserSession : IAsyncDisposable
         _playwright = null;
 
         Exception? cleanupFailure = null;
+        Exception? browserCloseFailure = null;
         foreach (var isolatedContext in isolatedContexts)
         {
             try
@@ -846,6 +881,7 @@ public sealed partial class BrowserSession : IAsyncDisposable
             }
             catch (Exception ex)
             {
+                browserCloseFailure = ex;
                 cleanupFailure ??= ex;
             }
         }
@@ -862,15 +898,30 @@ public sealed partial class BrowserSession : IAsyncDisposable
             }
         }
 
-        // The browser closed on purpose, so nothing is left for the next start to clean up. Done even when
-        // cleanup reported a failure: a stale record would point at a PID that is gone (harmless) or reused
-        // (rejected by the start-time check), while keeping it risks acting on the wrong process later.
-        LaunchedBrowserRegistry.Forget(_projectRoot, _log);
+        // Verify every browser recorded for this Playwright lifetime is gone before clearing ownership.
+        // This also removes a wedged isolated bonus-video process that CloseAsync reported as closed.
+        var processCleanup = LaunchedBrowserRegistry.CleanupTrackedBrowsers(_projectRoot, _log);
+        if (processCleanup.ClosedCount > 0)
+        {
+            _log?.Invoke($"[browser] force-closed {processCleanup.ClosedCount} verified leftover browser process(es).");
+        }
+
+        var browserCloseWasRecovered = browserCloseFailure is not null
+            && processCleanup.RecordedCount > 0
+            && processCleanup.Completed;
+        if (processCleanup.RemainingCount > 0
+            || (processCleanup.Skipped && browserCloseFailure is not null)
+            || (browserCloseFailure is not null && !browserCloseWasRecovered))
+        {
+            var failure = cleanupFailure ?? new InvalidOperationException(
+                $"{processCleanup.RemainingCount} owned browser process(es) remain after cleanup.");
+            _browserTrace.Event("ERROR", "browser-session-close", "failed", failure.Message);
+            throw new InvalidOperationException("Browser session cleanup did not close every owned browser process.", failure);
+        }
 
         if (cleanupFailure is not null)
         {
-            _browserTrace.Event("ERROR", "browser-session-close", "failed", cleanupFailure.Message);
-            throw new InvalidOperationException("Browser session cleanup did not complete cleanly.", cleanupFailure);
+            _log?.Invoke($"[browser] graceful cleanup reported an error, but browser-process closure was verified: {cleanupFailure.Message}");
         }
 
         _browserTrace.Event("PAGE_CONTEXT", "browser-session-closed", detail: "result=success");

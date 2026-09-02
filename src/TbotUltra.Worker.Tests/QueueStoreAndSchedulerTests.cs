@@ -402,6 +402,64 @@ public sealed class QueueStoreAndSchedulerTests : IDisposable
         Assert.Equal(expected, QueueGroupCatalog.ResolveGroup(taskName));
     }
 
+    [Theory]
+    [InlineData("desktop_runtime_manual:login", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:logout", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:session_sleep", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:switchvillage", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:restartbrowser", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:add_farms_to_list", QueueGroup.Farming)]
+    [InlineData("desktop_runtime_manual:analyze_farmlists", QueueGroup.Farming)]
+    [InlineData("desktop_runtime_manual:create_farmlists", QueueGroup.Farming)]
+    [InlineData("desktop_runtime_manual:farm_send_now", QueueGroup.Farming)]
+    [InlineData("desktop_runtime_manual:farm_send_all_now", QueueGroup.Farming)]
+    [InlineData("desktop_runtime_manual:catapult_waves", QueueGroup.Farming)]
+    [InlineData("desktop_runtime_manual:refresh_hero_inventory", QueueGroup.Hero)]
+    [InlineData("desktop_runtime_manual:refresh_hero_hp", QueueGroup.Hero)]
+    [InlineData("desktop_runtime_manual:refresh_hero_stats", QueueGroup.Hero)]
+    [InlineData("desktop_runtime_manual:refresh_adventures", QueueGroup.Hero)]
+    [InlineData("desktop_runtime_manual:refresh_reinforcement_villages", QueueGroup.Reinforcements)]
+    [InlineData("desktop_runtime_manual:refresh_troop_queues", QueueGroup.TroopTraining)]
+    [InlineData("desktop_runtime_manual:check_celebration", QueueGroup.BreweryCelebration)]
+    [InlineData("desktop_runtime_manual:scan_resource_villages", QueueGroup.ResourceTransfer)]
+    [InlineData("desktop_runtime_manual:accountscan", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:banrecoveryscan", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:scanproductionbonus", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:bulkmessagesanalyze", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:bulkmessagessend", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:savepagehtml", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:bulksavepagehtml", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:savereportpng", QueueGroup.Account)]
+    [InlineData("desktop_runtime_manual:upgradeallresources", QueueGroup.Construction)]
+    [InlineData("desktop_runtime_manual:upgradeallresourcestomax", QueueGroup.Construction)]
+    [InlineData("desktop_runtime_manual:unclassified_manual_action", QueueGroup.Account)]
+    public void QueueGroupCatalog_ResolvesRuntimeTasks_ByDomain(string taskName, QueueGroup expected)
+    {
+        Assert.Equal(expected, QueueGroupCatalog.ResolveGroup(taskName));
+    }
+
+    [Fact]
+    public void QueueStore_ReclassifiesPersistedRuntimeHistory_WhenLoaded()
+    {
+        File.WriteAllText(
+            _queuePath,
+            """
+            [{
+              "id": "11346f00-0000-0000-0000-000000000001",
+              "taskName": "desktop_runtime_manual:login",
+              "displayName": "Login",
+              "group": "Construction",
+              "payload": {},
+              "status": "Succeeded",
+              "isRuntimeOnly": true
+            }]
+            """);
+
+        var item = Assert.Single(new JsonQueueStore(_queuePath).GetAll());
+
+        Assert.Equal(QueueGroup.Account, item.Group);
+    }
+
     [Fact]
     public void ResourceUpgradePayload_ParsesAndSerializesDictionary()
     {
