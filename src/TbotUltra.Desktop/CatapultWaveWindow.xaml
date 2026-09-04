@@ -255,13 +255,13 @@
                     HorizontalAlignment="Right"
                     Margin="0,12,0,0">
             <Button x:Name="StartButton"
-                    Width="100"
+                    Width="120"
                     Margin="0,0,8,0"
                     Background="{DynamicResource SuccessBgBrush}"
                     BorderBrush="{DynamicResource SuccessBorderBrush}"
                     Foreground="{DynamicResource SuccessTextBrush}"
                     FontWeight="SemiBold"
-                    Content="Start"
+                    Content="Prepare waves"
                     Click="StartButton_Click" />
             <Button x:Name="CancelButton"
                     Width="100"

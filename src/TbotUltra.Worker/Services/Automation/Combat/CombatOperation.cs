@@ -19,8 +19,9 @@ internal sealed class CombatOperation(ICombatClient client)
 
     public Task<CatapultWaveRunResult> StartCatapultWavesAsync(
         CatapultWaveRequest request,
+        Func<int, CancellationToken, Task<bool>> sendConfirmationRequested,
         CancellationToken cancellationToken)
-        => client.StartCatapultWavesAsync(request, cancellationToken);
+        => client.StartCatapultWavesAsync(request, sendConfirmationRequested, cancellationToken);
 
     public Task<string> SendReinforcementsBetweenOwnVillagesAsync(CancellationToken cancellationToken)
         => client.SendReinforcementsBetweenOwnVillagesAsync(cancellationToken);

@@ -12,6 +12,9 @@ namespace TbotUltra.Worker.Services;
 // this partial to co-locate the contract with the domain it covers.
 public sealed partial class TravianClient : ICombatClient
 {
+    private const int CatapultPreparationDelayMinMilliseconds = 250;
+    private const int CatapultPreparationDelayMaxMilliseconds = 500;
+
     private static readonly string[] CatapultSendButtonSelectors =
     [
         "button#ok[name='ok'][value='ok'][type='submit']",
@@ -73,10 +76,12 @@ public sealed partial class TravianClient : ICombatClient
 
     public async Task<CatapultWaveRunResult> StartCatapultWavesAsync(
         CatapultWaveRequest request,
+        Func<int, CancellationToken, Task<bool>> sendConfirmationRequested,
         CancellationToken cancellationToken = default)
     {
         var plan = CatapultWavePlanner.BuildPlan(request);
         Notify($"[catapult] starting — target ({request.X}|{request.Y}), {plan.Attacks.Count} attack(s): 1 first + {request.WaveCount} wave(s)");
+        Notify($"[catapult] preparation pacing {CatapultPreparationDelayMinMilliseconds}–{CatapultPreparationDelayMaxMilliseconds} ms per attack; final dispatch timing unchanged.");
 
         await EnsureLoggedInAsync(cancellationToken: cancellationToken);
         await EnsureRallyPointAndOpenSendTroopsPageAsync(cancellationToken, allowReuseCurrentPage: true);
@@ -101,6 +106,18 @@ public sealed partial class TravianClient : ICombatClient
             }
 
             VerifyCatapultArrivalOrder(prepared);
+            await prepared[0].Page.BringToFrontAsync();
+            Notify($"[catapult] all {prepared.Count} attack(s) prepared; waiting for Send now or Cancel.");
+            if (!await sendConfirmationRequested(prepared.Count, cancellationToken))
+            {
+                Notify("[catapult] canceled after preparation; no attacks were sent.");
+                throw new OperationCanceledException("Catapult waves canceled before sending.", cancellationToken);
+            }
+
+            // The user may have reviewed another attack tab while the confirmation was open. Always
+            // restore the first attack before the existing tight dispatch loop begins.
+            await prepared[0].Page.BringToFrontAsync();
+            Notify("[catapult] Send now confirmed; first attack tab activated before dispatch.");
             var sent = 0;
             var failed = 0;
             var dispatched = new List<PreparedCatapultAttack>();
@@ -206,7 +223,7 @@ public sealed partial class TravianClient : ICombatClient
         foreach (var attack in plan.Attacks.Skip(1))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var page = await OpenCatapultWaveTabAsync(_page, request.TabOpenDelayMilliseconds, cancellationToken);
+            var page = await OpenCatapultWaveTabAsync(_page, cancellationToken);
             page.SetDefaultTimeout(_config.TimeoutMs);
             _browserTrace.AttachPage(page, "catapult-wave-tab");
             prepared.Add(new PreparedCatapultAttack(page, attack.Label, attack.Troops, null));
@@ -226,8 +243,9 @@ public sealed partial class TravianClient : ICombatClient
 
         Notify($"[catapult:verbose] changing original tab to {attack.Label.ToLowerInvariant()} to ({request.X}|{request.Y})");
         await FillCatapultAttackFormAsync(_page, attack, request, cancellationToken);
+        await DelayBeforeCatapultPreparationActionAsync(cancellationToken);
 
-        if (!await TryClickCatapultSendButtonAsync(_page, request.TabOpenDelayMilliseconds, cancellationToken))
+        if (!await TryClickCatapultSendButtonAsync(_page, 0, cancellationToken))
         {
             throw new InvalidOperationException($"Could not open confirmation page for {attack.Label.ToLowerInvariant()}.");
         }
@@ -323,10 +341,11 @@ public sealed partial class TravianClient : ICombatClient
         return attack with { DurationSeconds = await TryReadAttackDurationSecondsAsync(attack.Page, cancellationToken) };
     }
 
-    private async Task<IPage> OpenCatapultWaveTabAsync(IPage sourcePage, int delayMilliseconds, CancellationToken cancellationToken)
+    private async Task<IPage> OpenCatapultWaveTabAsync(IPage sourcePage, CancellationToken cancellationToken)
     {
         var newPageTask = sourcePage.Context.WaitForPageAsync();
-        if (!await TryClickCatapultSendButtonAsync(sourcePage, delayMilliseconds, [KeyboardModifier.Control], cancellationToken))
+        await DelayBeforeCatapultPreparationActionAsync(cancellationToken);
+        if (!await TryClickCatapultSendButtonAsync(sourcePage, 0, [KeyboardModifier.Control], cancellationToken))
         {
             throw new InvalidOperationException("Could not open a catapult wave tab from Send Troops.");
         }
@@ -347,6 +366,14 @@ public sealed partial class TravianClient : ICombatClient
         }
 
         return newPage;
+    }
+
+    private static Task DelayBeforeCatapultPreparationActionAsync(CancellationToken cancellationToken)
+    {
+        var delayMilliseconds = Random.Shared.Next(
+            CatapultPreparationDelayMinMilliseconds,
+            CatapultPreparationDelayMaxMilliseconds + 1);
+        return Task.Delay(delayMilliseconds, cancellationToken);
     }
 
     private async Task EnsureCatapultConfirmReadyAsync(

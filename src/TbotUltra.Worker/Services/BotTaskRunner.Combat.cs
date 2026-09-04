@@ -117,6 +117,7 @@ public sealed partial class BotTaskRunner
         BotOptions options,
         CatapultWaveRequest request,
         Action<string> log,
+        Func<int, CancellationToken, Task<bool>> sendConfirmationRequested,
         string? accountName = null,
         CancellationToken cancellationToken = default)
     {
@@ -131,7 +132,10 @@ public sealed partial class BotTaskRunner
             {
                 await client.LoginAsync(cancellationToken);
                 await TrySwitchToTargetVillageAsync(client, options, log, cancellationToken, skipFeatureRefresh: true);
-                result = await new CombatOperation(client).StartCatapultWavesAsync(request, cancellationToken);
+                result = await new CombatOperation(client).StartCatapultWavesAsync(
+                    request,
+                    sendConfirmationRequested,
+                    cancellationToken);
             });
 
         return result ?? throw new InvalidOperationException("Could not start catapult waves.");

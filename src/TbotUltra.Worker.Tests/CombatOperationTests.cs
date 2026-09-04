@@ -30,7 +30,8 @@ public sealed class CombatOperationTests
 
         await operation.ReadAvailableTroopsForCatapultWavesAsync(true, cancellation.Token);
         await operation.ReadCatapultWaveSetupInfoAsync(false, cancellation.Token);
-        await operation.StartCatapultWavesAsync(request, cancellation.Token);
+        Func<int, CancellationToken, Task<bool>> sendConfirmationRequested = (_, _) => Task.FromResult(true);
+        await operation.StartCatapultWavesAsync(request, sendConfirmationRequested, cancellation.Token);
         await operation.SendReinforcementsBetweenOwnVillagesAsync(cancellation.Token);
         await operation.SendResourcesBetweenOwnVillagesAsync(cancellation.Token);
         await operation.TestSendReinforcementsBetweenOwnVillagesAsync(cancellation.Token);
@@ -38,6 +39,7 @@ public sealed class CombatOperationTests
         Assert.Equal(["available", "setup", "start", "reinforcements", "resources", "test-reinforcements"], client.Calls);
         Assert.True(client.ForceRefresh);
         Assert.Same(request, client.Request);
+        Assert.Same(sendConfirmationRequested, client.SendConfirmationRequested);
         Assert.All(client.CancellationTokens, token => Assert.Equal(cancellation.Token, token));
     }
 
@@ -48,6 +50,7 @@ public sealed class CombatOperationTests
         public List<CancellationToken> CancellationTokens { get; } = [];
         public bool ForceRefresh { get; private set; }
         public CatapultWaveRequest? Request { get; private set; }
+        public Func<int, CancellationToken, Task<bool>>? SendConfirmationRequested { get; private set; }
 
         public Task<IReadOnlyDictionary<string, long>> ReadAvailableTroopsForCatapultWavesAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyDictionary<string, long>>(new Dictionary<string, long>());
@@ -61,9 +64,13 @@ public sealed class CombatOperationTests
         public Task<CatapultWaveSetupInfo> ReadCatapultWaveSetupInfoAsync(bool forceRefresh, CancellationToken cancellationToken = default)
             => Record("setup", cancellationToken, new CatapultWaveSetupInfo(new Dictionary<string, long>(), 10));
 
-        public Task<CatapultWaveRunResult> StartCatapultWavesAsync(CatapultWaveRequest request, CancellationToken cancellationToken = default)
+        public Task<CatapultWaveRunResult> StartCatapultWavesAsync(
+            CatapultWaveRequest request,
+            Func<int, CancellationToken, Task<bool>> sendConfirmationRequested,
+            CancellationToken cancellationToken = default)
         {
             Request = request;
+            SendConfirmationRequested = sendConfirmationRequested;
             return Record("start", cancellationToken, new CatapultWaveRunResult(3, 3, 3, 0, 1, -2));
         }
 

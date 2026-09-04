@@ -72,14 +72,39 @@ public sealed class SendTroopsFormSourceTests
     }
 
     [Fact]
-    public void CatapultWaveTabBurst_UsesOnlyItsConfiguredTabDelay()
+    public void CatapultWavePreparation_UsesShortDedicatedDelayWithoutChangingDispatchDelay()
     {
         var source = ReadWorkerSource("Services", "Automation", "Combat", "TravianClient.Catapults.cs");
 
         Assert.Contains("DelayBeforeCatapultWaveClickAsync", source, StringComparison.Ordinal);
+        Assert.Contains("CatapultPreparationDelayMinMilliseconds = 250", source, StringComparison.Ordinal);
+        Assert.Contains("CatapultPreparationDelayMaxMilliseconds = 500", source, StringComparison.Ordinal);
+        Assert.Contains("DelayBeforeCatapultPreparationActionAsync", source, StringComparison.Ordinal);
+        Assert.Contains("TryClickCatapultSendButtonAsync(_page, 0", source, StringComparison.Ordinal);
+        Assert.Contains("TryClickCatapultSendButtonAsync(sourcePage, 0", source, StringComparison.Ordinal);
         Assert.DoesNotContain("DelayBeforeClickAsync", source, StringComparison.Ordinal);
         Assert.DoesNotContain("TypeHumanlyAsync", source, StringComparison.Ordinal);
         Assert.DoesNotContain("GotoOnCatapultPageAsync", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CatapultWaves_RequireApprovalAfterPreparationAndReturnToFirstTabBeforeDispatch()
+    {
+        var source = ReadWorkerSource("Services", "Automation", "Combat", "TravianClient.Catapults.cs");
+        var runStart = source.IndexOf("public async Task<CatapultWaveRunResult> StartCatapultWavesAsync", StringComparison.Ordinal);
+        var cleanupStart = source.IndexOf("finally", runStart, StringComparison.Ordinal);
+        Assert.True(runStart >= 0 && cleanupStart > runStart);
+
+        var runBody = source[runStart..cleanupStart];
+        var preparation = runBody.IndexOf("VerifyCatapultArrivalOrder(prepared);", StringComparison.Ordinal);
+        var firstTab = runBody.IndexOf("prepared[0].Page.BringToFrontAsync", preparation, StringComparison.Ordinal);
+        var approval = runBody.IndexOf("sendConfirmationRequested", firstTab, StringComparison.Ordinal);
+        var dispatch = runBody.IndexOf("var dispatched = new List<PreparedCatapultAttack>();", approval, StringComparison.Ordinal);
+
+        Assert.True(preparation >= 0 && firstTab > preparation);
+        Assert.True(approval > firstTab, "The first prepared tab must be active before asking the user.");
+        Assert.True(dispatch > approval, "No Confirm button may be clicked before the user approves sending.");
+        Assert.Contains("throw new OperationCanceledException", runBody[firstTab..dispatch], StringComparison.Ordinal);
     }
 
     [Fact]

@@ -27,7 +27,7 @@ public partial class CatapultWaveWindow : Window
     private bool _isRunning;
     private bool _isRefreshing;
 
-    public Func<CatapultWaveRequest, Action<string>, CancellationToken, Task<CatapultWaveRunResult>>? StartRequested { get; init; }
+    public Func<CatapultWaveRequest, Action<string>, Func<int, CancellationToken, Task<bool>>, CancellationToken, Task<CatapultWaveRunResult>>? StartRequested { get; init; }
     public Func<Action<string>, CancellationToken, Task<CatapultWaveSetupInfo>>? RefreshRequested { get; init; }
 
     /// <summary>
@@ -224,11 +224,15 @@ public partial class CatapultWaveWindow : Window
         }
 
         SetRunning(true);
-        BusyOverlay.Show("Sending catapult waves", "Preparing catapult waves…");
+        BusyOverlay.Show("Preparing catapult waves", "Opening and preparing attack tabs…");
         try
         {
             SetStatus("Preparing catapult waves...", isAlarm: false);
-            var result = await StartRequested(request!, message => SetStatus(message, isAlarm: false), _windowCts.Token);
+            var result = await StartRequested(
+                request!,
+                message => SetStatus(message, isAlarm: false),
+                ConfirmPreparedAttacksAsync,
+                _windowCts.Token);
             var attackMode = request!.RaidAttack ? "raid" : "normal attack";
             var done = $"Sent {result.SentCount}/{result.TotalAttacks} {attackMode}(s) to ({result.X}|{result.Y}).";
             SetStatus(done, isAlarm: false);
@@ -255,6 +259,39 @@ public partial class CatapultWaveWindow : Window
 
     #region Confirmation popup
 
+    private Task<bool> ConfirmPreparedAttacksAsync(int preparedCount, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Dispatcher.CheckAccess())
+        {
+            return Task.FromResult(ShowPreparedAttacksConfirmation(preparedCount));
+        }
+
+        return Dispatcher
+            .InvokeAsync(() => ShowPreparedAttacksConfirmation(preparedCount))
+            .Task
+            .WaitAsync(cancellationToken);
+    }
+
+    private bool ShowPreparedAttacksConfirmation(int preparedCount)
+    {
+        BusyOverlay.Text = $"{preparedCount} attacks prepared. Waiting for confirmation…";
+        SetStatus("All attacks are prepared. Review the browser tabs before sending.", isAlarm: false);
+        var result = AppDialog.ShowCustom(
+            this,
+            $"All catapult attacks are prepared in {preparedCount} browser tabs.\n\n" +
+            "Review each tab and change any Random catapult target you want. " +
+            "Send now returns to the first tab and sends every attack with the configured wave timing.",
+            "Catapult attacks prepared",
+            [("Send now", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
+            MessageBoxImage.Question,
+            MessageBoxResult.Cancel,
+            MessageBoxResult.Cancel,
+            successResult: MessageBoxResult.Yes,
+            dangerResult: MessageBoxResult.Cancel);
+        return result == MessageBoxResult.Yes;
+    }
+
     private MessageBoxResult ShowStartConfirmation(CatapultWaveRequest request)
     {
         var mode = request.RaidAttack ? "Raid" : "Normal attack";
@@ -265,10 +302,17 @@ public partial class CatapultWaveWindow : Window
 
         content.Children.Add(new TextBlock
         {
-            Text = "Start catapult waves?",
+            Text = "Prepare catapult waves?",
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(ThemeColors.Get("TextPrimaryBrush")),
-            Margin = new Thickness(0, 0, 0, 10),
+            Margin = new Thickness(0, 0, 0, 6),
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = "No attacks will be sent yet. The browser tabs will only be prepared for review.",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = new SolidColorBrush(ThemeColors.Get("TextSecondaryBrush")),
+            Margin = new Thickness(0, 0, 0, 12),
         });
         content.Children.Add(CreateSummaryText($"Target: ({request.X}|{request.Y})"));
         content.Children.Add(CreateSummaryText($"Mode: {mode}"));
@@ -277,13 +321,16 @@ public partial class CatapultWaveWindow : Window
         content.Children.Add(CreateSummaryText($"Each wave: {FormatTroopSet(request.WaveTroops)}"));
         content.Children.Add(CreateSummaryText($"Total attacks: {request.WaveCount + 1}"));
 
-        return AppDialog.ShowContent(
+        return AppDialog.ShowCustomContent(
             this,
             content,
-            "Confirm catapult waves",
-            MessageBoxButton.YesNo,
+            "Prepare catapult waves",
+            [("Prepare waves", MessageBoxResult.Yes), ("Cancel", MessageBoxResult.Cancel)],
             MessageBoxImage.Question,
-            MessageBoxResult.No);
+            MessageBoxResult.Cancel,
+            MessageBoxResult.Cancel,
+            successResult: MessageBoxResult.Yes,
+            dangerResult: MessageBoxResult.Cancel);
     }
 
     private static TextBlock CreateSummaryText(string text)

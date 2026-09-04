@@ -238,8 +238,10 @@ Published artifacts belong under `artifacts/`, never beside source files.
   If the recorded runtime is below the new limit and Allowed hours permit running, wake with zero added sleep delay.
 - Known queue deadlines are authoritative and may not be shortened by pacing.
 - Action pacing is mandatory. Persisted configuration and incoming payloads may change its delay ranges but may
-  not disable it. The manual Catapult wave tab burst is the only exception: it uses only its explicitly selected
-  50–500 ms tab delay between clicks and does not apply general human/action pacing while filling its form.
+  not disable it. Manual Catapult-wave preparation uses a dedicated 250–500 ms delay once per attack, then
+  activates the first prepared tab
+  and requires explicit `Send now` confirmation. Only the final confirmation burst uses the explicitly selected
+  50–500 ms delay without general action pacing; cancel sends nothing and temporary wave tabs are closed.
 - Proxy settings are account-scoped. Browser, HTTP client, tests, and bonus video use the same effective route.
   Never log credentials or place them in user-visible URLs.
 - Proxy Finder and Proxy Library classify a proxy as reliable only after three consecutive neutral HTTPS probes

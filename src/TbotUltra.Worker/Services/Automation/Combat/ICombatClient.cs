@@ -20,6 +20,7 @@ public interface ICombatClient
 
     Task<CatapultWaveRunResult> StartCatapultWavesAsync(
         CatapultWaveRequest request,
+        Func<int, CancellationToken, Task<bool>> sendConfirmationRequested,
         CancellationToken cancellationToken = default);
 
     Task<string> SendReinforcementsBetweenOwnVillagesAsync(CancellationToken cancellationToken = default);

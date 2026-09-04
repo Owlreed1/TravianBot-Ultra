@@ -219,9 +219,9 @@ public sealed class DesktopBotService : IDesktopBotService
         return _taskRunner.ReadCatapultWaveSetupInfoAsync(options, log, forceRefresh, null, cancellationToken);
     }
 
-    public Task<CatapultWaveRunResult> StartCatapultWavesAsync(BotOptions options, CatapultWaveRequest request, Action<string> log, CancellationToken cancellationToken)
+    public Task<CatapultWaveRunResult> StartCatapultWavesAsync(BotOptions options, CatapultWaveRequest request, Action<string> log, Func<int, CancellationToken, Task<bool>> sendConfirmationRequested, CancellationToken cancellationToken)
     {
-        return _taskRunner.StartCatapultWavesAsync(options, request, log, null, cancellationToken);
+        return _taskRunner.StartCatapultWavesAsync(options, request, log, sendConfirmationRequested, null, cancellationToken);
     }
 
 public Task ExecuteLoginAsync(BotOptions options, Action<string> log, bool keepBrowserOpenAfterLogin, CancellationToken cancellationToken)

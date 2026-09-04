@@ -116,7 +116,7 @@ public partial class MainWindow
                     status("Opening Send Troops and reading troops…");
                     return await ReadSetupAsync(options, forceRefresh: true, status, token);
                 },
-                StartRequested = async (request, status, token) =>
+                StartRequested = async (request, status, sendConfirmationRequested, token) =>
                 {
                     using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(operationToken, token);
                     var options = ApplySelectedVillageToOptions(LoadBotOptions());
@@ -130,6 +130,7 @@ public partial class MainWindow
                             AppendLog(message);
                             status(message);
                         },
+                        sendConfirmationRequested,
                         linkedCts.Token);
 
                     var attackMode = request.RaidAttack ? "raid" : "normal attack";
