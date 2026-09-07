@@ -208,7 +208,7 @@ public partial class ProxyFinderWindow : Window
                 Candidate = new ProxyCandidate(
                     string.IsNullOrWhiteSpace(result.Scheme) ? "socks5" : result.Scheme,
                     result.Host,
-                    result.Port),
+                    result.Port, result.Username, result.Password),
             })
             .ToList();
 
@@ -233,6 +233,8 @@ public partial class ProxyFinderWindow : Window
                     Scheme = row.Candidate.Scheme,
                     Host = row.Candidate.Host,
                     Port = row.Candidate.Port,
+                    Username = row.Candidate.Username ?? string.Empty,
+                    Password = row.Candidate.Password ?? string.Empty,
                     LatencyMs = row.LatencyMs,
                     Country = row.Country,
                 })
@@ -333,6 +335,8 @@ public partial class ProxyFinderWindow : Window
             Name = name,
             Scheme = row.Candidate.Scheme,
             Host = row.Candidate.Host,
+            Username = row.Candidate.Username ?? string.Empty,
+            Password = row.Candidate.Password ?? string.Empty,
             Port = row.Candidate.Port,
             Country = country,
             LatencyMs = row.LatencyMs,

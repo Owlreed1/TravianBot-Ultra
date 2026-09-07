@@ -51,7 +51,9 @@ internal sealed record AccountEditorInput(
     string ProxyHost,
     string ProxyPort,
     bool EditingExistingAccount,
-    string ExistingAccountName);
+    string ExistingAccountName,
+    string ProxyUsername = "",
+    string ProxyPassword = "");
 
 /// <summary>
 /// Stateless account-editor state comparisons and saved-proxy presentation ordering.
@@ -74,7 +76,7 @@ internal static class AccountEditorState
         var proxyHost = input.ProxyHost.Trim();
         var proxyPort = input.ProxyPort.Trim();
         var proxyScheme = string.IsNullOrWhiteSpace(input.ProxyScheme) ? "socks5" : input.ProxyScheme.Trim();
-        var proxyServer = BuildProxyServer(proxyScheme, proxyHost, proxyPort);
+        var proxyServer = BuildProxyServer(proxyScheme, proxyHost, proxyPort, input.ProxyUsername, input.ProxyPassword);
         if (proxyEnabled || neverUseOwnIp)
         {
             if (proxyHost.Length == 0 || proxyPort.Length == 0)
@@ -118,17 +120,19 @@ internal static class AccountEditorState
         };
     }
 
-    internal static string BuildProxyServer(string? scheme, string? host, string? port)
+    internal static string BuildProxyServer(string? scheme, string? host, string? port, string? username = null, string? password = null)
     {
         var normalizedScheme = string.IsNullOrWhiteSpace(scheme) ? "socks5" : scheme.Trim();
         var normalizedHost = host?.Trim() ?? string.Empty;
         var normalizedPort = port?.Trim() ?? string.Empty;
         return normalizedHost.Length == 0 && normalizedPort.Length == 0
             ? string.Empty
-            : $"{normalizedScheme}://{normalizedHost}:{normalizedPort}";
+            : int.TryParse(normalizedPort, out var portNumber)
+                ? ProxyParser.BuildServer(normalizedScheme, normalizedHost, portNumber, username, password)
+                : $"{normalizedScheme}://{normalizedHost}:{normalizedPort}";
     }
 
-    internal static string ValidateProxyFieldsForCheck(string? scheme, string? host, string? port)
+    internal static string ValidateProxyFieldsForCheck(string? scheme, string? host, string? port, string? username = null, string? password = null)
     {
         var normalizedHost = host?.Trim() ?? string.Empty;
         var normalizedPort = port?.Trim() ?? string.Empty;
@@ -147,7 +151,7 @@ internal static class AccountEditorState
             throw new InvalidOperationException("Proxy port must be a number between 1 and 65535.");
         }
 
-        return BuildProxyServer(scheme, normalizedHost, normalizedPort);
+        return BuildProxyServer(scheme, normalizedHost, normalizedPort, username, password);
     }
 
     internal static bool HasChanges(AccountEditorSnapshot baseline, AccountEditorSnapshot current)

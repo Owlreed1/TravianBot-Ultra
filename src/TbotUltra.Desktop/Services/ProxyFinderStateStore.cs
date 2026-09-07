@@ -12,6 +12,8 @@ public sealed class ProxyFinderSavedResult
     public string Scheme { get; set; } = string.Empty;
     public string Host { get; set; } = string.Empty;
     public int Port { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
     public long LatencyMs { get; set; }
     public string Country { get; set; } = string.Empty;
 }

@@ -6,6 +6,31 @@ namespace TbotUltra.Worker.Tests;
 public sealed class ProxyParserTests
 {
     [Theory]
+    [InlineData("user", "secret")]
+    [InlineData("user:name@example", " p@ss:%/#?\\word ")]
+    [InlineData("user", "")]
+    public void BuildServer_RoundTripsCredentialsForBrowserAndHttp(string username, string password)
+    {
+        var server = ProxyParser.BuildServer("http", "proxy.example", 8080, username, password);
+        Assert.True(ProxyParser.TryBuild(server, out var browserProxy, out _));
+        Assert.Equal(username, browserProxy!.Username);
+        Assert.Equal(password, browserProxy.Password ?? string.Empty);
+
+        var httpProxy = ProxyParser.BuildWebProxy(server);
+        Assert.Equal("http://proxy.example:8080/", httpProxy.Address!.AbsoluteUri);
+        var credential = httpProxy.Credentials!.GetCredential(httpProxy.Address, "Basic");
+        Assert.Equal(username, credential!.UserName);
+        Assert.Equal(password, credential.Password);
+        Assert.DoesNotContain(Uri.EscapeDataString(password.Length > 0 ? password : "unused"), ProxyParser.MaskForLog(server));
+    }
+
+    [Fact]
+    public void BuildWebProxy_UnauthenticatedProxyHasNoCredentials()
+    {
+        Assert.Null(ProxyParser.BuildWebProxy("http://proxy.example:8080").Credentials);
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("   ")]
     [InlineData(null)]

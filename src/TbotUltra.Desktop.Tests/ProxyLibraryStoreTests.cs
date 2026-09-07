@@ -6,6 +6,57 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class ProxyLibraryStoreTests
 {
     [Fact]
+    public void Load_MigratesInlineCredentialsAndSavePreservesThem()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"tbot-proxy-auth-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var path = Path.Combine(root, "proxies.json");
+        try
+        {
+            File.WriteAllText(path, """
+                [{"id":"legacy","name":"user:secret@proxy.example:8080","scheme":"http",
+                  "host":"user:secret@proxy.example","port":8080,"isWorking":false}]
+                """);
+            var store = new ProxyLibraryStore(path);
+            var entry = Assert.Single(store.Load());
+            Assert.Equal("legacy", entry.Id);
+            Assert.Equal("user", entry.Username);
+            Assert.Equal("secret", entry.Password);
+            Assert.Equal("proxy.example", entry.Host);
+            Assert.DoesNotContain("secret", entry.DisplayName);
+            Assert.Null(entry.IsWorking);
+            store.Save([entry]);
+            var restored = Assert.Single(store.Load());
+            Assert.Equal(entry.Server, restored.Server);
+            Assert.Same(restored, ProxyLibraryStore.FindByServer([restored], entry.Server));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Upsert_DistinguishesCredentialsButPreservesEndpointReuseProtection()
+    {
+        var entries = new List<ProxyLibraryEntry>();
+        var first = ProxyLibraryStore.Upsert(entries, new ProxyLibraryEntry
+        {
+            Scheme = "http", Host = "proxy.example", Port = 8080,
+            Username = "user", Password = "secret", AssignedAccount = "alice",
+        });
+        var second = ProxyLibraryStore.Upsert(entries, new ProxyLibraryEntry
+        {
+            Scheme = "http", Host = "proxy.example", Port = 8080,
+            Username = "user", Password = "Secret",
+        });
+        Assert.Equal(2, entries.Count);
+        Assert.Same(first, ProxyLibraryStore.FindByServer(entries, first.Server));
+        Assert.Same(second, ProxyLibraryStore.FindByServer(entries, second.Server));
+        Assert.Equal(ProxyReuse.LockedToOther, ProxyLibraryStore.ClassifyReuse(entries, second.Server, "bob").Reuse);
+    }
+
+    [Fact]
     public void Remove_DeletesOnlyTheRequestedPersistedEntry()
     {
         var root = Path.Combine(Path.GetTempPath(), $"tbot-proxy-remove-{Guid.NewGuid():N}");

@@ -7,6 +7,20 @@ namespace TbotUltra.Desktop.Tests;
 public sealed class AccountEditorStateTests
 {
     [Fact]
+    public void AuthenticatedProxy_SurvivesAccountSaveAndIpCheck()
+    {
+        var input = new AccountEditorInput("player", "game-password", false, "World", "https://example.com",
+            true, true, "http", "proxy.example", "8080", false, "", "proxy-user", " p@ss:% ");
+        var account = AccountEditorState.BuildAccountEntry(input);
+        var checkServer = AccountEditorState.ValidateProxyFieldsForCheck(input.ProxyScheme, input.ProxyHost,
+            input.ProxyPort, input.ProxyUsername, input.ProxyPassword);
+        Assert.Equal(account.ProxyServer, checkServer);
+        Assert.True(TbotUltra.Worker.Infrastructure.ProxyParser.TryBuild(account.ProxyServer, out var proxy, out _));
+        Assert.Equal(input.ProxyUsername, proxy!.Username);
+        Assert.Equal(input.ProxyPassword, proxy.Password);
+    }
+
+    [Fact]
     public void BuildProxyServer_NormalizesFieldsAndUsesDefaultScheme()
     {
         Assert.Equal("socks5://127.0.0.1:1080", AccountEditorState.BuildProxyServer(null, " 127.0.0.1 ", " 1080 "));

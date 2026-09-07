@@ -7,13 +7,15 @@ using System.Text.Json;
 namespace TbotUltra.Worker.Infrastructure;
 
 /// <summary>A single proxy to test: chosen scheme plus host/port parsed from one pasted line.</summary>
-public sealed record ProxyCandidate(string Scheme, string Host, int Port)
+public sealed record ProxyCandidate(string Scheme, string Host, int Port, string? Username = null, string? Password = null)
 {
     /// <summary>Full connection string, e.g. <c>socks5://1.2.3.4:1080</c>.</summary>
-    public string Server => $"{Scheme}://{Host}:{Port}";
+    public string Server => ProxyParser.BuildServer(Scheme, Host, Port, Username, Password);
 
     /// <summary>Display form without scheme, e.g. <c>1.2.3.4:1080</c>.</summary>
     public string HostPort => $"{Host}:{Port}";
+
+    public override string ToString() => $"{Scheme}://{HostPort}";
 }
 
 /// <summary>Outcome of a single lightweight probe: whether the proxy answered and how fast.</summary>
@@ -100,7 +102,7 @@ public sealed class ProxyListTester
         }
 
         var normalizedScheme = NormalizeScheme(scheme);
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<ProxyCandidate>();
         var limit = maxProxies <= 0 ? int.MaxValue : maxProxies;
 
         foreach (var rawLine in pastedText.Split('\n'))
@@ -121,7 +123,7 @@ public sealed class ProxyListTester
                 continue;
             }
 
-            if (seen.Add(candidate.HostPort))
+            if (seen.Add(candidate with { Host = candidate.Host.ToLowerInvariant() }))
             {
                 result.Add(candidate);
             }
@@ -279,7 +281,7 @@ public sealed class ProxyListTester
     {
         var handler = new SocketsHttpHandler
         {
-            Proxy = new WebProxy(new Uri(server)),
+            Proxy = ProxyParser.BuildWebProxy(server),
             UseProxy = true,
             AllowAutoRedirect = false,
             ConnectTimeout = ProbeTimeout,
@@ -370,11 +372,11 @@ public sealed class ProxyListTester
         return true;
     }
 
-    private static async Task<ProxyProbeResult> DefaultProbeAsync(string server, string url, CancellationToken cancellationToken)
+    internal static async Task<ProxyProbeResult> DefaultProbeAsync(string server, string url, CancellationToken cancellationToken)
     {
         var handler = new SocketsHttpHandler
         {
-            Proxy = new WebProxy(new Uri(server)),
+            Proxy = ProxyParser.BuildWebProxy(server),
             UseProxy = true,
             AllowAutoRedirect = false,
             ConnectTimeout = ProbeTimeout,
@@ -449,7 +451,8 @@ public sealed class ProxyListTester
             rest = line[(schemeIndex + 3)..];
         }
 
-        // Drop any credentials (unusual for public lists) — keep host:port only.
+        ProxyParser.TryBuild(line, out var parsedProxy, out _);
+        // Keep credentials separately so host labels never contain a password.
         var atIndex = rest.LastIndexOf('@');
         if (atIndex >= 0)
         {
@@ -474,7 +477,7 @@ public sealed class ProxyListTester
             return false;
         }
 
-        candidate = new ProxyCandidate(effectiveScheme, host, port);
+        candidate = new ProxyCandidate(effectiveScheme, host, port, parsedProxy?.Username, parsedProxy?.Password);
         return true;
     }
 

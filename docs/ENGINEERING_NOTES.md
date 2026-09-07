@@ -244,6 +244,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
   50–500 ms delay without general action pacing; cancel sends nothing and temporary wave tabs are closed.
 - Proxy settings are account-scoped. Browser, HTTP client, tests, and bonus video use the same effective route.
   Never log credentials or place them in user-visible URLs.
+  Proxy library/finder entries carry username and password separately; migrate legacy inline Host credentials
+  before normalization. Serialize credentials with `ProxyParser.BuildServer` and use `BuildWebProxy` for HTTP
+  probes/IP lookups so authentication is explicit. Connection matching is credential-sensitive, while account
+  reuse protection remains endpoint-scoped. Account selection, editing, and rotation must preserve credentials.
+  Playwright inherits launch proxy credentials in new contexts; do not add context overrides without a failing repro.
 - Proxy Finder and Proxy Library classify a proxy as reliable only after three consecutive neutral HTTPS probes
   and two consecutive Travian reachability probes. All five probes use fresh connections and the active cancellation
   token; a single failed probe rejects the proxy. Only HTTP 2xx/3xx responses count as usable; blocked, proxy-auth

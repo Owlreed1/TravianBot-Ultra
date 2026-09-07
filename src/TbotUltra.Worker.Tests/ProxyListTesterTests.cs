@@ -7,6 +7,21 @@ namespace TbotUltra.Worker.Tests;
 
 public sealed class ProxyListTesterTests
 {
+    [Fact]
+    public void ParseCandidates_PreservesCredentialsAndDistinguishesProxyAccounts()
+    {
+        var candidates = ProxyListTester.ParseCandidates(
+            "http://user:secret@proxy.example:8080\nhttp://user:Secret@proxy.example:8080\nhttp://user:secret@proxy.example:8080",
+            "http", 0);
+
+        Assert.Equal(2, candidates.Count);
+        Assert.True(ProxyParser.TryBuild(candidates[0].Server, out var proxy, out _));
+        Assert.Equal("user", proxy!.Username);
+        Assert.Equal("secret", proxy.Password);
+        Assert.DoesNotContain("secret", candidates[0].HostPort);
+        Assert.DoesNotContain("secret", candidates[0].ToString());
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.OK, true)]
     [InlineData(HttpStatusCode.NoContent, true)]

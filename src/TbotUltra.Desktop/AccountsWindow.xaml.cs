@@ -37,6 +37,8 @@ public partial class AccountsWindow : Window
     private readonly CancellationTokenSource _specialServerLoadCts = new();
     private string _activeAccountName = string.Empty;
     private bool _showPassword;
+    private string _editorProxyUsername = string.Empty;
+    private string _editorProxyPassword = string.Empty;
     private bool _editingExistingAccount;
     private string _editingOriginalName = string.Empty;
     private string _editingOriginalServerName = string.Empty;
@@ -679,9 +681,7 @@ public partial class AccountsWindow : Window
         UseProxyCheckBox.IsChecked = true;
         SafeRunAccountEditorAction(() =>
         {
-            SelectProxyScheme(pick.Scheme);
-            ProxyHostTextBox.Text = pick.Host;
-            ProxyPortTextBox.Text = pick.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            LoadProxyFields(pick.Server);
             RefreshSavedProxySelection();
         }, "apply selected proxy");
         UpdateActionButtons();
@@ -818,9 +818,7 @@ public partial class AccountsWindow : Window
             return;
         }
 
-        SelectProxyScheme(proxy.Scheme);
-        ProxyHostTextBox.Text = proxy.Host;
-        ProxyPortTextBox.Text = proxy.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        LoadProxyFields(proxy.Server);
     }
 
     private void SynchronizeSavedScheduleProxy(string accountName)
@@ -847,9 +845,7 @@ public partial class AccountsWindow : Window
         if (proxy is not null)
         {
             account.ProxyServer = proxy.Server;
-            SelectProxyScheme(proxy.Scheme);
-            ProxyHostTextBox.Text = proxy.Host;
-            ProxyPortTextBox.Text = proxy.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            LoadProxyFields(proxy.Server);
         }
 
         _store.SaveAccount(account, setActive: false);
@@ -919,9 +915,7 @@ public partial class AccountsWindow : Window
         UseProxyCheckBox.IsChecked = true;
         SafeRunAccountEditorAction(() =>
         {
-            SelectProxyScheme(entry.Scheme);
-            ProxyHostTextBox.Text = entry.Host;
-            ProxyPortTextBox.Text = entry.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            LoadProxyFields(entry.Server);
         }, "apply saved proxy");
         UpdateActionButtons();
     }
@@ -1200,7 +1194,9 @@ public partial class AccountsWindow : Window
             ProxyHostTextBox.Text,
             ProxyPortTextBox.Text,
             _editingExistingAccount,
-            _editingOriginalName));
+            _editingOriginalName,
+            _editorProxyUsername,
+            _editorProxyPassword));
     }
 
     private void SelectByName(string name)
@@ -1363,6 +1359,9 @@ public partial class AccountsWindow : Window
 
     private void LoadProxyFields(string? proxyServer)
     {
+        ProxyParser.TryBuild(proxyServer, out var proxy, out _);
+        _editorProxyUsername = proxy?.Username ?? string.Empty;
+        _editorProxyPassword = proxy?.Password ?? string.Empty;
         var value = proxyServer?.Trim() ?? string.Empty;
         var scheme = "socks5";
         var rest = value;
@@ -1431,7 +1430,8 @@ public partial class AccountsWindow : Window
             scheme = "socks5";
         }
 
-        return AccountEditorState.BuildProxyServer(scheme, ProxyHostTextBox?.Text, ProxyPortTextBox?.Text);
+        return AccountEditorState.BuildProxyServer(scheme, ProxyHostTextBox?.Text, ProxyPortTextBox?.Text,
+            _editorProxyUsername, _editorProxyPassword);
     }
 
     private string ValidateCurrentProxyFields()
@@ -1440,7 +1440,9 @@ public partial class AccountsWindow : Window
         return AccountEditorState.ValidateProxyFieldsForCheck(
             scheme,
             ProxyHostTextBox?.Text,
-            ProxyPortTextBox?.Text);
+            ProxyPortTextBox?.Text,
+            _editorProxyUsername,
+            _editorProxyPassword);
     }
 
     private void ShowProxyCheckOverlay(string title, string status, bool completed)

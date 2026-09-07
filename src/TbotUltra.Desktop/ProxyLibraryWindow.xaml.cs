@@ -66,11 +66,13 @@ public partial class ProxyLibraryWindow : Window
         schemeBox.SelectedIndex = 0;
         var hostBox = new TextBox { MinWidth = 260 };
         var portBox = new TextBox { MinWidth = 90 };
+        var usernameBox = new TextBox { MinWidth = 260 };
+        var passwordBox = new PasswordBox { MinWidth = 260 };
 
         var panel = new Grid { Margin = new Thickness(0, 4, 0, 0) };
         panel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(88) });
         panel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        for (var i = 0; i < 4; i++)
+        for (var i = 0; i < 6; i++)
         {
             panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         }
@@ -79,6 +81,8 @@ public partial class ProxyLibraryWindow : Window
         AddDialogRow(panel, 1, "Type", schemeBox);
         AddDialogRow(panel, 2, "Host/IP", hostBox);
         AddDialogRow(panel, 3, "Port", portBox);
+        AddDialogRow(panel, 4, "Username", usernameBox);
+        AddDialogRow(panel, 5, "Password", passwordBox);
 
         var result = AppDialog.ShowContent(this, panel, "Manual add proxy", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.OK);
         if (result != MessageBoxResult.OK)
@@ -88,9 +92,21 @@ public partial class ProxyLibraryWindow : Window
 
         var scheme = (schemeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "socks5";
         var host = hostBox.Text.Trim();
-        if (!int.TryParse(portBox.Text.Trim(), out var port) || port is < 1 or > 65535 || host.Length == 0 || host.Any(char.IsWhiteSpace))
+        if (!int.TryParse(portBox.Text.Trim(), out var port) || port is < 1 or > 65535 || host.Length == 0
+            || host.Any(char.IsWhiteSpace) || host.IndexOfAny(['@', '/', '?', '#']) >= 0)
         {
-            AppDialog.Show(this, "Enter a valid host/IP and port.", "Manual add proxy", MessageBoxButton.OK, MessageBoxImage.Warning);
+            AppDialog.Show(this, "Enter a valid host/IP and port. Use the separate fields for credentials.", "Manual add proxy", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if ((usernameBox.Text.Length > 0 || passwordBox.Password.Length > 0) && scheme != "http")
+        {
+            AppDialog.Show(this, "Browser proxy authentication requires HTTP. SOCKS authentication is not supported.", "Manual add proxy", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (usernameBox.Text.Length == 0 && passwordBox.Password.Length > 0)
+        {
+            AppDialog.Show(this, "Enter a username when specifying a password.", "Manual add proxy", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -100,6 +116,8 @@ public partial class ProxyLibraryWindow : Window
             Scheme = scheme,
             Host = host,
             Port = port,
+            Username = usernameBox.Text,
+            Password = passwordBox.Password,
             CreatedAtUtc = DateTime.UtcNow,
         });
 
@@ -229,7 +247,7 @@ public partial class ProxyLibraryWindow : Window
         try
         {
             var candidates = _workingProxies
-                .Select(entry => new ProxyCandidate(entry.Scheme, entry.Host, entry.Port))
+                .Select(entry => new ProxyCandidate(entry.Scheme, entry.Host, entry.Port, entry.Username, entry.Password))
                 .ToList();
             var progress = new Progress<ProxyTestProgress>(p =>
                 BusyOverlay.Text = $"Testing {p.Tested} / {p.Total} - {p.Found} working");
@@ -248,7 +266,7 @@ public partial class ProxyLibraryWindow : Window
                 token);
             token.ThrowIfCancellationRequested();
 
-            var resultByServer = results.ToDictionary(item => item.Candidate.Server, StringComparer.OrdinalIgnoreCase);
+            var resultByServer = results.ToDictionary(item => item.Candidate.Server, StringComparer.Ordinal);
             foreach (var entry in _workingProxies)
             {
                 if (resultByServer.TryGetValue(entry.Server, out var result))
@@ -369,6 +387,8 @@ public partial class ProxyLibraryWindow : Window
                 Scheme = scheme,
                 Host = host,
                 Port = port,
+                Username = item.Username,
+                Password = item.Password,
                 Country = item.Country.Trim(),
                 LatencyMs = item.LatencyMs,
                 IsWorking = item.IsWorking,

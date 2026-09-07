@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using System.Net;
 
 namespace TbotUltra.Worker.Infrastructure;
 
@@ -62,12 +63,12 @@ public static class ProxyParser
             var colonIndex = credentials.IndexOf(':');
             if (colonIndex >= 0)
             {
-                username = credentials[..colonIndex];
-                password = credentials[(colonIndex + 1)..];
+                username = Uri.UnescapeDataString(credentials[..colonIndex]);
+                password = Uri.UnescapeDataString(credentials[(colonIndex + 1)..]);
             }
             else
             {
-                username = credentials;
+                username = Uri.UnescapeDataString(credentials);
             }
         }
 
@@ -95,6 +96,32 @@ public static class ProxyParser
         }
 
         return true;
+    }
+
+    /// <summary>Serializes proxy credentials for storage/transport, never for display.</summary>
+    public static string BuildServer(string scheme, string host, int port, string? username = null, string? password = null)
+    {
+        var credentials = string.IsNullOrEmpty(username) && string.IsNullOrEmpty(password)
+            ? string.Empty
+            : $"{Uri.EscapeDataString(username ?? string.Empty)}:{Uri.EscapeDataString(password ?? string.Empty)}@";
+        return $"{scheme}://{credentials}{host.Trim()}:{port}";
+    }
+
+    /// <summary>Uses the same credential parsing for HTTP probes as for Playwright.</summary>
+    public static WebProxy BuildWebProxy(string server)
+    {
+        if (!TryBuild(server, out var proxy, out _))
+        {
+            throw new ArgumentException("Proxy must include a host.", nameof(server));
+        }
+
+        var address = proxy!.Server.Contains("://", StringComparison.Ordinal)
+            ? proxy.Server : $"http://{proxy.Server}";
+        return new WebProxy(new Uri(address))
+        {
+            Credentials = proxy.Username is null && proxy.Password is null
+                ? null : new NetworkCredential(proxy.Username ?? string.Empty, proxy.Password ?? string.Empty),
+        };
     }
 
     /// <summary>

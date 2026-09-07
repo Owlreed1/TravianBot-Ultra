@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using TbotUltra.Worker;
+using TbotUltra.Worker.Infrastructure;
 
 namespace TbotUltra.Desktop.Services;
 
@@ -26,6 +27,8 @@ public sealed class ProxyLibraryEntry : INotifyPropertyChanged
     private string _scheme = "socks5";
     private string _host = string.Empty;
     private int _port;
+    private string _username = string.Empty;
+    private string _password = string.Empty;
     private string _country = string.Empty;
     private long? _latencyMs;
     private bool? _isWorking;
@@ -86,6 +89,26 @@ public sealed class ProxyLibraryEntry : INotifyPropertyChanged
                 OnPropertyChanged(nameof(HostPort));
                 OnPropertyChanged(nameof(DisplayName));
             }
+        }
+    }
+
+    public string Username
+    {
+        get => _username;
+        set
+        {
+            if (SetField(ref _username, value ?? string.Empty, nameof(Username)))
+                OnPropertyChanged(nameof(Server));
+        }
+    }
+
+    public string Password
+    {
+        get => _password;
+        set
+        {
+            if (SetField(ref _password, value ?? string.Empty, nameof(Password)))
+                OnPropertyChanged(nameof(Server));
         }
     }
 
@@ -155,10 +178,10 @@ public sealed class ProxyLibraryEntry : INotifyPropertyChanged
     }
 
     [JsonIgnore]
-    public string Server => $"{NormalizeScheme(Scheme)}://{Host.Trim()}:{Port}";
+    public string Server => ProxyParser.BuildServer(NormalizeScheme(Scheme), Host, Port, Username, Password);
 
     [JsonIgnore]
-    public string HostPort => $"{Host.Trim()}:{Port}";
+    public string HostPort => ProxyParser.MaskForLog($"{Host.Trim()}:{Port}");
 
     [JsonIgnore]
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? HostPort : $"{Name.Trim()} — {HostPort}";
@@ -209,6 +232,8 @@ public sealed class ProxyLibraryEntry : INotifyPropertyChanged
             Scheme = Scheme,
             Host = Host,
             Port = Port,
+            Username = Username,
+            Password = Password,
             Country = Country,
             LatencyMs = LatencyMs,
             IsWorking = IsWorking,
@@ -346,12 +371,16 @@ public sealed class ProxyLibraryStore
 
     public static ProxyLibraryEntry Upsert(List<ProxyLibraryEntry> entries, ProxyLibraryEntry entry)
     {
+        entry = entry.Clone();
+        MigrateInlineCredentials(entry);
         if (!TryCanonicalize(entry.Server, out var scheme, out var host, out var port))
         {
             throw new InvalidOperationException("Proxy must include host and valid port.");
         }
 
-        var existing = entries.FirstOrDefault(item => SameServer(item, scheme, host, port));
+        var existing = entries.FirstOrDefault(item => SameServer(item, scheme, host, port)
+            && string.Equals(item.Username, entry.Username, StringComparison.Ordinal)
+            && string.Equals(item.Password, entry.Password, StringComparison.Ordinal));
         if (existing is not null)
         {
             if (!string.IsNullOrWhiteSpace(entry.Name))
@@ -392,8 +421,11 @@ public sealed class ProxyLibraryStore
 
     public static ProxyLibraryEntry? FindByServer(IEnumerable<ProxyLibraryEntry> entries, string? server)
     {
+        ProxyParser.TryBuild(server, out var proxy, out _);
         return TryCanonicalize(server, out var scheme, out var host, out var port)
-            ? entries.FirstOrDefault(item => SameServer(item, scheme, host, port))
+            ? entries.FirstOrDefault(item => SameServer(item, scheme, host, port)
+                && string.Equals(item.Username, proxy?.Username ?? string.Empty, StringComparison.Ordinal)
+                && string.Equals(item.Password, proxy?.Password ?? string.Empty, StringComparison.Ordinal))
             : null;
     }
 
@@ -421,20 +453,22 @@ public sealed class ProxyLibraryStore
 
     public static ProxyReuseClassification ClassifyReuse(IEnumerable<ProxyLibraryEntry> entries, string? server, string? currentAccountName)
     {
-        var entry = FindByServer(entries, server);
-        if (entry is null)
+        if (!TryCanonicalize(server, out var scheme, out var host, out var port))
         {
             return ProxyReuseClassification.Ok;
         }
 
+        // Different credentials may share one exit. Preserve endpoint-level reuse protection.
+        var matches = entries.Where(item => SameServer(item, scheme, host, port)).ToList();
         var current = currentAccountName?.Trim() ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(entry.AssignedAccount)
-            && !string.Equals(entry.AssignedAccount, current, StringComparison.OrdinalIgnoreCase))
+        var locked = matches.Where(item => !string.IsNullOrWhiteSpace(item.AssignedAccount)
+            && !string.Equals(item.AssignedAccount, current, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (locked.Count > 0)
         {
-            return new ProxyReuseClassification(ProxyReuse.LockedToOther, new[] { entry.AssignedAccount! });
+            return new ProxyReuseClassification(ProxyReuse.LockedToOther, locked.Select(item => item.AssignedAccount!).Distinct(StringComparer.OrdinalIgnoreCase).ToList());
         }
 
-        var others = entry.UsedByAccounts
+        var others = matches.SelectMany(item => item.UsedByAccounts)
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .Where(item => !string.Equals(item.Trim(), current, StringComparison.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -498,6 +532,7 @@ public sealed class ProxyLibraryStore
         var result = new List<ProxyLibraryEntry>();
         foreach (var entry in entries)
         {
+            MigrateInlineCredentials(entry);
             if (!TryCanonicalize(entry.Server, out var scheme, out var host, out var port))
             {
                 continue;
@@ -517,6 +552,29 @@ public sealed class ProxyLibraryStore
         }
 
         return result.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static void MigrateInlineCredentials(ProxyLibraryEntry entry)
+    {
+        var atIndex = entry.Host.LastIndexOf('@');
+        if (atIndex < 0)
+            return;
+
+        var legacyHost = entry.Host;
+        if (!ProxyParser.TryBuild($"{entry.Scheme}://{legacyHost}:{entry.Port}", out var proxy, out _))
+            return;
+
+        if (string.IsNullOrEmpty(entry.Username) && string.IsNullOrEmpty(entry.Password))
+        {
+            entry.Username = proxy!.Username ?? string.Empty;
+            entry.Password = proxy.Password ?? string.Empty;
+        }
+        entry.Host = legacyHost[(atIndex + 1)..];
+        entry.Name = entry.Name.Replace(legacyHost, entry.Host, StringComparison.Ordinal);
+        // Previous credential-free checks cannot establish the status of this connection.
+        entry.IsWorking = null;
+        entry.LastFailureUtc = null;
+        Debug.WriteLine("[proxylib] migrated inline proxy credentials to separate fields.");
     }
 
     private static bool SameServer(ProxyLibraryEntry entry, string scheme, string host, int port)
