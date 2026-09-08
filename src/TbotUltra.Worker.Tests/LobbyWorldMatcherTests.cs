@@ -99,6 +99,14 @@ public sealed class LobbyWorldMatcherTests
                 "https://ts50.x5.arabics.travian.com"));
     }
 
+    [Fact]
+    public void IsConfiguredGameOrigin_DoesNotTreatChooseInLobbyAsAReachedGameWorld()
+    {
+        Assert.False(TravianClient.IsConfiguredGameOrigin(
+            "https://lobby.legends.travian.com/account",
+            "https://lobby.legends.travian.com"));
+    }
+
     [Theory]
     [InlineData("https://schild.x3.netherlands.travian.com/dorf1.php", true, "https://schild.x3.netherlands.travian.com")]
     [InlineData("https://unitexd.x1.balkans.travian.com/dorf2.php", true, "https://unitexd.x1.balkans.travian.com")]

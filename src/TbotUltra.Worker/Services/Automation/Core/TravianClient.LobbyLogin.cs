@@ -873,7 +873,11 @@ public sealed partial class TravianClient
 
     internal static bool IsConfiguredGameOrigin(string? url, string serverUrl)
     {
-        return Uri.TryCreate(url, UriKind.Absolute, out var landed)
+        // "Choose in lobby" uses the lobby as the temporary configured base URL. The lobby must never
+        // count as a reached game origin, otherwise its own navigation after Play now is accepted as
+        // success before the selected world's redirect commits.
+        return TryResolveOfficialGameOrigin(url, out _)
+            && Uri.TryCreate(url, UriKind.Absolute, out var landed)
             && Uri.TryCreate(serverUrl, UriKind.Absolute, out var configured)
             && landed.Scheme.Equals(configured.Scheme, StringComparison.OrdinalIgnoreCase)
             && landed.Host.Equals(configured.Host, StringComparison.OrdinalIgnoreCase)
