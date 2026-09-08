@@ -1006,6 +1006,9 @@ public partial class MainWindow
 
         var wasEnabled = option.IsEnabled;
         option.IsEnabled = toggle.IsChecked == true;
+        // Persist the selected village before evaluating or stopping active work. Queue execution reads
+        // this store as the authority, so the new value must be visible before a canceled run can restart.
+        SaveAutomationLoopGroupsForSelectedVillage();
         if (wasEnabled
             && !option.IsEnabled
             && string.Equals(option.TaskName, QueueGroupCatalog.GetKey(QueueGroup.Hero), StringComparison.OrdinalIgnoreCase))
@@ -1017,14 +1020,37 @@ public partial class MainWindow
             }
         }
 
+        QueueItem? activeDisabledItem = null;
         if (!option.IsEnabled
             && QueueGroupCatalog.TryParse(option.TaskName, out var disabledGroup)
-            && GetActiveContinuousLoopGroup() == disabledGroup
-            && IsContinuousLoopRunning())
+            && selectedVillage is not null)
         {
-            _restartContinuousLoopAfterStop = HasEnabledContinuousLoopGroupsExcept(disabledGroup);
+            var selectedVillageKey = _villageSettingsStore.ResolveCanonicalKey(selectedVillage.Key)
+                ?? selectedVillage.Key;
+            activeDisabledItem = _botService.GetQueueItemsForDisplay()
+                .FirstOrDefault(item => AutomationGroupDisablePolicy.ShouldCancelRunningItem(
+                    item,
+                    disabledGroup,
+                    _villageSettingsStore.ResolveCanonicalKey(GetQueueItemVillageKey(item))
+                        ?? GetQueueItemVillageKey(item),
+                    selectedVillageKey));
+        }
+
+        if (activeDisabledItem is not null)
+        {
+            if (IsContinuousLoopRunning())
+            {
+                // Keep the bot running when another village still has this group (or another group)
+                // enabled. The restarted selector will leave this village's disabled item queued.
+                _restartContinuousLoopAfterStop = HasAnyEnabledContinuousLoopGroups();
+            }
+            else if (_autoQueueRunning)
+            {
+                _restartAutoQueueAfterSettingsChange = true;
+            }
+
             RequestAutomationStop(AutomationStopMode.CancelCurrentAction);
-            AppendLog($"{QueueGroupCatalog.GetTitle(disabledGroup)} group disabled. Stopping current loop task.");
+            AppendLog($"{QueueGroupCatalog.GetTitle(activeDisabledItem.Group)} group disabled for '{selectedVillage!.Name}'. Stopping its current task.");
         }
 
         if (option.IsEnabled
@@ -1073,9 +1099,6 @@ public partial class MainWindow
 
         RefreshAutomationLoopDashboardUi();
         PersistAutomationLoopTasksToConfig();
-        // Save these group toggles as the selected village's per-village override before waking
-        // the loop, so runtime-item generation reads the new value immediately.
-        SaveAutomationLoopGroupsForSelectedVillage();
         if (QueueGroupCatalog.TryParse(option.TaskName, out var toggledGroup)
             && toggledGroup == QueueGroup.BreweryCelebration)
         {

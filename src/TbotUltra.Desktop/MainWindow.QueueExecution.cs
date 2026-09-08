@@ -406,6 +406,14 @@ public partial class MainWindow
         QueueExecutionMode mode,
         CancellationToken cancellationToken)
     {
+        // Settings may change after the scheduler selected this item. Re-check at the final execution
+        // boundary so a disabled village/group cannot transition to Running or reach the browser.
+        if (!IsQueueItemAllowedByAutomationSettings(item))
+        {
+            AppendLog($"{logPrefix} SKIP task={item.TaskName}, id={item.Id} because automation is disabled for its village.");
+            return true;
+        }
+
         using var logContext = AutomationLogContext.BeginScope(
             account: _accountStore.ActiveAccountName(),
             task: item.TaskName,
@@ -459,6 +467,15 @@ public partial class MainWindow
 
         try
         {
+            // Close the narrow race where the setting changes between the pre-check above and the
+            // Running transition. Once Running, the toggle handler also cancels this run immediately.
+            if (!IsQueueItemAllowedByAutomationSettings(item))
+            {
+                _botService.MarkQueueItemDeferred(item.Id, TimeSpan.Zero);
+                AppendLog($"{logPrefix} SKIP task={item.TaskName}, id={item.Id} because automation was disabled for its village before execution.");
+                return true;
+            }
+
             if (TryHandleUpgradeWaitingForConstruct(item, logPrefix, tickSw))
             {
                 return true;

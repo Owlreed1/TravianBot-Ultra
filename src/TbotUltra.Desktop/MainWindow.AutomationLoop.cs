@@ -30,20 +30,10 @@ public partial class MainWindow
         RunOrPostToUi(Apply);
     }
 
-    private QueueGroup? GetActiveContinuousLoopGroup()
+    private bool HasAnyEnabledContinuousLoopGroups()
     {
-        var taskName = _activeAutomationTaskName;
-        if (string.IsNullOrWhiteSpace(taskName))
-        {
-            return null;
-        }
-
-        return QueueGroupCatalog.ResolveGroup(taskName);
-    }
-
-    private bool HasEnabledContinuousLoopGroupsExcept(QueueGroup excludedGroup)
-    {
-        return GetContinuousLoopEnabledGroupsInOrder().Any(group => group != excludedGroup);
+        return GetContinuousLoopConsideredGroupsInOrder()
+            .Any(group => group is not QueueGroup.Account and not QueueGroup.Demolish);
     }
 
     private bool IsContinuousLoopRunning()

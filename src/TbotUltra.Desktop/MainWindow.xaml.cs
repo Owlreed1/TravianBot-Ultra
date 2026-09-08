@@ -350,6 +350,7 @@ public partial class MainWindow : Window
     private bool _restartContinuousLoopAfterStop;
     private bool _startContinuousLoopAfterQueueStop;
     private bool _restartAutoQueueAfterLanguageGate;
+    private bool _restartAutoQueueAfterSettingsChange;
 
     /// <summary>
     /// Public accessor so the Buildings panel can bind to the buildings view

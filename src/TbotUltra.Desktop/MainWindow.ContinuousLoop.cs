@@ -1010,18 +1010,20 @@ public partial class MainWindow
             }
 
             _startContinuousLoopAfterQueueStop = false;
-            if (_restartAutoQueueAfterLanguageGate
+            if ((_restartAutoQueueAfterLanguageGate || _restartAutoQueueAfterSettingsChange)
                 && _isLoggedIn
                 && !_uiBusy
                 && !_autoQueueRunning
                 && !IsContinuousLoopRunning())
             {
                 _restartAutoQueueAfterLanguageGate = false;
+                _restartAutoQueueAfterSettingsChange = false;
                 _ = TriggerQueueAutoRunAsync();
                 return;
             }
 
             _restartAutoQueueAfterLanguageGate = false;
+            _restartAutoQueueAfterSettingsChange = false;
         });
     }
 

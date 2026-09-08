@@ -1126,6 +1126,7 @@ public partial class MainWindow
         _activeManualExecution = null;
         _activeAutomationTaskName = null;
         _activeFunctionDisplayName = null;
+        _restartAutoQueueAfterSettingsChange = false;
 
         // Return login/session state to startup: not logged in, browser closed, inbox idle.
         _isLoggedIn = false;
