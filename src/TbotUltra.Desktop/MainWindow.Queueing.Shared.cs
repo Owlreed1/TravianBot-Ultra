@@ -103,12 +103,6 @@ public partial class MainWindow
     private int RemoveSmithyQueueItemsForVillage(string? villageName)
         => RemoveQueueItemsForVillage("upgrade_troops_at_smithy", villageName);
 
-    // Same rationale as the Smithy version, for build_troops: a queued item carries the OLD per-village
-    // troop-training snapshot, and the loop won't re-enqueue while it is active, so drop it after the user
-    // changes that village's training settings. Pass null to clear build_troops items for every village.
-    private int RemoveTroopTrainingQueueItemsForVillage(string? villageName)
-        => RemoveQueueItemsForVillage("build_troops", villageName);
-
     private int RemoveTownHallQueueItemsForVillage(string? villageName)
         => RemoveQueueItemsForVillage("run_town_hall_celebration", villageName);
 

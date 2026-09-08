@@ -51,6 +51,11 @@ public sealed class TroopTrainingMaximumSubmitSourceTests
         Assert.Contains("for (var submitAttempt = 1; submitAttempt <= submitAttempts; submitAttempt++)", submitBody, StringComparison.Ordinal);
         Assert.Contains("await WaitForPageReadyAsync(cancellationToken);", submitBody, StringComparison.Ordinal);
         Assert.Contains("form auto-refreshed", submitBody, StringComparison.OrdinalIgnoreCase);
+        var guard = submitBody.IndexOf("TroopTrainingExecutionSettings.VerifyBeforeSubmit();", StringComparison.Ordinal);
+        var click = submitBody.IndexOf("await submitButton.ClickAsync();", StringComparison.Ordinal);
+        var pacing = submitBody.LastIndexOf("await DelayBeforeClickAsync", StringComparison.Ordinal);
+        Assert.True(pacing >= 0 && guard > pacing && click > guard,
+            "Saved training settings must be checked after pacing and before the Train click.");
     }
 
     [Fact]

@@ -1302,6 +1302,8 @@ public sealed partial class TravianClient : ITrainingClient
                     continue;
                 }
 
+                TroopTrainingExecutionSettings.VerifyBeforeSubmit();
+                cancellationToken.ThrowIfCancellationRequested();
                 await submitButton.ClickAsync();
                 Notify($"[troops:verbose] submit:clicked Train button for '{inputName}' with parsedValue={finalValue.Value} on attempt {submitAttempt}/{submitAttempts}.");
                 return true;

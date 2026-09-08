@@ -837,7 +837,7 @@ public partial class MainWindow
     /// <summary>
     /// Opens the quick per-village troop-training settings popup for all known villages. The popup only
     /// edits each building's enabled/troop choice and preserves advanced settings from the village override
-    /// or global defaults. Stale build_troops queue items are dropped so the loop re-enqueues fresh payloads.
+    /// or global defaults. Pending build_troops items receive the saved rules while retaining their deadlines.
     /// Called by the Troops panel's "Troop settings" button.
     /// </summary>
     // Top-bar "Troop settings" button (always visible). Opens the same per-village training overview as
@@ -920,20 +920,19 @@ public partial class MainWindow
         {
             _troopTrainingPanelService.SaveVillageSettings(account, result.VillageKey, result.Settings);
             CacheDashboardTroopTrainingPayload(account, result.VillageKey, result.Settings);
+            RefreshQueuedTroopTrainingSettings(result.VillageKey, result.Settings);
             var village = villages.FirstOrDefault(v => string.Equals(v.Key, result.VillageKey, StringComparison.OrdinalIgnoreCase))
                 ?? new VillageSettingsStore.VillageKeyInfo(result.VillageKey, result.VillageName, null, null, false);
             PersistBuildTroopsGroupEnabled(village, result.IsBuildTroopsEnabled, troopTrainingGroupKey);
             UpdateVillageSettingsBuildTroopsRow(villageSettingsRows, result, troopTrainingGroupKey);
         }
 
-        var removed = RemoveTroopTrainingQueueItemsForVillage(null);
         // Reload the Troops tab from the (possibly just-changed) selected village's override so the
         // two surfaces stay in sync.
         ApplyTroopTrainingForSelectedVillage();
         RequestDashboardVillageProjectionRefresh();
         _troopTrainingViewModel.InfoText = $"Saved troop-training settings for {window.Results.Count} village(s).";
-        AppendLog($"Saved troop-training settings for {window.Results.Count} village(s). "
-            + $"Cleared {removed} queued build_troops task(s) to apply the change.");
+        AppendLog($"Saved troop-training settings for {window.Results.Count} village(s); refreshed pending training tasks.");
     }
 
     private bool ResolveBuildTroopsEnabledForVillage(
@@ -988,7 +987,7 @@ public partial class MainWindow
     /// <summary>
     /// Troops panel's "Sync settings" button. After a confirmation, copies the settings currently shown on
     /// the Troops tab (the building rules / troop / amount / run trigger / checks / fallback) to EVERY
-    /// village's per-village override, and drops stale build_troops queue items so the loop re-enqueues with
+    /// village's per-village override, and refreshes pending build_troops queue items with
     /// the synced settings.
     /// </summary>
     internal void OnTroopsSyncSettingsClicked()
@@ -1050,13 +1049,13 @@ public partial class MainWindow
         foreach (var key in keys)
         {
             CacheDashboardTroopTrainingPayload(account, key, syncedPayload);
+            RefreshQueuedTroopTrainingSettings(key, syncedPayload);
         }
         RequestDashboardVillageProjectionRefresh();
-        var removed = matchingVillages.Sum(village => RemoveTroopTrainingQueueItemsForVillage(village.Name));
         _troopTrainingViewModel.InfoText = $"Synced troop-training settings to {keys.Count} {sourceTribe} village(s); skipped {skippedVillages.Count}.";
         AppendLog($"Synced troop-training settings to {keys.Count} village(s). "
             + $"Skipped {skippedVillages.Count}: {string.Join(", ", skippedVillages)}. "
-            + $"Cleared {removed} queued build_troops task(s) to apply the change.");
+            + "Refreshed pending training tasks for the target villages.");
     }
 
     // Loads the selected village's per-village troop-training override into the Troops tab's building
@@ -1125,12 +1124,33 @@ public partial class MainWindow
             var payload = _troopTrainingViewModel.BuildVillageTrainingPayload();
             _troopTrainingPanelService.SaveVillageSettings(account, key, payload);
             CacheDashboardTroopTrainingPayload(account, key, payload);
+            RefreshQueuedTroopTrainingSettings(key, payload);
             RequestDashboardVillageProjectionRefresh();
         }
         catch (Exception ex)
         {
             AppendLog($"Could not save troop training for selected village: {ex.Message}");
         }
+    }
+
+    private void RefreshQueuedTroopTrainingSettings(string villageKey, TroopTrainingPayload settings)
+    {
+        var canonicalKey = _villageSettingsStore.ResolveCanonicalKey(villageKey) ?? villageKey;
+        foreach (var item in _botService.GetQueueItemsForDisplay()
+            .Where(item => item.Status == QueueStatus.Pending
+                && string.Equals(item.TaskName, "build_troops", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(GetQueueItemVillageKey(item), canonicalKey, StringComparison.OrdinalIgnoreCase)))
+        {
+            var payload = TroopTrainingExecutionSettings.MergePayload(item.Payload, settings);
+            if (ContinuousLoopSelector.PayloadEquals(item.Payload, payload))
+                continue;
+
+            // No delay argument: the server queue/resource deadline remains authoritative.
+            if (_botService.UpdateDeferredQueueItem(item.Id, payload))
+                AppendLog($"[troops] updated pending training selection for village {canonicalKey}, task {item.Id}.");
+        }
+        RequestQueueUiRefresh();
+        RequestContinuousAutomationWake();
     }
 
     // Builds the troop rows for the upgrade-options popup: the tribe's improvable troops (combat + siege,

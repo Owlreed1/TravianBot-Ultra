@@ -10,6 +10,24 @@ public sealed class TroopTrainingSettingsStoreTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "tbot_tt_" + Guid.NewGuid().ToString("N"));
 
     [Fact]
+    public void SavedSelectionChange_InvalidatesOnlyTheExecutingVillageAndSurvivesReload()
+    {
+        TroopTrainingSettingsStore.SaveForVillages(_root, "acc", ["1|2", "3|4"], Make(troop: "Swordsman"));
+        using (TbotUltra.Worker.Services.TroopTrainingExecutionSettings.BeginScope(
+            () => TroopTrainingSettingsStore.Load(_root, "acc", "1|2"), _ => { }))
+        {
+            TroopTrainingSettingsStore.Save(_root, "acc", "3|4", Make(troop: "Phalanx"));
+            TbotUltra.Worker.Services.TroopTrainingExecutionSettings.VerifyBeforeSubmit();
+            TroopTrainingSettingsStore.Save(_root, "acc", "1|2", Make(troop: "Phalanx"));
+            Assert.Throws<TbotUltra.Worker.Services.TaskWaitException>(
+                TbotUltra.Worker.Services.TroopTrainingExecutionSettings.VerifyBeforeSubmit);
+        }
+        var refreshed = TbotUltra.Worker.Services.TroopTrainingExecutionSettings.MergePayload(
+            Make(troop: "Swordsman").ToDictionary(), TroopTrainingSettingsStore.Load(_root, "acc", "1|2"));
+        Assert.Equal("Phalanx", refreshed[TbotUltra.Core.Configuration.BotOptionPayloadKeys.TroopTrainingBarracksTroopType]);
+    }
+
+    [Fact]
     public void Save_Then_Load_RoundTrips()
     {
         var payload = Make(barracksEnabled: true, troop: "Phalanx", fallback: 60);

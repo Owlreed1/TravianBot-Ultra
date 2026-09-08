@@ -412,6 +412,12 @@ public partial class MainWindow
             village: GetQueueItemVillageName(item),
             villageKey: GetQueueItemVillageKey(item));
         var tickSw = Stopwatch.StartNew();
+        var trainingAccount = _accountStore.ActiveAccountName();
+        var trainingVillageKey = GetQueueItemVillageKey(item);
+        using var trainingSettings = string.Equals(item.TaskName, "build_troops", StringComparison.OrdinalIgnoreCase)
+            ? TroopTrainingExecutionSettings.BeginScope(
+                () => TroopTrainingSettingsStore.Load(_projectRoot, trainingAccount, trainingVillageKey), AppendLog)
+            : null;
         if (string.Equals(item.TaskName, "hero_manage", StringComparison.OrdinalIgnoreCase)
             || string.Equals(item.TaskName, "spend_hero_attribute_points", StringComparison.OrdinalIgnoreCase))
         {

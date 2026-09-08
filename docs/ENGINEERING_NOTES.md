@@ -612,6 +612,11 @@ Published artifacts belong under `artifacts/`, never beside source files.
 - New Build troops settings default all three training buildings to `% resources` at 90%, with Wood, Clay and Iron
   selected and Crop unselected. Troop-settings sync copies all three building rules plus shared resource/fallback
   settings from one source village to selected targets, but never changes a target village's Build troops ON toggle.
+  Saved village training rules are authoritative for the next order. Refresh pending payloads by canonical village
+  key without deleting tasks or resetting their deadlines; paused tasks resolve the latest rules on execution too.
+  Capture the task account/village at execution, override stale queued training rules, and check the saved snapshot
+  again after click pacing immediately before Train. A changed snapshot defers normally without clicking; orders
+  already submitted to Travian remain untouched.
 - Build troops `maximum` amount mode must click Travian's numeric `.details .cta a[href='#']` shortcut beside the
   selected troop input and verify Travian filled the advertised amount; do not type that maximum manually. The
   existing paced Train-button click remains the submit action after the shortcut succeeds.

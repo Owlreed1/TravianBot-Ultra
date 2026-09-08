@@ -615,10 +615,8 @@ public partial class MainWindow : Window
         _troopTrainingDeferredRefreshDebounceTimer.Tick += (_, _) =>
         {
             _troopTrainingDeferredRefreshDebounceTimer.Stop();
-            // The user changed troop-training settings. A queued build_troops item still carries the OLD
-            // per-village snapshot and the loop won't re-enqueue while it is active, so drop the selected
-            // village's item to force a fresh enqueue with the new settings (e.g. a lowered % threshold).
-            RemoveTroopTrainingQueueItemsForVillage(GetSelectedVillageName());
+            // Settings saves already refresh the target village's payload without deleting its task.
+            // Re-evaluate resource waits from the live snapshot (e.g. a lowered % threshold).
             if (_lastResourceStatusForUi is not null)
             {
                 TriggerDeferredTroopTrainingWaitRefresh(_lastResourceStatusForUi, "troop_config_changed", force: true);

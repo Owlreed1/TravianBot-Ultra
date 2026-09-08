@@ -7,7 +7,10 @@ internal static class QueueExecutionOptionsResolver
 {
     internal static BotOptions Resolve(BotOptions currentOptions, QueueItem item)
     {
-        var resolved = BotOptionsPayloadApplier.Apply(currentOptions, item.Payload);
+        var payload = string.Equals(item.TaskName, "build_troops", StringComparison.OrdinalIgnoreCase)
+            ? TroopTrainingExecutionSettings.ResolvePayload(item.Payload)
+            : item.Payload;
+        var resolved = BotOptionsPayloadApplier.Apply(currentOptions, payload);
         if (IsHeroManageTask(item.TaskName))
         {
             // hero_manage can remain deferred for hours while HP regenerates or the Hero is away.
